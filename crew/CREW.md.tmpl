@@ -49,9 +49,15 @@ An update is internal (staff only) unless you pass `--customer`. An empty body, 
 
 `BASE` is the board app ({{board.url}}), `APP` is the product under test ({{product.appUrl}}).
 
-`get_task` gives the 5 newest updates of a card, newest first. To catch up on a card you read before, pass
-`"since": "<newest update id you have>"`: that gives everything after it, oldest first, nothing skipped. Do not read a
-card again while what you have is still current.
+Reading a card's updates with `get_task` (it returns the card in full, but only part of its `updates`):
+
+1. First read: `{"id": "<card id>"}` gives the 5 newest updates, newest first. The newest is the FIRST one in
+   `updates`. Remember its `id`.
+2. Need the older ones? When `updatesMatched` is bigger than `updatesShown`, there are more. Read the thread from its
+   start with `{"id": "<card id>", "order": "oldest", "limit": 200}`.
+3. Read the card again when an event or notification is about it, and before you move it or post on it. Pass the id
+   you remembered: `{"id": "<card id>", "since": "<that id>"}`. You get every newer update, oldest first, none
+   skipped. The newest is now the LAST one in `updates`. Remember its `id` for next time.
 
 The agent tools you will use most: `get_board`, `get_task`, `my_tasks`, `create_task`
 (pass `assignee` as a person's name), `update_task`, `move_task`, `post_task_update` (the
@@ -354,7 +360,8 @@ Use `browser` to look and check. Use `run` (Playwright, below) for a script that
 
 1. `my_tasks`, then `get_board`. Take the highest-priority task in **To do** that is yours and
    unblocked; `move_task` it to **In progress**. Read its whole thread once, from the start: `get_task` with
-   `"order": "oldest", "limit": 200`. After that, catch up with `"since": "<newest update id you have>"`.
+   `"order": "oldest", "limit": 200`. The newest is the LAST one in `updates`: remember its `id`, and after that
+   read the card with `"since": "<that id>"`.
 2. Do the work inside your owned files. Test it in your browser. Lint it.
 3. `attach` a screenshot, then post an update from a file (`update`, see "Your tool") with: what you built, the files you changed,
    how you tested it, anything left over. Log your time (rule 7c). If a person sees the change, add
