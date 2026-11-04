@@ -70,6 +70,22 @@ export function forkTeamCrew(teamId: string, linkId: string, rotate: boolean): P
   return $fetch<ForkResult>(`/api/teams/${teamId}/crews/${linkId}/fork`, { method: 'POST', body: { rotate } })
 }
 
+/** `forks-<crew>-<board>.json`: the file Boss hands to `init.mjs --forks`. */
+export function forkFileName(result: ForkResult): string {
+  const board = result.board.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'board'
+  return `forks-${result.crew.slug}-${board}.json`
+}
+
+/** Saves the whole answer, passwords included, as the file the crew kit reads. */
+export function downloadForkFile(result: ForkResult): void {
+  const url = URL.createObjectURL(new Blob([`${JSON.stringify(result, null, 2)}\n`], { type: 'application/json' }))
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = forkFileName(result)
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
+
 export function unforkTeamCrew(teamId: string, linkId: string): Promise<{ ok: true }> {
   return $fetch<{ ok: true }>(`/api/teams/${teamId}/crews/${linkId}/fork`, { method: 'DELETE' })
 }

@@ -99,8 +99,11 @@ async function copySkill() {
           size="xs"
           aria-label="Back to settings"
         />
-        <h1 class="font-semibold text-sm">
+        <h1 class="flex items-center gap-1.5 font-semibold text-sm">
           Sprocket
+          <HelpHint page="agents/sprocket">
+            Sprocket answers in the chat panel with exactly your permissions. It can search the help, so ask it how something works.
+          </HelpHint>
         </h1>
       </div>
     </div>

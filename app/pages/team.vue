@@ -558,8 +558,11 @@ async function saveColumns(names: string[]) {
             <!-- Customers -->
             <template v-else-if="section === 'customers'">
               <div class="flex items-center justify-between gap-3">
-                <p class="text-xs text-muted">
-                  Customers group projects and log in to follow them. They see only the tasks you share with them.
+                <p class="flex items-start gap-1.5 text-xs text-muted">
+                  <span>Customers group projects and log in to follow them. They see only the tasks you share with them.</span>
+                  <HelpHint page="team/customers-and-contacts">
+                    A customer is a client with projects and logins of their own. A new task is shared with the customer by default, so check what a board shows before you file it under one.
+                  </HelpHint>
                 </p>
                 <UButton
                   size="sm"
@@ -595,8 +598,11 @@ async function saveColumns(names: string[]) {
 
             <!-- Board defaults -->
             <template v-else-if="section === 'boards'">
-              <p class="text-xs text-muted">
-                A new board of this team starts with these columns, in this order. Boards that already exist keep theirs.
+              <p class="flex items-start gap-1.5 text-xs text-muted">
+                <span>A new board of this team starts with these columns, in this order. Boards that already exist keep theirs.</span>
+                <HelpHint page="team/board-defaults">
+                  Changing these only affects boards made from now on. A team rule that names a column skips every board that has no column of that name.
+                </HelpHint>
               </p>
               <div
                 v-if="!settings"

@@ -147,7 +147,7 @@ function menuItems(project: Project) {
     manage.push({
       label: 'Give it a crew',
       icon: 'i-lucide-users-round',
-      onSelect: () => { void navigateTo({ path: '/team', query: { section: 'crews', board: project.id } }) }
+      onSelect: () => { void navigateTo({ path: '/team', query: { section: 'crews', board: project.id, wizard: '1' } }) }
     })
   }
   return [pin, manage, [

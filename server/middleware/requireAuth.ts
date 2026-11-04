@@ -20,7 +20,8 @@ const PROTECTED_PREFIXES = [
   '/api/timer',
   '/api/customers',
   '/api/admin',
-  '/api/github'
+  '/api/github',
+  '/api/help'
 ]
 
 // GitHub calls this itself, so it carries no session. It proves who it is with the

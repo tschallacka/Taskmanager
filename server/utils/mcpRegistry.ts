@@ -7,6 +7,7 @@ import { MCP_BOARD_TOOLS } from './mcpBoardTools'
 import { MCP_FIELD_TOOLS } from './mcpFieldTools'
 import { MCP_GITHUB_TOOLS } from './mcpGithubTools'
 import { MCP_GOAL_TOOLS } from './mcpGoalTools'
+import { MCP_HELP_TOOLS } from './mcpHelpTools'
 import { MCP_ME_TOOLS } from './mcpMeTools'
 import { MCP_MESSAGE_TOOLS } from './mcpMessageTools'
 import { MCP_RULE_TOOLS } from './mcpRuleTools'
@@ -21,6 +22,7 @@ export const MCP_TOOLS: McpToolDefinition[] = [
   ...MCP_FIELD_TOOLS,
   ...MCP_GITHUB_TOOLS,
   ...MCP_GOAL_TOOLS,
+  ...MCP_HELP_TOOLS,
   ...MCP_MESSAGE_TOOLS,
   ...MCP_ME_TOOLS,
   ...MCP_RULE_TOOLS,

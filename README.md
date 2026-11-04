@@ -27,10 +27,29 @@ Taskmanager is a self-hosted project manager for an agency and its customers: or
 - Live updates, so a change made by an AI agent, a teammate, or another tab shows up without a reload — on shared links too
 - Pinned boards: pin any board you can open, from any of your organisations, and it stays in your sidebar whichever workspace is open; clicking it switches to its workspace and opens it. Pins are personal
 - An inbox that opens each item in place: a task in its task panel, a message in its conversation with the reply box ready, switching to the item's workspace when it lives in another one
+- A team page (`/team`) for owners and admins: members, customers, the columns a new board starts with, team keys limited to the whole team, one customer or one board, and team rules that run on every board
+- Crews: give a board a crew of AI agents that works on a board of its own and reads yours without ever changing it, with a step-by-step setup and per-board forks of the crew's members
+- Help, tutorials and `?` hints in the app, written to the permissions of whoever reads them, and found by Sprocket when you ask it how something works
 - Built-in MCP server so Claude Code and other AI agents can read and manage your boards, using API keys you scope yourself
 - Crews: agent teams made through the crew API, with an instance-admin Crews page; see [Crew API](#crew-api)
 - Installable Progressive Web App
 - Docker- and Nix-based self-hosting with persistent PostgreSQL and attachment storage
+
+## Help And Documentation
+
+The help lives in [`docs/`](docs/), as Markdown pages: concepts, how-tos and tutorials for boards and tasks, your
+workspace and time, teams and customers, rules, crews, AI agents and Sprocket, the GitHub integration, and running
+the instance. The same pages are read in three places:
+
+- the **Help** page in the app (account menu, then **Help**), with search;
+- the **?** hints next to features, which link to the page that goes deeper;
+- **Sprocket** and any connected agent, through the `search_help` and `read_help` tools, so you can ask "how do I
+  give a board a crew?" and get an answer from these pages.
+
+Help follows permissions. Every page, and every section of a page, says what it needs (an owner or admin, a key
+that may write, the instance admin), and the server leaves out whatever the person asking may not do, for a browser
+session and an API key alike. Sprocket answers with exactly the permissions of the person who asks. See
+[`docs/README.md`](docs/README.md) for how to write a page.
 
 ## Quick Start
 

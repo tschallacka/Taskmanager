@@ -118,8 +118,11 @@ async function removeEntry(id: string) {
         aria-label="Open sidebar"
         @click="sidebarOpen = true"
       />
-      <h1 class="text-base font-semibold text-default">
+      <h1 class="flex items-center gap-1.5 text-base font-semibold text-default">
         Timesheet
+        <HelpHint page="workspace/timesheet">
+          The time you and your team logged, by day and project. How to start a timer or log time by hand is in the help.
+        </HelpHint>
       </h1>
     </header>
 

@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url'
 import { send, setResponseHeader, setResponseStatus } from 'h3'
 
 // https://nuxt.com/docs/api/configuration/nuxt-config
@@ -34,6 +35,9 @@ export default defineNuxtConfig({
 
   nitro: {
     preset: 'bun',
+    // The help pages in docs/ ship inside the server build, so a deployed instance has the same
+    // pages the repository has. server/utils/helpStore.ts reads them as `assets:docs`.
+    serverAssets: [{ baseName: 'docs', dir: fileURLToPath(new URL('./docs', import.meta.url)) }],
     // In dev, a server error is printed as plain text with its stack and answered
     // as JSON. The default renderer (youch) reads source maps through a
     // WebAssembly parser that traps ("unreachable") on this project's bundles,

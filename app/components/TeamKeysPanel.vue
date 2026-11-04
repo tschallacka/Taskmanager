@@ -152,8 +152,11 @@ const day = (ms: number) => format(new Date(ms), 'd MMM yyyy')
 
 <template>
   <div class="space-y-5 text-sm">
-    <p class="text-xs text-muted">
-      Keys let an AI agent work in this team through MCP. A key limited to one board or one customer reaches only that, and is not given the tools that work across the whole team (goals, portfolios, new boards, the inbox).
+    <p class="flex items-start gap-1.5 text-xs text-muted">
+      <span>Keys let an AI agent work in this team through MCP. A key limited to one board or one customer reaches only that, and is not given the tools that work across the whole team (goals, portfolios, new boards, the inbox).</span>
+      <HelpHint page="team/keys">
+        A key never does more than the person it belongs to. Give each agent its own key with the smallest reach that lets it do its job, and copy the key when it is made: it is shown once.
+      </HelpHint>
     </p>
 
     <!-- The key, once -->

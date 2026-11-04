@@ -140,8 +140,11 @@ async function copy(text: string, id: string) {
           size="xs"
           aria-label="Back to settings"
         />
-        <h1 class="font-semibold text-sm">
+        <h1 class="flex items-center gap-1.5 font-semibold text-sm">
           Connect an AI agent
+          <HelpHint page="agents/connect-claude-code">
+            An agent works with your permissions, through a key you make. The help walks you through connecting Claude Code, step by step.
+          </HelpHint>
         </h1>
       </div>
     </div>

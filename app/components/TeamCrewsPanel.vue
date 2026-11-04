@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { attachTeamCrew, detachTeamCrew, forkTeamCrew, listTeamCrews, unforkTeamCrew } from '~/composables/useTeamCrews'
+import { attachTeamCrew, detachTeamCrew, downloadForkFile, forkTeamCrew, listTeamCrews, unforkTeamCrew } from '~/composables/useTeamCrews'
 import type { ForkResult, TeamCrewLink, TeamCrewsList } from '~/composables/useTeamCrews'
 
 // The crews working on this team's boards. Each one keeps a shadow board of its own, in its own
@@ -148,16 +148,17 @@ const isForkResultOpen = computed({
 
 // The file Boss reads the keys from: the whole answer, passwords included, as it was sent.
 function downloadForks() {
-  const result = forkResult.value
-  if (!result) return
-  const board = result.board.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'board'
-  const url = URL.createObjectURL(new Blob([`${JSON.stringify(result, null, 2)}\n`], { type: 'application/json' }))
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = `forks-${result.crew.slug}-${board}.json`
-  anchor.click()
-  URL.revokeObjectURL(url)
+  if (forkResult.value) downloadForkFile(forkResult.value)
 }
+
+// The guided version of the form above. "Give it a crew" in a board's menu opens it with the board chosen.
+const isWizardOpen = ref(false)
+let wizardAsked = false
+watch(data, (loaded) => {
+  if (wizardAsked || !loaded?.canAttach || route.query.wizard !== '1') return
+  wizardAsked = true
+  isWizardOpen.value = true
+})
 
 const SELECT_CLASS = 'min-w-0 flex-1 rounded-md border border-default bg-default px-2 py-1.5 text-sm text-default outline-none focus:border-primary'
 </script>
@@ -177,9 +178,25 @@ const SELECT_CLASS = 'min-w-0 flex-1 rounded-md border border-default bg-default
       data-team-crew-form
       @submit.prevent="give"
     >
-      <p class="text-xs font-semibold uppercase tracking-wide text-muted">
-        Give a board a crew
-      </p>
+      <div class="flex items-center justify-between gap-2">
+        <p class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
+          Give a board a crew
+          <HelpHint page="crews/give-a-board-a-crew">
+            Pick a board and a crew you made, and the crew gets a board of its own for it. It reads your board and never changes it. The step-by-step version also covers forking the members and handing over their keys.
+          </HelpHint>
+        </p>
+        <UButton
+          v-if="data.crews.length"
+          size="xs"
+          color="neutral"
+          variant="soft"
+          icon="i-lucide-list-checks"
+          data-team-crew-wizard-open
+          @click="isWizardOpen = true"
+        >
+          Step by step
+        </UButton>
+      </div>
       <p
         v-if="data.crews.length === 0"
         class="text-xs text-muted"
@@ -481,5 +498,13 @@ const SELECT_CLASS = 'min-w-0 flex-1 rounded-md border border-default bg-default
         </div>
       </template>
     </UModal>
+
+    <CrewBoardWizard
+      v-model:open="isWizardOpen"
+      :team-id="teamId"
+      :data="data"
+      :board-id="String(route.query.board ?? '') || projectId"
+      @changed="load"
+    />
   </div>
 </template>

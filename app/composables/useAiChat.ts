@@ -293,6 +293,21 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
       await deleteTask(id) // soft delete — restorable from the board's trash
       return { result: { ok: true, id, trashed: true }, label: `Moved task "${row.title}" to trash` }
     }
+    case 'search_help': {
+      // Help is cut to what the person may do on the server, so what comes back is all there is to tell them.
+      const query = String(args.query ?? '').trim()
+      const { hits } = await $fetch<{ hits: { slug: string, title: string, summary: string, snippet: string | null }[] }>('/api/help', { query: { q: query } })
+      return { result: { count: hits.length, pages: hits }, label: `Searched the help "${query}"` }
+    }
+    case 'read_help': {
+      const slug = String(args.slug ?? '').trim()
+      try {
+        const page = await $fetch<{ slug: string, title: string, body: string }>(`/api/help/${slug.split('/').map(encodeURIComponent).join('/')}`)
+        return { result: { slug: page.slug, title: page.title, markdown: page.body }, label: `Read the help "${page.title}"`, url: `/help/${page.slug}` }
+      } catch {
+        return { result: { error: `There is no help page "${slug}" for you. Search to see the pages that exist.` }, label: 'Help page not found' }
+      }
+    }
     default:
       return { result: { error: `Unknown tool: ${name}` }, label: `Unknown tool ${name}` }
   }

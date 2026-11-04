@@ -22,6 +22,11 @@ const accountItems = computed(() => [[
     onSelect: () => navigateTo('/settings')
   },
   {
+    label: 'Help',
+    icon: 'i-lucide-life-buoy',
+    onSelect: () => navigateTo('/help')
+  },
+  {
     label: isDark.value ? 'Light mode' : 'Dark mode',
     icon: isDark.value ? 'i-lucide-sun' : 'i-lucide-moon',
     onSelect: toggleColorMode

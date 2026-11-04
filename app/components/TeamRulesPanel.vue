@@ -116,8 +116,11 @@ function when(ms: number): string {
     data-team-rules
   >
     <div class="flex items-center justify-between gap-3">
-      <p class="text-xs text-muted">
-        A team rule applies to every board of this team and runs before the board's own rules. Boards that lack a column a rule names are skipped.
+      <p class="flex items-start gap-1.5 text-xs text-muted">
+        <span>A team rule applies to every board of this team and runs before the board's own rules. Boards that lack a column a rule names are skipped.</span>
+        <HelpHint page="team/rules">
+          Write a rule once and it runs on every board. A rule is "by name" (columns written as names, people from the team) or "column-free" (nothing that needs a column or a particular person).
+        </HelpHint>
       </p>
       <UButton
         v-if="data?.canManage && editing === null"

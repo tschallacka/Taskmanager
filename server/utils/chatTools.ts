@@ -134,6 +134,34 @@ export const CHAT_TOOLS: ChatToolCallDef[] = [
         required: ['id']
       }
     }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'search_help',
+      description: 'Search the Taskmanager help pages for how something works or how to do it. Returns the best matching pages (slug, title, summary, a line of text). Only pages about what this person may do are searched. Use it before answering any question about Taskmanager itself.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'What to look for, in plain words, e.g. "give a board a crew".' }
+        },
+        required: ['query']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'read_help',
+      description: 'Read one help page in full (Markdown) by the slug search_help returned.',
+      parameters: {
+        type: 'object',
+        properties: {
+          slug: { type: 'string', description: 'The page slug, e.g. "crews/give-a-board-a-crew".' }
+        },
+        required: ['slug']
+      }
+    }
   }
 ]
 
@@ -151,6 +179,7 @@ Guidelines:
 - When editing, always pass complete replacement values for description and tags, not deltas.
 - Use "- [ ]" checklist items when the user wants a checklist in a task description.
 - Diagrams and charts are fenced code blocks, in replies as well as in task descriptions: a \`\`\`mermaid block (flowchart, sequenceDiagram, gantt, …) is drawn as a diagram; a \`\`\`chart block is drawn as a simple chart. A chart block is a few lines: "type: bar" (or line, pie), optional "title: …", "labels: a, b, c" for the x axis or the pie slices, then one "Series name: 1, 2, 3" line per series. Prefer a chart block over a table when the user asks to visualise numbers, and a mermaid block when they ask for a diagram, flow or timeline.
+- For a question about Taskmanager itself, such as how to do something, what a feature is or where a setting lives, call search_help first and read the best page with read_help, then answer from it and name the page. The help only holds what this person may do, so a feature it does not mention is not theirs to use: say you cannot help with that here rather than describing it from memory. Never reveal or work around something their permissions keep from them.
 - delete_task only moves a task to the trash, where the user can restore it — confirm intent in your reply, not with an extra question, when the request was explicit.
 
 Dates are YYYY-MM-DD. Be concise, use markdown, and reply in the user's language.`
