@@ -14,9 +14,10 @@ const { db } = await import('../server/db')
 const schema = await import('../server/db/schema')
 const { crews, member, organization, projectColumns, projectTasks, projects, user } = schema
 const { attachCrew } = await import('../server/utils/crewBoards')
-const { GRANT_READABLE_TOOLS, mayUseReadGrant, readGrantedBoardIds } = await import('../server/utils/crewBoardAccess')
+const { GRANT_READABLE_TOOLS, isStaffOfShadowedBoard, mayUseReadGrant, readGrantedBoardIds, shadowBoardForStaff } = await import('../server/utils/crewBoardAccess')
 const { boardFilter, audienceOf } = await import('../server/utils/mcpAccess')
 const { MCP_TOOLS } = await import('../server/utils/mcpRegistry')
+const { requireProject } = await import('../server/utils/projects')
 
 const tag = randomBytes(4).toString('hex')
 const id = (name: string) => `tca-${tag}-${name}`
@@ -75,8 +76,9 @@ const boardIds = async (context: ReturnType<typeof keyOf> & { readGrantedBoardId
 
 test('only a crew account has a read reach, and only on the boards its crew was given', async () => {
   assert.deepEqual(await readGrantedBoardIds(keyOf(crewMember, crewTeam)), [realBoard])
-  assert.deepEqual(await readGrantedBoardIds(keyOf(boss, realTeam)), [])
-  assert.deepEqual(await readGrantedBoardIds(keyOf(stranger, realTeam)), [])
+  // The real board's staff read its shadow board; they have no read reach on the real board beyond their own.
+  assert.deepEqual(await readGrantedBoardIds(keyOf(boss, realTeam)), [shadowBoard])
+  assert.deepEqual(await readGrantedBoardIds({ ...keyOf(stranger, realTeam), teamId: null }), [])
 })
 
 test('a key limited to the shadow board reads only the real board that shadow is linked to', async () => {
@@ -127,4 +129,52 @@ test('a write on the real board with the key of a crew member is refused: the bo
   )
   const rows = await db.select({ id: projectTasks.id }).from(projectTasks).where(eq(projectTasks.projectId, realBoard))
   assert.equal(rows.length, 1)
+})
+
+// ─── The staff of the real board reading the crew's shadow board (browser and key) ───
+
+const eventOf = (userId: string, activeTeamId: string | null, method = 'GET') =>
+  ({ method, context: { session: { user: { id: userId }, session: { activeOrganizationId: activeTeamId } } } }) as unknown as Parameters<typeof requireProject>[0]
+
+test('the staff of the real board open its shadow board, read-only and as staff', async () => {
+  const opened = await requireProject(eventOf(boss, realTeam), shadowBoard)
+  assert.equal(opened.id, shadowBoard)
+  assert.equal(opened.readOnly, true)
+  assert.equal(opened.audience, 'staff')
+})
+
+test('every request that is not a read is refused on a shadow board', async () => {
+  for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
+    await assert.rejects(requireProject(eventOf(boss, realTeam, method), shadowBoard), (e: { statusCode?: number }) => e.statusCode === 403, method)
+  }
+})
+
+test('a board of the team still opens normally, with full access', async () => {
+  const own = await requireProject(eventOf(boss, realTeam, 'POST'), realBoard)
+  assert.equal(own.readOnly, false)
+  assert.equal(own.audience, 'staff')
+})
+
+test('nobody else reaches a shadow board: not another team, not a person with no team, not a contact', async () => {
+  const notFound = (e: { statusCode?: number }) => e.statusCode === 404
+  // The stranger belongs to no team at all (a customer contact has none either): no shadow board.
+  await assert.rejects(requireProject(eventOf(stranger, null), shadowBoard), notFound)
+  await assert.rejects(requireProject(eventOf(stranger, realTeam), shadowBoard), notFound)
+  // The crew's own team is not the real board's team: its members use the normal path, full access.
+  assert.equal((await requireProject(eventOf(crewMember, crewTeam, 'POST'), shadowBoard)).readOnly, false)
+  assert.equal(await shadowBoardForStaff(realTeam, otherBoard), undefined)
+  assert.equal(await shadowBoardForStaff(null, shadowBoard), undefined)
+})
+
+test('files of a shadow board are served to the staff of the real board, and to nobody outside', async () => {
+  assert.equal(await isStaffOfShadowedBoard(boss, shadowBoard), true)
+  assert.equal(await isStaffOfShadowedBoard(stranger, shadowBoard), false)
+  assert.equal(await isStaffOfShadowedBoard(boss, otherBoard), false)
+})
+
+test('a team key of the real board team reads its shadow boards; a key limited to one board does not', async () => {
+  assert.ok((await readGrantedBoardIds(keyOf(boss, realTeam))).includes(shadowBoard))
+  assert.deepEqual(await readGrantedBoardIds(keyOf(boss, realTeam, otherBoard)), [])
+  // The crew team is nobody's real team: a key there gains nothing from this rule.
+  assert.ok(!(await readGrantedBoardIds(keyOf(boss, crewTeam))).includes(shadowBoard))
 })

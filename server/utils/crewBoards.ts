@@ -25,7 +25,7 @@ export interface CrewLinkView {
   crewName: string
   crewSlug: string
   crewTeamId: string
-  canOpen: boolean
+  inCrewTeam: boolean
   crewDisabled: boolean
   projectId: string
   projectName: string
@@ -116,8 +116,8 @@ export async function detachCrew(link: CrewBoard): Promise<void> {
 
 /**
  * Every crew link on the boards of a team, newest first, for the Crews section and the board menu.
- * `canOpen` says whether `userId` belongs to the crew's team: the shadow board is in that team, and
- * only its members can open it.
+ * `inCrewTeam` says whether `userId` belongs to the crew's team, which is where the shadow board lives:
+ * its members open it with full access. Everyone else on the real board's team reads it, never writes.
  */
 export async function crewLinksOfTeam(teamId: string, userId: string): Promise<CrewLinkView[]> {
   const real = alias(projects, 'real_board')
@@ -147,5 +147,5 @@ export async function crewLinksOfTeam(teamId: string, userId: string): Promise<C
         .where(and(eq(member.userId, userId), inArray(member.organizationId, rows.map(row => row.crewTeamId))))
     : []
   const mineIds = new Set(mine.map(row => row.teamId))
-  return rows.map(({ crewDisabledAt, ...row }) => ({ ...row, crewDisabled: crewDisabledAt !== null, canOpen: mineIds.has(row.crewTeamId) }))
+  return rows.map(({ crewDisabledAt, ...row }) => ({ ...row, crewDisabled: crewDisabledAt !== null, inCrewTeam: mineIds.has(row.crewTeamId) }))
 }

@@ -111,8 +111,8 @@ test('the links are listed under the team of the real board, and not under the c
   assert.deepEqual(await crewLinksOfTeam(crewTeam, owner), [])
   // Only a member of the crew's team can open its shadow board.
   assert.equal(links[0]!.crewTeamId, crewTeam)
-  assert.equal(links[0]!.canOpen, false)
-  assert.equal((await crewLinksOfTeam(realTeam, other))[0]!.canOpen, true)
+  assert.equal(links[0]!.inCrewTeam, false)
+  assert.equal((await crewLinksOfTeam(realTeam, other))[0]!.inCrewTeam, true)
 })
 
 test('detaching drops the link and archives the shadow board instead of deleting it', async () => {

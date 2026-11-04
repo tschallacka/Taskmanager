@@ -4,6 +4,7 @@ import { projects, projectColumns, projectTasks } from '../db/schema'
 import { eq, and, asc, isNull } from 'drizzle-orm'
 import { audienceFor, customerIdsOf, getUserActiveTeamId, sessionProjectFilter } from './auth-helpers'
 import type { Audience } from './auth-helpers'
+import { shadowBoardForStaff } from './crewBoardAccess'
 
 export function genId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2)
@@ -25,7 +26,12 @@ async function audienceOf(event: H3Event, project: { userId: string, teamId: str
 }
 
 // Resolves a project the caller may access, 404 otherwise. Column and task
+// Resolves a project the caller may access, 404 otherwise. Column and task
 // endpoints funnel through here so a foreign id never leaks workspace data.
+//
+// One more way in: the staff of a real board may READ the shadow board its crew keeps in another
+// team. That board comes back as `readOnly`, and every request that is not a read is refused here,
+// for every endpoint at once. A customer has no team, so never reaches it.
 export async function requireProject(event: H3Event, projectId: string) {
   const filter = await getProjectAccessFilter(event)
   const [project] = await db
@@ -33,10 +39,15 @@ export async function requireProject(event: H3Event, projectId: string) {
     .from(projects)
     .where(and(eq(projects.id, projectId), filter))
 
-  if (!project) throw createError({ statusCode: 404, message: 'Project not found' })
-  return { ...project, audience: await audienceOf(event, project) }
-}
+  if (project) return { ...project, audience: await audienceOf(event, project), readOnly: false }
 
+  const shadow = await shadowBoardForStaff(await getUserActiveTeamId(event), projectId)
+  if (!shadow) throw createError({ statusCode: 404, message: 'Project not found' })
+  if (!['GET', 'HEAD'].includes(event.method)) {
+    throw createError({ statusCode: 403, message: 'This is a crew board. You can read it, not change it.' })
+  }
+  return { ...shadow, audience: 'staff' as Audience, readOnly: true }
+}
 /**
  * Stops a customer contact at a change only staff may make. Contacts can read
  * what is shared with them, add tasks and comment; the board itself is staff's.

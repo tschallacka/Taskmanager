@@ -26,6 +26,8 @@ export interface Project {
   customerId?: string | null
   customerName?: string | null
   audience?: Audience
+  // Set by the server on a crew's shadow board opened by the staff of the real board.
+  readOnly?: boolean
   // Colours pinned to this board's task labels, keyed by the label. A label
   // with no entry falls back to the colour derived from its own text.
   labelColors?: Record<string, string>
@@ -468,6 +470,8 @@ export function useProjects() {
   // The server enforces this; the board only uses it to stop offering what a
   // customer contact would be refused.
   const isCustomerView = computed(() => activeProject.value?.audience === 'customer')
+  // A crew's board, read by the staff of the board it works on: the server refuses every change.
+  const isReadOnlyBoard = computed(() => activeProject.value?.readOnly === true)
 
   async function load() {
     const [projects, tasks] = await Promise.all([
@@ -1063,6 +1067,7 @@ export function useProjects() {
     allTasks: _allTasks,
     activeProject,
     isCustomerView,
+    isReadOnlyBoard,
     activeProjectId: _activeProjectId,
     board: _board,
     subtasks: _subtasks,

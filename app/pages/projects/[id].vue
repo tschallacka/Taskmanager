@@ -12,6 +12,7 @@ const searchOpen = useSearchModal()
 const {
   activeProject,
   isCustomerView,
+  isReadOnlyBoard,
   loadBoard,
   board,
   boardColumns,
@@ -253,6 +254,13 @@ useSeoMeta({
 
 <template>
   <div class="flex min-w-0 flex-1 flex-col">
+    <p
+      v-if="isReadOnlyBoard"
+      class="shrink-0 border-b border-default bg-elevated px-4 py-1.5 text-xs text-muted lg:px-6"
+      data-readonly-board
+    >
+      This is a crew's board. You can read it here; only the crew's team changes it.
+    </p>
     <!-- Board header -->
     <header class="flex shrink-0 items-center gap-2 border-b border-default px-4 py-3 lg:px-6">
       <UButton

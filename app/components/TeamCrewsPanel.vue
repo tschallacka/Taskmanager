@@ -82,9 +82,10 @@ async function detach() {
   }
 }
 
-// The shadow board is in the crew's own team: switch there first, as a pinned board does.
+// A member of the crew's team works on its board in that team's workspace, as a pinned board does.
+// Everyone else on this team reads it from here: the server refuses anything but reads.
 async function openCrewBoard(link: TeamCrewLink) {
-  await switchWorkspace(link.crewTeamId)
+  if (link.inCrewTeam) await switchWorkspace(link.crewTeamId)
   await navigateTo(`/projects/${link.shadowProjectId}`)
 }
 
@@ -231,8 +232,7 @@ const SELECT_CLASS = 'min-w-0 flex-1 rounded-md border border-default bg-default
             color="neutral"
             variant="soft"
             icon="i-lucide-arrow-up-right"
-            :disabled="!link.canOpen"
-            :title="link.canOpen ? undefined : 'Only members of the crew\'s own team can open its board.'"
+            :title="link.inCrewTeam ? undefined : 'You can read the crew board, not change it.'"
             data-team-crew-open
             @click="openCrewBoard(link)"
           >

@@ -5,8 +5,10 @@
 // board. Every write tool resolves its board through the same filter without the grant, so a real
 // board is simply not found for it.
 import { and, eq } from 'drizzle-orm'
+import { alias } from 'drizzle-orm/pg-core'
 import { db } from '../db'
-import { crewBoards, user } from '../db/schema'
+import { crewBoards, member, projects, user } from '../db/schema'
+import type { Project } from '../db/schema'
 import type { ApiKeyContext } from './api-keys'
 
 /** The reads a crew may do on a real board: the board, its tasks and threads, never its secrets or its rules. */
@@ -27,19 +29,66 @@ export function mayUseReadGrant(tool: { name: string, readOnly: boolean }): bool
 }
 
 /**
- * The real boards a key's person may read through a crew link. Only a crew account has any. A key
- * limited to one board (a member forked for that board) reads only the real board its own shadow
- * board is linked to; a key limited to a customer gets none, so its reach never widens.
+ * The shadow boards of a team's boards: the staff of the real board may READ them (Q35a, never
+ * writes), and a customer never can, since a customer has no team here.
  */
-export async function readGrantedBoardIds(context: Pick<ApiKeyContext, 'userId' | 'projectId' | 'customerId'>): Promise<string[]> {
-  if (context.customerId) return []
-  const [account] = await db.select({ crewId: user.crewId }).from(user).where(eq(user.id, context.userId))
-  if (!account?.crewId) return []
-  const links = await db
-    .select({ projectId: crewBoards.projectId })
+export async function shadowBoardIdsOfTeam(teamId: string): Promise<string[]> {
+  const real = alias(projects, 'real_board')
+  const rows = await db
+    .select({ id: crewBoards.shadowProjectId })
     .from(crewBoards)
-    .where(context.projectId
-      ? and(eq(crewBoards.crewId, account.crewId), eq(crewBoards.shadowProjectId, context.projectId))
-      : eq(crewBoards.crewId, account.crewId))
-  return links.map(link => link.projectId)
+    .innerJoin(real, eq(real.id, crewBoards.projectId))
+    .where(eq(real.teamId, teamId))
+  return rows.map(row => row.id)
+}
+
+/** The shadow board `projectId` as a team's staff may read it, or undefined when it is not one of theirs. */
+export async function shadowBoardForStaff(teamId: string | null, projectId: string): Promise<Project | undefined> {
+  if (!teamId) return undefined
+  const real = alias(projects, 'real_board')
+  const [row] = await db
+    .select({ shadow: projects })
+    .from(crewBoards)
+    .innerJoin(projects, eq(projects.id, crewBoards.shadowProjectId))
+    .innerJoin(real, eq(real.id, crewBoards.projectId))
+    .where(and(eq(crewBoards.shadowProjectId, projectId), eq(real.teamId, teamId)))
+  return row?.shadow
+}
+
+/** Whether `userId` belongs to a team whose board `projectId` is the shadow of: for serving files. */
+export async function isStaffOfShadowedBoard(userId: string, projectId: string): Promise<boolean> {
+  const real = alias(projects, 'real_board')
+  const [row] = await db
+    .select({ id: crewBoards.id })
+    .from(crewBoards)
+    .innerJoin(real, eq(real.id, crewBoards.projectId))
+    .innerJoin(member, and(eq(member.organizationId, real.teamId), eq(member.userId, userId)))
+    .where(eq(crewBoards.shadowProjectId, projectId))
+  return Boolean(row)
+}
+
+/**
+ * The boards a key's person may READ through a crew link, beyond its own reach:
+ *   - a crew account reads the real boards its crew was given. A key limited to one board (a member
+ *     forked for that board) reads only the real board its own shadow board is linked to;
+ *   - the staff of a real board read its shadow board, with a key for the whole team.
+ * A key limited to a customer gets none, so its reach never widens.
+ */
+export async function readGrantedBoardIds(context: Pick<ApiKeyContext, 'userId' | 'teamId' | 'projectId' | 'customerId'>): Promise<string[]> {
+  if (context.customerId) return []
+  const granted: string[] = []
+
+  const [account] = await db.select({ crewId: user.crewId }).from(user).where(eq(user.id, context.userId))
+  if (account?.crewId) {
+    const links = await db
+      .select({ projectId: crewBoards.projectId })
+      .from(crewBoards)
+      .where(context.projectId
+        ? and(eq(crewBoards.crewId, account.crewId), eq(crewBoards.shadowProjectId, context.projectId))
+        : eq(crewBoards.crewId, account.crewId))
+    granted.push(...links.map(link => link.projectId))
+  }
+
+  if (context.teamId && !context.projectId) granted.push(...await shadowBoardIdsOfTeam(context.teamId))
+  return granted
 }

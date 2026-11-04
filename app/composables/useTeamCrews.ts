@@ -6,8 +6,9 @@ export interface TeamCrewLink {
   crewName: string
   crewSlug: string
   crewTeamId: string
-  // Whether the caller belongs to the crew's team, the only people who can open its board.
-  canOpen: boolean
+  // Whether the caller belongs to the crew's team: they open its board with full access.
+  // Everyone else on the real board's team reads it and cannot change it.
+  inCrewTeam: boolean
   crewDisabled: boolean
   projectId: string
   projectName: string
