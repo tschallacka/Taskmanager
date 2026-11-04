@@ -4,6 +4,8 @@ All notable changes to Arnotes are documented in this file.
 
 ## Unreleased
 
+- **`get_task` reads less by default.** A plain read gives the 5 newest updates, newest first, so a long thread no longer fills an agent's context. A read with `since` or `prefix` still gives every match oldest first, so catching up from the newest update you have (`"since": "<update id>"`) never skips one. `limit` and `order` override both defaults. The tool description, the agent skill and the crew documents say how to read a whole thread and how to catch up; the PM finds its question with `prefix: "QUESTION:"`, and Boss finds a `WAKE` comment with `prefix: "WAKE"`
+
 - **Pinned boards.** Pin a board from its menu in the sidebar (**Pin to sidebar**, also on a customer's board) and it shows under **Pinned** in every workspace, with the team it belongs to. Clicking it switches to that workspace and opens the board. A pin is yours alone; a board you can no longer open, or that is archived, drops off the list. New `board_pins` table, and `GET`/`POST /api/pins`, `DELETE /api/pins/:projectId`
 - **The inbox opens an item in place.** A task notification opens the task panel over the inbox, where you can read the task and comment as on the board. A message or a reply opens its conversation with the reply box ready. When the board is in another workspace, the inbox switches there first. Notifications for messages now keep the conversation they belong to (`notifications.message_id`), so mail and push links open that conversation too (`?view=messages&message=<id>`); older ones open the board's messages
 - `GET /api/projects/:id/workspace` says which workspace opens a board for the caller: its team, or the personal workspace for a customer contact

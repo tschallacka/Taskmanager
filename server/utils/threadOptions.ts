@@ -72,26 +72,36 @@ function threadText(args: Record<string, unknown>, key: string, hint: string): s
   return value.trim()
 }
 
-/** Reads get_task's thread options, refusing what it cannot use and naming what it can. */
+/** How many of the newest updates a plain get_task read returns. */
+export const LATEST_UPDATES = 5
+
+/**
+ * Reads get_task's thread options, refusing what it cannot use and naming what it can.
+ * A plain read (no since, no prefix) defaults to the LATEST_UPDATES newest updates, newest
+ * first: a first look at a long thread. With since or prefix every match comes back oldest
+ * first, so reading on from a since mark never skips an update. A limit or order given wins.
+ */
 export function readThreadOptions(args: Record<string, unknown>): ThreadOptions {
   const limit = args.limit as number | null | undefined
   if (limit !== undefined && limit !== null && (!Number.isInteger(limit) || limit < 1 || limit > 200)) {
-    throw new McpToolError('"limit" must be a whole number from 1 to 200, or left out to get the last 5 updates.')
-  }
-  const order = args.order ?? 'newest'
-  if (typeof order !== 'string' || !(THREAD_ORDERS as readonly string[]).includes(order)) {
-    throw new McpToolError('"order" must be "oldest" or "newest".')
+    throw new McpToolError(`"limit" must be a whole number from 1 to 200, or left out: then a plain read returns the ${LATEST_UPDATES} newest updates, and a read with since or prefix every match.`)
   }
   const since = threadText(args, 'since', SINCE_HINT)
   // Something that starts like a date but is not a zoned time is refused here, not read as an id.
   if (since !== undefined && /^\d{4}-/.test(since) && parseSinceTime(since) === undefined) {
     throw new McpToolError(SINCE_REFUSAL)
   }
+  const prefix = threadText(args, 'prefix', PREFIX_HINT)
+  const plain = since === undefined && prefix === undefined
+  const order = args.order ?? (plain ? 'newest' : 'oldest')
+  if (typeof order !== 'string' || !(THREAD_ORDERS as readonly string[]).includes(order)) {
+    throw new McpToolError('"order" must be "oldest" or "newest".')
+  }
   return {
-    limit: limit ?? 5,
+    limit: limit ?? (plain ? LATEST_UPDATES : undefined),
     order: order as ThreadOptions['order'],
     since,
-    prefix: threadText(args, 'prefix', PREFIX_HINT)
+    prefix
   }
 }
 

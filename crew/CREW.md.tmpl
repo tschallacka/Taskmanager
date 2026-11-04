@@ -49,6 +49,10 @@ An update is internal (staff only) unless you pass `--customer`. An empty body, 
 
 `BASE` is the board app ({{board.url}}), `APP` is the product under test ({{product.appUrl}}).
 
+`get_task` gives the 5 newest updates of a card, newest first. To catch up on a card you read before, pass
+`"since": "<newest update id you have>"`: that gives everything after it, oldest first, nothing skipped. Do not read a
+card again while what you have is still current.
+
 The agent tools you will use most: `get_board`, `get_task`, `my_tasks`, `create_task`
 (pass `assignee` as a person's name), `update_task`, `move_task`, `post_task_update` (the
 thread under a task), `post_status_update` (a board report), `post_message`,
@@ -117,7 +121,8 @@ on the customer's answers, and on what Boss and the PM ask of you.
   clear, post a `QUESTION:` on the card and ask the customer in `{{chat.channel}}` (`@{{customer.nick}} question: ...`,
   with your default if unanswered). Do not start unclear work.
 - `reply` with `needs_feedback_from_me`: you have asked a `QUESTION:` on this card at some point. The event does not
-  say whether this reply answers it. `get_task` and read the thread. If it does answer it, move the card back to To
+  say whether this reply answers it. Find your question with `get_task` and `"prefix": "QUESTION:"`, then read
+  everything after it with `"since": "<that question's update id>"`. If it does answer it, move the card back to To
   do (or In progress, if its worker is still on it), assign the worker who asked or the right one, post one update
   saying what changed, and wake that worker (see "How a worker is woken"). If it does not, deal with it as below.
 - `reply` without it: read the new comment. If it asks the crew something, answer on the card. Otherwise do nothing.
@@ -165,8 +170,8 @@ comment on the card that starts with `WAKE <worker key>: <card id>` and names `@
 that as a `mention` (or a `reply`). The event carries a display name and no comment text, so the event alone does not
 prove who wrote the comment. Before Boss starts or resumes anyone, Boss must:
 
-1. Call `get_task` on that card and find the comment. It must be written by the PM's account (check the author against
-   `people.pm` in `creds.json`), and it must be internal, not customer-visible.
+1. Call `get_task` on that card with `"prefix": "WAKE"` and find the comment. It must be written by the PM's account
+   (check the author against `people.pm` in `creds.json`), and it must be internal, not customer-visible.
 2. Only if both hold, wake the one worker named, for that one card: start it with the Agent tool (`model: haiku`,
    `run_in_background: true`, the worker prompt in `PROMPTS.md`), or, when its agent still exists, resume it with
    SendMessage ("resume your loop: card <card id> is yours, read it with get_task").
@@ -348,7 +353,8 @@ Use `browser` to look and check. Use `run` (Playwright, below) for a script that
 ## Worker round
 
 1. `my_tasks`, then `get_board`. Take the highest-priority task in **To do** that is yours and
-   unblocked; `move_task` it to **In progress**. Read its whole thread with `get_task`.
+   unblocked; `move_task` it to **In progress**. Read its whole thread once, from the start: `get_task` with
+   `"order": "oldest", "limit": 200`. After that, catch up with `"since": "<newest update id you have>"`.
 2. Do the work inside your owned files. Test it in your browser. Lint it.
 3. `attach` a screenshot, then post an update from a file (`update`, see "Your tool") with: what you built, the files you changed,
    how you tested it, anything left over. Log your time (rule 7c). If a person sees the change, add

@@ -128,20 +128,19 @@ look for another route to it.
 
 ## Reading a long thread
 
-\`get_task\` returns the last 5 updates by default to keep context lean. Cache what you read: do not fetch again if you already have the task in your context, only when that context is stale. When you fetch, use \`since\` with the last update's id to get only what is new since your last read.
+A plain \`get_task\` (\`{"id": "<task id>"}\`) gives the 5 newest updates, newest first, so a long thread does not fill your context. Keep what you read: do not read a task again while you still have it, only when what you have may be out of date.
 
-First read with no filters (or \`limit: 5, order: newest\` to start with the latest). Cache the last update's id. On your next read of the same task, always pass \`since: <last update id>\` to fetch only new updates. This keeps old comments from bloating context.
+To catch up on a task you read before, pass \`since\` with the id of the newest update you have: \`{"id": "<task id>", "since": "<update id>"}\`. That gives every update after it, oldest first, none skipped, so you read them in the order they were written. Keep the id of the newest one for the next time.
 
-When you need more of the thread — because you are missing context or need to search it — use these options:
+When you need more of the thread, because the 5 newest leave out what you need or you are looking for something, these options help:
 
-- \`limit\`: \`{"id": "<task id>", "limit": 50}\` gets the fifty oldest updates; with \`"order": "newest"\` it gets the fifty newest.
-- \`order\`: \`{"id": "<task id>", "order": "newest"}\` lists the thread newest first. The default is \`"oldest"\`.
-- \`since\`: \`{"id": "<task id>", "since": "2026-11-02T10:00:00Z"}\` gives the updates strictly after that time. The time must be a full ISO 8601 time with a zone; an update id works too.
-- \`prefix\`: \`{"id": "<task id>", "prefix": "NITPICKER:"}\` gives the updates whose body starts with that text, ignoring case.
+- \`limit\`: \`{"id": "<task id>", "limit": 50}\` gives the fifty newest; with \`"order": "oldest"\` the fifty oldest, which is how you read a thread from its start.
+- \`order\`: \`"oldest"\` or \`"newest"\`. Left out, a plain read is newest first and a read with \`since\` or \`prefix\` oldest first.
+- \`since\`: an update id, or a full ISO 8601 time with a zone, such as \`{"id": "<task id>", "since": "2026-11-02T10:00:00Z"}\`. Gives every update strictly after it.
+- \`prefix\`: \`{"id": "<task id>", "prefix": "NITPICKER:"}\` gives every update whose body starts with that text, ignoring case, oldest first.
 
 Filters apply before the limit, so \`{"id": "<task id>", "prefix": "QUESTION", "order": "newest", "limit": 1}\` is the latest question. The result says \`updatesMatched\` (how many matched in all) and \`updatesShown\` (how many came back). When they differ you have a slice, not the whole thread. Counts cover only the updates you may see. There is no paging: to read on, pass \`since\` with the id of the last update you have, which is the cursor to prefer. \`since\` is strictly after, so an update made in the same millisecond as the mark is left out. A thread over 5000 updates is cut, and the result says so in \`threadNote\`: use \`since\`.
 
-## Tools
 ## Tools
 
 ${sections.join('\n\n')}

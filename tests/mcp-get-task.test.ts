@@ -1,10 +1,11 @@
-// get_task's thread options: limit, order, since (its shape), prefix, the thread cap, and
+// get_task's thread options: the defaults (a plain read gives the newest few; since and prefix
+// give every match oldest first), limit, order, since (its shape), prefix, the thread cap, and
 // the customer rule. Fake rows only where the database is not needed. Run:
 //   node --import tsx --test tests/mcp-get-task.test.ts
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { PgDialect } from 'drizzle-orm/pg-core'
-import { readThreadOptions, selectUpdates, parseSinceTime, foldCase, capThread, THREAD_CAP, THREAD_CAP_NOTE, SINCE_REFUSAL } from '../server/utils/threadOptions'
+import { readThreadOptions, selectUpdates, parseSinceTime, foldCase, capThread, THREAD_CAP, THREAD_CAP_NOTE, SINCE_REFUSAL, LATEST_UPDATES } from '../server/utils/threadOptions'
 import type { ThreadOptions } from '../server/utils/threadOptions'
 import { commentVisibleTo, CUSTOMER_COMMENT_VISIBILITY } from '../server/utils/commentVisibility'
 import { commentVisibilityFilter } from '../server/utils/auth-helpers'
@@ -23,15 +24,30 @@ const options = (overrides: Partial<ThreadOptions> = {}): ThreadOptions => ({ or
 const ids = (updates: { id: string }[]) => updates.map(update => update.id)
 const refusal = (pattern: RegExp) => (error: unknown) => error instanceof McpToolError && pattern.test(error.message)
 
-test('with no options every update comes back oldest first and the counts agree', () => {
-  assert.deepEqual(readThreadOptions({}), { limit: undefined, order: 'oldest', since: undefined, prefix: undefined })
-  const { shown, matched } = selectUpdates(rows, options(), 'staff')
-  assert.deepEqual(ids(shown), ['u1', 'u2', 'u3', 'u4', 'u5'])
-  assert.equal(matched, 5)
+test('a plain read gives the newest updates, newest first, and the counts say how many there are', () => {
+  assert.deepEqual(readThreadOptions({}), { limit: LATEST_UPDATES, order: 'newest', since: undefined, prefix: undefined })
+  const long = Array.from({ length: 8 }, (_, i) => ({ id: `u${i + 1}`, body: `update ${i + 1}`, visibility: 'staff' }))
+  const { shown, matched } = selectUpdates(long, readThreadOptions({}), 'staff')
+  assert.deepEqual(ids(shown), ['u8', 'u7', 'u6', 'u5', 'u4'])
+  assert.equal(matched, 8)
+})
+
+test('with since or prefix every match comes back oldest first, so reading on from a mark skips nothing', () => {
+  assert.deepEqual(readThreadOptions({ since: 'u3' }), { limit: undefined, order: 'oldest', since: 'u3', prefix: undefined })
+  assert.deepEqual(readThreadOptions({ prefix: 'NITPICKER:' }), { limit: undefined, order: 'oldest', since: undefined, prefix: 'NITPICKER:' })
+  // Eight new updates after the mark: all eight come back, in the order they were written.
+  const after = Array.from({ length: 8 }, (_, i) => ({ id: `n${i + 1}`, body: `new ${i + 1}`, visibility: 'staff' }))
+  assert.deepEqual(ids(selectUpdates(after, readThreadOptions({ since: 'u3' }), 'staff').shown), after.map(update => update.id))
+})
+
+test('a limit or order given wins over the defaults', () => {
+  assert.deepEqual(readThreadOptions({ order: 'oldest' }), { limit: LATEST_UPDATES, order: 'oldest', since: undefined, prefix: undefined })
+  assert.deepEqual(readThreadOptions({ limit: 50 }), { limit: 50, order: 'newest', since: undefined, prefix: undefined })
+  assert.deepEqual(readThreadOptions({ since: 'u3', order: 'newest', limit: 2 }), { limit: 2, order: 'newest', since: 'u3', prefix: undefined })
 })
 
 test('null limit, order and filters count as left out', () => {
-  assert.deepEqual(readThreadOptions({ limit: null, order: null, since: null, prefix: null }), { limit: undefined, order: 'oldest', since: undefined, prefix: undefined })
+  assert.deepEqual(readThreadOptions({ limit: null, order: null, since: null, prefix: null }), { limit: LATEST_UPDATES, order: 'newest', since: undefined, prefix: undefined })
 })
 
 test('limit keeps the oldest updates, and 1 and 200 are accepted', () => {
