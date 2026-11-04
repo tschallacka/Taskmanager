@@ -124,7 +124,7 @@ watch(projects, async (list) => {
             class="py-8 text-center text-sm text-muted"
             data-no-collaborators
           >
-            Invite teammates from the team switcher to work together.
+            Invite teammates under Team, Members, or share a board with a guest, to work together.
           </p>
           <ul
             v-else
@@ -135,12 +135,21 @@ watch(projects, async (list) => {
               :key="person.id"
               class="flex items-center gap-2.5 text-sm text-default"
             >
-              <UAvatar
-                :src="person.image ?? undefined"
-                :alt="person.name || person.email"
-                size="sm"
-              />
-              <span class="truncate">{{ person.name || person.email }}</span>
+              <PersonCard
+                :person-id="person.id"
+                :name="person.name || person.email"
+                :image="person.image"
+                class="min-w-0"
+              >
+                <span class="flex min-w-0 items-center gap-2.5">
+                  <UAvatar
+                    :src="person.image ?? undefined"
+                    :alt="person.name || person.email"
+                    size="sm"
+                  />
+                  <span class="truncate">{{ person.name || person.email }}</span>
+                </span>
+              </PersonCard>
             </li>
           </ul>
         </section>

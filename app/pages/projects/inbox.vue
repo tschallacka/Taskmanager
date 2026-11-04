@@ -10,8 +10,37 @@ definePageMeta({ layout: 'app' })
 const { sidebarOpen } = useSidebar()
 useSeoMeta({ title: 'Inbox' })
 
-const { items, unread, prefs, push, loaded, load, markRead, markAllRead, setPreference, setPush, testPush } = useNotifications()
+const { items, unread, prefs, push, loaded, load, markRead, markAllRead, decideGuestRequest, setPreference, setPush, testPush } = useNotifications()
 onMounted(load)
+
+// A guest manager's request for a person outside their domain is decided here, by a project admin.
+const deciding = ref<string | null>(null)
+// The link of an invitation just approved, when no mail could carry it.
+const approvedLinks = ref<Record<string, string>>({})
+
+async function decide(item: NotificationItem, approve: boolean) {
+  if (deciding.value) return
+  deciding.value = item.id
+  try {
+    if (!item.readAt) markRead([item.id])
+    const answer = await decideGuestRequest(item, approve)
+    if (approve && answer.url && !answer.emailed) approvedLinks.value = { ...approvedLinks.value, [item.id]: answer.url }
+    toast.add({
+      title: approve ? `${item.invitationEmail ?? 'The guest'} is invited` : 'Request declined',
+      description: approve ? (answer.emailed ? 'They got the invitation by email.' : 'Copy the link below and send it to them.') : undefined,
+      icon: approve ? 'i-lucide-user-check' : 'i-lucide-user-x'
+    })
+  } catch (e: unknown) {
+    toast.add({ title: (e as { data?: { message?: string } })?.data?.message || 'Could not decide that', color: 'error' })
+  } finally {
+    deciding.value = null
+  }
+}
+
+async function copyLink(url: string) {
+  await navigator.clipboard.writeText(url)
+  toast.add({ title: 'Link copied', icon: 'i-lucide-clipboard-check', duration: 2000 })
+}
 
 // The Agent audit tab exists only for someone with an agent; ?tab=agent keeps it across a reload.
 const audit = useAgentAudit()
@@ -367,6 +396,53 @@ async function sendTest() {
                   <p class="mt-1 text-xs text-dimmed">
                     {{ item.projectName }}
                   </p>
+                  <div
+                    v-if="item.type === 'guest_request' && item.invitationStatus === 'awaiting_approval'"
+                    class="mt-2 flex gap-2"
+                    data-guest-request-actions
+                    @click.stop
+                  >
+                    <UButton
+                      label="Approve"
+                      icon="i-lucide-check"
+                      size="xs"
+                      :loading="deciding === item.id"
+                      data-guest-approve
+                      @click="decide(item, true)"
+                    />
+                    <UButton
+                      label="Decline"
+                      icon="i-lucide-x"
+                      size="xs"
+                      color="neutral"
+                      variant="soft"
+                      :disabled="deciding === item.id"
+                      data-guest-decline
+                      @click="decide(item, false)"
+                    />
+                  </div>
+                  <p
+                    v-else-if="item.type === 'guest_request' && item.invitationStatus"
+                    class="mt-1 text-xs text-muted"
+                    data-guest-request-status
+                  >
+                    {{ item.invitationStatus === 'declined' ? 'Declined' : item.invitationStatus === 'revoked' ? 'Withdrawn' : 'Approved' }}
+                  </p>
+                  <div
+                    v-if="approvedLinks[item.id]"
+                    class="mt-2 flex items-center gap-2 text-xs"
+                    @click.stop
+                  >
+                    <code class="min-w-0 flex-1 truncate rounded bg-elevated px-2 py-1">{{ approvedLinks[item.id] }}</code>
+                    <UButton
+                      label="Copy"
+                      icon="i-lucide-copy"
+                      size="xs"
+                      color="neutral"
+                      variant="soft"
+                      @click="copyLink(approvedLinks[item.id]!)"
+                    />
+                  </div>
                 </div>
                 <span class="shrink-0 text-xs text-dimmed">{{ relativeTime(item.createdAt) }}</span>
               </li>

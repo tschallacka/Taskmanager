@@ -7,6 +7,7 @@ import { db } from '../db'
 import { customerInvitations, member, organization, user } from '../db/schema'
 import { generateJoinCode } from './auth-helpers'
 import { hashInvitationToken, INVITATION_COOKIE } from './customers'
+import { isLiveAddressedInvitation } from './invitations'
 import { genId } from './projects'
 
 function slugFor(name: string): string {
@@ -82,5 +83,7 @@ export async function isLiveInvitation(token: string | null): Promise<boolean> {
       eq(customerInvitations.tokenHash, hashInvitationToken(token)),
       gt(customerInvitations.expiresAt, Date.now())
     ))
-  return Boolean(row && !row.acceptedAt)
+  if (row && !row.acceptedAt) return true
+  // A team or a board can invite an address too, and that person may create an account on a closed instance.
+  return isLiveAddressedInvitation(token)
 }

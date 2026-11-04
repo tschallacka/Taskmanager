@@ -10,6 +10,8 @@ const props = defineProps<{
   link: string
   /** What is being shared, lowercase, for the wording, e.g. 'board'. */
   subject: string
+  /** The words on the button; "Share" unless the surrounding dialog already says it. */
+  label?: string
   save: (isPublic: boolean, publicUntil: number | null) => Promise<{ isPublic: boolean, publicUntil: number | null }>
 }>()
 
@@ -95,7 +97,7 @@ async function submit(isPublic: boolean) {
       variant="ghost"
       :aria-label="`Share ${subject}`"
     >
-      <span class="hidden sm:inline">Share</span>
+      <span :class="label ? '' : 'hidden sm:inline'">{{ label ?? 'Share' }}</span>
     </UButton>
 
     <template #content>

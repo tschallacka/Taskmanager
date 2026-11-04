@@ -157,6 +157,12 @@ async function unarchiveNow() {
   await unarchiveProject(project.id)
 }
 
+// Whether the person asked to hear about every new task here, read when the board opens.
+const boardWatch = useBoardWatch(() => projectId.value)
+watch(projectId, (id) => {
+  if (id && /^[a-z0-9]+$/i.test(id)) boardWatch.load()
+}, { immediate: true })
+
 // The trash entry earns its place only when there is something in it — or when
 // it is already on, so there is a way back. A board with nothing deleted looks
 // exactly as it did before.
@@ -170,7 +176,11 @@ const projectMenu = computed(() => {
     : []
 
   return [
-    [{ label: 'Rename project', icon: 'i-lucide-pencil', onSelect: startRename }, { label: 'Settings', icon: 'i-lucide-settings', onSelect: () => setView('settings') }],
+    [
+      { label: 'Rename project', icon: 'i-lucide-pencil', onSelect: startRename },
+      { label: boardWatch.watching.value ? 'Stop notifying me of new tasks' : 'Notify me of new tasks', icon: boardWatch.watching.value ? 'i-lucide-bell-off' : 'i-lucide-bell', onSelect: () => boardWatch.set(!boardWatch.watching.value) },
+      { label: 'Settings', icon: 'i-lucide-settings', onSelect: () => setView('settings') }
+    ],
     ...trash
   ]
 })
@@ -390,14 +400,28 @@ useSeoMeta({
           <span class="hidden sm:inline">Settings</span>
         </UButton>
 
-        <SharePopover
-          v-if="activeProject && !isCustomerView"
-          subject="board"
+        <!-- Who may share decides what shows: a project admin or a manager guest gets the dialog,
+             any other team member the public-link popover, and an outside reader nothing. -->
+        <BoardShare
+          v-if="activeProject && !isReadOnlyBoard"
+          :project-id="activeProject.id"
+          :project-name="activeProject.name"
+          :outside-reader="isCustomerView"
           :is-public="activeProject.isPublic"
           :public-until="activeProject.publicUntil"
-          :link="publicLink"
-          :save="saveSharing"
-        />
+          :public-link="publicLink"
+          :save-sharing="saveSharing"
+        >
+          <template #fallback>
+            <SharePopover
+              subject="board"
+              :is-public="activeProject.isPublic"
+              :public-until="activeProject.publicUntil"
+              :link="publicLink"
+              :save="saveSharing"
+            />
+          </template>
+        </BoardShare>
 
         <UDropdownMenu
           v-if="!isCustomerView"

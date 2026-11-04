@@ -64,6 +64,11 @@ export function customerTopic(customerId: string): string {
   return `customer:${customerId}`
 }
 
+/** A board's guests work from their personal workspace, so they listen on each board they were let onto. */
+export function guestTopic(projectId: string): string {
+  return `guest:${projectId}`
+}
+
 /**
  * Topics for the public read-only pages. A shared link is its own audience:
  * the readers are anonymous and belong to no workspace, so they subscribe to
@@ -141,7 +146,7 @@ async function projectTopics(projectId: string): Promise<string[]> {
     .from(projects)
     .where(eq(projects.id, projectId))
   if (!project) return []
-  const topics = [workspaceTopic(project.userId, project.teamId)]
+  const topics = [workspaceTopic(project.userId, project.teamId), guestTopic(projectId)]
   if (project.customerId) topics.push(customerTopic(project.customerId))
   return topics
 }

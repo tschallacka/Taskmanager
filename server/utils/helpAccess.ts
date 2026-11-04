@@ -6,6 +6,7 @@ import { db } from '../db'
 import { member, user } from '../db/schema'
 import type { ApiKeyScope } from '../db/schema'
 import { customerIdsOf } from './auth-helpers'
+import { guestProjectIdsOf } from './guests'
 import type { HelpPermission } from '#shared/utils/helpDocs'
 
 export interface HelpViewer {
@@ -25,7 +26,8 @@ export async function helpPermissionsOf(viewer: HelpViewer): Promise<Set<HelpPer
 
   // In a team they are staff. On their own workspace they are staff too, unless they only log in as a
   // contact of a customer, who sees what is shared with customers and nothing of how the team works.
-  const contactOnly = !role && (await customerIdsOf(viewer.userId)).length > 0
+  const contactOnly = !role
+    && ((await customerIdsOf(viewer.userId)).length > 0 || (await guestProjectIdsOf(viewer.userId)).length > 0)
   if (contactOnly) held.add('customer')
   else held.add('staff')
 

@@ -11,6 +11,7 @@ import type { Project } from '../db/schema'
 import type { ApiKeyContext } from './api-keys'
 import { audienceFor, customerIdsOf, sessionProjectFilter } from './auth-helpers'
 import type { Audience } from './auth-helpers'
+import { guestProjectIdsOf } from './guests'
 import { McpToolError } from './mcpToolKit'
 
 /** Whether the key is limited to one customer's boards or to one board. */
@@ -23,7 +24,12 @@ export function isNarrowedKey(context: Pick<ApiKeyContext, 'customerId' | 'proje
  * one board or customer a limited key is pinned to.
  */
 export async function boardFilter(context: ApiKeyContext) {
-  const open = sessionProjectFilter(context.userId, context.teamId, await customerIdsOf(context.userId))
+  const open = sessionProjectFilter(
+    context.userId,
+    context.teamId,
+    await customerIdsOf(context.userId),
+    await guestProjectIdsOf(context.userId)
+  )
   const reach = context.projectId
     ? and(open, eq(projects.id, context.projectId))
     : context.customerId ? and(open, eq(projects.customerId, context.customerId)) : open

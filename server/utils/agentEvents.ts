@@ -31,6 +31,7 @@ import { apiKeys, crews, member, projectGithubRepos, projects, user } from '../d
 import { customerIdsOf, isTeamMember } from './auth-helpers'
 import { crewAccountLive, isCrewAddress, normalizeAddress, personKeyOf } from './crewAccounts'
 import { projectPeople } from './people'
+import { notifyWatchersOfTask } from './projectWatchers'
 
 const CORE_EVENT_KINDS = ['task_created', 'task_assigned', 'reply', 'task_moved', 'mention'] as const
 // A task that was blocked is no longer (GH #36): sent to its assignee and the crew's pm. Only unblockedWatch.ts emits it.
@@ -967,6 +968,9 @@ export function announceTaskCreated(
   actorId: string | null,
   origin: AgentEventOrigin
 ): void {
+  // People who asked to hear of every new task on the board get a notification, whatever made it. This
+  // is the inbox, not an agent event, so it does not wait for an agent to be listening.
+  void notifyWatchersOfTask(board, task, actorId).catch(error => console.error('[notifications] could not tell the watchers of a new task', error))
   emitInBackground(async () => {
     const watched = (await projectPeople(board)).filter(person => agentEventHub.watches(person.id))
     if (!watched.length) return

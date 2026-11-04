@@ -5,10 +5,11 @@ const route = useRoute()
 const token = computed(() => String(route.params.token ?? ''))
 const { session, isPending: sessionPending } = useAuth()
 
-interface InvitationPreview {
-  customerName: string
-  organizationName: string
-}
+// A customer link works for whoever opens it; a team or board invitation was sent to one address.
+type InvitationPreview
+  = | { kind: 'customer', customerName: string, organizationName: string }
+    | { kind: 'team', email: string, organizationName: string, inviterName: string | null, role: string }
+    | { kind: 'board', email: string, projectName: string, inviterName: string | null, role: string }
 
 // Reading the invitation also sets the cookie that lets its recipient create an
 // account where sign-up is otherwise closed, so it has to happen in the browser.
@@ -31,9 +32,19 @@ async function accept() {
   accepting.value = true
   acceptError.value = ''
   try {
-    await $fetch(`/api/invitations/${token.value}/accept`, { method: 'POST' })
-    // A full load, so the projects store picks up the customer's boards.
-    await navigateTo('/projects', { external: true })
+    const answer = await $fetch<{ kind: 'team' | 'board' | 'customer', organizationId?: string, projectId?: string }>(
+      `/api/invitations/${token.value}/accept`,
+      { method: 'POST' }
+    )
+    // A new team member lands in that team; a guest works from their personal workspace, where
+    // the boards they were let onto open.
+    if (answer.kind === 'team' && answer.organizationId) {
+      await authClient.organization.setActive({ organizationId: answer.organizationId })
+    } else if (answer.kind === 'board') {
+      await authClient.organization.setActive({ organizationId: null })
+    }
+    // A full load, so the projects store picks up the new boards.
+    await navigateTo(answer.kind === 'board' && answer.projectId ? `/projects/${answer.projectId}` : '/projects', { external: true })
   } catch (e: unknown) {
     acceptError.value = (e as { data?: { message?: string } })?.data?.message || 'Could not accept the invitation'
   } finally {
@@ -54,8 +65,18 @@ async function accept() {
           v-if="invitation"
           class="text-sm text-zinc-400"
         >
-          {{ invitation.organizationName }} invited you to follow the projects of
-          <span class="text-zinc-200 font-medium">{{ invitation.customerName }}</span>.
+          <template v-if="invitation.kind === 'team'">
+            {{ invitation.inviterName ?? 'Someone' }} invited you to join
+            <span class="text-zinc-200 font-medium">{{ invitation.organizationName }}</span>.
+          </template>
+          <template v-else-if="invitation.kind === 'board'">
+            {{ invitation.inviterName ?? 'Someone' }} invited you to the board
+            <span class="text-zinc-200 font-medium">{{ invitation.projectName }}</span>.
+          </template>
+          <template v-else>
+            {{ invitation.organizationName }} invited you to follow the projects of
+            <span class="text-zinc-200 font-medium">{{ invitation.customerName }}</span>.
+          </template>
         </p>
       </div>
 
@@ -81,6 +102,12 @@ async function accept() {
           <p class="text-sm text-zinc-400 text-center">
             Signed in as <span class="text-zinc-200">{{ session.user.email }}</span>.
           </p>
+          <UAlert
+            v-if="invitation.kind !== 'customer' && session.user.email.toLowerCase() !== invitation.email"
+            color="warning"
+            variant="subtle"
+            :description="`This invitation was sent to ${invitation.email}. Sign in with that address to accept it.`"
+          />
           <UAlert
             v-if="acceptError"
             color="error"

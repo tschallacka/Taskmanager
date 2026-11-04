@@ -475,6 +475,11 @@ async function saveColumns(names: string[]) {
 
             <!-- Members -->
             <template v-else-if="section === 'members'">
+              <TeamInvitesPanel
+                v-if="isTeamAdmin && activeTeamId"
+                :team-id="activeTeamId"
+                :is-owner="isTeamOwner"
+              />
               <div class="space-y-2">
                 <p class="text-xs text-muted">
                   Every member of the team can see these email addresses.

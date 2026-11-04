@@ -6,6 +6,7 @@ import { and, eq } from 'drizzle-orm'
 import { auth } from '#server/lib/auth'
 import { isTeamMember } from '#server/utils/auth-helpers'
 import { isStaffOfShadowedBoard } from '#server/utils/crewBoardAccess'
+import { guestRowOf } from '#server/utils/guests'
 import { ATTACHMENT_MIME, SAFE_FILENAME, SAFE_ID, taskAttachmentDir } from '#server/utils/attachments'
 
 // Serves an image uploaded into a task description. Readable by whoever can
@@ -45,6 +46,8 @@ export default defineEventHandler(async (event) => {
       userId === row.userId
       || (row.teamId ? await isTeamMember(userId, row.teamId) : false)
       || (sharedWithCustomers && row.customerId ? await isCustomerContact(userId, row.customerId) : false)
+      // A guest of the board reads what is not marked private, like a customer's contact.
+      || (sharedWithCustomers && Boolean(await guestRowOf(row.projectId, userId)))
       // The staff of a real board read the shadow board its crew keeps in another team.
       || await isStaffOfShadowedBoard(userId, row.projectId)
     )

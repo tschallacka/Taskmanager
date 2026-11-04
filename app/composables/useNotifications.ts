@@ -3,7 +3,11 @@ import { errorMessage, untypedFetch } from '~/utils/untypedFetch'
 
 export interface NotificationItem {
   id: string
-  type: 'assigned' | 'comment' | 'message' | 'reply' | 'update'
+  type: 'assigned' | 'comment' | 'message' | 'reply' | 'update' | 'guest_request' | 'guest_decision' | 'task_added'
+  /** For a guest request: the invitation, and what became of it. Approve and Decline show only while it waits. */
+  invitationId?: string | null
+  invitationStatus?: 'open' | 'awaiting_approval' | 'accepted' | 'declined' | 'revoked' | null
+  invitationEmail?: string | null
   projectId: string
   projectName: string
   taskId: string | null
@@ -173,6 +177,19 @@ export function useNotifications() {
     await request('/api/notifications/read', { method: 'POST', headers: realtimeHeaders(), body: { ids } })
   }
 
+  /**
+   * A project admin approves or declines a guest manager's request from the inbox. An approval answers
+   * with the invitation link (once) and whether it was mailed.
+   */
+  async function decideGuestRequest(item: NotificationItem, approve: boolean): Promise<{ url?: string, emailed?: boolean }> {
+    const base = `/api/projects/${item.projectId}/guests/invitations/${item.invitationId}`
+    const answer = await request<{ url?: string, emailed?: boolean }>(`${base}/${approve ? 'approve' : 'decline'}`, {
+      method: 'POST', headers: realtimeHeaders(), body: {}
+    })
+    await load()
+    return answer ?? {}
+  }
+
   async function markAllRead() {
     const now = Date.now()
     _items.value = _items.value.map(item => item.readAt ? item : { ...item, readAt: now })
@@ -211,5 +228,5 @@ export function useNotifications() {
     })
   }
 
-  return { items: _items, unread: _unread, prefs: _prefs, push: _push, loaded: _loaded, load, markRead, markAllRead, setPreference, setPush, testPush, init }
+  return { items: _items, unread: _unread, prefs: _prefs, push: _push, loaded: _loaded, load, markRead, markAllRead, decideGuestRequest, setPreference, setPush, testPush, init }
 }

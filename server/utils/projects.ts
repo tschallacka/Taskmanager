@@ -4,6 +4,7 @@ import { projects, projectColumns, projectTasks } from '../db/schema'
 import { eq, and, asc, isNull } from 'drizzle-orm'
 import { audienceFor, customerIdsOf, getUserActiveTeamId, sessionProjectFilter } from './auth-helpers'
 import type { Audience } from './auth-helpers'
+import { guestProjectIdsOf } from './guests'
 import { shadowBoardForStaff } from './crewBoardAccess'
 
 export function genId(): string {
@@ -17,7 +18,12 @@ export function genId(): string {
 export async function getProjectAccessFilter(event: H3Event) {
   const userId = event.context.session.user.id
   const teamId = await getUserActiveTeamId(event)
-  return sessionProjectFilter(userId, teamId, teamId ? [] : await customerIdsOf(userId))
+  return sessionProjectFilter(
+    userId,
+    teamId,
+    teamId ? [] : await customerIdsOf(userId),
+    teamId ? [] : await guestProjectIdsOf(userId)
+  )
 }
 
 /** The caller's relation to a project they reached through the filter above. */

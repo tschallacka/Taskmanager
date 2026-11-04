@@ -437,7 +437,10 @@ export const taskFieldValues = pgTable(
 // names the project (and task) it points at and carries the words as they were
 // when it was sent; whether the recipient may still open it is decided when they
 // do. `emailedAt` is when a copy went out by mail, if it did.
-export const NOTIFICATION_TYPES = ['assigned', 'comment', 'message', 'reply', 'update'] as const
+// `guest_request` asks a project admin to approve a guest invitation; `guest_decision` tells the
+// guest manager who asked what became of it.
+// `task_added` goes to those who asked to hear about every new task on a board.
+export const NOTIFICATION_TYPES = ['assigned', 'comment', 'message', 'reply', 'update', 'guest_request', 'guest_decision', 'task_added'] as const
 export type NotificationType = typeof NOTIFICATION_TYPES[number]
 
 export const notifications = pgTable(
@@ -451,6 +454,8 @@ export const notifications = pgTable(
     // For a message or a reply: the conversation it belongs to (the first message), so the
     // inbox opens that conversation.
     messageId: text('message_id').references((): AnyPgColumn => projectMessages.id, { onDelete: 'cascade' }),
+    // For a guest request: the invitation waiting for a decision, so the inbox can approve it in place.
+    invitationId: text('invitation_id').references((): AnyPgColumn => projectGuestInvitations.id, { onDelete: 'cascade' }),
     actorId: text('actor_id').references(() => user.id, { onDelete: 'set null' }),
     title: text('title').notNull(),
     body: text('body').notNull().default(''),
@@ -1011,6 +1016,106 @@ export const projectMembers = pgTable(
 )
 
 export type ProjectMember = typeof projectMembers.$inferSelect
+
+// ─── Guests ───────────────────────────────────────────────────────────────────
+
+// A guest is a person from outside the team who was let onto one board. They read what is not
+// marked private (the same rule as a customer's contact), add tasks and reply. `manager` may also
+// invite more guests, but only addresses at `allowedDomain`; anyone else needs a project admin to
+// approve it. The project admin sets that domain, and a plain `editor` cannot invite at all.
+export const GUEST_ROLES = ['editor', 'manager'] as const
+export type GuestRole = typeof GUEST_ROLES[number]
+
+export const projectGuests = pgTable(
+  'project_guests',
+  {
+    id: text('id').primaryKey(),
+    projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+    userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+    role: text('role').notNull().$type<GuestRole>(),
+    // Lowercase, no leading @. Only meaningful for a manager.
+    allowedDomain: text('allowed_domain'),
+    addedBy: text('added_by').references(() => user.id, { onDelete: 'set null' }),
+    createdAt: bigint('created_at', { mode: 'number' }).notNull()
+  },
+  table => [
+    uniqueIndex('project_guests_project_user_idx').on(table.projectId, table.userId),
+    index('project_guests_user_id_idx').on(table.userId)
+  ]
+)
+
+export type ProjectGuest = typeof projectGuests.$inferSelect
+
+// `open`: a link was made and waits to be used. `awaiting_approval`: a guest manager asked for an
+// address outside their domain; there is no link until a project admin approves it.
+export const GUEST_INVITATION_STATES = ['open', 'awaiting_approval', 'accepted', 'declined', 'revoked'] as const
+export type GuestInvitationState = typeof GUEST_INVITATION_STATES[number]
+
+export const projectGuestInvitations = pgTable(
+  'project_guest_invitations',
+  {
+    id: text('id').primaryKey(),
+    projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+    email: text('email').notNull(),
+    role: text('role').notNull().$type<GuestRole>(),
+    allowedDomain: text('allowed_domain'),
+    // SHA-256 of the link's token, like API keys. Null until the invitation is approved.
+    tokenHash: text('token_hash').unique(),
+    status: text('status').notNull().$type<GuestInvitationState>(),
+    invitedBy: text('invited_by').references(() => user.id, { onDelete: 'set null' }),
+    // Why a guest manager wants this person in, for the project admin who decides.
+    reason: text('reason'),
+    decidedBy: text('decided_by').references(() => user.id, { onDelete: 'set null' }),
+    decidedAt: bigint('decided_at', { mode: 'number' }),
+    createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+    expiresAt: bigint('expires_at', { mode: 'number' }).notNull(),
+    acceptedBy: text('accepted_by').references(() => user.id, { onDelete: 'set null' }),
+    acceptedAt: bigint('accepted_at', { mode: 'number' })
+  },
+  table => [
+    index('project_guest_invitations_project_idx').on(table.projectId),
+    index('project_guest_invitations_email_idx').on(table.email)
+  ]
+)
+
+export type ProjectGuestInvitation = typeof projectGuestInvitations.$inferSelect
+
+// Whoever asked to hear about every task added to a board ("Notify when tasks are added"). A person
+// hears only of the tasks they may read, the same rule as any notification.
+export const projectWatchers = pgTable(
+  'project_watchers',
+  {
+    projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+    userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+    createdAt: bigint('created_at', { mode: 'number' }).notNull()
+  },
+  table => [primaryKey({ columns: [table.projectId, table.userId] })]
+)
+
+// ─── Team invitations ─────────────────────────────────────────────────────────
+
+// An invitation to join a team, by address. The link is single use, shown to the inviter once, and
+// only the account with this address may accept it. It also lets that person create an account while
+// sign-up is otherwise closed. (Better Auth's own `invitation` table stays unused.)
+export const teamInvitations = pgTable(
+  'team_invitations',
+  {
+    id: text('id').primaryKey(),
+    organizationId: text('organization_id').notNull().references(() => organization.id, { onDelete: 'cascade' }),
+    email: text('email').notNull(),
+    role: text('role').notNull(),
+    tokenHash: text('token_hash').notNull().unique(),
+    invitedBy: text('invited_by').references(() => user.id, { onDelete: 'set null' }),
+    createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+    expiresAt: bigint('expires_at', { mode: 'number' }).notNull(),
+    acceptedBy: text('accepted_by').references(() => user.id, { onDelete: 'set null' }),
+    acceptedAt: bigint('accepted_at', { mode: 'number' }),
+    revokedAt: bigint('revoked_at', { mode: 'number' })
+  },
+  table => [index('team_invitations_organization_idx').on(table.organizationId)]
+)
+
+export type TeamInvitation = typeof teamInvitations.$inferSelect
 
 // Who may read a secret's value: only the managers, or every project member.
 export const SECRET_ACCESS = ['managers', 'members'] as const

@@ -2,6 +2,7 @@ import { and, eq, inArray, isNull, or } from 'drizzle-orm'
 import { db } from '../db'
 import { member, organization, projects } from '../db/schema'
 import { customerIdsOf } from './auth-helpers'
+import { guestProjectIdsOf } from './guests'
 
 /**
  * Boards a person can open in one of their workspaces: every board of a team they are in,
@@ -11,10 +12,12 @@ import { customerIdsOf } from './auth-helpers'
 export async function reachOf(userId: string) {
   const teamIds = (await db.select({ id: member.organizationId }).from(member).where(eq(member.userId, userId))).map(r => r.id)
   const customerIds = await customerIdsOf(userId)
+  const guestIds = await guestProjectIdsOf(userId)
   const filter = or(
     and(eq(projects.userId, userId), isNull(projects.teamId)),
     teamIds.length ? inArray(projects.teamId, teamIds) : undefined,
-    customerIds.length ? inArray(projects.customerId, customerIds) : undefined
+    customerIds.length ? inArray(projects.customerId, customerIds) : undefined,
+    guestIds.length ? inArray(projects.id, guestIds) : undefined
   )
   return { teamIds: new Set(teamIds), filter }
 }

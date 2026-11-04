@@ -79,10 +79,20 @@ export async function customerIdsOf(userId: string): Promise<string[]> {
  * keeps using `projectAccessFilter`: its output is not filtered by visibility,
  * so a customer project is not reachable through it.
  */
-export function sessionProjectFilter(userId: string, teamId: string | null, customerIds: string[]) {
+export function sessionProjectFilter(
+  userId: string,
+  teamId: string | null,
+  customerIds: string[],
+  guestProjectIds: string[] = []
+) {
   const own = projectAccessFilter(userId, teamId)
-  if (teamId || !customerIds.length) return own
-  return or(own, inArray(projects.customerId, customerIds))
+  if (teamId || (!customerIds.length && !guestProjectIds.length)) return own
+  // The boards a person was let onto as a guest open in the personal workspace, like a customer's.
+  return or(
+    own,
+    customerIds.length ? inArray(projects.customerId, customerIds) : undefined,
+    guestProjectIds.length ? inArray(projects.id, guestProjectIds) : undefined
+  )
 }
 
 /**
