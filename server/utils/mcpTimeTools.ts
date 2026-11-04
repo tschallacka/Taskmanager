@@ -2,7 +2,8 @@
 // logged. Entries belong to the person who owns the API key.
 import { formatDuration } from '#shared/utils/duration'
 import { entriesWhere, loadEntries, logEntry, parseEntryDay, parseEntryMinutes, parseEntryNote, parseRange } from './timeTracking'
-import { findStaffBoard, findTask } from './mcpBoardTools'
+import { accessibleBoards, findStaffBoard, findTask } from './mcpBoardTools'
+import { isNarrowedKey } from './mcpAccess'
 import { McpToolError, asToolError, optionalString, requireString } from './mcpToolKit'
 import type { McpToolDefinition } from './mcpToolKit'
 
@@ -76,7 +77,9 @@ export const MCP_TIME_TOOLS: McpToolDefinition[] = [
           where = entriesWhere({ projectIds: [board.id], ...range })
           scope = { board: { id: board.id, name: board.name }, ...range }
         } else {
-          where = entriesWhere({ userId: context.userId, ...range })
+          // A key limited to one board or customer reads the owner's time on its own boards only.
+          const own = isNarrowedKey(context) ? (await accessibleBoards(context)).map(board => board.id) : undefined
+          where = entriesWhere({ userId: context.userId, projectIds: own, ...range })
           scope = { owner: 'the key\'s owner', ...range }
         }
       }

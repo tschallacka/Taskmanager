@@ -4,7 +4,7 @@
 // connect, and every request is authorised on its own.
 import { authenticateApiKey, hasScope } from '../../utils/api-keys'
 import type { ApiKeyContext } from '../../utils/api-keys'
-import { toolsForScopes } from '../../utils/mcpRegistry'
+import { toolsForKey, toolsForScopes } from '../../utils/mcpRegistry'
 import { recordAgentAction } from '../../utils/agentAudit'
 import { McpToolError } from '../../utils/mcpToolKit'
 import { API_KEY_SCOPES } from '../../db/schema'
@@ -133,7 +133,7 @@ async function handleMessage(message: JsonRpcMessage, context: ApiKeyContext) {
 
     case 'tools/list':
       return result(id, {
-        tools: toolsForScopes(context.scopes).map(tool => ({
+        tools: toolsForKey(context).map(tool => ({
           name: tool.name,
           title: tool.title,
           description: tool.description,
@@ -153,14 +153,15 @@ async function handleMessage(message: JsonRpcMessage, context: ApiKeyContext) {
         return failure(id, ErrorCode.InvalidParams, 'Expected a tool "name".')
       }
 
-      const tool = toolsForScopes(context.scopes).find(candidate => candidate.name === name)
+      const tool = toolsForKey(context).find(candidate => candidate.name === name)
       if (!tool) {
         // A tool that exists but is out of scope gets a message the model can act
         // on, rather than one that reads like a client bug.
         const outOfScope = toolsForScopes(ALL_SCOPES).find(candidate => candidate.name === name)
-        return outOfScope
-          ? toolFailure(id, `This API key does not carry the "${outOfScope.scope}" permission that "${name}" requires.`)
-          : failure(id, ErrorCode.MethodNotFound, `Unknown tool "${name}".`)
+        if (!outOfScope) return failure(id, ErrorCode.MethodNotFound, `Unknown tool "${name}".`)
+        return toolFailure(id, hasScope(context, outOfScope.scope)
+          ? `This API key is limited to one ${context.projectId ? 'board' : 'customer'}, and "${name}" works across the whole workspace, so it is not open to it.`
+          : `This API key does not carry the "${outOfScope.scope}" permission that "${name}" requires.`)
       }
 
       try {

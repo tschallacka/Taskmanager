@@ -6,8 +6,7 @@ import { audienceFor, getUserActiveTeamId } from '../utils/auth-helpers'
 import { requireOrgCustomer } from '../utils/customers'
 import { publishFromEvent } from '../utils/realtime'
 import { terminalColumnIds } from '#shared/utils/board'
-
-export const DEFAULT_COLUMNS = ['Backlog', 'To do', 'Verify', 'Done'] as const
+import { columnsForNewBoard } from '../utils/teamSettings'
 
 export default defineEventHandler(async (event) => {
   const userId = event.context.session.user.id
@@ -79,7 +78,7 @@ export default defineEventHandler(async (event) => {
     updatedAt: now
   }).returning()
 
-  const seeded = DEFAULT_COLUMNS.map((name, i) => ({
+  const seeded = (await columnsForNewBoard(teamId)).map((name, i) => ({
     id: genId(),
     projectId: id,
     name,

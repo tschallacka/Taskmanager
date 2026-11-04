@@ -118,7 +118,7 @@ export interface AgentEventRecord {
   customerId: string | null
 }
 
-export interface StreamKey { keyId: string, userId: string, teamId: string | null }
+export interface StreamKey extends KeyReach { keyId: string, userId: string, teamId: string | null }
 
 /** The teams and customers a user belongs to now, read when a stream opens. */
 export interface Membership { teamIds: string[], customerIds: string[] }
@@ -177,13 +177,19 @@ export function audienceOfEvent(customerVisible: boolean, membership: { staff: b
   return null
 }
 
+/** The one board or customer a key is limited to. Both empty means the whole workspace. */
+export interface KeyReach { projectId?: string | null, customerId?: string | null }
+
 /**
  * Whether a key may receive a kept event. A team-pinned key sees only that team's
  * boards, as the browser does for the same team; a personal key sees its own boards and
  * the customer boards it is a contact of. A crew account is a member of its crew's team
- * only, so it never gets another crew's events.
+ * only, so it never gets another crew's events. A key limited to one board or one customer
+ * gets nothing from any other.
  */
-export function deliverableTo(record: Pick<AgentEventRecord, 'audience' | 'teamId'>, keyTeamId: string | null): boolean {
+export function deliverableTo(record: Pick<AgentEventRecord, 'audience' | 'teamId'> & Partial<Pick<AgentEventRecord, 'board' | 'customerId'>>, keyTeamId: string | null, reach: KeyReach = {}): boolean {
+  if (reach.projectId && record.board !== reach.projectId) return false
+  if (reach.customerId && record.customerId !== reach.customerId) return false
   if (keyTeamId) return record.audience === 'staff' && record.teamId === keyTeamId
   return record.audience === 'customer' || (record.audience === 'staff' && record.teamId === null)
 }
@@ -272,6 +278,9 @@ interface Stream {
   keyId: string
   userId: string
   teamId: string | null
+  /** The one board or customer this stream is limited to; null when it follows the whole workspace. */
+  projectId: string | null
+  customerId: string | null
   connection: StreamConnection | null
   membership: Membership | null
   timers: ReturnType<typeof setInterval>[]
@@ -376,6 +385,8 @@ export class AgentEventHub {
       keyId: key.keyId,
       userId: key.userId,
       teamId: key.teamId,
+      projectId: key.projectId ?? null,
+      customerId: key.customerId ?? null,
       connection: null,
       membership: null,
       timers: [],
@@ -411,7 +422,7 @@ export class AgentEventHub {
 
     const frame = frameOfEvent(record)
     for (const stream of [...this.streams.values()]) {
-      if (stream.userId === userId && stream.connection && deliverableTo(record, stream.teamId)) this.send(stream, frame)
+      if (stream.userId === userId && stream.connection && deliverableTo(record, stream.teamId, stream)) this.send(stream, frame)
     }
   }
 
@@ -561,7 +572,7 @@ export class AgentEventHub {
     }
     for (const record of backlog) {
       if (stream.closed) return
-      if (record.id > lastEventId && deliverableTo(record, stream.teamId) && stillMember(record, membership)) {
+      if (record.id > lastEventId && deliverableTo(record, stream.teamId, stream) && stillMember(record, membership)) {
         this.send(stream, frameOfEvent(record))
       }
     }

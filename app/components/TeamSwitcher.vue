@@ -6,7 +6,6 @@ const { isInstanceAdmin, canCreateOrganizations } = useAuth()
 const { refresh: refreshProjects } = useProjects()
 const { refresh: refreshCustomers } = useCustomers()
 
-const showManageModal = ref(false)
 const showCreateModal = ref(false)
 const showJoinModal = ref(false)
 const showCustomersModal = ref(false)
@@ -88,9 +87,9 @@ const dropdownItems = computed<DropdownMenuItem[]>(() => {
       onSelect: () => { showCustomersModal.value = true }
     })
     items.push({
-      label: 'Team Settings & Members',
+      label: 'Team',
       icon: 'i-lucide-settings-2',
-      onSelect: () => { showManageModal.value = true }
+      onSelect: () => { navigateTo('/team') }
     })
   }
 
@@ -153,7 +152,6 @@ const dropdownItems = computed<DropdownMenuItem[]>(() => {
     </UDropdownMenu>
 
     <TeamManageModal
-      v-model:open="showManageModal"
       v-model:create-open="showCreateModal"
       v-model:join-open="showJoinModal"
     />

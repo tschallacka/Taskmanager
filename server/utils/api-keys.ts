@@ -43,6 +43,10 @@ export interface ApiKeyContext {
   userId: string
   /** The single workspace this key may touch; null for the owner's personal workspace. */
   teamId: string | null
+  /** Set when the key is limited to one customer's boards; its team is then set too. */
+  customerId: string | null
+  /** Set when the key is limited to one board; its team is then set too. */
+  projectId: string | null
   scopes: ApiKeyScope[]
 }
 
@@ -132,6 +136,8 @@ export async function authenticateApiKey(event: H3Event): Promise<ApiKeyContext>
     keyName: key.name,
     userId: key.userId,
     teamId: key.teamId,
+    customerId: key.customerId,
+    projectId: key.projectId,
     scopes: key.scopes.filter(isApiKeyScope)
   }
 }

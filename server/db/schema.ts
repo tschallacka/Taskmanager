@@ -101,6 +101,14 @@ export const organization = pgTable('organization', {
   joinCode: text('join_code').unique()
 })
 
+// Settings a team keeps for itself. One row per team, made when something is first set.
+export const teamSettings = pgTable('team_settings', {
+  teamId: text('team_id').primaryKey().references(() => organization.id, { onDelete: 'cascade' }),
+  // The columns a new board starts with, in order. NULL = the built-in set.
+  defaultColumns: json('default_columns').$type<string[] | null>(),
+  updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
+})
+
 export const member = pgTable(
   'member',
   {
@@ -709,6 +717,10 @@ export const apiKeys = pgTable(
     // The workspace this key can reach. NULL means the owner's personal workspace;
     // otherwise the key is pinned to one team and never follows the owner around.
     teamId: text('team_id').references(() => organization.id, { onDelete: 'cascade' }),
+    // A team key may be limited further, to one customer's boards or to one board. At most
+    // one of the two is set. A key whose customer or board is deleted goes with it.
+    customerId: text('customer_id').references(() => customers.id, { onDelete: 'cascade' }),
+    projectId: text('project_id').references(() => projects.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
     // Only the SHA-256 digest is stored — the key itself is shown once, at creation.
     keyHash: text('key_hash').notNull().unique(),

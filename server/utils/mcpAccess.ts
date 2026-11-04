@@ -6,16 +6,27 @@
 // what that audience may change. Anything hidden from them is hidden from the
 // agent, and anything the app would refuse them is refused here.
 import { and, eq, inArray, or, sql } from 'drizzle-orm'
-import { projectTasks } from '../db/schema'
+import { projects, projectTasks } from '../db/schema'
 import type { Project } from '../db/schema'
 import type { ApiKeyContext } from './api-keys'
 import { audienceFor, customerIdsOf, sessionProjectFilter } from './auth-helpers'
 import type { Audience } from './auth-helpers'
 import { McpToolError } from './mcpToolKit'
 
-/** The boards this key's person can open: the same filter the browser uses. */
+/** Whether the key is limited to one customer's boards or to one board. */
+export function isNarrowedKey(context: Pick<ApiKeyContext, 'customerId' | 'projectId'>): boolean {
+  return Boolean(context.customerId || context.projectId)
+}
+
+/**
+ * The boards this key's person can open: the same filter the browser uses, cut down to the
+ * one board or customer a limited key is pinned to.
+ */
 export async function boardFilter(context: ApiKeyContext) {
-  return sessionProjectFilter(context.userId, context.teamId, await customerIdsOf(context.userId))
+  const open = sessionProjectFilter(context.userId, context.teamId, await customerIdsOf(context.userId))
+  if (context.projectId) return and(open, eq(projects.id, context.projectId))
+  if (context.customerId) return and(open, eq(projects.customerId, context.customerId))
+  return open
 }
 
 /** How the person relates to a board: on its team, or a customer's contact. */
