@@ -139,15 +139,15 @@ function menuItems(project: Project) {
     onSelect: () => togglePin(project.id)
   }]
   if (project.audience === 'customer') return [pin]
-  const manage = [
+  const manage: { label: string, icon: string, onSelect: () => unknown }[] = [
     { label: 'Rename', icon: 'i-lucide-pencil', onSelect: () => startRename(project) }
   ]
   // A team's owner or admin gives a board a crew; the Crews section of /team does the attaching.
-  if (isTeamAdmin.value && project.teamId) {
+  if (isTeamAdmin.value) {
     manage.push({
       label: 'Give it a crew',
       icon: 'i-lucide-users-round',
-      onSelect: () => navigateTo({ path: '/team', query: { section: 'crews', board: project.id } })
+      onSelect: () => { void navigateTo({ path: '/team', query: { section: 'crews', board: project.id } }) }
     })
   }
   return [pin, manage, [

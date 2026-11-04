@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => {
   const membership = await requireTeamRole(event, teamId, ['owner', 'admin', 'member'])
   const canAttach = ['owner', 'admin'].includes(membership.role)
 
-  const links = await crewLinksOfTeam(teamId)
+  const links = await crewLinksOfTeam(teamId, event.context.session.user.id)
   if (!canAttach) return { links, canAttach, crews: [], boards: [] }
 
   const [crews, boards] = await Promise.all([

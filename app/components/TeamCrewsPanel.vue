@@ -10,6 +10,7 @@ const props = defineProps<{ teamId: string }>()
 
 const toast = useToast()
 const route = useRoute()
+const { switchWorkspace } = useWorkspace()
 
 const data = ref<TeamCrewsList | null>(null)
 const loading = ref(false)
@@ -79,6 +80,12 @@ async function detach() {
   } finally {
     detaching.value = false
   }
+}
+
+// The shadow board is in the crew's own team: switch there first, as a pinned board does.
+async function openCrewBoard(link: TeamCrewLink) {
+  await switchWorkspace(link.crewTeamId)
+  await navigateTo(`/projects/${link.shadowProjectId}`)
 }
 
 const isDetachOpen = computed({
@@ -220,12 +227,14 @@ const SELECT_CLASS = 'min-w-0 flex-1 rounded-md border border-default bg-default
         </div>
         <div class="flex shrink-0 items-center gap-2">
           <UButton
-            :to="`/projects/${link.shadowProjectId}`"
             size="xs"
             color="neutral"
             variant="soft"
             icon="i-lucide-arrow-up-right"
+            :disabled="!link.canOpen"
+            :title="link.canOpen ? undefined : 'Only members of the crew\'s own team can open its board.'"
             data-team-crew-open
+            @click="openCrewBoard(link)"
           >
             Crew board
           </UButton>

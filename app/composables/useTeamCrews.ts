@@ -5,6 +5,9 @@ export interface TeamCrewLink {
   crewId: string
   crewName: string
   crewSlug: string
+  crewTeamId: string
+  // Whether the caller belongs to the crew's team, the only people who can open its board.
+  canOpen: boolean
   crewDisabled: boolean
   projectId: string
   projectName: string
@@ -26,7 +29,7 @@ export function listTeamCrews(teamId: string): Promise<TeamCrewsList> {
 }
 
 export function attachTeamCrew(teamId: string, crewId: string, projectId: string): Promise<{ id: string, shadowProjectId: string }> {
-  return $fetch(`/api/teams/${teamId}/crews`, { method: 'POST', body: { crewId, projectId } })
+  return $fetch<{ id: string, shadowProjectId: string }>(`/api/teams/${teamId}/crews`, { method: 'POST', body: { crewId, projectId } })
 }
 
 export function detachTeamCrew(teamId: string, linkId: string): Promise<{ ok: true }> {

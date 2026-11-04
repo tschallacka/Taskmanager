@@ -24,13 +24,21 @@ export function isNarrowedKey(context: Pick<ApiKeyContext, 'customerId' | 'proje
  */
 export async function boardFilter(context: ApiKeyContext) {
   const open = sessionProjectFilter(context.userId, context.teamId, await customerIdsOf(context.userId))
-  if (context.projectId) return and(open, eq(projects.id, context.projectId))
-  if (context.customerId) return and(open, eq(projects.customerId, context.customerId))
-  return open
+  const reach = context.projectId
+    ? and(open, eq(projects.id, context.projectId))
+    : context.customerId ? and(open, eq(projects.customerId, context.customerId)) : open
+  // A crew's read reach on the real boards it works on; only a plain read call carries it.
+  const granted = context.readGrantedBoardIds ?? []
+  return granted.length ? or(reach, inArray(projects.id, granted)) : reach
 }
 
-/** How the person relates to a board: on its team, or a customer's contact. */
-export function audienceOf(context: ApiKeyContext, board: Pick<Project, 'userId' | 'teamId'>): Audience {
+/**
+ * How the person relates to a board: on its team, or a customer's contact. A board a crew reads
+ * through its crew link counts as the team's, so the crew sees every task on it; it can only be
+ * reached by a read call, so nothing it may not do is ever asked of it.
+ */
+export function audienceOf(context: ApiKeyContext, board: Pick<Project, 'userId' | 'teamId'> & { id?: string }): Audience {
+  if (board.id && context.readGrantedBoardIds?.includes(board.id)) return 'staff'
   return audienceFor(context.userId, context.teamId, board)
 }
 

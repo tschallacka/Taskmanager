@@ -48,6 +48,11 @@ export interface ApiKeyContext {
   /** Set when the key is limited to one board; its team is then set too. */
   projectId: string | null
   scopes: ApiKeyScope[]
+  /**
+   * Real boards a crew may READ through a crew link, set by the MCP server for a plain read tool only
+   * (see crewBoardAccess.ts). Never set on a write call, so those boards do not resolve for it.
+   */
+  readGrantedBoardIds?: string[]
 }
 
 function readBearerToken(event: H3Event): string | null {

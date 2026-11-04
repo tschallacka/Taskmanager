@@ -39,7 +39,8 @@ before(async () => {
   ])
   await db.insert(member).values([
     { id: id('m1'), organizationId: realTeam, userId: owner, role: 'owner', createdAt: at },
-    { id: id('m2'), organizationId: realTeam, userId: other, role: 'admin', createdAt: at }
+    { id: id('m2'), organizationId: realTeam, userId: other, role: 'admin', createdAt: at },
+    { id: id('m3'), organizationId: crewTeam, userId: other, role: 'member', createdAt: at }
   ])
   await db.insert(customers).values({ id: customer, organizationId: crewTeam, name: 'Crew product', createdAt: now, updatedAt: now })
   const crewRow = (cid: string, slug: string, by: string, disabledAt: number | null = null) =>
@@ -102,12 +103,16 @@ test('a board of another team, an archived board and a crew own board are refuse
 })
 
 test('the links are listed under the team of the real board, and not under the crew team', async () => {
-  const links = await crewLinksOfTeam(realTeam)
+  const links = await crewLinksOfTeam(realTeam, owner)
   assert.equal(links.length, 1)
   assert.equal(links[0]!.crewId, crew.mine)
   assert.equal(links[0]!.projectId, board.real)
   assert.equal(links[0]!.crewDisabled, false)
-  assert.deepEqual(await crewLinksOfTeam(crewTeam), [])
+  assert.deepEqual(await crewLinksOfTeam(crewTeam, owner), [])
+  // Only a member of the crew's team can open its shadow board.
+  assert.equal(links[0]!.crewTeamId, crewTeam)
+  assert.equal(links[0]!.canOpen, false)
+  assert.equal((await crewLinksOfTeam(realTeam, other))[0]!.canOpen, true)
 })
 
 test('detaching drops the link and archives the shadow board instead of deleting it', async () => {
@@ -117,9 +122,11 @@ test('detaching drops the link and archives the shadow board instead of deleting
   assert.ok(link)
 
   await detachCrew(link!)
-  assert.deepEqual(await crewLinksOfTeam(realTeam), [])
+  assert.deepEqual(await crewLinksOfTeam(realTeam, owner), [])
   const [shadow] = await db.select().from(projects).where(eq(projects.id, row!.shadowProjectId))
   assert.ok(shadow!.archivedAt)
+  // Renamed, so a crew given the board again does not leave two boards of one name.
+  assert.match(shadow!.name, /\(taken off\)$/)
   // The crew can be given the board again after it was taken off.
   const again = await attachCrew({ crew: await requireOwnCrew(crew.mine, owner), projectId: board.real, teamId: realTeam, userId: owner })
   assert.notEqual(again.shadowProjectId, row!.shadowProjectId)

@@ -4,11 +4,11 @@
 //   - the crew's own boards are never real boards;
 //   - the crew reads the real board and never writes to it (the access side lives in crewBoardAccess.ts);
 //   - detaching drops the link and archives the shadow board, so the crew's notes are kept.
-import { and, desc, eq, isNull } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { createError } from 'h3'
 import { db } from '../db'
-import { crewBoards, crews, projectColumns, projects } from '../db/schema'
+import { crewBoards, crews, member, projectColumns, projects } from '../db/schema'
 import type { Crew, CrewBoard } from '../db/schema'
 import { genId } from './projects'
 import { BOARD_COLUMNS } from './crewProvisioning'
@@ -24,6 +24,8 @@ export interface CrewLinkView {
   crewId: string
   crewName: string
   crewSlug: string
+  crewTeamId: string
+  canOpen: boolean
   crewDisabled: boolean
   projectId: string
   projectName: string
@@ -108,12 +110,16 @@ export async function findCrewLink(teamId: string, linkId: string): Promise<Crew
 export async function detachCrew(link: CrewBoard): Promise<void> {
   await db.transaction(async (tx) => {
     await tx.delete(crewBoards).where(eq(crewBoards.id, link.id))
-    await tx.update(projects).set({ archivedAt: Date.now() }).where(eq(projects.id, link.shadowProjectId))
+    await tx.update(projects).set({ archivedAt: Date.now(), name: sql`${projects.name} || ' (taken off)'` }).where(eq(projects.id, link.shadowProjectId))
   })
 }
 
-/** Every crew link on the boards of a team, newest first, for the Crews section and the board menu. */
-export async function crewLinksOfTeam(teamId: string): Promise<CrewLinkView[]> {
+/**
+ * Every crew link on the boards of a team, newest first, for the Crews section and the board menu.
+ * `canOpen` says whether `userId` belongs to the crew's team: the shadow board is in that team, and
+ * only its members can open it.
+ */
+export async function crewLinksOfTeam(teamId: string, userId: string): Promise<CrewLinkView[]> {
   const real = alias(projects, 'real_board')
   const shadow = alias(projects, 'shadow_board')
   const rows = await db
@@ -122,6 +128,7 @@ export async function crewLinksOfTeam(teamId: string): Promise<CrewLinkView[]> {
       crewId: crews.id,
       crewName: crews.name,
       crewSlug: crews.slug,
+      crewTeamId: crews.teamId,
       crewDisabledAt: crews.disabledAt,
       projectId: real.id,
       projectName: real.name,
@@ -133,7 +140,12 @@ export async function crewLinksOfTeam(teamId: string): Promise<CrewLinkView[]> {
     .innerJoin(crews, eq(crews.id, crewBoards.crewId))
     .innerJoin(real, eq(real.id, crewBoards.projectId))
     .innerJoin(shadow, eq(shadow.id, crewBoards.shadowProjectId))
-    .where(eq(real.teamId, teamId))
+    .where(and(eq(real.teamId, teamId), isNull(shadow.archivedAt)))
     .orderBy(desc(crewBoards.createdAt))
-  return rows.map(({ crewDisabledAt, ...row }) => ({ ...row, crewDisabled: crewDisabledAt !== null }))
+  const mine = rows.length
+    ? await db.select({ teamId: member.organizationId }).from(member)
+        .where(and(eq(member.userId, userId), inArray(member.organizationId, rows.map(row => row.crewTeamId))))
+    : []
+  const mineIds = new Set(mine.map(row => row.teamId))
+  return rows.map(({ crewDisabledAt, ...row }) => ({ ...row, crewDisabled: crewDisabledAt !== null, canOpen: mineIds.has(row.crewTeamId) }))
 }

@@ -5,6 +5,7 @@
 import { authenticateApiKey, hasScope } from '../../utils/api-keys'
 import type { ApiKeyContext } from '../../utils/api-keys'
 import { toolsForKey, toolsForScopes } from '../../utils/mcpRegistry'
+import { mayUseReadGrant, readGrantedBoardIds } from '../../utils/crewBoardAccess'
 import { recordAgentAction } from '../../utils/agentAudit'
 import { McpToolError } from '../../utils/mcpToolKit'
 import { API_KEY_SCOPES } from '../../db/schema'
@@ -165,7 +166,11 @@ async function handleMessage(message: JsonRpcMessage, context: ApiKeyContext) {
       }
 
       try {
-        const value = await tool.handler(asRecord(params.arguments), context)
+        // A crew's read reach on the real boards it works on goes only to a plain read tool.
+        const callContext = mayUseReadGrant(tool)
+          ? { ...context, readGrantedBoardIds: await readGrantedBoardIds(context) }
+          : context
+        const value = await tool.handler(asRecord(params.arguments), callContext)
         if (!tool.readOnly) announceWrite(tool, value, context)
         // Only what succeeded is recorded; the recording never fails or slows the call.
         if (tool.audit ?? !tool.readOnly) void recordAgentAction(tool, asRecord(params.arguments), value, context)
