@@ -12,6 +12,7 @@ import { crewBoards, crews, member, projectColumns, projects } from '../db/schem
 import type { Crew, CrewBoard } from '../db/schema'
 import { genId } from './projects'
 import { BOARD_COLUMNS } from './crewProvisioning'
+import { removeForks } from './crewForks'
 
 export interface CrewChoice {
   id: string
@@ -106,8 +107,9 @@ export async function findCrewLink(teamId: string, linkId: string): Promise<Crew
   return row?.link
 }
 
-/** Drops the link and archives the shadow board, so what the crew wrote on it is kept. */
+/** Drops the link and archives the shadow board, so what the crew wrote on it is kept. The forked members go: their keys reach nothing else. */
 export async function detachCrew(link: CrewBoard): Promise<void> {
+  await removeForks(link.id)
   await db.transaction(async (tx) => {
     await tx.delete(crewBoards).where(eq(crewBoards.id, link.id))
     await tx.update(projects).set({ archivedAt: Date.now(), name: sql`${projects.name} || ' (taken off)'` }).where(eq(projects.id, link.shadowProjectId))

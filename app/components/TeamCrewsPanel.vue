@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { attachTeamCrew, detachTeamCrew, listTeamCrews } from '~/composables/useTeamCrews'
-import type { TeamCrewLink, TeamCrewsList } from '~/composables/useTeamCrews'
+import { attachTeamCrew, detachTeamCrew, forkTeamCrew, listTeamCrews, unforkTeamCrew } from '~/composables/useTeamCrews'
+import type { ForkResult, TeamCrewLink, TeamCrewsList } from '~/composables/useTeamCrews'
 
 // The crews working on this team's boards. Each one keeps a shadow board of its own, in its own
 // team, for the board it works on. It reads the real board and never writes to it: the results
@@ -95,6 +95,69 @@ const isDetachOpen = computed({
     if (!open) confirmDetach.value = null
   }
 })
+
+// ─── Members forked for a board ──────────────────────────────
+
+const forkBusy = ref(false)
+// The keys of a fork or a rotate, shown once and then dropped.
+const forkResult = ref<ForkResult | null>(null)
+const forkConfirm = ref<{ link: TeamCrewLink, action: 'rotate' | 'remove' } | null>(null)
+
+async function fork(link: TeamCrewLink) {
+  if (forkBusy.value) return
+  forkBusy.value = true
+  try {
+    forkResult.value = await forkTeamCrew(props.teamId, link.id, false)
+    await load()
+  } catch (e) {
+    fail(e, 'Could not fork the crew')
+  } finally {
+    forkBusy.value = false
+  }
+}
+
+async function confirmForkAction() {
+  const pending = forkConfirm.value
+  if (!pending || forkBusy.value) return
+  forkBusy.value = true
+  try {
+    if (pending.action === 'rotate') forkResult.value = await forkTeamCrew(props.teamId, pending.link.id, true)
+    else await unforkTeamCrew(props.teamId, pending.link.id)
+    forkConfirm.value = null
+    await load()
+  } catch (e) {
+    fail(e, pending.action === 'rotate' ? 'Could not make new keys' : 'Could not remove the forks')
+  } finally {
+    forkBusy.value = false
+  }
+}
+
+const isForkConfirmOpen = computed({
+  get: () => forkConfirm.value !== null,
+  set: (open) => {
+    if (!open) forkConfirm.value = null
+  }
+})
+
+const isForkResultOpen = computed({
+  get: () => forkResult.value !== null,
+  set: (open) => {
+    if (!open) forkResult.value = null
+  }
+})
+
+// The file Boss reads the keys from: the whole answer, passwords included, as it was sent.
+function downloadForks() {
+  const result = forkResult.value
+  if (!result) return
+  const board = result.board.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'board'
+  const url = URL.createObjectURL(new Blob([`${JSON.stringify(result, null, 2)}\n`], { type: 'application/json' }))
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = `forks-${result.crew.slug}-${board}.json`
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
 
 const SELECT_CLASS = 'min-w-0 flex-1 rounded-md border border-default bg-default px-2 py-1.5 text-sm text-default outline-none focus:border-primary'
 </script>
@@ -249,6 +312,72 @@ const SELECT_CLASS = 'min-w-0 flex-1 rounded-md border border-default bg-default
             @click="confirmDetach = link"
           />
         </div>
+        <div
+          v-if="link.mine || link.forks.length"
+          class="basis-full space-y-1.5 border-t border-default pt-2"
+          data-team-crew-forks
+        >
+          <p class="text-xs text-muted">
+            <template v-if="link.forks.length">
+              Members forked for this board, each with a key that reaches only the crew's board:
+            </template>
+            <template v-else>
+              The members work for the whole crew. Fork them to give this board agents of their own, named for it, each with a key that reaches only its crew board.
+            </template>
+          </p>
+          <div
+            v-if="link.forks.length"
+            class="flex flex-wrap gap-1.5"
+          >
+            <UBadge
+              v-for="forked in link.forks"
+              :key="forked.key"
+              size="xs"
+              variant="subtle"
+              color="neutral"
+              data-team-crew-fork
+            >
+              {{ forked.agentType }}
+            </UBadge>
+          </div>
+          <div
+            v-if="link.mine"
+            class="flex flex-wrap gap-2"
+          >
+            <UButton
+              v-if="!link.forks.length"
+              size="xs"
+              icon="i-lucide-git-fork"
+              :loading="forkBusy"
+              data-team-crew-fork-new
+              @click="fork(link)"
+            >
+              Fork the crew for this board
+            </UButton>
+            <template v-else>
+              <UButton
+                size="xs"
+                color="neutral"
+                variant="soft"
+                icon="i-lucide-refresh-cw"
+                data-team-crew-fork-rotate
+                @click="forkConfirm = { link, action: 'rotate' }"
+              >
+                New keys
+              </UButton>
+              <UButton
+                size="xs"
+                color="error"
+                variant="ghost"
+                icon="i-lucide-trash-2"
+                data-team-crew-fork-remove
+                @click="forkConfirm = { link, action: 'remove' }"
+              >
+                Remove the forks
+              </UButton>
+            </template>
+          </div>
+        </div>
       </li>
     </ul>
 
@@ -274,6 +403,81 @@ const SELECT_CLASS = 'min-w-0 flex-1 rounded-md border border-default bg-default
           >
             Take it off
           </UButton>
+        </div>
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="isForkConfirmOpen"
+      :title="forkConfirm?.action === 'rotate' ? 'Make new keys for the forks?' : 'Remove the forks?'"
+      :description="forkConfirm?.action === 'rotate'
+        ? 'The current keys of these agents stop working at once. You get new ones, once.'
+        : 'These agents lose their accounts and keys at once. The crew stays on the board.'"
+    >
+      <template #body>
+        <div class="flex justify-end gap-2">
+          <UButton
+            color="neutral"
+            variant="soft"
+            :disabled="forkBusy"
+            @click="isForkConfirmOpen = false"
+          >
+            Cancel
+          </UButton>
+          <UButton
+            :color="forkConfirm?.action === 'rotate' ? 'warning' : 'error'"
+            :loading="forkBusy"
+            data-team-crew-fork-confirm
+            @click="confirmForkAction"
+          >
+            {{ forkConfirm?.action === 'rotate' ? 'Make new keys' : 'Remove' }}
+          </UButton>
+        </div>
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="isForkResultOpen"
+      title="The forked members"
+      description="Shown once. Copy the keys or download the file now, and name each agent after its agent type."
+    >
+      <template #body>
+        <div
+          class="space-y-3"
+          data-team-crew-fork-result
+        >
+          <div class="max-h-72 divide-y divide-default overflow-y-auto rounded-lg border border-default text-xs">
+            <div
+              v-for="m in forkResult?.members"
+              :key="m.key"
+              class="space-y-0.5 px-3 py-2"
+            >
+              <p class="font-medium text-default">
+                {{ m.agentType }}
+                <span class="font-normal text-muted">({{ m.name }})</span>
+              </p>
+              <p class="break-all font-mono text-muted">
+                {{ m.apiKey }}
+              </p>
+            </div>
+          </div>
+          <p class="text-xs text-muted">
+            Each key reaches only the crew's board for this board, and reads this board. The file also holds each account's password.
+          </p>
+          <div class="flex justify-end gap-2">
+            <UButton
+              color="neutral"
+              variant="soft"
+              icon="i-lucide-download"
+              data-team-crew-fork-download
+              @click="downloadForks"
+            >
+              Download
+            </UButton>
+            <UButton @click="isForkResultOpen = false">
+              Done
+            </UButton>
+          </div>
         </div>
       </template>
     </UModal>

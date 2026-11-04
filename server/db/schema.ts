@@ -1140,6 +1140,27 @@ export const crewBoards = pgTable(
 
 export type CrewBoard = typeof crewBoards.$inferSelect
 
+// A member of a crew forked for one board (Q36): its own account and key, named for the board
+// (`internal-tools-wren`), with a key limited to that board's shadow board. The account belongs to the
+// crew (user.crewId) so it is cut off with the crew, but the crew's own rotate leaves it alone.
+export const crewBoardMembers = pgTable(
+  'crew_board_members',
+  {
+    id: text('id').primaryKey(),
+    linkId: text('link_id').notNull().references(() => crewBoards.id, { onDelete: 'cascade' }),
+    userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+    personKey: text('person_key').notNull(),
+    agentType: text('agent_type').notNull(),
+    createdAt: bigint('created_at', { mode: 'number' }).notNull()
+  },
+  table => [
+    uniqueIndex('crew_board_members_link_person_idx').on(table.linkId, table.personKey),
+    uniqueIndex('crew_board_members_user_idx').on(table.userId)
+  ]
+)
+
+export type CrewBoardMember = typeof crewBoardMembers.$inferSelect
+
 // The crew API window (BRIEF-crew-feature 2b): one row, id "gate". While openUntil is
 // in the future a remote caller may use the temporary crews:manage key tempKeyId.
 // Stored here, not in memory, so a restart neither leaves it open nor loses the reason

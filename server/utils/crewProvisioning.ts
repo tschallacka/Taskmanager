@@ -4,13 +4,13 @@
 // Passwords and keys leave this module once, in the create or rotate result; nothing
 // here logs them, and an error message never carries them.
 import { randomBytes } from 'node:crypto'
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray, notInArray } from 'drizzle-orm'
 import { hashPassword } from 'better-auth/crypto'
 import { createError } from 'h3'
 import type { H3Event } from 'h3'
 import { db } from '../db'
 import {
-  account, agentAudit, apiKeys, crews, customerMembers, customers, member,
+  account, agentAudit, apiKeys, crewBoardMembers, crews, customerMembers, customers, member,
   organization, projectColumns, projects, session, user
 } from '../db/schema'
 import type { ApiKeyScope, Crew } from '../db/schema'
@@ -126,8 +126,20 @@ function roleOf(key: string) {
   return CREW_PEOPLE.find(person => person.key === key)
 }
 
-async function accountsOf(crewId: string) {
+/** Every account of the crew, the members forked for a board included. */
+async function allAccountsOf(crewId: string) {
   return db.select({ id: user.id, name: user.name, email: user.email }).from(user).where(eq(user.crewId, crewId))
+}
+
+/**
+ * The crew's own people. A member forked for one board has an account too, but belongs to that board's
+ * link: the crew's rotate and its status view leave it alone, or rotating would widen its limited key.
+ */
+async function accountsOf(crewId: string) {
+  return db
+    .select({ id: user.id, name: user.name, email: user.email })
+    .from(user)
+    .where(and(eq(user.crewId, crewId), notInArray(user.id, db.select({ id: crewBoardMembers.userId }).from(crewBoardMembers))))
 }
 
 /** The crew without any secret, as the status calls answer it. */
@@ -373,7 +385,8 @@ export async function crewBySlug(slug: string): Promise<Crew> {
 /** Cuts a crew off at once: keys revoked, sessions ended. Sign-in is refused by the auth hook. Idempotent. */
 export async function disableCrew(crew: Crew) {
   await db.update(crews).set({ disabledAt: crew.disabledAt ?? Date.now() }).where(eq(crews.id, crew.id))
-  const ids = (await accountsOf(crew.id)).map(a => a.id)
+  // Everyone of the crew, forks included: disabling cuts all of them off at once.
+  const ids = (await allAccountsOf(crew.id)).map(a => a.id)
   if (ids.length) {
     await db.delete(apiKeys).where(inArray(apiKeys.userId, ids))
     await db.delete(session).where(inArray(session.userId, ids))
