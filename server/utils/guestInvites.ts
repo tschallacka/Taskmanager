@@ -7,7 +7,7 @@ import { notifications, projectGuestInvitations, projectGuests, user } from '../
 import type { GuestRole } from '../db/schema'
 import { INVITATION_TTL_MS, newInvitationToken } from './customers'
 import { isInvalidDomain } from './crewAccounts'
-import { accountByEmail, emailInDomain, guestRowOf, normalizeDomain, normalizeEmail, parseGuestRole } from './guests'
+import { accountByEmail, emailInDomain, guestRowOf, normalizeEmail, parseAllowedDomain, parseGuestRole } from './guests'
 import { mailInvitation } from './invitations'
 import { listProjectPeople, vaultRoleOf } from './projectMembers'
 import { genId } from './projects'
@@ -126,11 +126,7 @@ export async function inviteGuest(
     throw createError({ statusCode: 403, message: 'Only a project admin can make someone a manager guest' })
   }
 
-  let allowedDomain: string | null = null
-  if (role === 'manager' && input.allowedDomain !== undefined && input.allowedDomain !== null && input.allowedDomain !== '') {
-    allowedDomain = normalizeDomain(input.allowedDomain)
-    if (!allowedDomain) throw createError({ statusCode: 400, message: 'Write the domain like superfabulousshop.com' })
-  }
+  const allowedDomain = role === 'manager' ? parseAllowedDomain(input.allowedDomain) : null
 
   // Someone who already has the access a guest would get is not invited again.
   const account = await accountByEmail(email)
@@ -318,10 +314,7 @@ export async function changeGuest(
 
   const role = patch.role === undefined ? row.role : parseGuestRole(patch.role)
   let allowedDomain = row.allowedDomain
-  if (patch.allowedDomain !== undefined) {
-    allowedDomain = patch.allowedDomain === null || patch.allowedDomain === '' ? null : normalizeDomain(patch.allowedDomain)
-    if (patch.allowedDomain && !allowedDomain) throw createError({ statusCode: 400, message: 'Write the domain like superfabulousshop.com' })
-  }
+  if (patch.allowedDomain !== undefined) allowedDomain = parseAllowedDomain(patch.allowedDomain)
   await db.update(projectGuests).set({ role, allowedDomain: role === 'manager' ? allowedDomain : null }).where(eq(projectGuests.id, row.id))
   await announce(project)
 }

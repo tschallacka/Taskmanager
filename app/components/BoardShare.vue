@@ -91,12 +91,18 @@ function domainOf(address: string): string {
   return at < 0 ? '' : address.slice(at + 1).trim().toLowerCase()
 }
 
+// A public mail provider is never offered as a manager guest's domain.
+function suggestedDomain(address: string): string {
+  const domain = domainOf(address)
+  return isPublicMailDomain(domain) ? '' : domain
+}
+
 // A manager guest's domain follows the address typed, until the admin writes their own.
 watch(email, (value) => {
   if (role.value === 'manager' && !domainTouched.value) domain.value = domainOf(value)
 })
 watch(role, (value) => {
-  if (value === 'manager' && !domainTouched.value) domain.value = domainOf(email.value)
+  if (value === 'manager' && !domainTouched.value) domain.value = suggestedDomain(email.value)
 })
 
 const typedDomain = computed(() => domainOf(email.value))
@@ -164,7 +170,7 @@ function changeGuestRole(guest: Guest, next: GuestRole) {
   if (guest.role === next) return
   // A manager guest keeps their domain when switched back later; the server drops it for an editor.
   return act(`g:${guest.userId}`, () => untypedFetch(`${base.value}/guests/${guest.userId}`, {
-    method: 'PUT', headers: realtimeHeaders(), body: { role: next, allowedDomain: next === 'manager' ? (guest.allowedDomain ?? domainOf(guest.email)) : null }
+    method: 'PUT', headers: realtimeHeaders(), body: { role: next, allowedDomain: next === 'manager' ? (guest.allowedDomain ?? suggestedDomain(guest.email)) : null }
   }), 'Could not change the role')
 }
 
@@ -172,7 +178,7 @@ const editingDomain = ref<string | null>(null)
 const domainDraft = ref('')
 function startDomain(guest: Guest) {
   editingDomain.value = guest.userId
-  domainDraft.value = guest.allowedDomain ?? domainOf(guest.email)
+  domainDraft.value = guest.allowedDomain ?? suggestedDomain(guest.email)
 }
 async function saveDomain(guest: Guest) {
   const value = domainDraft.value
@@ -350,7 +356,7 @@ watch(open, (isOpen) => {
             <UFormField
               v-if="authority === 'admin' && role === 'manager'"
               label="Domain this manager guest may invite at"
-              help="They invite people at this domain straight away, and must ask you for anyone else."
+              help="Your whitelist: they invite people at this company domain straight away and must ask you for anyone else. Public mail providers like gmail.com cannot be whitelisted."
             >
               <UInput
                 v-model="domain"

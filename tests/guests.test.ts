@@ -260,6 +260,13 @@ test('"notify when tasks are added" tells a guest of what is not private, and ne
   assert.equal(await isWatching(board, manager), false)
 })
 
+test('a public mail provider can never be whitelisted as a manager guest\'s domain', async () => {
+  await refuses(invites.inviteGuest(project(), owner, { email: 'a@company.test', role: 'manager', allowedDomain: 'gmail.com' }, link), 400, /public mail provider/)
+  await refuses(invites.changeGuest(project(), owner, manager, { allowedDomain: '@Outlook.com' }), 400, /public mail provider/)
+  assert.equal(guests.parseAllowedDomain(''), null)
+  assert.equal(guests.parseAllowedDomain('Company.test'), 'company.test')
+})
+
 test('a team invitation is looked up by its link, and is spent or withdrawn for good', async () => {
   const { hashInvitationToken, newInvitationToken } = await import('../server/utils/customers')
   const { token, tokenHash } = newInvitationToken()

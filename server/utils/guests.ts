@@ -3,6 +3,7 @@ import { and, eq } from 'drizzle-orm'
 import { db } from '../db'
 import { projectGuests, user } from '../db/schema'
 import type { GuestRole } from '../db/schema'
+import { isPublicMailDomain } from '#shared/utils/mailDomains'
 
 /** The boards a person is a guest of. */
 export async function guestProjectIdsOf(userId: string): Promise<string[]> {
@@ -23,6 +24,20 @@ export function normalizeDomain(input: unknown): string | null {
   const domain = input.trim().toLowerCase().replace(/^@/, '')
   if (domain.length > 253) return null
   return /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(domain) ? domain : null
+}
+
+/**
+ * A domain a project admin may whitelist for a manager guest: a real domain, and not a public mail
+ * provider. Null input is "no domain". Anything else that fails is a 400 saying why.
+ */
+export function parseAllowedDomain(input: unknown): string | null {
+  if (input === undefined || input === null || input === '') return null
+  const domain = normalizeDomain(input)
+  if (!domain) throw createError({ statusCode: 400, message: 'Write the domain like superfabulousshop.com' })
+  if (isPublicMailDomain(domain)) {
+    throw createError({ statusCode: 400, message: `${domain} is a public mail provider. Whitelist a company domain, and invite people at ${domain} one by one.` })
+  }
+  return domain
 }
 
 /** Lowercase and trimmed, or null when it is not an address. */
