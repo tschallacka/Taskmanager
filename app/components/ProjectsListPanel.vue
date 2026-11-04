@@ -8,7 +8,7 @@ const { ready, projects, allTasks, deleteProject, renameProject } = useProjects(
 const route = useRoute()
 const { unread: inboxUnread } = useNotifications()
 const { pins, pinsLoaded, loadPins, isPinned, pinBoard, unpinBoard } = usePins()
-const { activeTeamId } = useTeams()
+const { activeTeamId, isTeamAdmin } = useTeams()
 const { switchWorkspace } = useWorkspace()
 const toast = useToast()
 
@@ -139,9 +139,18 @@ function menuItems(project: Project) {
     onSelect: () => togglePin(project.id)
   }]
   if (project.audience === 'customer') return [pin]
-  return [pin, [
+  const manage = [
     { label: 'Rename', icon: 'i-lucide-pencil', onSelect: () => startRename(project) }
-  ], [
+  ]
+  // A team's owner or admin gives a board a crew; the Crews section of /team does the attaching.
+  if (isTeamAdmin.value && project.teamId) {
+    manage.push({
+      label: 'Give it a crew',
+      icon: 'i-lucide-users-round',
+      onSelect: () => navigateTo({ path: '/team', query: { section: 'crews', board: project.id } })
+    })
+  }
+  return [pin, manage, [
     {
       label: 'Delete project',
       icon: 'i-lucide-trash-2',
