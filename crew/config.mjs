@@ -5,7 +5,7 @@
 // lives in CREW_HOME, so the kit folder itself can be replaced on update. CREW_HOME defaults
 // to the kit folder. crew.json (written by `crew setup`, or by hand) holds the product,
 // URLs, people and chat settings; creds.json holds the accounts and keys the board made.
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync, existsSync, readdirSync } from 'node:fs'
 import { crewHome, kitDir } from './home.mjs'
 
 export { kitDir }
@@ -57,13 +57,38 @@ export const config = {
 // The columns every board needs, in this order. The crew API creates them.
 export const COLUMNS = ['Backlog', 'To do', 'In progress', 'Verify', 'Ready for live', 'Done', 'Bugs']
 
+/**
+ * The forks of this crew: one file each in CREW_HOME/forks, as the board's "Fork the crew for this board"
+ * hands them over. A file that does not read as a fork (not JSON, no members with an agent type and a key)
+ * is left out, so one broken file never stops the rest.
+ */
+export function loadForks() {
+  const dir = `${here}forks`
+  if (!existsSync(dir)) return []
+  return readdirSync(dir).filter(name => name.endsWith('.json')).sort().flatMap((file) => {
+    try {
+      const data = JSON.parse(readFileSync(`${dir}/${file}`, 'utf8'))
+      const usable = Array.isArray(data.members) && data.members.length && data.members.every(m => m?.agentType && m.apiKey && m.email)
+      return usable ? [{ file, data }] : []
+    } catch { return [] }
+  })
+}
+
 export function loadCreds() {
   const file = `${here}creds.json`
   if (!existsSync(file)) {
     console.error(`No creds.json in ${here}: the crew has not been provisioned here (see README.md).`)
     process.exit(78)
   }
-  return JSON.parse(readFileSync(file, 'utf8'))
+  const creds = JSON.parse(readFileSync(file, 'utf8'))
+  // A fork signs in as its agent type (`internal-tools-wren`), so `crew internal-tools-wren mcp ...` works like any member.
+  creds.people ??= {}
+  for (const { data } of loadForks()) {
+    for (const person of data.members) {
+      if (!creds.people[person.agentType]) creds.people[person.agentType] = { name: person.name, email: person.email, password: person.password, apiKey: person.apiKey, fork: data.board?.name ?? true }
+    }
+  }
+  return creds
 }
 
 const slugify = text => String(text).toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')

@@ -230,6 +230,31 @@ scratch card. Each step ends with what you should see.
 The check passes when steps 3, 7, 9, 10 and 11 show the expected output. Report any step that does not, with the
 trace from `claude --debug`.
 
+## Forks: one agent per member per board
+
+A crew that works on several boards has one set of members for all of them. When a board's owner or admin presses
+**Fork the crew for this board** (Team, Crews), the board makes an account for each working member (the PM, the four
+workers, the usability tester and the code quality reviewer), named for the board, with a key that reaches only that
+board's crew board. It shows the keys once and offers a `forks-<crew>-<board>.json` file.
+
+Hand the file to the kit:
+
+```
+CREW_HOME=~/crew-home/<slug> node <kit folder>/init.mjs --forks ~/Downloads/forks-<crew>-<board>.json
+```
+
+That stores it in `CREW_HOME/forks` (readable by you only) and writes one agent type per fork, such as
+`internal-tools-wren`. Boss launches it like any member, and the fork signs in as its own name:
+
+```
+CREW_HOME=~/crew-home/<slug> node <kit folder>/crew.mjs internal-tools-wren mcp get_board '{"board":"..."}'
+```
+
+A fork does the role of the member it was made from, in the documents of the crew (`CREW.md`, `PROMPTS.md`); the
+definition says to use its own name wherever those write a member key. **New keys** on the board gives a fork new
+keys: run `init --forks` again with the new file, which replaces the old one. **Remove the forks** deletes the
+accounts, after which their definitions and the file are yours to delete.
+
 ## Commands
 
     crew <who> <command ...>      board tools as one person (tm.mjs)

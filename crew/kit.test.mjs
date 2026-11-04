@@ -342,7 +342,7 @@ describe('CREW_HOME and the agent types', () => {
     writeFileSync(join(dir, 'crew.json'), JSON.stringify({ team: 'Acme Crew', crew: { slug: 'acme' }, board: { url: 'http://127.0.0.1:9' } }))
     return dir
   }
-  const run = (home, script, crewHomeValue) => spawnSync(process.execPath, [join(KIT, script)], {
+  const run = (home, script, crewHomeValue, ...args) => spawnSync(process.execPath, [join(KIT, script), ...args], {
     cwd: home, // not the kit folder, so a relative reading of "~/..." would land under it
     encoding: 'utf8',
     env: { ...process.env, HOME: home, CLAUDE_CONFIG_DIR: '', CREW_HOME: crewHomeValue }
@@ -385,6 +385,63 @@ describe('CREW_HOME and the agent types', () => {
     assert.equal(readFileSync(join(agents, 'acme-wren-worker.md'), 'utf8'), 'mine\n')
     assert.match(out.stdout, /FAIL \S+acme-wren-worker\.md exists and was not written by init/)
     assert.equal(out.status, 1)
+  })
+
+  // What the board hands over under "Fork the crew for this board".
+  const forkFile = {
+    base: 'http://127.0.0.1:9',
+    crew: { slug: 'acme', name: 'Acme Crew' },
+    board: { id: 'b1', name: 'Internal Tools' },
+    members: [
+      { key: 'w1', name: 'Wren Worker (Internal Tools)', agentType: 'internal-tools-wren', email: 'acme-f1-w1@crew.invalid', password: 'pw-one', apiKey: 'arn_forkone' },
+      { key: 'pm', name: 'Pia Planner (Internal Tools)', agentType: 'internal-tools-pia', email: 'acme-f1-pm@crew.invalid', password: 'pw-two', apiKey: 'arn_forktwo' }
+    ]
+  }
+
+  test('init --forks stores the file privately and writes one agent type per fork, named for the board', () => {
+    const home = mkdtempSync(join(SCRATCH, 'kit-home-'))
+    made.push(home)
+    const dir = crewIn(home)
+    const source = join(home, 'forks-acme-internal-tools.json')
+    writeFileSync(source, JSON.stringify(forkFile))
+    const out = run(home, 'init.mjs', '~/crew-home/acme', '--forks', source)
+    assert.match(out.stdout, /ok\s+internal-tools-wren\s+\(Internal Tools\)/)
+    const stored = join(dir, 'forks', 'forks-acme-internal-tools.json')
+    assert.equal(statSync(stored).mode & 0o777, 0o600, 'the file holds passwords and keys: owner only')
+    const wren = readFileSync(join(home, '.claude', 'agents', 'internal-tools-wren.md'), 'utf8')
+    assert.match(wren, /^---\nname: internal-tools-wren\ndescription: ".+Internal Tools.+"\nmodel: haiku\n---\n/)
+    assert.ok(wren.includes('crew.mjs internal-tools-wren'), 'the definition tells the agent to sign in as itself')
+    assert.ok(!wren.includes('arn_forkone') && !wren.includes('pw-one'), 'no secret goes into an agent definition')
+    // The crew's own members are written as before, next to the forks.
+    assert.ok(readdirSync(join(home, '.claude', 'agents')).includes('acme-wren-worker.md'))
+  })
+
+  test('a file that is not a forks file is refused and stored nowhere', () => {
+    const home = mkdtempSync(join(SCRATCH, 'kit-home-'))
+    made.push(home)
+    const dir = crewIn(home)
+    const source = join(home, 'nope.json')
+    writeFileSync(source, JSON.stringify({ members: [{ key: 'w1' }] }))
+    const out = run(home, 'init.mjs', '~/crew-home/acme', '--forks', source)
+    assert.match(out.stdout, /FAIL .+nope\.json: it is not a forks file/)
+    assert.ok(!existsSync(join(dir, 'forks', 'nope.json')))
+  })
+
+  test('a fork signs in as its agent type: creds gain it as a person, the crew keys stay', () => {
+    const home = mkdtempSync(join(SCRATCH, 'kit-home-'))
+    made.push(home)
+    const dir = crewIn(home)
+    mkdirSync(join(dir, 'forks'), { recursive: true })
+    writeFileSync(join(dir, 'forks', 'one.json'), JSON.stringify(forkFile))
+    writeFileSync(join(dir, 'forks', 'broken.json'), '{ not json')
+    writeFileSync(join(dir, 'creds.json'), JSON.stringify({ base: 'http://127.0.0.1:9', people: { w1: { email: 'w1@crew.test', password: 'p', apiKey: 'arn_crewkey' } } }))
+    const script = `import('${join(KIT, 'config.mjs')}').then(m => console.log(JSON.stringify({ people: m.loadCreds().people, forks: m.loadForks().map(f => f.file) })))`
+    const out = spawnSync(process.execPath, ['-e', script], { encoding: 'utf8', env: { ...process.env, HOME: home, CREW_HOME: dir } })
+    const answer = JSON.parse(out.stdout)
+    assert.deepEqual(answer.forks, ['one.json'], 'a broken file is left out, not fatal')
+    assert.equal(answer.people.w1.apiKey, 'arn_crewkey')
+    assert.equal(answer.people['internal-tools-wren'].apiKey, 'arn_forkone')
+    assert.equal(answer.people['internal-tools-pia'].email, 'acme-f1-pm@crew.invalid')
   })
 })
 

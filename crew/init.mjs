@@ -5,11 +5,11 @@
 // and writes one Claude Code agent definition per member into ~/.claude/agents. Safe to run
 // again: it overwrites generated documents (edit the .tmpl, not the output) but never
 // PROJECT-RULES.md or BRIEF.md once they exist.
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs'
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, chmodSync } from 'node:fs'
 import { execSync } from 'node:child_process'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { CAST, agentNames, config, here, kitDir, templateValues } from './config.mjs'
+import { CAST, agentNames, config, here, kitDir, loadForks, templateValues } from './config.mjs'
 
 const ok = m => console.log(`  ok   ${m}`)
 const warn = m => console.log(`  WARN ${m}`)
@@ -108,6 +108,56 @@ ${marker}
 You are ${person} on the crew "${config.team}". Your launch prompt holds your role: follow it and the crew documents in ${here} (CREW.md, PROJECT-RULES.md, BRIEF.md). Run every crew-kit command the way those documents write it, starting with \`${values.node_kit}/\`: that sets CREW_HOME for this crew, and without it the kit cannot find crew.json.
 `)
   ok(`${name}`)
+}
+
+// Forks: the files the board hands over under "Fork the crew for this board". `--forks a.json b.json` puts
+// them in CREW_HOME/forks (private, replacing a file of the same name: new keys), and every file in that
+// folder gets one agent type per member, named by the board and the person (`internal-tools-wren`). A fork
+// signs in as that name: `crew internal-tools-wren mcp get_board`.
+console.log('\nForks')
+const forksAt = process.argv.indexOf('--forks')
+const forkFiles = forksAt >= 0 ? process.argv.slice(forksAt + 1).filter(arg => !arg.startsWith('--')) : []
+if (forkFiles.length) {
+  mkdirSync(`${here}forks`, { recursive: true, mode: 0o700 })
+  for (const source of forkFiles) {
+    try {
+      const data = JSON.parse(readFileSync(source, 'utf8'))
+      const usable = Array.isArray(data.members) && data.members.length && data.members.every(m => m?.agentType && m.apiKey && m.email)
+      if (!usable) throw new Error('it is not a forks file from the board (no members with an agent type and a key)')
+      const target = `${here}forks/${source.split('/').pop()}`
+      writeFileSync(target, readFileSync(source), { mode: 0o600 })
+      chmodSync(target, 0o600)
+      ok(`${source} stored in ${here}forks`)
+    } catch (error) { fail(`${source}: ${error.message}`) }
+  }
+}
+const forks = loadForks()
+if (!forks.length) console.log('  none (hand a fork over with: init.mjs --forks <file from the board>)')
+for (const { file, data } of forks) {
+  const boardName = data.board?.name ?? file
+  for (const member of data.members) {
+    const name = member.agentType
+    const agentFile = join(agentsDir, `${name}.md`)
+    const marker = `<!-- ${name}: written by the crew kit's init.mjs, which rewrites this file -->`
+    if (existsSync(agentFile) && !readFileSync(agentFile, 'utf8').includes(marker)) {
+      fail(`${agentFile} exists and was not written by init for this fork: rename or remove it, then run init again`)
+      continue
+    }
+    const base = config.people[member.key] ?? member.name
+    const description = `${member.name}, ${DUTIES[member.key] ?? DUTIES.w1} Forked from crew "${config.team}" for the board "${boardName}". Launch prompt in ${here}PROMPTS.md.`
+    writeFileSync(agentFile, `---
+name: ${name}
+description: ${JSON.stringify(description)}
+model: haiku
+---
+
+${marker}
+
+You are ${member.name} on the crew "${config.team}", working for the board "${boardName}" only: your key reaches that board's crew board and nothing else.
+Your role is the one ${base} has in the crew documents in ${here} (CREW.md, PROMPTS.md, PROJECT-RULES.md, BRIEF.md): follow them, with one change. Wherever they run a kit command as \`${values.node_kit}/crew.mjs ${member.key} ...\`, run it as \`${values.node_kit}/crew.mjs ${name} ...\`: that signs in as you.
+`)
+    ok(`${name}  (${boardName})`)
+  }
 }
 
 const next = existsSync(`${here}creds.json`)
