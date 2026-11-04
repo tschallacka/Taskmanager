@@ -1117,6 +1117,29 @@ export const crews = pgTable(
 
 export type Crew = typeof crews.$inferSelect
 
+// A crew working on a real board: the real board (in the team that owns the work) and the
+// shadow board the crew keeps in its OWN team, so every project has its own crew context. The
+// crew reads the real board but never writes to it; Boss carries results over. Detaching drops
+// the link and archives the shadow board.
+export const crewBoards = pgTable(
+  'crew_boards',
+  {
+    id: text('id').primaryKey(),
+    crewId: text('crew_id').notNull().references(() => crews.id, { onDelete: 'cascade' }),
+    projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+    shadowProjectId: text('shadow_project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+    createdBy: text('created_by').references(() => user.id, { onDelete: 'set null' }),
+    createdAt: bigint('created_at', { mode: 'number' }).notNull()
+  },
+  table => [
+    uniqueIndex('crew_boards_crew_project_idx').on(table.crewId, table.projectId),
+    uniqueIndex('crew_boards_shadow_idx').on(table.shadowProjectId),
+    index('crew_boards_project_idx').on(table.projectId)
+  ]
+)
+
+export type CrewBoard = typeof crewBoards.$inferSelect
+
 // The crew API window (BRIEF-crew-feature 2b): one row, id "gate". While openUntil is
 // in the future a remote caller may use the temporary crews:manage key tempKeyId.
 // Stored here, not in memory, so a restart neither leaves it open nor loses the reason
