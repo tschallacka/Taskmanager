@@ -21,7 +21,8 @@ Customers belong to a team. You cannot have customers in your personal workspace
 - Inside a board, each task and each comment is either **team only** or **shared with the customer**. A contact
   only ever sees the shared ones. See [What customers see](/help/team/what-customers-see).
 
-Contacts are not team members. They cannot see the team's other boards, its members or its join code.
+Contacts are not team members. They cannot see the team's other boards, the Team page or its join code. They do
+see the name and email address of the team members who work on a board they follow.
 
 ## Where customers are
 

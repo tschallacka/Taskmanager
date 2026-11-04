@@ -33,7 +33,8 @@ Click a card to open it. The panel shows the task's column, its assignee, start 
 its subtasks, its description (with any pictures, tables, charts and diagrams) and the comments. It is **read-only**:
 you can look at everything in it, but not change the task itself.
 
-At the bottom of the panel is the task's **activity log**: when it was created, moved, finished or given a new date.
+In the comments area, between the comments, is the task's **activity log**: when it was created, moved, finished or
+given a new date.
 
 ## Ask for something
 

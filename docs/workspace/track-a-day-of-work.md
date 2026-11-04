@@ -21,7 +21,7 @@ This tutorial follows Sam, a designer on a team, through one working day. Sam wo
 ## Start the timer
 
 4. Sam clicks the task. Its panel opens on the *Website* board.
-5. At the bottom, in the **Time** section, Sam clicks **Start timer**. The button turns red and counts up, and a
+5. In the **Time** section, under **Blocked by**, Sam clicks **Start timer**. The button turns red and counts up, and a
    timer with the task's name now shows in the sidebar.
 6. Sam works for a while, then switches to *Brochure* pages and back. The timer keeps running through all of it.
 

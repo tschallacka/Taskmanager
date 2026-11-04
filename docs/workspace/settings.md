@@ -45,6 +45,9 @@ Two ways to protect how you sign in:
   authenticator, and they are **not shown again**, so store them somewhere safe. Once it is on, you can **Add another
   app**, make **New backup codes**, or **Turn off** two-factor, each of which asks for your password.
 
+An account that signs in without a password has no two-factor controls: the page says **Your account signs in without
+a password, so there is no password sign-in for a code to protect.**
+
 If a step fails you see a message such as **That code did not match**. Nothing is turned on until the code you type
 matches.
 

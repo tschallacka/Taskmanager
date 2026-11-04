@@ -14,7 +14,7 @@ Open the workspace menu (the team switcher at the top of the sidebar) and choose
 
 The only thing the window changes is **Can create organisations**. By default a new account can join a team with a code, or work in a customer's portal, but cannot start an organisation. Switch the right on for the people who should. Switching it off again stops new organisations only: the ones that person already owns stay. The switch is fixed for the instance admin.
 
-I found no other account management in the app, such as deleting an account or setting someone's password. If you need that, it is outside what these pages cover.
+There is no page for deleting an account or setting someone's password.
 
 ## Ways to sign in
 

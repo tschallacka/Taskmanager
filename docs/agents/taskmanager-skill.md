@@ -33,8 +33,8 @@ generic one, and a tool added in an update is in the next copy. It covers:
 You can also open **Settings**, then **Sprocket**, and under **Connect an agent** press **Copy SKILL.md** in the
 **Taskmanager skill** block.
 
-The page **Connect an AI agent** (the **Setup guide** button) also shows a skill text. Prefer the downloaded one: it is
-made from the tools as they are now, while that text is written by hand and can lag behind.
+Use one of these two, not a skill text copied from somewhere else: they are made from the tools as they are now, and
+a text written by hand can lag behind.
 
 ## Where to save it
 

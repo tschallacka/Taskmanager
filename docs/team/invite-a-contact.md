@@ -39,7 +39,8 @@ They open the link. The page says "You're invited" and who invited them to follo
 1. If they are not signed in, they click **Sign in or create an account**. After signing in or signing up they are
    brought back to the same page.
 2. They click **Accept invitation**.
-3. They land on the board list, and the customer's boards are there.
+3. They land on the most recently updated board in their personal workspace, and all of the customer's boards are
+   listed in the sidebar.
 
 The customer's boards appear in their **personal workspace**. A contact does not become a member of your team.
 

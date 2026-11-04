@@ -29,7 +29,7 @@ The server reads its settings from environment variables. Nothing here is change
 
 ## Sign-in
 
-`NUXT_PUBLIC_DISCORD_ENABLED`, `NUXT_PUBLIC_GITHUB_ENABLED`, `NUXT_PUBLIC_GOOGLE_ENABLED` and `NUXT_PUBLIC_OIDC_ENABLED` switch a method on, each with its `..._CLIENT_ID` and `..._CLIENT_SECRET` (`OIDC_DISCOVERY_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` for OIDC). `NUXT_PUBLIC_OIDC_NAME` labels its button. `NUXT_PUBLIC_PASSKEYS_ENABLED` defaults to `true`. `NUXT_PUBLIC_EMAIL_CODE_ENABLED` needs mail, below. All of them are in [Users and sign-in](/help/admin/users-and-sign-in).
+`NUXT_PUBLIC_DISCORD_ENABLED`, `NUXT_PUBLIC_GITHUB_ENABLED`, `NUXT_PUBLIC_GOOGLE_ENABLED` and `NUXT_PUBLIC_OIDC_ENABLED` switch a method on. Discord, GitHub and Google each need their own `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET` (and the same for `GITHUB_` and `GOOGLE_`); OIDC needs `OIDC_DISCOVERY_URL`, `OIDC_CLIENT_ID` and `OIDC_CLIENT_SECRET`. `NUXT_PUBLIC_OIDC_NAME` labels its button. `NUXT_PUBLIC_PASSKEYS_ENABLED` defaults to `true`. `NUXT_PUBLIC_EMAIL_CODE_ENABLED` needs mail, below. All of them are in [Users and sign-in](/help/admin/users-and-sign-in).
 
 ## Mail and push
 
@@ -58,7 +58,7 @@ Sprocket, the assistant in the chat panel, can be answered by Claude Code instea
 |---|---|
 | `SPROCKET_CLAUDE_BIN` | The `claude` program. By default the server looks in `~/.local/bin`, Homebrew's and `/usr/local/bin`, then the `PATH`. If you set it and the file is not there, Claude Code counts as not installed. |
 | `SPROCKET_CLAUDE_FOR_ALL` | `true` lets every account choose Claude Code, on that same login. |
-| `SPROCKET_MCP_URL` | How a run reaches this server's own agent endpoint. By default `http://localhost:<PORT>/api/mcp`, or the `HOST` when set. |
+| `SPROCKET_MCP_URL` | How a run reaches this server's own agent endpoint. By default `http://localhost:<PORT>/api/mcp`, or the address in `HOST` when that is a specific address (not `0.0.0.0`). |
 
 A run works as one of the chooser's own API keys, which needs at least board read access, so it sees only what that key may. It gets a short-lived key that exists only in the server's memory for that run, and only a short list of environment variables (such as `HOME` and `PATH`), never the server's secrets. A run stops after 10 minutes.
 

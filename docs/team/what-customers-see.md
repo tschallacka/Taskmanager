@@ -59,7 +59,7 @@ are named **Team only** and **Shared with customer** as well.
 | Change who sees a task or comment | no | yes |
 | Use the Messages, Time and Settings tabs | no | yes |
 | See custom fields, the board trash, or rename the board | no | yes |
-| See which task blocks another | only that it is blocked | yes |
+| See which task blocks another | only blockers that are shared; a team-only blocker shows as "a hidden task" | yes |
 
 A contact can be given a task: a person picker in the task offers the customer's contacts too, marked
 "(customer)", so assigning work to one is a deliberate choice. A contact cannot assign or set a due date on a task

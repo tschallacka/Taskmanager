@@ -76,8 +76,12 @@ Only an owner can delete a team.
 3. Read the dialog "Delete this team?" and confirm with **Delete Team**.
 
 This permanently deletes the team and everything that belongs to it: its boards and their tasks, its customers
-(and so their contacts' access), and the team's goals, portfolios, rules and crews. There is no trash and no way
-to get it back. Everyone in the team loses access at once.
+(and so their contacts' access), and the team's goals, portfolios, rules, keys and board defaults. There is no
+trash and no way to get it back. Everyone in the team loses access at once.
+
+A crew that works on one of its boards loses its link to it. The crew's own board and any members forked for that
+board are not deleted with the team, so take the crew off the board first
+(see [Give a board a crew](/help/crews/give-a-board-a-crew)) if you want its forks removed.
 
 If you only want people out, remove them one by one instead, or transfer ownership and leave, which keeps the team
 for the others.

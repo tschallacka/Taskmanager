@@ -70,4 +70,4 @@ If you press **Catch up now** on a server that has no GitHub token, it is skippe
 
 GitHub keeps a log of each delivery in the webhook's settings. One that shows as failed there was refused by Taskmanager (for example 429 for too many in a minute, or 503 when it could not be queued). Redeliver it from that screen.
 
-If Taskmanager took a delivery and then could not apply it, it tries again after 30 seconds and after 2 minutes. After the third try it is kept as a failed delivery, and GitHub still shows it as delivered. Ask your instance admin, or the crew's project manager, who can retry it.
+If Taskmanager took a delivery and then could not apply it, it tries again after 30 seconds and after 2 minutes. After the third try it is kept as a failed delivery, and GitHub still shows it as delivered. Only the crew's project manager can retry it. A board with no crew has nobody who can.

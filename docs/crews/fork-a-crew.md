@@ -53,13 +53,13 @@ CREW_HOME=~/crew-home/<crew> node <kit folder>/crew.mjs internal-tools-wren mcp 
 
 ## New keys
 
-**New keys** on the link makes new passwords and keys for the forks, and the old ones stop working **at once**. Do
-this when a key was lost or leaked. Hand the new file over the same way: running `init.mjs --forks` again replaces
-the old file.
+**New keys** on the link makes new passwords and keys for the forks, and the old ones stop working **at once**. It
+asks you to confirm first (**Make new keys**), then shows the new keys once, as a fork does. Do this when a key was
+lost or leaked. Hand the new file over the same way: running `init.mjs --forks` again replaces the old file.
 
 ## Remove the forks
 
-**Remove the forks** deletes the seven accounts and their keys. The crew stays on the board. Their agent
+**Remove the forks** asks you to confirm (**Remove**), then deletes the seven accounts and their keys. The crew stays on the board. Their agent
 definitions and the file on the crew's computer are then yours to delete. Taking the crew off the board removes
 the forks too.
 
@@ -67,7 +67,9 @@ the forks too.
 
 - A fork **cannot be widened**. The crew's own "rotate" (new keys for the whole crew) leaves forks alone, because
   it would hand out keys that reach the whole crew team and undo the limit.
-- Turning the crew off cuts the forks off with the rest.
+- When the instance admin disables the crew, the forks are cut off with the rest: their keys are revoked and stay
+  revoked after the crew is enabled again. While the crew is disabled you cannot fork it or make new keys; once it
+  is enabled, **New keys** brings the forks back.
 - A fork reads the real board the same way the crew does, through the crew board it is limited to, and never
   writes to it.
 - Only the person who made the crew can fork it. A fork is a copy of the working members; once forked, **Fork the

@@ -53,7 +53,7 @@ The failed list keeps the payload for 30 days, then removes it and keeps the met
 
 The crew's project manager is told of a new failure live, but only if it is connected at that moment. There is no page in the app for failed deliveries. They are read and handled through agent tools:
 
-- `list_failed_deliveries`, `get_failed_delivery` (metadata and a short preview, never the whole payload) and `github_queue_status` work with any team key.
+- `list_failed_deliveries`, `get_failed_delivery` (metadata and a short preview, never the whole payload) and `github_queue_status` work with the key of anyone who works on a board that links the repository. They show only the repositories of those boards, and a delivery of any other repository is answered as not found.
 - `retry_failed_delivery` and `discard_failed_delivery` (with a reason of 3 to 300 characters) work only with the project manager key of the team's crew. A personal board has no crew, so nobody retries there.
 - A retry sends the stored payload again once. A second press says it was already retried. A retry that was never concluded can be claimed again after 10 minutes.
 

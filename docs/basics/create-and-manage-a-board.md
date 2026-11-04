@@ -21,7 +21,7 @@ without a name is called *Untitled project*.
 
 ## Rename a board
 
-Click the board's name at the top of the board and type a new one; Enter saves and Escape cancels. You can also use
+Click the board's name at the top of the board and type a new one; Enter saves, and so does clicking away or pressing Escape. You can also use
 **...** (*Project options*) then **Rename project**, the **...** on the board's row in the sidebar then **Rename**,
 or the **Name** field under **Settings**, **General**.
 
@@ -57,8 +57,9 @@ Archiving is the gentle way to put a board away.
 1. Open **Settings**, **General**.
 2. Under **Archive**, click **Archive project**.
 
-An archived board is hidden from the project lists and from search, and its rules stop running. The board itself
-still opens and its tasks can still be edited. A banner on the board says **Archived** and has an **Unarchive** button.
+An archived board is hidden from the project lists and from the search results for boards, and its rules stop running.
+Its tasks still turn up in search, **My tasks** and Home. The board itself still opens and its tasks can still be
+edited. A banner on the board says **Archived** and has an **Unarchive** button.
 To find an archived board later, open **Browse projects**: it has an **Archived** list with **Unarchive** on each row.
 
 ## Delete a board

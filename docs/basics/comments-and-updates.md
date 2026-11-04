@@ -64,7 +64,6 @@ Between the comments the panel lists what happened to the task, in time order, e
 - assigned to someone, or the assignee removed
 - start date or due date set or cleared
 - renamed, or made Team only or shared
-- a label added or removed
 - a *Blocked by* link added or removed
 
 A line says *(via an agent)* or *(via the AI assistant)* when it was not a person using the app, and *Rule: name* when

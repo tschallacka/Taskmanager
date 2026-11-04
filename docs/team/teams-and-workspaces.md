@@ -31,7 +31,7 @@ A team has:
 
 ## Switch between workspaces
 
-1. Click the workspace button at the top of the sidebar. It shows the name of the workspace you are in, with a
+1. Click the workspace button at the bottom of the sidebar, above your name. It shows the name of the workspace you are in, with a
    **Team** badge when it is a team.
 2. Pick **Personal Workspace**, or one of your teams under **Your Teams**.
 
@@ -66,7 +66,7 @@ If you are in your personal workspace, the Team page only says so and asks you t
 ## Easy to get wrong
 
 - **A board belongs to the workspace it was made in.** A board made in your personal workspace does not appear
-  in the team, and the other way round. I found no control for moving a board between workspaces.
+  in the team, and the other way round. There is no control for moving a board between workspaces.
 - **The active workspace is a setting of your sign-in**, not of a board. If a board you expect is missing, check
   the workspace button first.
 - **Everyone in the team sees every team board.** There is no per-board guest list for team members. To show a

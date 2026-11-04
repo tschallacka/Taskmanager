@@ -50,6 +50,12 @@ Use the **All** and **Unread** filters at the top, press a row to mark it read, 
 
 - **Ordinary reads.** Listing boards, reading a task or searching are not logged.
 - **Attempts that failed.** A change the server refused is not in the audit, because nothing changed.
+<!-- requires: staff -->
+  The exception is a retry or discard of a failed GitHub delivery: a refused attempt is recorded, with the reason.
+<!-- /requires -->
+<!-- requires: instance-admin -->
+  Crew management is the same: a refused attempt is recorded.
+<!-- /requires -->
 - **The words of an edited or removed update.** A row about one gives its id and length, not the text.
 - **Changes you made yourself** in the app. They show where they always do.
 

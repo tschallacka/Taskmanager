@@ -61,6 +61,6 @@ Team members see every link. A customer's contact sees only the links marked **S
 
 ## Agents
 
-An agent with a key for your team can do the same. `link_github` and `unlink_github` need a key that may change things, `get_task_github` can be used with a read-only key. All three are for the team, not for a customer's contact.
+An agent with a key for your team can do the same. `link_github` and `unlink_github` need a key that may change things, `get_task_github` can be used with a read-only key. Linking and unlinking are for the team, not for a customer's contact. A contact's key can read only the links shared with customers.
 
 If you want a task to be made from a GitHub issue instead of linking an issue to a task that already exists, see [Sync GitHub issues to cards](/help/integrations/sync-issues-to-cards).

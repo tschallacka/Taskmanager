@@ -28,7 +28,7 @@ Each of these is written to the agent audit with **Crews page** as the one who d
 
 ## The crew API and its window
 
-The set-up can also be done from a script or an agent host, through `/api/crews`. That address answers only a request that really comes from the server's own machine, with no proxy in between. Through a reverse proxy every request counts as remote and gets a plain 404, with no hint that the address exists.
+The set-up can also be done from a script or an agent host, through `/api/crews`. That address answers only a request that really comes from the server's own machine, with no proxy in between. Through a reverse proxy every request counts as remote. While the window below is closed it gets a plain 404, with no hint that the address exists.
 
 To let a remote machine use it for a short time, open the window:
 
@@ -42,7 +42,7 @@ To make a permanent key for crew management, press **Create a crews:manage key**
 
 ## Behind a reverse proxy
 
-The gate decides "local" from the connection, and treats any `X-Forwarded-For`, `X-Real-IP` or `Forwarded` header as proof of a proxy. Every proxy location that reaches the app should therefore set `X-Real-IP` and `X-Forwarded-For` to the address of the socket it accepted (`$remote_addr` in nginx), not `$proxy_add_x_forwarded_for`. The repository's README has the full deploy note and a one-line check to run once after installing. I did not test the gate against a live proxy for this page.
+The gate decides "local" from the connection, and treats any `X-Forwarded-For`, `X-Real-IP` or `Forwarded` header as proof of a proxy. Every proxy location that reaches the app should therefore set `X-Real-IP` and `X-Forwarded-For` to the address of the socket it accepted (`$remote_addr` in nginx), not `$proxy_add_x_forwarded_for`. The repository's README has the full deploy note and a one-line check to run once after installing.
 
 On the workbench install, make crews against `http://127.0.0.1:3100` directly, not through nginx.
 

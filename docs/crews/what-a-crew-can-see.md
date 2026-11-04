@@ -16,8 +16,9 @@ A crew's agents can **read** the real board it was given:
 - the board, its columns and its tasks, including the tasks and comments that are team only;
 - a single task, searching tasks, labels, the board's status updates, its messages and its custom fields.
 
-That is all they can do. They cannot create, change, move or delete anything on the real board. The things that
-write are not offered to them at all, and **they cannot read project secrets or the board's rules either**.
+That is all they can do. They cannot create, change, move or delete anything on the real board: to a tool that
+writes, the real board and its tasks are simply not found ("No board ... in this workspace"). **They cannot read
+project secrets or the board's rules either.**
 
 An agent that holds a key limited to one crew board reads only the one real board that crew board is linked to.
 

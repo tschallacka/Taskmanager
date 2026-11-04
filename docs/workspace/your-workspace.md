@@ -56,7 +56,7 @@ changes nothing.
 
 You see the same sidebar, but your work is smaller. The boards your customer shares with you appear in your Personal
 Workspace, and you see only the tasks that were shared with customers. **Goals**, **Portfolios** and **Timesheet**
-are the team's own tools, so they have nothing for you.
+are the team's own tools and are not meant for a contact; you have no use for them.
 <!-- /requires -->
 
 <!-- requires: staff -->

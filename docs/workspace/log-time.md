@@ -12,7 +12,7 @@ This page is the steps for recording time. For how time works and who sees it, r
 ## Time a task with the timer
 
 1. Open the task: click its card, or open it from **My tasks** or the search box.
-2. In the task panel, find the **Time** section near the bottom. Click **Start timer**.
+2. In the task panel, find the **Time** section, under **Blocked by** and above **Subtasks**. Click **Start timer**.
 3. The button turns red and reads **Stop** with a clock, for example `Stop 00:12:40`. The same timer now shows in the
    sidebar, under the workspace links, with the task's title.
 4. Work. You can leave the task, change page, or close the tab: the timer keeps running.
@@ -57,7 +57,8 @@ The Timesheet lets you add time without opening the task first.
 If you forget to pick a task you see **Pick the task the time was spent on**. When it works, the length and the note
 are cleared, ready for the next entry, and the grid updates.
 
-The list of tasks only holds tasks that are not completed, in projects you work on as staff. To log time on a
+The list of tasks only holds tasks that are not completed, in projects you work on as staff in the workspace you are
+in. To log time on a
 completed task, open that task and use its own **Time** section.
 
 ## Delete an entry
@@ -70,7 +71,7 @@ You can delete only entries you logged.
 It goes at once, without asking, and it cannot be undone. Entries have no edit, so to correct one, delete it and add
 it again with the right values.
 
-If it cannot be deleted you see **Could not delete the entry**.
+If an entry cannot be deleted from the Timesheet you see **Could not delete the entry**.
 
 ## Good to know
 

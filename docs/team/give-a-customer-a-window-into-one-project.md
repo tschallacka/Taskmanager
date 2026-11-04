@@ -24,7 +24,7 @@ the result. It takes about ten minutes. The concepts behind each step are on
 
 ## 1. Switch to the team
 
-Click the workspace button at the top of the sidebar and pick **Acme Studio** under **Your Teams**. Customers
+Click the workspace button at the bottom of the sidebar, above your name, and pick **Acme Studio** under **Your Teams**. Customers
 only exist inside a team, so the **Customers** entry only shows once a team is active.
 
 ## 2. Add the customer
@@ -74,8 +74,8 @@ Maria opens the link. She sees "You're invited". If she has no account she click
 account** and makes one; the link works even if the instance is otherwise closed to sign-ups. Back on the
 invitation page she clicks **Accept invitation**.
 
-She lands on the board list. **Website relaunch** is there, in her personal workspace, with Brightside Bakery's
-name beside it. She opens it and sees the shared tasks only, and can comment on them. She has no Messages, Time or
+She lands on a board in her personal workspace (the most recently updated one, which is **Website relaunch** if
+it is her first). **Website relaunch** is in the sidebar with Brightside Bakery's name beside it. She opens it and sees the shared tasks only, and can comment on them. She has no Messages, Time or
 Settings tab.
 
 ## 7. Check it worked

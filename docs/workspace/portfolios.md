@@ -23,7 +23,8 @@ change or delete them: the server does not check a role here. In your Personal W
 2. Type a name in the box, such as "Marketing". **Add portfolio** stays off until there is text.
 3. Press **Add portfolio**. The new portfolio opens its settings so you can add projects.
 
-Until you add projects, an empty list explains what a portfolio is.
+While you have no portfolio yet, the page shows a line saying what a portfolio is. A new portfolio with no projects
+says **No projects yet. Open the settings to add some.**
 
 ## Add and remove projects
 
@@ -40,7 +41,8 @@ You can also rename the portfolio here: edit **Name**, and it saves when you lea
 The top row of a portfolio shows:
 
 - its name;
-- three small counts for **on track**, **at risk** and **off track**: how many of its projects have each health;
+- three small counts, each next to a coloured dot, for **on track**, **at risk** and **off track**: how many of its
+  projects have each health. The dots carry no words; the colours match the project's health status;
 - a bar and a percentage: the average of how much of each project is done.
 
 Below it, a table has one row per project, ordered by name:

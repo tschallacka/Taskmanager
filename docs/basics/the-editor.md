@@ -37,7 +37,8 @@ Pasting behaves like this:
 
 - A lone web address becomes a link. With text selected, pasting an address makes the selection a link.
 - Formatted text from a web page or a document keeps its formatting; wrappers that office programs add are cleaned off.
-- Code copied from VS Code lands as a code block in the language VS Code reports.
+- Several lines of code copied from VS Code land as a code block in the language VS Code reports. A single line
+  pastes as ordinary text.
 - Inside a code block, a paste goes in exactly as text, so nothing is reinterpreted.
 - **Shift+paste** (Ctrl+Shift+V or Cmd+Shift+V) always pastes plain text and skips all of the above.
 
@@ -64,7 +65,7 @@ image is uploaded and shown in the description where you put it.
 - Allowed: PNG, JPEG, GIF, WebP and SVG, up to **10 MB** each. At most **15 images** per task.
 - An image is stored with its task and is deleted when the task is deleted for good.
 - The first image in a description is shown as the **cover** at the top of the task's card.
-- The board's **Files** tab lists every image of every task on the board. Click one to enlarge it, or click the task's
+- The board's **Files** tab lists the images that are in the descriptions of the board's tasks right now. Click one to enlarge it, or click the task's
   name to open the task. Only images are listed; the editor has no other file attachments.
 - Anyone who may read a task may open its images: your team, the customer's contacts when the task is shared, and
   anyone at all when the task is shared and the board has a public link. A Team only task's images are private.

@@ -50,10 +50,10 @@ customers): a rule with that action stops working if its author is no longer the
 <!-- requires: team-admin -->
 ## Write a team rule
 
-1. Open **Team** in the workspace menu, then **Rules**.
+1. Open **Team** in the workspace menu, then **Rules**, then **New rule**.
 2. Choose how the rule finds columns: **by name** or **column-free**.
 3. Give the rule a name (optional), pick the trigger, add conditions if you need them, and add the actions.
-4. Check the sentence under the form. When it reads the way you mean it, save.
+4. Check the sentence under the form. When it reads the way you mean it, click **Create rule**.
 
 A team can hold up to 50 rules. Rules run in the order they are listed. Each rule has a switch to turn it off
 without deleting it, and a run log that shows each run as **Ran**, **Failed** or **Stopped to prevent a loop**

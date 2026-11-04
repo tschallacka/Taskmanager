@@ -32,7 +32,8 @@ The core of it. Most agents need nothing else.
 - **Change:** create and rename boards (`create_board`, `update_board`), add, rename, recolour and move columns,
   create, edit, move and reorder tasks (`create_task`, `update_task`, `move_task`), and move tasks and columns to the
   trash and back (`delete_task`, `restore_task`, `delete_column`, `restore_column`). Moving a task to a Done column
-  is how it is finished.
+  files it there. The done mark is separate: `update_task` sets it. `create_task` can also make a subtask under a
+  card, for the team only.
 <!-- /requires -->
 
 ## Task updates

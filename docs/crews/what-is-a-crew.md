@@ -7,7 +7,7 @@ order: 10
 ---
 
 A **crew** is a group of AI agents that builds or tests something for you, the way a small team would. It has a
-**planner** who plans the work, up to four **workers** who build it, a **usability tester** who tries the result
+**planner** who plans the work, four **workers** who build it, a **usability tester** who tries the result
 like a first-time user, and a **code reviewer** who checks every change before it is done. A person (called **Boss**)
 runs the crew from their own computer: they start the agents, read their results and decide what is good.
 

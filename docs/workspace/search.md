@@ -54,7 +54,8 @@ search another. It does not find:
 
 - subtasks, which live inside their parent task;
 - tasks in the trash;
-- archived projects. Find those under **Browse projects**.
+- archived projects themselves (their name does not come up under **Projects**; find them under **Browse projects**).
+  The tasks of an archived project are still searched.
 
 A customer's contact finds only the tasks that were shared with customers.
 

@@ -17,7 +17,7 @@ A person on the team sends you an invitation link. Nothing is emailed by the app
 2. If you are not signed in, click **Sign in or create an account**. You come back to the same page afterwards.
 3. Click **Accept invitation**.
 
-You land on the board list. The link works for one person and for 14 days, and the first account that accepts it
+You land on the most recently updated of your boards, with all of them listed in the sidebar. The link works for one person and for 14 days, and the first account that accepts it
 uses it up. If you see "This invitation link is not valid." or "This invitation has already been used or has
 expired.", ask the team for a new link.
 
@@ -48,9 +48,10 @@ The team can also assign a task to you, which shows you as its assignee.
 
 ## What you cannot do
 
-- Change someone else's task: edit, move, complete or delete it.
-- Change who sees a task or comment.
-- See the team's other boards, its members, or its internal notes.
+- Change a task, including one you added yourself: edit, move, complete or delete it.
+- Change who sees a task or comment, or edit or delete someone else's comment.
+- See the team's other boards, its Team page or its internal notes. You do see the name and email address of the
+  team members who work on your boards.
 - Rename the board, or file it under another customer.
 
 ## If you lose access

@@ -11,8 +11,9 @@ column or a task is deleted. Deleting here is safe for a week: deleted columns a
 
 ## Add a column
 
-At the right end of the board click **Add column**, type a name and press Enter. Pressing Escape cancels. Clicking
-away with a name typed also adds it. The new column lands at the far right; drag it where you want it.
+At the right end of the board click **Add column**, type a name and press Enter. Clicking
+away with a name typed also adds it, and so does pressing Escape: Escape closes the box but keeps the name you typed.
+To back out, clear the name first. The new column lands at the far right; drag it where you want it.
 
 ## Rename, recolour and reorder
 

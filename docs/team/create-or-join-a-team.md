@@ -13,20 +13,21 @@ and has a valid code.
 ## Join a team with a code
 
 1. Ask someone in the team for the join code. Any member can read it on the Team page (see below).
-2. Click the workspace button at the top of the sidebar and choose **Join a team with a code**. If you cannot
+2. Click the workspace button at the bottom of the sidebar (above your name) and choose **Join a team with a code**. If you cannot
    create teams, the menu also shows a **Join a team with a code** link in its hint text.
 3. Type or paste the code into **Team Code** and click **Join a team with a code**.
 
-The code is 16 letters and digits. Capitals, spaces and dashes do not matter: `k3f9-qx7b m2h8 yrwz` works the same
-as `K3F9QX7BM2H8YRWZ`.
+The code is 16 letters and digits, never I, L, O, 0 or 1. Capitals, spaces and dashes do not matter:
+`k3f9-qx7b m2h8 yrwz` works the same as `K3F9QX7BM2H8YRWZ`.
 
 When it works, you become a **member** of the team and the team becomes your active workspace. Joining always
 makes you a member, whatever the code's owner intended. If you were already in the team, nothing changes.
 
 If it does not work you see "That code is not valid. Ask the team owner for a new one." The usual cause is a
 code that was rotated since it was given to you (see below). The code stays in the field so you can correct a
-typo without retyping it. Any other message ("Could not join. Try again.") means the server could not be
-reached.
+typo without retyping it. Any other message ("Could not join. Try again.") means the join failed for another
+reason: the server could not be reached, or your account may not join teams (a crew account can only be in its
+own crew's team).
 
 ## Create a team
 
