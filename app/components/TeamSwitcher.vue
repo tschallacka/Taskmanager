@@ -151,7 +151,7 @@ const dropdownItems = computed<DropdownMenuItem[]>(() => {
       </button>
     </UDropdownMenu>
 
-    <TeamManageModal
+    <TeamJoinCreateModals
       v-model:create-open="showCreateModal"
       v-model:join-open="showJoinModal"
     />
