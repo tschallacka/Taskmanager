@@ -1,13 +1,15 @@
 <script setup lang="ts">
 // One step of a rule (the trigger, a condition or an action): a kind, and the one
 // value that kind needs. The builder says which kinds it offers and what to pick from.
-type StepField = 'none' | 'column' | 'person' | 'personOrNobody' | 'personOrAnyone' | 'label' | 'days' | 'text' | 'visibility' | 'yesNo'
+import type { StepField } from '~/utils/ruleKinds'
 
 const props = defineProps<{
   kinds: { value: string, label: string, field: StepField, disabled?: boolean }[]
   columns: { id: string, name: string }[]
   people: { id: string, name: string }[]
   labels: string[]
+  // A team rule names its column in words instead of picking one board's column.
+  columnAsText?: boolean
 }>()
 
 const row = defineModel<{ kind: string, value: string }>({ required: true })
@@ -42,8 +44,19 @@ function setValue(value: string) {
       </option>
     </select>
 
+    <input
+      v-if="field === 'column' && columnAsText"
+      :value="row.value"
+      type="text"
+      maxlength="40"
+      placeholder="Column name"
+      class="w-44 rounded-md border border-default bg-default px-2 py-1.5 text-sm text-default outline-none focus:border-primary"
+      data-step-value
+      @input="setValue(($event.target as HTMLInputElement).value)"
+    >
+
     <select
-      v-if="field === 'column'"
+      v-else-if="field === 'column'"
       :value="row.value"
       class="min-w-0 rounded-md border border-default bg-default px-2 py-1.5 text-sm text-default outline-none focus:border-primary"
       data-step-value

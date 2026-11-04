@@ -7,6 +7,8 @@ import type { RuleContext, RuleNames } from '~~/server/utils/ruleSpec'
 import { boardPeople } from '~/composables/useProjects'
 import { createProjectRule, updateProjectRule, ruleErrorMessage } from '~/composables/useProjectRules'
 import type { ProjectRule, RuleBody } from '~/composables/useProjectRules'
+import { ACTIONS, CONDITIONS, NO_KIND, TRIGGERS, fromStored, kindList, toStored } from '~/utils/ruleKinds'
+import type { Row } from '~/utils/ruleKinds'
 
 const props = defineProps<{
   projectId: string
@@ -19,105 +21,22 @@ const emit = defineEmits<{ saved: [rule: ProjectRule], cancel: [] }>()
 
 const { boardColumns, isTrashed, boardTagCounts } = useProjects()
 
-type StepField = 'none' | 'column' | 'person' | 'personOrNobody' | 'personOrAnyone' | 'label' | 'days' | 'text' | 'visibility' | 'yesNo'
-interface KindInfo { label: string, field: StepField, key?: string }
-interface Row { kind: string, value: string }
-
-// The plain words for each kind, and the key the rule model stores its value under.
-const TRIGGERS: Record<string, KindInfo> = {
-  task_added: { label: 'A task is added', field: 'none' },
-  task_moved: { label: 'A task is moved to a column', field: 'column', key: 'columnId' },
-  task_completed: { label: 'A task is completed', field: 'none' },
-  task_reopened: { label: 'A task is reopened', field: 'none' },
-  task_assigned: { label: 'A task is assigned to someone', field: 'personOrAnyone', key: 'assigneeId' },
-  due_set: { label: 'A due date is set or changed', field: 'none' },
-  due_passed: { label: 'A due date passes', field: 'none' },
-  comment_added: { label: 'A comment is added', field: 'none' },
-  pr_merged: { label: 'A linked pull request is merged', field: 'none' },
-  pr_closed: { label: 'A linked pull request is closed', field: 'none' },
-  pr_checks_failed: { label: 'Checks fail on a linked pull request', field: 'none' }
-}
-
-const CONDITIONS: Record<string, KindInfo> = {
-  in_column: { label: 'The task is in a column', field: 'column', key: 'columnId' },
-  assigned_to: { label: 'It is assigned to someone, or to nobody', field: 'personOrNobody', key: 'assigneeId' },
-  has_label: { label: 'It has a label', field: 'label', key: 'label' },
-  has_due_date: { label: 'It has a due date (yes or no)', field: 'yesNo', key: 'value' },
-  visibility: { label: 'It is team only or shared with customer', field: 'visibility', key: 'value' }
-}
-
-const ACTIONS: Record<string, KindInfo> = {
-  move_to_column: { label: 'Move it to a column', field: 'column', key: 'columnId' },
-  assign: { label: 'Assign it to someone', field: 'person', key: 'assigneeId' },
-  unassign: { label: 'Unassign it', field: 'none' },
-  set_due_in_days: { label: 'Set the due date, days from now', field: 'days', key: 'days' },
-  complete: { label: 'Mark it complete', field: 'none' },
-  reopen: { label: 'Reopen it', field: 'none' },
-  add_label: { label: 'Add a label', field: 'label', key: 'label' },
-  add_comment: { label: 'Add a comment', field: 'text', key: 'text' },
-  create_subtask: { label: 'Create a subtask', field: 'text', key: 'title' },
-  set_visibility: { label: 'Set it team only or shared with customer', field: 'visibility', key: 'value' }
-}
-
-function kindList(table: Record<string, KindInfo>, disabled: (kind: string) => boolean = () => false) {
-  return Object.entries(table).map(([value, info]) => ({
-    value,
-    label: value === 'set_visibility' && disabled(value) ? `${info.label} (project owner only)` : info.label,
-    field: info.field,
-    disabled: disabled(value)
-  }))
-}
-
 const triggerKinds = kindList(TRIGGERS)
 const conditionKinds = kindList(CONDITIONS)
-const actionKinds = kindList(ACTIONS, kind => kind === 'set_visibility' && !props.canSetVisibility)
+const actionKinds = kindList(ACTIONS, kind => kind === 'set_visibility' && !props.canSetVisibility, 'project owner only')
 
 // Columns the board still has; a trashed column cannot be picked for a new rule.
 const columns = computed(() => boardColumns.value.filter(column => !isTrashed(column)).map(column => ({ id: column.id, name: column.name })))
 const people = computed(() => boardPeople().map(person => ({ id: person.id, name: person.name || person.email })))
 const labels = computed(() => boardTagCounts.value.map(([tag]) => tag))
 
-// Rows are edited as text; each kind turns its value into the stored shape.
-function fromStored(item: Record<string, unknown>, info: KindInfo): Row {
-  const kind = String(item.kind)
-  if (!info.key) return { kind, value: '' }
-  const raw = item[info.key]
-  if (info.field === 'yesNo') return { kind, value: raw === true ? 'yes' : raw === false ? 'no' : '' }
-  if (info.field === 'days') return { kind, value: raw === undefined ? '' : String(raw) }
-  return { kind, value: typeof raw === 'string' ? raw : '' }
-}
-
-function toStored(row: Row, info: KindInfo): Record<string, unknown> {
-  const out: Record<string, unknown> = { kind: row.kind }
-  if (!info.key) return out
-  switch (info.field) {
-    case 'personOrNobody':
-      out[info.key] = row.value === '' ? null : row.value
-      break
-    case 'personOrAnyone':
-      // An empty value is the choice "anyone", which the model reads as no key.
-      if (row.value !== '') out[info.key] = row.value
-      break
-    case 'days':
-      out[info.key] = row.value === '' ? row.value : Number(row.value)
-      break
-    case 'yesNo':
-      out[info.key] = row.value === 'yes' ? true : row.value === 'no' ? false : ''
-      break
-    default:
-      out[info.key] = row.value.trim()
-  }
-
-  return out
-}
-
 const stored = props.rule ?? null
 const name = ref(stored?.name ?? '')
 const trigger = ref<Row>(stored
-  ? fromStored(stored.trigger as unknown as Record<string, unknown>, TRIGGERS[stored.trigger.kind] ?? { label: '', field: 'none' })
+  ? fromStored(stored.trigger as unknown as Record<string, unknown>, TRIGGERS[stored.trigger.kind] ?? NO_KIND)
   : { kind: 'task_moved', value: '' })
-const conditions = ref<Row[]>(stored?.conditions.map(item => fromStored(item as unknown as Record<string, unknown>, CONDITIONS[item.kind] ?? { label: '', field: 'none' })) ?? [])
-const actions = ref<Row[]>(stored?.actions.map(item => fromStored(item as unknown as Record<string, unknown>, ACTIONS[item.kind] ?? { label: '', field: 'none' })) ?? [])
+const conditions = ref<Row[]>(stored?.conditions.map(item => fromStored(item as unknown as Record<string, unknown>, CONDITIONS[item.kind] ?? NO_KIND)) ?? [])
+const actions = ref<Row[]>(stored?.actions.map(item => fromStored(item as unknown as Record<string, unknown>, ACTIONS[item.kind] ?? NO_KIND)) ?? [])
 if (!stored) actions.value = [{ kind: 'move_to_column', value: '' }]
 
 function addCondition() {
@@ -129,11 +48,11 @@ function addAction() {
 }
 
 const body = computed<RuleBody>(() => {
-  const trig = toStored(trigger.value, TRIGGERS[trigger.value.kind] ?? { label: '', field: 'none' })
+  const trig = toStored(trigger.value, TRIGGERS[trigger.value.kind] ?? NO_KIND)
   const result: RuleBody = {
     trigger: trig as unknown as RuleBody['trigger'],
-    conditions: conditions.value.map(row => toStored(row, CONDITIONS[row.kind] ?? { label: '', field: 'none' })) as unknown as RuleBody['conditions'],
-    actions: actions.value.map(row => toStored(row, ACTIONS[row.kind] ?? { label: '', field: 'none' })) as unknown as RuleBody['actions']
+    conditions: conditions.value.map(row => toStored(row, CONDITIONS[row.kind] ?? NO_KIND)) as unknown as RuleBody['conditions'],
+    actions: actions.value.map(row => toStored(row, ACTIONS[row.kind] ?? NO_KIND)) as unknown as RuleBody['actions']
   }
   // An unnamed rule is sent without a name; the server reads that as no name at all.
   const text = name.value.trim()

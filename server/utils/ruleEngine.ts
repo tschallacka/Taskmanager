@@ -2,10 +2,11 @@
 // project's enabled rules whose trigger matches, checks their conditions, runs
 // their actions and writes one run-log line per firing. It never throws: a rule
 // that breaks must not break the request that changed the task.
-import { and, asc, eq } from 'drizzle-orm'
+import { and, asc, eq, isNull } from 'drizzle-orm'
 import { db } from '../db'
-import { projectColumns, projectRuleRuns, projectRules, projects } from '../db/schema'
+import { member, projectColumns, projectRuleRuns, projectRules, projects, teamRuleRuns, teamRules } from '../db/schema'
 import { conditionsHold, describeRule, MAX_RULE_STEPS, type Action, type Condition, type Rule, type RuleNames, type Trigger } from './ruleSpec'
+import { isTeamRuleMode, materialiseTeamRule, type TeamAction, type TeamCondition, type TeamTrigger } from './teamRuleSpec'
 import { genId } from './projects'
 import { projectPeople } from './people'
 import { runAction, snapshotTask, type RuleChain, type RuleEvent, type RuleProject } from './ruleActions'
@@ -49,7 +50,10 @@ async function namesFor(project: RuleProject): Promise<RuleNames> {
   }
 }
 
+type RuleOrigin = 'team' | 'project'
+
 async function writeRun(args: {
+  origin: RuleOrigin
   ruleId: string
   projectId: string
   taskId: string | null
@@ -59,7 +63,7 @@ async function writeRun(args: {
   chain: RuleChain
   createdAt: number
 }) {
-  await db.insert(projectRuleRuns).values({
+  const values = {
     id: genId(),
     ruleId: args.ruleId,
     projectId: args.projectId,
@@ -70,7 +74,65 @@ async function writeRun(args: {
     chainId: args.chain.id,
     depth: args.chain.depth,
     createdAt: args.createdAt
-  })
+  }
+  if (args.origin === 'team') await db.insert(teamRuleRuns).values(values)
+  else await db.insert(projectRuleRuns).values(values)
+}
+
+// A rule ready to run on one board: its steps already name this board's columns.
+interface Runnable {
+  origin: RuleOrigin
+  id: string
+  name: string
+  createdBy: string | null
+  mayChangeVisibility?: boolean
+  rule: Rule
+}
+
+async function isTeamOwner(userId: string | null, teamId: string): Promise<boolean> {
+  if (!userId) return false
+  const [row] = await db.select({ role: member.role }).from(member)
+    .where(and(eq(member.organizationId, teamId), eq(member.userId, userId)))
+  return Boolean(row?.role.split(',').includes('owner'))
+}
+
+/**
+ * The team's rules as ordinary rules for this board, in the order they run. A rule that names a
+ * column this board does not have is left out for this board.
+ */
+async function teamRunnables(project: RuleProject): Promise<Runnable[]> {
+  if (!project.teamId) return []
+  const rows = await db.select().from(teamRules)
+    .where(and(eq(teamRules.teamId, project.teamId), eq(teamRules.enabled, true)))
+    .orderBy(asc(teamRules.position), asc(teamRules.createdAt))
+  if (!rows.length) return []
+
+  const columns = await db.select({ id: projectColumns.id, name: projectColumns.name }).from(projectColumns)
+    .where(and(eq(projectColumns.projectId, project.id), isNull(projectColumns.deletedAt)))
+  const runnables: Runnable[] = []
+  for (const row of rows) {
+    if (!isTeamRuleMode(row.mode)) continue
+    const rule = materialiseTeamRule({
+      name: row.name,
+      enabled: row.enabled,
+      mode: row.mode,
+      trigger: row.trigger as TeamTrigger,
+      conditions: (row.conditions ?? []) as TeamCondition[],
+      actions: (row.actions ?? []) as TeamAction[]
+    }, columns)
+    if (!rule) continue
+    // Visibility is the owner's call: a team rule may set it only while its author still owns the team.
+    const setsVisibility = rule.actions.some(action => action.kind === 'set_visibility')
+    runnables.push({
+      origin: 'team',
+      id: row.id,
+      name: row.name,
+      createdBy: row.createdBy,
+      mayChangeVisibility: setsVisibility ? await isTeamOwner(row.createdBy, project.teamId) : false,
+      rule
+    })
+  }
+  return runnables
 }
 
 async function fire(event: RuleEvent, chain: RuleChain): Promise<void> {
@@ -85,38 +147,47 @@ async function fire(event: RuleEvent, chain: RuleChain): Promise<void> {
   // An archived project runs nothing.
   if (!project || project.archivedAt) return
 
-  const rules = await db.select().from(projectRules)
+  const rows = await db.select().from(projectRules)
     .where(and(eq(projectRules.projectId, project.id), eq(projectRules.enabled, true)))
     .orderBy(asc(projectRules.position), asc(projectRules.createdAt))
-  if (!rules.length) return
+  // The team's rules run first, then the board's own.
+  const runnables: Runnable[] = [
+    ...await teamRunnables(project),
+    ...rows.map((row): Runnable => ({
+      origin: 'project',
+      id: row.id,
+      name: row.name,
+      createdBy: row.createdBy,
+      rule: {
+        name: row.name,
+        enabled: row.enabled,
+        trigger: row.trigger as Trigger,
+        conditions: (row.conditions ?? []) as Condition[],
+        actions: (row.actions ?? []) as Action[]
+      }
+    }))
+  ]
+  if (!runnables.length) return
 
   let names: RuleNames | null = null
   // Each rule sees the task as the rules before it left it.
-  for (const row of rules) {
-    const trigger = row.trigger as Trigger
-    if (!triggerMatches(trigger, event)) continue
+  for (const entry of runnables) {
+    const { rule } = entry
+    if (!triggerMatches(rule.trigger, event)) continue
 
     const task = await snapshotTask(event.taskId)
     if (!task || task.deleted) return
 
-    const conditions = (row.conditions ?? []) as Condition[]
-    if (!conditionsHold(conditions, task)) continue
+    if (!conditionsHold(rule.conditions, task)) continue
 
-    const rule: Rule = {
-      name: row.name,
-      enabled: row.enabled,
-      trigger,
-      conditions,
-      actions: (row.actions ?? []) as Action[]
-    }
     names ??= await namesFor(project)
     const startedAt = Date.now()
-    const key = `${row.id}:${event.taskId}`
-    const base = { ruleId: row.id, projectId: project.id, taskId: event.taskId, trigger: event.type, chain, createdAt: startedAt }
+    const key = `${entry.id}:${event.taskId}`
+    const base = { origin: entry.origin, ruleId: entry.id, projectId: project.id, taskId: event.taskId, trigger: event.type, chain, createdAt: startedAt }
 
     if (chain.depth >= MAX_RULE_STEPS || chain.fired.has(key)) {
       const why = chain.fired.has(key)
-        ? `"${row.name}" already ran on this task in this chain`
+        ? `"${entry.name}" already ran on this task in this chain`
         : `the step limit of ${MAX_RULE_STEPS} was reached`
       await writeRun({ ...base, outcome: 'loop_stopped', detail: `Stopped after ${chain.depth} steps: ${why}, so it would have repeated.` })
       continue
@@ -126,11 +197,11 @@ async function fire(event: RuleEvent, chain: RuleChain): Promise<void> {
     const followUp = (next: RuleEvent) => fireRules(next, { id: chain.id, depth: chain.depth + 1, fired: chain.fired })
     try {
       for (const action of rule.actions) {
-        await runAction(action, project, { id: row.id, name: row.name, createdBy: row.createdBy }, event.taskId, followUp)
+        await runAction(action, project, { id: entry.id, name: entry.name, createdBy: entry.createdBy, mayChangeVisibility: entry.mayChangeVisibility }, event.taskId, followUp)
       }
       await writeRun({ ...base, outcome: 'ran', detail: describeRule(rule, names) })
     } catch (error) {
-      console.error(`[rules] "${row.name}" failed on task ${event.taskId}: ${reasonOf(error)}`)
+      console.error(`[rules] "${entry.name}" failed on task ${event.taskId}: ${reasonOf(error)}`)
       await writeRun({ ...base, outcome: 'failed', detail: reasonOf(error) })
     }
   }

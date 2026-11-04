@@ -38,6 +38,7 @@ const SECTIONS = computed(() => [
   { id: 'members', label: 'Members', icon: 'i-lucide-users' },
   { id: 'customers', label: 'Customers', icon: 'i-lucide-building-2' },
   { id: 'boards', label: 'Board defaults', icon: 'i-lucide-columns-3' },
+  { id: 'rules', label: 'Rules', icon: 'i-lucide-workflow' },
   ...(isTeamAdmin.value ? [{ id: 'keys', label: 'Keys', icon: 'i-lucide-key-round' }] : [])
 ])
 
@@ -700,6 +701,12 @@ async function saveColumns(names: string[]) {
                 </p>
               </template>
             </template>
+
+            <!-- Rules -->
+            <TeamRulesPanel
+              v-else-if="section === 'rules'"
+              :team-id="activeTeam.id"
+            />
 
             <!-- Keys -->
             <TeamKeysPanel

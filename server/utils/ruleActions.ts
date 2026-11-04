@@ -42,6 +42,8 @@ export interface RuleSource {
   id: string
   name: string
   createdBy: string | null
+  /** Set by the engine for a team rule: whether its author still owns the team. A board rule leaves it out and the board's owner decides. */
+  mayChangeVisibility?: boolean
 }
 
 export type FollowUp = (event: RuleEvent) => Promise<void>
@@ -249,7 +251,7 @@ export async function runAction(
 
     case 'set_visibility': {
       // Visibility decides what the customer sees, so only the project owner's rules may set it.
-      if (rule.createdBy !== project.userId) {
+      if (!(rule.mayChangeVisibility ?? rule.createdBy === project.userId)) {
         throw createError({ statusCode: 400, message: 'Only the project owner can make a rule change task visibility' })
       }
       const value: Visibility = action.value

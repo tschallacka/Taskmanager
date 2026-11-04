@@ -941,6 +941,49 @@ export const projectRuleRuns = pgTable(
 
 export type ProjectRuleRun = typeof projectRuleRuns.$inferSelect
 
+// Rules for every board of a team. A board's column ids belong to that board, so a team rule names a
+// column by its name (mode by_name) or uses no column at all (mode column_free); see teamRuleSpec.ts.
+// The engine turns the rule into an ordinary rule for each board it fires on.
+export const teamRules = pgTable(
+  'team_rules',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('team_id').notNull().references(() => organization.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    enabled: boolean('enabled').notNull().default(true),
+    mode: text('mode').notNull(),
+    trigger: json('trigger').notNull(),
+    conditions: json('conditions').notNull().default([]),
+    actions: json('actions').notNull().default([]),
+    position: integer('position').notNull().default(0),
+    createdBy: text('created_by').references(() => user.id, { onDelete: 'set null' }),
+    createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+    updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
+  },
+  table => [index('team_rules_team_id_idx').on(table.teamId)]
+)
+
+export type TeamRuleRow = typeof teamRules.$inferSelect
+
+// One line per firing of a team rule, on the board it fired on.
+export const teamRuleRuns = pgTable(
+  'team_rule_runs',
+  {
+    id: text('id').primaryKey(),
+    ruleId: text('rule_id').notNull().references(() => teamRules.id, { onDelete: 'cascade' }),
+    projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+    taskId: text('task_id'),
+    trigger: text('trigger').notNull(),
+    // ran, failed or loop_stopped
+    outcome: text('outcome').notNull(),
+    detail: text('detail').notNull().default(''),
+    chainId: text('chain_id').notNull(),
+    depth: integer('depth').notNull().default(0),
+    createdAt: bigint('created_at', { mode: 'number' }).notNull()
+  },
+  table => [index('team_rule_runs_rule_created_idx').on(table.ruleId, table.createdAt)]
+)
+
 // ─── Project members and secrets ──────────────────────────────────────────────
 
 // Who works on a project beyond the people the whole team already shares it with.
