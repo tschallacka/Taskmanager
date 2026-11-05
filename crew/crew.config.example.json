@@ -22,11 +22,11 @@
     "w2": "Wick Worker",
     "w3": "Wynn Worker",
     "w4": "Wade Worker",
-    "pietje": "Peter Precise",
+    "pietje": "Usher Xander",
     "nitpicker": "Nina Nitpick",
     "contact": "Casey Contact"
   },
-  "nicks": { "pm": "pia", "w1": "wren", "w2": "wick", "w3": "wynn", "w4": "wade", "pietje": "peter", "nitpicker": "nitpicker" },
+  "nicks": { "pm": "pia", "w1": "wren", "w2": "wick", "w3": "wynn", "w4": "wade", "pietje": "usher", "nitpicker": "nitpicker" },
   "chat": {
     "client": "/absolute/path/to/chat-client-rs (leave empty to run without the chat line)",
     "channel": "#acme",
