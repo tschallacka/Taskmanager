@@ -22,13 +22,13 @@ import { genId } from './projects'
 // role in the crew's team; a contact is a customer login and joins no team.
 export const CREW_PEOPLE = [
   { key: 'boss', name: 'Boss', role: 'owner: reads the reports, owns the bugs column', team: 'admin' },
-  { key: 'pm', name: 'Pia Planner', role: 'project manager', team: 'member' },
+  { key: 'pia', name: 'Pia Planner', role: 'project manager', team: 'member' },
   { key: 'wren', name: 'Wren Worker', role: 'worker 1', team: 'member' },
   { key: 'wick', name: 'Wick Worker', role: 'worker 2', team: 'member' },
   { key: 'wynn', name: 'Wynn Worker', role: 'worker 3', team: 'member' },
   { key: 'wade', name: 'Wade Worker', role: 'worker 4', team: 'member' },
   { key: 'usher', name: 'Usher Xander', role: 'usability tester: browses the dev copy, tries every feature', team: 'member' },
-  { key: 'nitpicker', name: 'Nina Nitpick', role: 'code quality reviewer: reviews pull requests, times her review', team: 'member' },
+  { key: 'nina', name: 'Nina Nitpick', role: 'code quality reviewer: reviews pull requests, times her review', team: 'member' },
   { key: 'quincy', name: 'Quincy Average', role: 'QA: uses the finished task like a customer or a blind agent', team: 'member' },
   { key: 'customer', name: 'Scrappy Customer', role: 'the customer: asks for things, never sees internal tasks', team: 'contact' },
   { key: 'contact', name: 'Casey Customer', role: 'customer contact: sees only what is shared with the customer', team: 'contact' }

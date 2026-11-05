@@ -17,17 +17,17 @@
   },
   "people": {
     "boss": "Boss",
-    "pm": "Pia Planner",
+    "pia": "Pia Planner",
     "wren": "Wren Worker",
     "wick": "Wick Worker",
     "wynn": "Wynn Worker",
     "wade": "Wade Worker",
     "usher": "Usher Xander",
-    "nitpicker": "Nina Nitpick",
+    "nina": "Nina Nitpick",
     "quincy": "Quincy Average",
     "contact": "Casey Contact"
   },
-  "nicks": { "pm": "pia", "wren": "wren", "wick": "wick", "wynn": "wynn", "wade": "wade", "usher": "usher", "nitpicker": "nitpicker", "quincy": "quincy" },
+  "nicks": { "pia": "pia", "wren": "wren", "wick": "wick", "wynn": "wynn", "wade": "wade", "usher": "usher", "nina": "nina", "quincy": "quincy" },
   "chat": {
     "client": "/absolute/path/to/chat-client-rs (leave empty to run without the chat line)",
     "channel": "#acme",

@@ -1,6 +1,6 @@
 import { renameCrewPersonKeys } from '../utils/crewKeyRename'
 
-// A crew made before the person keys were renamed (w1..w4, pietje) gets the new ones. Idempotent.
+// A crew made before the person keys were renamed (w1..w4, pietje, pm, nitpicker) gets the new ones. Idempotent.
 export default defineNitroPlugin(() => {
   renameCrewPersonKeys()
     .then((count) => {

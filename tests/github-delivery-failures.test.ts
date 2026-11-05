@@ -225,7 +225,7 @@ function seed(store: ReturnType<typeof fakeStore>, extra: Partial<Stored> & { de
   })
 }
 
-const CREW_PEOPLE = [{ userId: 'pm-user', key: 'pm' }, { userId: 'w1-user', key: 'w1' }]
+const CREW_PEOPLE = [{ userId: 'pm-user', key: 'pia' }, { userId: 'w1-user', key: 'w1' }]
 
 function deps(store: ReturnType<typeof fakeStore>, queue = fakeQueue()): PmDeps {
   return { rows: store.rows, reads: store.reads, linked, queue: queue.deps, now: () => NOW, crewPeople: async () => CREW_PEOPLE }

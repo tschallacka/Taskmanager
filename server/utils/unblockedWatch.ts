@@ -265,7 +265,7 @@ async function unblockedBy(board: BoardRef, blockers: Blocker[], actorId: string
 
   const from = await nameOf(actorId)
   const crew = board.teamId ? await githubDatabaseLookups.crewPeople(board.teamId) : []
-  const pm = crew.filter(person => person.key === 'pm').map(person => person.userId)
+  const pm = crew.filter(person => person.key === 'pia').map(person => person.userId)
   for (const id of freed) {
     const { task, freedBy } = waiting.get(id)!
     const body = unblockBody(freedBy)

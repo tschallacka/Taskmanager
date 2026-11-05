@@ -272,7 +272,7 @@ function framesOf(connection: FakeConnection): Record<string, unknown>[] {
 const crewBoard = { id: 'board-c', userId: 'pm-user', teamId: 'team-c', customerId: null }
 const crewMembers = { 'pm-user': ['team-c'], 'boss-user': ['team-c'], 'w1-user': ['team-c'], 'w2-user': ['team-c'] }
 const crewPeople = [
-  { userId: 'pm-user', key: 'pm' },
+  { userId: 'pm-user', key: 'pia' },
   { userId: 'boss-user', key: 'boss' },
   { userId: 'w1-user', key: 'w1' },
   { userId: 'w2-user', key: 'w2' }

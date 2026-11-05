@@ -484,7 +484,7 @@ async function managedProject(context: ApiKeyContext, row: FailureRow | null, de
  */
 async function requireCrewPm(context: ApiKeyContext, project: LinkedProject['project'], deps: PmDeps): Promise<void> {
   const people = project.teamId ? await (deps.crewPeople ?? githubDatabaseLookups.crewPeople)(project.teamId) : []
-  if (!people.some(person => person.userId === context.userId && person.key === 'pm')) throw new McpToolError(PM_ONLY)
+  if (!people.some(person => person.userId === context.userId && person.key === 'pia')) throw new McpToolError(PM_ONLY)
 }
 
 /** A row as a tool shows it: metadata only. */

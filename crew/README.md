@@ -99,7 +99,7 @@ plain `http://` is accepted only for `localhost`, a `*.localhost` name, `127.0.0
 1. `cd` into the kit folder and run `npm install` (it installs `@modelcontextprotocol/sdk`, Node 20 or newer).
 2. The member must be provisioned: `creds.json` in `CREW_HOME` has `base` and `people.<key>.apiKey`. The channel
    also reads `crew.json` in `CREW_HOME` (a sample is in `crew.config.example.json`).
-3. In the folder where you start `claude`, add `.mcp.json` (one member per folder; `<who>` is the key, `pm`, `wren`, `boss`...):
+3. In the folder where you start `claude`, add `.mcp.json` (one member per folder; `<who>` is the key, `pia`, `wren`, `boss`...):
 
    ```json
    {
@@ -218,26 +218,26 @@ scratch card. Each step ends with what you should see.
    `node -e "import('@modelcontextprotocol/sdk/server/index.js').then(() => console.log('sdk ok'))"` prints `sdk ok`.
 2. Check that the key exists without printing it:
    `node -e "const c=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));console.log(Object.keys(c.people).join(' '))" <CREW_HOME>/creds.json`.
-   Expected: a list of member keys that includes `pm`.
+   Expected: a list of member keys that includes `pia`.
 3. Start the channel by hand, with no session attached:
-   `CREW_HOME=<CREW_HOME> timeout 5 node <kit folder>/channel.mjs pm < /dev/null; echo "exit $?"`.
-   Expected: `[channel pm] started for pm at the live tail` (or `from event <n>`), then `exit 0`.
+   `CREW_HOME=<CREW_HOME> timeout 5 node <kit folder>/channel.mjs pia < /dev/null; echo "exit $?"`.
+   Expected: `[channel pia] started for pia at the live tail` (or `from event <n>`), then `exit 0`.
 4. The same with a member that has no key, for example `pm2`: expected `channel pm2: no apiKey for this person in creds.json, or no base URL. Provision the crew first.`
    and `exit 78`.
 5. Create `.mcp.json` as above in the folder you start `claude` from.
 6. Start the session: `claude --dangerously-load-development-channels server:taskmanager-crew`. Expected: the
    session opens (accept the development-channel prompt if Claude Code shows one). Not with `-p`.
 7. Type `/mcp`. Expected: `taskmanager-crew` is listed as connected.
-8. Run `claude --debug` instead, or read the debug log: expected `[channel pm] started for pm at the live tail`
+8. Run `claude --debug` instead, or read the debug log: expected `[channel pia] started for pia at the live tail`
    (or `from event <n>`).
 9. Check the audit row. Sign in to Taskmanager as the key's owner (the PM account) and open `/projects/inbox?tab=agent`
-   (Agent audit). Expected: a row `Event stream connected`, tool `agent.events`, for the key `pm`. One row per connect,
+   (Agent audit). Expected: a row `Event stream connected`, tool `agent.events`, for the key `pia`. One row per connect,
    not per event.
 10. Create a scratch card on the crew board in the app, with the title `scratch:channel` (the title, not a tag).
     Expected in the session within a few seconds: a tag `<channel source="taskmanager-crew" event="task_created" ... origin="person">`,
     with that title. Delete the scratch card when done.
 11. Stop the session. Create a second scratch card (title `scratch:channel`) while it is down. Start the session again.
-    Expected: the second card's `task_created` arrives, and the log shows `started for pm from event <n>` and no
+    Expected: the second card's `task_created` arrives, and the log shows `started for pia from event <n>` and no
     `backlog_cut` line. Delete both scratch cards.
 12. Optional: a `closed` stop. Set the key to disabled in the app, or revoke it, and start the session. Expected:
     `the server closed the event stream (key_revoked)` or `(disabled)`, the process exits with 1, and there are no

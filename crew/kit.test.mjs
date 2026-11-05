@@ -371,7 +371,7 @@ describe('CREW_HOME and the agent types', () => {
     assert.ok(pia.includes(`CREW_HOME=${dir} node ${KIT}/`), 'the definition carries the resolved CREW_HOME')
     const prompts = readFileSync(join(dir, 'PROMPTS.md'), 'utf8')
     assert.match(prompts, /\| `wren` \| Wren Worker \| wren \| `acme-wren-worker` \|/)
-    assert.ok(prompts.includes(`CREW_HOME=${dir} node ${KIT}/listen.mjs pm 60`), 'commands carry CREW_HOME')
+    assert.ok(prompts.includes(`CREW_HOME=${dir} node ${KIT}/listen.mjs pia 60`), 'commands carry CREW_HOME')
   })
 
   test('init never overwrites a definition it did not write', () => {
@@ -394,7 +394,7 @@ describe('CREW_HOME and the agent types', () => {
     board: { id: 'b1', name: 'Internal Tools' },
     members: [
       { key: 'wren', name: 'Wren Worker (Internal Tools)', agentType: 'internal-tools-wren', email: 'acme-f1-wren@crew.invalid', password: 'pw-one', apiKey: 'arn_forkone' },
-      { key: 'pm', name: 'Pia Planner (Internal Tools)', agentType: 'internal-tools-pia', email: 'acme-f1-pm@crew.invalid', password: 'pw-two', apiKey: 'arn_forktwo' }
+      { key: 'pia', name: 'Pia Planner (Internal Tools)', agentType: 'internal-tools-pia', email: 'acme-f1-pia@crew.invalid', password: 'pw-two', apiKey: 'arn_forktwo' }
     ]
   }
 
@@ -441,7 +441,7 @@ describe('CREW_HOME and the agent types', () => {
     assert.deepEqual(answer.forks, ['one.json'], 'a broken file is left out, not fatal')
     assert.equal(answer.people.wren.apiKey, 'arn_crewkey')
     assert.equal(answer.people['internal-tools-wren'].apiKey, 'arn_forkone')
-    assert.equal(answer.people['internal-tools-pia'].email, 'acme-f1-pm@crew.invalid')
+    assert.equal(answer.people['internal-tools-pia'].email, 'acme-f1-pia@crew.invalid')
   })
 })
 

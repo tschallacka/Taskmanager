@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Step 1 of the setup. Checks what the crew needs, writes the documents the agents read
-// (CREW.md, USHER.md, NITPICKER.md, PIA-UX.md, PROMPTS.md, BRIEF.md, PROJECT-RULES.md) from their
+// (CREW.md, USHER.md, NINA.md, PIA-UX.md, PROMPTS.md, BRIEF.md, PROJECT-RULES.md) from their
 // *.tmpl files with the values of crew.json, writes fonts.conf when a font directory is given,
 // and writes one Claude Code agent definition per member into ~/.claude/agents. Safe to run
 // again: it overwrites generated documents (edit the .tmpl, not the output) but never
@@ -127,10 +127,10 @@ console.log('\nAgent types')
 const agentsDir = join(process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude'), 'agents')
 mkdirSync(agentsDir, { recursive: true })
 const DUTIES = {
-  pm: 'project manager. Plans the board, steers the workers, pre-checks Verify.',
+  pia: 'project manager. Plans the board, steers the workers, pre-checks Verify.',
   wren: 'worker. Builds the tasks assigned to it on the board.',
   usher: 'usability tester. Tries the product as a first-time user and files [UX] findings for the PM.',
-  nitpicker: 'code quality reviewer. Reviews the diff of each task in Verify before Boss does.',
+  nina: 'code quality reviewer. Reviews the diff of each task in Verify before Boss does.',
   quincy: 'QA. Uses the finished task like a customer, or like an agent with no prior knowledge, and files QA violations for the PM.',
   watcher: 'log watcher (optional). Reads the dev logs and reports what matters; changes nothing.'
 }

@@ -7,7 +7,7 @@
 BRIEF.md.tmpl
 CHANGELOG.md
 CREW.md.tmpl
-NITPICKER.md.tmpl
+NINA.md.tmpl
 PIA-UX.md.tmpl
 PROJECT-RULES.md.tmpl
 PROMPTS.md.tmpl

@@ -15,7 +15,7 @@ export function crewKitCommands(origin: string): string {
  * Written by the shell, so $HOME is the agent machine's own. `who` is the member's key; `home` is
  * the crew's home folder, a folder of its own per crew.
  */
-export function crewChannelCommand(who = 'pm', home = '$HOME/crew-home'): string {
+export function crewChannelCommand(who = 'pia', home = '$HOME/crew-home'): string {
   return `cat > .mcp.json <<EOF
 {
   "mcpServers": {

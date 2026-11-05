@@ -1,11 +1,11 @@
-// The person keys were renamed: workers w1..w4 became wren, wick, wynn and wade, and the usability
-// tester pietje became usher. A crew home made before that has the old keys in creds.json, in the
-// people and nicks of crew.json, and in the files named for a person (profiles/<key>,
-// channel-<key>.state.json, .listen/<key>.json). This moves them to the new keys, once, and does
-// nothing when there is nothing left to move.
+// The person keys were renamed: workers w1..w4 became wren, wick, wynn and wade, the usability tester
+// pietje became usher, the project manager pm became pia and the code reviewer nitpicker became nina.
+// A crew home made before that has the old keys in creds.json, in the people and nicks of crew.json,
+// and in the files named for a person (profiles/<key>, channel-<key>.state.json, .listen/<key>.json).
+// This moves them to the new keys, once, and does nothing when there is nothing left to move.
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 
-export const RENAMED_KEYS = { w1: 'wren', w2: 'wick', w3: 'wynn', w4: 'wade', pietje: 'usher' }
+export const RENAMED_KEYS = { w1: 'wren', w2: 'wick', w3: 'wynn', w4: 'wade', pietje: 'usher', pm: 'pia', nitpicker: 'nina' }
 
 /** A copy of the object with old person keys renamed. When both the old and the new key are there, the new one wins. */
 export function renameKeys(object) {

@@ -136,7 +136,7 @@ function makeHome(base: string, opts: { state?: string, who?: string } = {}) {
   writeFileSync(join(home, 'crew.json'), JSON.stringify({ product: { name: 'Test' } }))
   writeFileSync(join(home, 'creds.json'), JSON.stringify({
     base,
-    people: { wick: { key: 'wick', apiKey: KEY }, pm: { key: 'pm', apiKey: KEY }, boss: { key: 'boss', apiKey: KEY } }
+    people: { wick: { key: 'wick', apiKey: KEY }, pia: { key: 'pia', apiKey: KEY }, boss: { key: 'boss', apiKey: KEY } }
   }))
   if (opts.state !== undefined) {
     writeFileSync(join(home, `channel-${opts.who ?? 'wick'}.state.json`), JSON.stringify({ last_event_id: opts.state }))
@@ -387,7 +387,7 @@ test('the PM gets every new card', async () => {
     await until(() => ch.notes.length >= 2)
     await sleep(2500)
     assert.deepEqual(ch.notes.map(note => note.meta.task).sort(), ['P1', 'P2'])
-  }, { who: 'pm' })
+  }, { who: 'pia' })
 })
 
 // A GitHub event: its text is the title and the ref only; the server sets the flags that say who it is for.
@@ -449,7 +449,7 @@ test('the PM hears all four GitHub kinds, with the ref in the line and origin gi
       assert.ok(note.content.includes('origin "github"'), 'the origin is github')
       assert.ok(note.content.length <= 400)
     }
-  }, { who: 'pm' })
+  }, { who: 'pia' })
 })
 
 test('a redirect is refused and the key is not sent to where it points', async () => {

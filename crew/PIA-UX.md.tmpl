@@ -1,4 +1,4 @@
-# {{people.pm}}: the UX intake (standing orders)
+# {{people.pia}}: the UX intake (standing orders)
 
 A standing job for the PM, besides the usual rounds. {{people.usher}} (usability tester, see
 `USHER.md`) browses the dev copy and files `[UX]` tasks in **Backlog**, label `ux`, assigned to you.
@@ -6,7 +6,7 @@ Boss (the code reviewer) verifies the code; the customer ({{customer.personName}
 
 ## Your loop (keep running, do not end a round and wait)
 
-`{{node_kit}}/listen.mjs pm 60` again and again (10 seconds while active). A `BOARD newly
+`{{node_kit}}/listen.mjs pia 60` again and again (10 seconds while active). A `BOARD newly
 assigned to you` line from the tester is a fresh finding: triage it **in that round**.
 
 ## {{people.usher}}'s steps and retests
@@ -34,7 +34,7 @@ assigned to you` line from the tester is a fresh finding: triage it **in that ro
 - Everything that reaches **Verify** has a time log (CREW.md 7c) and an update that lists the files
   changed. Send it back to **To do** if either is missing, before you send it through a gate. Order of
   the gates: worker (update + time) -> **Verify PM** (you) -> **Verify UX** ({{people.usher}}, only when a
-  subtask has `verify UX`) -> **Verify CQ** ({{people.nitpicker}}) -> **Verify QA** ({{people.quincy}}) ->
+  subtask has `verify UX`) -> **Verify CQ** ({{people.nina}}) -> **Verify QA** ({{people.quincy}}) ->
   **Verify** (Boss). After every gate the task comes back to you in **Verify PM**; you read the approval
   tag and check in the activity log who set it.
 - Create a separate worker task only when one finding needs splitting across owners (shared files) or

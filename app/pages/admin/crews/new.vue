@@ -291,14 +291,14 @@ function sessionCommands(who: string): string {
 // start needs no channel: Boss launches everyone, the PM included, with the listen-loop prompts.
 function bossMessage(alongside: boolean): string {
   const people = creds.value?.people ?? {}
-  const team = ['pm', 'wren', 'wick', 'wynn', 'wade', 'usher', 'nitpicker', 'quincy'].map(key => people[key]?.name ?? key).join(', ')
+  const team = ['pia', 'wren', 'wick', 'wynn', 'wade', 'usher', 'nina', 'quincy'].map(key => people[key]?.name ?? key).join(', ')
   const dir = crewDir.value
   return [
     alongside
       ? `Next to your current work, you are now also Boss of the Taskmanager crew "${form.name.trim()}".`
       : `You are Boss of the Taskmanager crew "${form.name.trim()}".`,
     `Its files are in ${dir}. Read ${dir}/CREW.md and ${dir}/PROMPTS.md in full. Run every crew-kit command exactly as PROMPTS.md writes it, with CREW_HOME in front.`,
-    `Then launch ${team} as background agents: one Agent call each, with subagent_type set to that person's agent type from the table at the top of PROMPTS.md, model haiku, run_in_background true, and that person's prompt from PROMPTS.md (for ${people.pm?.name ?? 'the PM'}, the prompt under "PM", not the channel-mode one).`,
+    `Then launch ${team} as background agents: one Agent call each, with subagent_type set to that person's agent type from the table at the top of PROMPTS.md, model haiku, run_in_background true, and that person's prompt from PROMPTS.md (for ${people.pia?.name ?? 'the PM'}, the prompt under "PM", not the channel-mode one).`,
     'If the Agent tool answers "Agent type not found", stop and tell me: never launch a crew member without its subagent_type.',
     'Then keep Boss\'s loop as the top of PROMPTS.md describes: when a crew member hands back, read the board and resume or relaunch them.',
     ...(alongside ? ['Between hand-backs, carry on with your own work.'] : [])
@@ -313,8 +313,8 @@ const startPlain = computed(() => {
 
 const startChannels = computed(() => {
   const people = creds.value?.people ?? {}
-  const pm = people.pm?.name ?? 'the project manager'
-  const workers = ['wren', 'wick', 'wynn', 'wade', 'usher', 'nitpicker', 'quincy'].map(key => people[key]?.name ?? key).join(', ')
+  const pm = people.pia?.name ?? 'the project manager'
+  const workers = ['wren', 'wick', 'wynn', 'wade', 'usher', 'nina', 'quincy'].map(key => people[key]?.name ?? key).join(', ')
   return [
     {
       id: 'boss',
@@ -323,9 +323,9 @@ const startChannels = computed(() => {
       message: `You are Boss of the crew "${form.name.trim()}". Its files are in ${crewDir.value}. Read ${crewDir.value}/CREW.md and ${crewDir.value}/PROMPTS.md in full. Then launch ${workers} as background agents with model haiku, each with their own subagent_type and prompt from PROMPTS.md. Do not launch ${pm}: she runs in her own window. Then keep Boss's loop as PROMPTS.md describes under "Channel mode: the PM's session and Boss's wake loop".`
     },
     {
-      id: 'pm',
+      id: 'pia',
       title: `Window 2: ${pm}, the project manager`,
-      command: sessionCommands('pm'),
+      command: sessionCommands('pia'),
       message: `You are ${pm}, the project manager of the crew "${form.name.trim()}". Open ${crewDir.value}/PROMPTS.md, find the section "Channel mode: the PM's session and Boss's wake loop", and follow the prompt in its first code block as your instructions.`
     }
   ]
@@ -918,7 +918,7 @@ const nextHint = computed(() => {
             <p>
               <span class="font-medium text-default">Give it work:</span> the board starts empty. Open the board, add a
               task in Backlog for each thing you want done, in plain words, and assign it to
-              <span class="text-default">{{ creds?.people.pm?.name ?? 'the project manager' }}</span>: being assigned
+              <span class="text-default">{{ creds?.people.pia?.name ?? 'the project manager' }}</span>: being assigned
               is what she notices. Within a minute or two she splits it up and hands the parts to the workers. A task
               that is ready for you to check lands in Verify.
             </p>

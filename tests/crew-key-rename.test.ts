@@ -1,4 +1,4 @@
-// A crew made before the person keys were renamed (w1..w4, pietje) gets the new ones: account
+// A crew made before the person keys were renamed (w1..w4, pietje, pm, nitpicker) gets the new ones: account
 // address, key name and fork member row. Needs the dev database. Run:
 //   TSX_TSCONFIG_PATH=.nuxt/tsconfig.server.json DATABASE_URL=postgresql://arnotes:arnotes@localhost:5433/arnotes node --import tsx --test tests/crew-key-rename.test.ts
 import { after, before, test } from 'node:test'
@@ -30,8 +30,9 @@ const owner = id('owner')
 const accounts = [
   { id: id('wren'), email: `${slug}-w1@crew.invalid`, key: 'wren', old: 'w1' },
   { id: id('usher'), email: `${slug}-pietje@crew.invalid`, key: 'usher', old: 'pietje' },
-  { id: id('pm'), email: `${slug}-pm@crew.invalid`, key: 'pm', old: 'pm' },
-  { id: id('fork'), email: `${slug}-f1-w2@crew.invalid`, key: 'wick', old: 'w2' }
+  { id: id('pia'), email: `${slug}-pm@crew.invalid`, key: 'pia', old: 'pm' },
+  { id: id('fork'), email: `${slug}-f1-w2@crew.invalid`, key: 'wick', old: 'w2' },
+  { id: id('nina'), email: `${slug}-nitpicker@crew.invalid`, key: 'nina', old: 'nitpicker' }
 ]
 const strangerNotCrew = { id: id('stranger'), email: `someone-w1@crew.invalid` }
 
@@ -74,7 +75,7 @@ test('a crew account, its key name and a fork member row move to the new person 
     assert.equal(emails.find(row => row.id === account.id)?.email, `${prefix}-${account.key}@crew.invalid`, account.old)
   }
   const names = await db.select({ name: apiKeys.name }).from(apiKeys).where(inArray(apiKeys.userId, accounts.map(a => a.id)))
-  assert.deepEqual(names.map(row => row.name).sort(), ['crew pm', 'crew usher', 'crew wick', 'crew wren'])
+  assert.deepEqual(names.map(row => row.name).sort(), ['crew nina', 'crew pia', 'crew usher', 'crew wick', 'crew wren'])
   const [row] = await db.select({ key: crewBoardMembers.personKey }).from(crewBoardMembers).where(eq(crewBoardMembers.linkId, linkId))
   assert.equal(row?.key, 'wick')
 })

@@ -1,9 +1,9 @@
-// The crew's person keys were renamed: workers w1..w4 became wren, wick, wynn and wade, and the
-// usability tester pietje became usher. A crew made before the rename has the old keys in three
-// places: the account address (<slug>-<key>@crew.invalid, a fork's is <slug>-f<id>-<key>@...), the
-// name of the account's key ("crew w1") and the key of a fork member row. This moves all three to the
-// new keys. It is idempotent, so it runs on every start and costs a few queries once there is
-// nothing left to move.
+// The crew's person keys were renamed: workers w1..w4 became wren, wick, wynn and wade, the usability
+// tester pietje became usher, the project manager pm became pia and the code reviewer nitpicker became
+// nina. A crew made before the rename has the old keys in three places: the account address
+// (<slug>-<key>@crew.invalid, a fork's is <slug>-f<id>-<key>@...), the name of the account's key
+// ("crew w1") and the key of a fork member row. This moves all three to the new keys. It is idempotent,
+// so it runs on every start and costs a few queries once there is nothing left to move.
 import { and, eq, isNotNull, like } from 'drizzle-orm'
 import { db } from '../db'
 import { apiKeys, crewBoardMembers, user } from '../db/schema'
@@ -13,7 +13,9 @@ export const RENAMED_PERSON_KEYS: Record<string, string> = {
   w2: 'wick',
   w3: 'wynn',
   w4: 'wade',
-  pietje: 'usher'
+  pietje: 'usher',
+  pm: 'pia',
+  nitpicker: 'nina'
 }
 
 const DOMAIN = '@crew.invalid'

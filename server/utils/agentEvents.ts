@@ -721,7 +721,7 @@ export function githubAudience(kind: GithubEventKind, role: { owner: boolean, pm
   return kind !== 'pipeline_passed' || inVerify
 }
 
-/** A person of a crew, with the key the crew gave them (pm, boss, wren...). */
+/** A person of a crew, with the key the crew gave them (pia, boss, wren...). */
 export interface CrewPerson { userId: string, key: string }
 
 export interface GithubLookups extends AudienceLookups {
@@ -789,7 +789,7 @@ export async function emitGithubEventWith(hub: AgentEventHub, lookups: GithubLoo
   const owners = [task.assigneeId, task.createdBy].filter((id): id is string => !!id)
   const crew = board.teamId ? await lookups.crewPeople(board.teamId) : []
   const keyOf = new Map(crew.map(person => [person.userId, person.key]))
-  const candidates = new Set([...owners, ...crew.filter(person => person.key === 'pm' || person.key === 'boss').map(person => person.userId)])
+  const candidates = new Set([...owners, ...crew.filter(person => person.key === 'pia' || person.key === 'boss').map(person => person.userId)])
   const inVerify = task.column?.toLowerCase() === 'verify'
   const ref = input.ref ? refText(input.ref) : null
   let kept = 0
@@ -798,7 +798,7 @@ export async function emitGithubEventWith(hub: AgentEventHub, lookups: GithubLoo
     const staff = board.teamId ? await lookups.isMember(userId, board.teamId) : board.userId === userId
     if (!staff) continue
     const key = keyOf.get(userId)
-    const role = { owner: owners.includes(userId), pm: key === 'pm', boss: key === 'boss' }
+    const role = { owner: owners.includes(userId), pm: key === 'pia', boss: key === 'boss' }
     if (!githubAudience(input.kind, role, inVerify)) continue
     hub.publish(userId, {
       kind: input.kind,
@@ -869,7 +869,7 @@ export async function emitDeliveryFailedWith(hub: AgentEventHub, lookups: Delive
   const keyOf = new Map(crew.map(person => [person.userId, person.key]))
   let recipients: string[]
   if (!board.teamId) recipients = [board.userId]
-  else if (crew.length) recipients = crew.filter(person => person.key === 'pm').map(person => person.userId)
+  else if (crew.length) recipients = crew.filter(person => person.key === 'pia').map(person => person.userId)
   else recipients = await lookups.teamOwners(board.teamId)
   const title = cleanEventText(`${plainText(input.event, 40)} ${plainText(input.owner, 100)}/${plainText(input.repo, 100)}: ${input.class}, ${input.attempts} attempts (${plainText(input.code, 40)})`)
   const ref = refText(input.deliveryId)
@@ -888,7 +888,7 @@ export async function emitDeliveryFailedWith(hub: AgentEventHub, lookups: Delive
       ref,
       needsFeedbackFromMe: false,
       assignedToMe: false,
-      isPm: keyOf.get(userId) === 'pm',
+      isPm: keyOf.get(userId) === 'pia',
       isBoss: false,
       audience: 'staff',
       teamId: board.teamId,

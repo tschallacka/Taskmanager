@@ -21,10 +21,10 @@ If it is, run `crew watch` to see where the run stands.
 | --- | --- | --- |
 | `boss` | the owner's login (you act through it, the crew never does) | applies schema changes, reviews code, publishes, reads reports |
 | `customer` | the customer (you, in a second role) | asks for things, answers the PM, only sees customer-visible tasks |
-| `pm` | the project manager (Haiku) | the customer's contact: plans tasks, assigns, pre-checks Verify, triages UX findings |
+| `pia` | the project manager (Haiku) | the customer's contact: plans tasks, assigns, pre-checks Verify, triages UX findings |
 | `wren` `wick` `wynn` `wade` | the workers (Haiku) | build, test in their own browser profile, report |
 | `usher` | Usher Xander, the usability tester (Haiku) | reviews a task in `Verify UX`, tries every feature, files `[UX]` findings for the PM |
-| `nitpicker` | Nina Nitpick, the code quality reviewer (Haiku) | reviews a task in `Verify CQ`, files `CQ violation` subtasks, tags `CQ approved` |
+| `nina` | Nina Nitpick, the code quality reviewer (Haiku) | reviews a task in `Verify CQ`, files `CQ violation` subtasks, tags `CQ approved` |
 | `quincy` | Quincy Average, QA (Haiku) | uses a task in `Verify QA` like a customer or a blind agent, files `QA violation` subtasks, tags `QA approved` |
 | `contact` | a read-only customer contact | lets anyone check what a customer sees |
 | log watcher (Haiku) | no login | reads the dev log, crew transcripts and new bugs; flags problems to you |
@@ -42,7 +42,7 @@ Columns: Backlog, To do, In progress, **Verify**, **Ready for live**, **Done**, 
    nitpicker) and **Verify QA** (Quincy). Each reviewer files problems as subtasks (`UX violation`,
    `CQ violation`, `QA violation`) and tags the task `UX approved`, `CQ approved` or `QA approved`
    when nothing is left. Only then does the PM move it to **Verify** for you:
-   worker -> PM -> usher -> nitpicker -> Quincy -> PM -> you. The tags are listed in `CREW.md` rule 7b.
+   worker -> PM -> usher -> nina -> Quincy -> PM -> you. The tags are listed in `CREW.md` rule 7b.
 3. **You review the code in Verify**: read the diff of the owned files (do not trust the summary),
    run lint and the typecheck, look at the screenshot, **try it yourself** in a browser. Approved:
    move to **Ready for live**. Not approved: post written feedback as subtasks tagged `Feedback Cato`,

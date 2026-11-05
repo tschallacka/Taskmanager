@@ -16,7 +16,7 @@ import { here, loadCreds } from './config.mjs'
 
 const who = process.argv[2]
 if (!who || !/^[a-z0-9]+$/.test(who)) {
-  console.error('usage: node channel.mjs <who>   (pm, wren, wick, wynn, wade, usher, or a key of crew.json)')
+  console.error('usage: node channel.mjs <who>   (pia, wren, wick, wynn, wade, usher, or a key of crew.json)')
   process.exit(2)
 }
 
@@ -172,7 +172,7 @@ const GITHUB_KINDS = new Set(['pipeline_failed', 'pipeline_passed', 'merged_stag
 // all four, the worker the card is assigned to all four, Boss the two merges and a passed pipeline (a failed
 // pipeline is the assignee to fix). Everything else is forwarded as it comes.
 function forwarded(event) {
-  if (event.kind === 'task_created') return who === 'pm' || event.assigned_to_me === true
+  if (event.kind === 'task_created') return who === 'pia' || event.assigned_to_me === true
   if (event.kind === 'delivery_failed') return event.is_pm === true
   if (!GITHUB_KINDS.has(event.kind)) return true
   if (event.is_pm === true || event.assigned_to_me === true) return true

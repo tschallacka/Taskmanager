@@ -204,7 +204,7 @@ async function tellAgentsOfMove(project: Project, task: Task, actorId: string | 
   if (!isDefaultMoveColumn(column.name) && !agentHearsMove(column, await enabledRuleTriggers(project.id))) return
   const from = await nameOf(actorId)
   const crew = project.teamId ? await githubDatabaseLookups.crewPeople(project.teamId) : []
-  const pm = crew.filter(person => person.key === 'pm').map(person => person.userId)
+  const pm = crew.filter(person => person.key === 'pia').map(person => person.userId)
   const customerVisible = task.visibility === 'customer'
   for (const recipient of moveRecipients(task, actorId, pm)) {
     moveCoalescer.offer(`${project.id}|${recipient}|${customerVisible ? 'customer' : 'internal'}`, { recipient, board: project, task, from, customerVisible })
