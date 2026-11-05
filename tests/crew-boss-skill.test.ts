@@ -17,7 +17,7 @@ test('a person who set up no crew gets no Boss instructions', async () => {
 })
 
 test('the Boss text covers intake, a help request from Pia and the final review', () => {
-  for (const phrase of ['Intake', 'split help', 'Final review', 'Feedback Cato', 'only you merge']) {
+  for (const phrase of ['Intake', 'split help', 'Final review', 'Feedback Cato', 'only you merge', 'Check your tasks regularly', 'You start Pia', 'never the go-between']) {
     assert.ok(BOSS_SKILL.includes(phrase), `missing: ${phrase}`)
   }
 })
