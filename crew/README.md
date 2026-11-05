@@ -260,7 +260,7 @@ CREW_HOME=~/crew-home/<slug> node <kit folder>/init.mjs --forks ~/Downloads/fork
 ```
 
 That stores it in `CREW_HOME/forks` (readable by you only) and writes one agent type per fork, such as
-`internal-tools-wren`. Boss launches it like any member, and the fork signs in as its own name:
+`internal-tools-wren`. Pia starts it like any member, and the fork signs in as its own name:
 
 ```
 CREW_HOME=~/crew-home/<slug> node <kit folder>/crew.mjs internal-tools-wren mcp get_board '{"board":"..."}'

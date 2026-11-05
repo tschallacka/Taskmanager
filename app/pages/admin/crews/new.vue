@@ -288,19 +288,19 @@ function sessionCommands(who: string): string {
 }
 
 // What Boss is told, in the session the admin already works in or in a window of its own. The plain
-// start needs no channel: Boss launches everyone, the PM included, with the listen-loop prompts.
+// start needs no channel: Boss starts Pia in a session of her own with the listen-loop prompt, and she starts the rest.
 function bossMessage(alongside: boolean): string {
   const people = creds.value?.people ?? {}
-  const team = ['pia', 'wren', 'wick', 'wynn', 'wade', 'usher', 'nina', 'quincy'].map(key => people[key]?.name ?? key).join(', ')
+  const team = ['wren', 'wick', 'wynn', 'wade', 'usher', 'nina', 'quincy'].map(key => people[key]?.name ?? key).join(', ')
   const dir = crewDir.value
   return [
     alongside
       ? `Next to your current work, you are now also Boss of the Taskmanager crew "${form.name.trim()}".`
       : `You are Boss of the Taskmanager crew "${form.name.trim()}".`,
     `Its files are in ${dir}. Read ${dir}/CREW.md and ${dir}/PROMPTS.md in full. Run every crew-kit command exactly as PROMPTS.md writes it, with CREW_HOME in front.`,
-    `Then launch ${team} as background agents: one Agent call each, with subagent_type set to that person's agent type from the table at the top of PROMPTS.md, model haiku, run_in_background true, and that person's prompt from PROMPTS.md (for ${people.pia?.name ?? 'the PM'}, the prompt under "PM", not the channel-mode one).`,
-    'If the Agent tool answers "Agent type not found", stop and tell me: never launch a crew member without its subagent_type.',
-    'Then keep Boss\'s loop as the top of PROMPTS.md describes: when a crew member hands back, read the board and resume or relaunch them.',
+    `Then start only ${people.pia?.name ?? 'the project manager'}, the project manager: she is the one crew member you start, and she starts her own workers and reviewers (${team}) herself. She needs her own Claude Code session, because a subagent cannot start other agents: open it with the interactive-shell skill as PROMPTS.md describes under "Starting Pia", and send her the prompt under "PM" as her first message.`,
+    'If that does not work, stop and tell me. Never start a crew member other than her.',
+    'Then keep Boss\'s loop: at the start of every turn read the board and check that she is available. If she is not, start her again the same way.',
     ...(alongside ? ['Between hand-backs, carry on with your own work.'] : [])
   ].join(' ')
 }
@@ -318,15 +318,15 @@ const startChannels = computed(() => {
   return [
     {
       id: 'boss',
-      title: 'Window 1: Boss, who launches the workers',
+      title: 'Window 1: Boss, who checks on the project manager',
       command: sessionCommands('boss'),
-      message: `You are Boss of the crew "${form.name.trim()}". Its files are in ${crewDir.value}. Read ${crewDir.value}/CREW.md and ${crewDir.value}/PROMPTS.md in full. Then launch ${workers} as background agents with model haiku, each with their own subagent_type and prompt from PROMPTS.md. Do not launch ${pm}: she runs in her own window. Then keep Boss's loop as PROMPTS.md describes under "Channel mode: the PM's session and Boss's wake loop".`
+      message: `You are Boss of the crew "${form.name.trim()}". Its files are in ${crewDir.value}. Read ${crewDir.value}/CREW.md and ${crewDir.value}/PROMPTS.md in full. Do not start anyone: ${pm} runs in her own window and starts the workers and reviewers (${workers}) herself. Keep Boss's loop as PROMPTS.md describes under "Channel mode: Pia's session": at the start of every turn read the board and check that she is available, and start her again as PROMPTS.md describes under "Starting Pia" if she is not.`
     },
     {
       id: 'pia',
       title: `Window 2: ${pm}, the project manager`,
       command: sessionCommands('pia'),
-      message: `You are ${pm}, the project manager of the crew "${form.name.trim()}". Open ${crewDir.value}/PROMPTS.md, find the section "Channel mode: the PM's session and Boss's wake loop", and follow the prompt in its first code block as your instructions.`
+      message: `You are ${pm}, the project manager of the crew "${form.name.trim()}". Open ${crewDir.value}/PROMPTS.md, find the section "Channel mode: Pia's session", and follow the prompt in its first code block as your instructions.`
     }
   ]
 })
@@ -806,7 +806,7 @@ const nextHint = computed(() => {
           class="space-y-3"
         >
           <p class="text-sm text-muted">
-            Boss is the Claude Code session that launches the crew members and checks their work. Choose
+            Boss is the Claude Code session that starts the project manager and does the final review. The project manager starts the workers and reviewers herself. Choose
             <span class="text-default">one</span> of the two ways below, not both.
           </p>
 
@@ -907,7 +907,7 @@ const nextHint = computed(() => {
 
           <div class="rounded-lg border border-default p-4 text-sm text-muted space-y-2">
             <p>
-              <span class="font-medium text-default">Good result:</span> Boss writes that it launched the crew members.
+              <span class="font-medium text-default">Good result:</span> Boss writes that it started {{ creds?.people.pia?.name ?? 'the project manager' }} and she answered.
               Within a few minutes, "key last used" for this crew on the
               <NuxtLink
                 to="/admin/crews"

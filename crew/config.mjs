@@ -98,7 +98,7 @@ export function loadCreds() {
 
 const slugify = text => String(text).toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
 
-// The members Boss launches as agents, the optional log watcher included.
+// The members Pia starts as agents (Pia herself runs in her own session), the optional log watcher included.
 export const CAST = ['pia', 'wren', 'wick', 'wynn', 'wade', 'usher', 'nina', 'quincy', 'watcher']
 
 /**

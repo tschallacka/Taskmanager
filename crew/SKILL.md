@@ -57,15 +57,16 @@ Columns: Backlog, To do, In progress, **Verify**, **Ready for live**, **Done**, 
 
 ## Running it
 
-- **Launch** the agents with the prompts in `$CREW_HOME/PROMPTS.md` (`Agent`, `subagent_type` from
-  the table at its top, `model: haiku`, `run_in_background: true`). Order: PM first (plans), workers,
-  then the code reviewer, then the tester when there is a dev copy to browse. Each member is its own
-  agent type (`init.mjs` writes them), so you can tell them apart when you resume or stop one. On
-  "Agent type not found", restart Claude Code (`claude --continue`): never launch a member without
-  its `subagent_type`.
-- **Wake on hand-backs.** A background agent ends its turn after some minutes even when told to
-  loop. Each hand-back wakes you: read the board (`crew watch`), then resume the agent
-  (`SendMessage`) or move on. Do not read transcripts.
+- **Start Pia, and only Pia.** She needs her own Claude Code session (a subagent cannot start other agents), so
+  start it in a real terminal with the `interactive-shell` skill, as `$CREW_HOME/PROMPTS.md` says under "Starting
+  Pia", and send her prompt as her first message. Pia starts the workers, the reviewers and the log watcher herself
+  with the prompts in that file (`Agent`, `subagent_type` from the table at its top, `model: haiku`,
+  `run_in_background: true`). You do not start them, do not watch them and are not the go-between for their
+  messages. Each member is its own agent type (`init.mjs` writes them). On "Agent type not found", restart Claude
+  Code (`claude --continue`): never start a member without its `subagent_type`.
+- **Check on Pia.** At the start of every turn read the board (`crew watch`), not the transcripts. When Pia is
+  unavailable (her session ended, or a task assigned to her had no update, move or tag from her for two of your
+  wake-ups), start her again the same way. Pia does the same for a worker or reviewer who is unavailable.
 - **Chat line.** Start the chat server, join the customer channel as the customer nick, keep a
   presence tail running and arm `guard.sh` as a tracked background task; its exit is the wake for
   an `@<customer nick>` mention. Re-arm it every time. The chat line is optional (off unless `chat.client` is set): without it, meetings and steering go through the board. See `README.md`.

@@ -121,7 +121,7 @@ for (const file of readdirSync(kitDir).filter(f => f.endsWith('.tmpl'))) {
   ok(`${out}${left ? `  (unfilled: ${[...new Set(left)].join(' ')})` : ''}`)
 }
 
-// One Claude Code agent type per member, so Boss launches and addresses each one by name. A file
+// One Claude Code agent type per member, so Pia starts and addresses each one by name. A file
 // without this crew's marker is someone else's and is never overwritten.
 console.log('\nAgent types')
 const agentsDir = join(process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude'), 'agents')
