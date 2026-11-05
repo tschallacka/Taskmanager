@@ -83,7 +83,7 @@ As an owner or admin you make them under **Team**, then **Keys**. See [Team keys
 
 **Settings**, **API keys & MCP**, **Active keys** lists your keys for the workspace you are in: the name, its permissions
 as badges, the start of the key (such as `arn_a1b2c3...`), when it was made, when it was last used and when it expires. You can end
-one at any time. See [Create and revoke a key](/help/agents/create-and-revoke-a-key).
+one at any time. See [Create and revoke a key](/help/agents/create-and-revoke-a-key). To replace the key of a connection that Claude Code already has, see [Connect Claude Code](/help/agents/connect-claude-code), under **Replace a key that is already connected**.
 
 ## Next
 

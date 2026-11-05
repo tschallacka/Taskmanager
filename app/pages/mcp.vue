@@ -26,6 +26,8 @@ const endpoint = computed(() => `${origin.value}/api/mcp`)
 
 const claudeCodeCommand = computed(() => `${exportKeyCommand()}\n${mcpAddCommand(origin.value)}`)
 
+const claudeCodeReplaceCommand = computed(() => mcpReplaceCommand(origin.value))
+
 const jsonConfig = computed(() => JSON.stringify({
   mcpServers: {
     taskmanager: {
@@ -186,6 +188,18 @@ async function copy(text: string, id: string) {
               <pre class="text-xs font-mono bg-elevated/50 border border-default rounded-md p-3 overflow-x-auto">{{ claudeCodeCommand }}</pre>
               <p class="text-xs text-muted">
                 Then run <code class="font-mono">/mcp</code> inside Claude Code to confirm it connected.
+              </p>
+              <p class="text-xs text-muted">
+                {{ KEY_VARIABLE_HOME }}
+              </p>
+              <div class="pt-2 space-y-2">
+                <p class="text-xs text-muted">
+                  Already connected? One paste replaces the key: it removes the old server and adds it again.
+                </p>
+                <pre class="text-xs font-mono bg-elevated/50 border border-default rounded-md p-3 overflow-x-auto">{{ claudeCodeReplaceCommand }}</pre>
+              </div>
+              <p class="text-xs text-muted">
+                Restart Claude Code from a terminal that has the new key. A running session keeps the key it started with.
               </p>
             </div>
 

@@ -43,6 +43,18 @@ export function mcpAddCommand(origin: string): string {
   return `claude mcp add --scope user --transport http taskmanager ${origin}/api/mcp \\\n  --header 'Authorization: Bearer \${${KEY_VARIABLE}}'`
 }
 
+/**
+ * Replaces an existing connection in one paste: the new key, the old server removed, the server added
+ * again. The remove fails when there is nothing to remove yet; its message is hidden and the add still
+ * runs, because each line is a command of its own.
+ */
+export function mcpReplaceCommand(origin: string, token = 'arn_your_key_here'): string {
+  return `${exportKeyCommand(token)}\nclaude mcp remove --scope user taskmanager 2>/dev/null\n${mcpAddCommand(origin)}`
+}
+
+/** Where the variable has to live, so a new terminal or a restarted agent still finds the key. */
+export const KEY_VARIABLE_HOME = 'Put the export line in the shell profile of the terminal that starts Claude Code: ~/.zshrc on a Mac, ~/.bashrc on Linux. An app that starts Claude Code with environment settings of its own needs TASKMANAGER_API_KEY in those settings instead; a shell profile is not read there.'
+
 /** Every step at once, as instructions to paste into a Claude Code session. */
 export function agentInstructions(origin: string): string {
   return `Set yourself up to work with my Taskmanager at ${origin}.

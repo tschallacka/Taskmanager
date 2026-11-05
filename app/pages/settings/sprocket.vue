@@ -60,6 +60,7 @@ const effortValue = computed(() => settings.value?.effort ?? DEFAULT_EFFORT)
 const origin = computed(() => (import.meta.client ? window.location.origin : ''))
 
 const mcpCommand = computed(() => mcpAddCommand(origin.value))
+const replaceCommand = computed(() => mcpReplaceCommand(origin.value))
 const kitCommands = computed(() => crewKitCommands(origin.value))
 const channelCommand = crewChannelCommand()
 const instructions = computed(() => agentInstructions(origin.value))
@@ -348,6 +349,7 @@ async function copySkill() {
               </div>
               <pre class="text-xs font-mono bg-elevated/50 border border-default rounded-md p-3 overflow-x-auto">{{ mcpCommand }}</pre>
               <p class="text-xs text-muted">
+                {{ KEY_VARIABLE_HOME }}
                 It saves the variable's name, not the key: Claude Code fills
                 <code class="font-mono">$TASKMANAGER_API_KEY</code> in from the environment each time it starts.
                 A new key under Settings → API keys shows it with the export line filled in. More clients on
@@ -355,6 +357,13 @@ async function copySkill() {
                   to="/mcp"
                   class="text-primary underline"
                 >Connect an AI agent</NuxtLink>.
+              </p>
+              <p class="text-xs text-muted">
+                Already connected? One paste replaces the key: it removes the old server and adds it again.
+              </p>
+              <pre class="text-xs font-mono bg-elevated/50 border border-default rounded-md p-3 overflow-x-auto">{{ replaceCommand }}</pre>
+              <p class="text-xs text-muted">
+                Restart Claude Code from a terminal that has the new key. A running session keeps the key it started with.
               </p>
             </div>
 

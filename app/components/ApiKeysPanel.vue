@@ -102,6 +102,9 @@ const claudeCommand = computed(() =>
   `${exportKeyCommand(issuedToken.value ?? '')}\n${mcpAddCommand(window.location.origin)}`
 )
 
+// Already connected: one paste swaps the key in and the server out for a fresh one.
+const replaceCommand = computed(() => mcpReplaceCommand(window.location.origin, issuedToken.value ?? undefined))
+
 const origin = import.meta.client ? window.location.origin : ''
 const kitCommands = crewKitCommands(origin)
 const instructions = agentInstructions(origin)
@@ -125,6 +128,19 @@ async function copyCommand() {
     await navigator.clipboard.writeText(claudeCommand.value)
     commandCopied.value = true
     toast.add({ title: 'Command copied', icon: 'i-lucide-check', duration: 2000 })
+  } catch {
+    toast.add({ title: 'Could not copy — select the command and copy it manually', icon: 'i-lucide-alert-triangle', color: 'error' })
+  }
+}
+
+const replaceCopied = ref(false)
+
+async function copyReplaceCommand() {
+  if (!issuedToken.value) return
+  try {
+    await navigator.clipboard.writeText(replaceCommand.value)
+    replaceCopied.value = true
+    toast.add({ title: 'Update command copied', icon: 'i-lucide-check', duration: 2000 })
   } catch {
     toast.add({ title: 'Could not copy — select the command and copy it manually', icon: 'i-lucide-alert-triangle', color: 'error' })
   }
@@ -306,10 +322,12 @@ function expiryLabel(key: ApiKeySummary): string {
               />
             </div>
             <p class="text-xs text-muted pt-1">
-              Or connect Claude Code in one go: these lines put the key in
+              Or connect Claude Code in one go. These lines put the key in
               <code class="font-mono">$TASKMANAGER_API_KEY</code> and add the MCP server by that name only, so
-              the key is never saved. Claude Code reads it on every start: keep the export in your shell
-              profile, or run it before <code class="font-mono">claude</code>.
+              the key is never saved. Claude Code reads the variable every time it starts.
+              {{ KEY_VARIABLE_HOME }}
+              Then open a new terminal, check with <code class="font-mono">echo ${TASKMANAGER_API_KEY:0:4}</code>
+              that it prints <code class="font-mono">arn_</code>, then start profile, or run it before <code class="font-mono">claude</code>.
             </p>
             <div class="flex gap-2">
               <pre class="flex-1 min-w-0 text-xs font-mono bg-default border border-default rounded-md px-3 py-2 whitespace-pre-wrap break-all">{{ claudeCommand }}</pre>
@@ -320,6 +338,21 @@ function expiryLabel(key: ApiKeySummary): string {
                 variant="soft"
                 size="sm"
                 @click="copyCommand"
+              />
+            </div>
+            <p class="text-xs text-muted pt-1">
+              Already connected? One paste replaces the key: it sets the new key, removes the old server and adds it
+              again. Restart Claude Code from a terminal that has the new key, since a running session keeps the old one.
+            </p>
+            <div class="flex gap-2">
+              <pre class="flex-1 min-w-0 text-xs font-mono bg-default border border-default rounded-md px-3 py-2 whitespace-pre-wrap break-all">{{ replaceCommand }}</pre>
+              <UButton
+                :icon="replaceCopied ? 'i-lucide-check' : 'i-lucide-copy'"
+                :label="replaceCopied ? 'Copied' : 'Copy update command'"
+                color="neutral"
+                variant="soft"
+                size="sm"
+                @click="copyReplaceCommand"
               />
             </div>
           </div>
