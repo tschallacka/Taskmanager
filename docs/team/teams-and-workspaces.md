@@ -69,8 +69,9 @@ If you are in your personal workspace, the Team page only says so and asks you t
   in the team, and the other way round. There is no control for moving a board between workspaces.
 - **The active workspace is a setting of your sign-in**, not of a board. If a board you expect is missing, check
   the workspace button first.
-- **Everyone in the team sees every team board.** There is no per-board guest list for team members. To show a
-  board to someone outside the team, use a [customer](/help/team/customers-and-contacts).
+- **Everyone in the team sees every team board.** Team members have no per-board list. To show a board to someone
+  outside the team, invite them as a guest (see [Share a board with guests](/help/basics/share-with-guests)) or use a
+  [customer](/help/team/customers-and-contacts).
 
 <!-- requires: team-admin -->
 ## Rules and keys

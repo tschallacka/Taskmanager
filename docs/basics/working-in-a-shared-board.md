@@ -6,7 +6,7 @@ topics: customer, contact, shared board, comment, request, add task, follow prog
 order: 130
 ---
 
-You log in as a contact of a customer. The team you work with has shared a board with you so you can follow the work
+You log in as a contact of a customer, or as a guest invited to a board. The team you work with has shared a board with you so you can follow the work
 and talk to them about it. This page explains what you will find there.
 
 ## Find the board

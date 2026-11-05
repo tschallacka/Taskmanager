@@ -44,8 +44,9 @@ If nothing is assigned to you, the card says **Nothing assigned to you.**
 Profile is a page about you. It shows your picture, name and email, and three cards:
 
 - **My tasks**: your next eight open tasks, with their project and due date.
-- **Frequent collaborators**: the other people on your ten most recently changed projects. When there are none it
-  tells you to invite teammates from the team switcher.
+- **Frequent collaborators**: the other people on your ten most recently changed projects. Hover a name or picture
+  for the [person card](/help/basics/person-card-and-profiles). When there are none it tells you to invite teammates
+  under Team, Members, or to share a board with a guest.
 - **My recent projects**: your eight most recently changed projects.
 
 The link **Edit profile in settings** takes you to [Settings](/help/workspace/settings). The Profile page itself

@@ -73,12 +73,17 @@ useSeoMeta({ title: computed(() => view.value?.person.name ?? 'Profile') })
             size="3xl"
           />
           <div class="min-w-0">
-            <h1
-              class="truncate text-3xl font-semibold text-default"
-              data-person-name
-            >
-              {{ view.person.name }}
-            </h1>
+            <div class="flex min-w-0 items-center gap-2">
+              <h1
+                class="truncate text-3xl font-semibold text-default"
+                data-person-name
+              >
+                {{ view.person.name }}
+              </h1>
+              <HelpHint page="basics/person-card-and-profiles">
+                You see people you share a board with. The card shows what you may see of them.
+              </HelpHint>
+            </div>
             <p
               v-if="view.person.email"
               class="truncate text-sm text-muted"

@@ -316,8 +316,11 @@ watch(open, (isOpen) => {
           data-share-dialog
         >
           <section class="space-y-2">
-            <h3 class="text-sm font-semibold text-default">
+            <h3 class="flex items-center gap-1.5 text-sm font-semibold text-default">
               Invite with email
+              <HelpHint page="basics/share-with-guests">
+                A guest sees this board and the tasks that are not marked private. A manager guest can invite people at their own domain.
+              </HelpHint>
             </h3>
             <form
               class="flex flex-wrap items-start gap-2"

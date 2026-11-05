@@ -1,8 +1,8 @@
 ---
 title: Users, sign-in methods and closed sign-up
-summary: Decide who may create organisations, which ways of signing in your instance offers, and how to close sign-up and still let invited customers in
+summary: Decide who may create organisations, which ways of signing in your instance offers, and how to close sign-up and still let invited people in
 requires: instance-admin
-topics: users, accounts, sign-in, sign-up, oauth, oidc, passkeys, two-factor, email code, invitation, closed instance
+topics: users, accounts, sign-in, sign-up, oauth, oidc, passkeys, two-factor, email code, invitation, team invitation, closed instance
 order: 20
 ---
 
@@ -50,17 +50,26 @@ By default anyone who reaches the login page can create an account. To make the 
 1. Create your own account first. The first account always gets in and becomes the instance admin.
 2. Set `ALLOW_SIGN_UP=false` and apply it (`docker compose up -d` for Docker, `services.arnotes.allowSignUp = false` on NixOS). When you run the server natively, also set `NUXT_PUBLIC_ALLOW_SIGN_UP=false`, which is what the login page reads. Compose and the module set both for you.
 
-The switch covers every way of creating an account, OAuth and email codes included. People who already have an account can still sign in, with any method. Nobody new gets one, except someone holding an invitation.
+The switch covers every way of creating an account, OAuth and email codes included. People who already have an account can still sign in, with any method. Nobody new gets one, except someone holding a live invitation link (see below).
 
-## Invitations let customers in
+## Invitations let invited people in
 
-An owner or admin of a team makes an invitation link for a customer under **Customers** in the workspace menu. A link works once, for 14 days, and is shown only when it is made, so it has to be copied then.
+Three kinds of invitation link open an account on a closed instance. Each works once and for 14 days, and each is shown only when it is made.
 
-Whoever opens the link signs in or creates an account, even when `ALLOW_SIGN_UP` is `false`, and becomes a contact of that customer. The customer's boards then appear in their personal workspace. Once the link is used, or has expired, it lets nobody in.
+- **A customer link.** An owner or admin of a team makes it under **Customers** in the workspace menu. Whoever opens it becomes a contact of that customer, and the customer's boards appear in their personal workspace.
+- **A team invitation by email.** An owner or admin types an address under **Invite by email** on the team's **Members** page. The link works for the account with that address only, and the person joins the team as a member, or as an admin when an owner invited them as one.
+- **A board invitation.** Someone who may share a board invites an address to it as a guest. This is the same mechanism and the same link page as the team invitation.
+
+Opening any of these links makes the server keep the link's token in a cookie for 24 hours. While that cookie holds an unspent, unexpired link, an account can be created, with a password, an email code or an OAuth sign-in alike. Once the link is used, withdrawn or expired, it lets nobody in.
+
+The check when an account is created does not compare addresses. Someone can create an account with a different address than the one invited, but that account cannot accept an address-bound link. A customer link has no address, so any account can accept it.
+
+Team invitations are mailed when the server has `SMTP_HOST` and `SMTP_FROM` set. Without them nothing is sent, and the inviter gets the link on screen to pass on.
 
 <!-- requires: team-admin -->
-The steps are in [Invite a customer contact](/help/team/invite-a-contact).
+The steps are in [Invite people to a team by email](/help/team/invite-people-by-email) and [Invite a customer contact](/help/team/invite-a-contact).
 <!-- /requires -->
+
 ## Crew accounts
 
 Crews make accounts at addresses ending in `.invalid`. They never get mail, cannot be created through the login page, cannot join or start a team, cannot accept an invitation, and cannot sign in once their crew is switched off. They do appear in **Accounts on this instance**, like any other account. See [Crews on your instance](/help/admin/crews-on-your-instance).

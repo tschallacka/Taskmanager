@@ -9,22 +9,30 @@ order: 100
 A **public link** lets someone look at a board without an account: a customer's boss, a stakeholder, a supplier. They
 see the board and the tasks you have shared, and cannot change anything.
 
+This page is about the public link only. To let named people in with an account of their own, who can then comment and
+add tasks, see [Share a board with guests](/help/basics/share-with-guests).
+
 Check [Who sees a task](/help/basics/task-visibility) first. The public link shows every task that is **Shared with
 customer**, and that is the setting a new task starts with.
 
 ## Turn sharing on
 
-1. Open the board and click **Share** (the share icon) at the top right.
+1. Open the board and click **Share** at the top right. What happens next depends on your role on the board:
+   - Most team members see a panel with the controls below at once. The button has a share icon.
+   - A project admin sees the **Share** dialog (a lock icon). Find the row **Public link**, which says **Off**, and click
+     it to open the same panel. The dialog itself is explained in
+     [Share a board with guests](/help/basics/share-with-guests).
 2. Optionally pick an **End date**. Leave it empty to share indefinitely.
 3. Click **Share board**. A message says *Board is shared*.
 4. The panel now shows **Link is active**, the link and when it expires. Click **Copy link** to copy it.
 
-The link looks like `/public/project/` followed by the board's id, on your instance's address. The button turns into a
-globe icon while a board is shared, so you can see it at a glance in the header.
+The link looks like `/public/project/` followed by the board's id, on your instance's address. While a board is shared,
+the panel's button turns into a globe icon, so you can see it at a glance in the header. In the project admin's dialog
+the **Public link** row says **On** instead.
 
 ## Change or end the share
 
-- To change the end date, open **Share**, pick a date and click **Save changes**. The date must be in the future.
+- To change the end date, open **Share** (a project admin then clicks **On** in the **Public link** row), pick a date and click **Save changes**. The date must be in the future.
   The share is open through the end of that day.
 - To close it, click **Stop sharing**. The link stops working at once, and anyone looking at the board is cut off.
 - Someone opening a link that is stopped, expired or wrong sees *This board is not available or has been made
@@ -51,7 +59,8 @@ Images in a task's description are served to the public too, but only the images
 
 - Anyone who has the link can open it, and can pass it on. There is no password. Treat the link like a key.
 - Making a task **Team only** takes it off the public page right away.
-- Anyone in your team can share a board, not only owners and admins.
+- Anyone who works on the board as a team member can turn the public link on and off, not only owners and admins.
+  Inviting people by email is a project admin's job.
 - Sharing a board is separate from filing it under a customer. A customer's contact logs in and can comment and add
   tasks; a public reader cannot do either.
 - Deleting the board ends the share too.

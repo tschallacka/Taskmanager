@@ -1,14 +1,16 @@
 ---
 title: Create or join a team
-summary: Start a team, join one with a join code, and find or rotate the code
+summary: Start a team, join one with a join code or an email invitation, and find or rotate the code
 requires: staff
 topics: create team, join team, join code, team code, rotate code, invite people, new team
 order: 20
 ---
 
-There are two ways into a team: you start one, or you join one with a **join code** that someone in the team
-gives you. Starting a team is a right the instance admin hands out; joining is open to anyone who is signed in
-and has a valid code.
+There are three ways into a team. You start one, you join one with a **join code** that someone in the team gives
+you, or an owner or admin invites you by email address. Starting a team is a right the instance admin hands out.
+Joining with a code is open to anyone who is signed in and has a valid code. An email invitation is for one person:
+the link works only for the address it was sent to, and it also works if you do not have an account yet. If you got
+such a link, open it and click **Accept invitation**; there is nothing to look up on the Team page.
 
 ## Join a team with a code
 
@@ -64,6 +66,10 @@ The new code is not sent to anyone. Copy it and pass it on yourself.
 
 Removing someone from the team is a separate step: see
 [Leave, remove, transfer or delete](/help/team/leave-remove-transfer-delete).
+
+To bring in one named person instead of handing out the code, invite them by email. The link works for their address
+only, can make them an admin when an owner sends it, and does not need the code. See
+[Invite people to a team by email](/help/team/invite-people-by-email).
 <!-- /requires -->
 
 <!-- requires: instance-admin -->
@@ -81,9 +87,10 @@ away again leaves the teams a person already owns in place.
 ## What is easy to get wrong
 
 - **A join code is not an invitation to one person.** Anyone who has it can use it, as often as they like, until
-  it is rotated. To invite an outside party to follow one project, use a customer link instead; see
+  it is rotated. To bring in one named person, an owner or admin sends an email invitation instead. To let an
+  outside party follow one project, use a customer link; see
   [Customers and contacts](/help/team/customers-and-contacts).
-- **You cannot pick a role when joining.** Everyone joins as a member. See
-  [Members and roles](/help/team/members-and-roles).
+- **The code always gives the member role.** You cannot pick a role when joining with it. An email invitation can
+  carry the admin role. See [Members and roles](/help/team/members-and-roles).
 - **Crew accounts** (accounts made for an agent crew) can only be in their own crew's team, so a join code for any
-  other team is refused for them.
+  other team is refused for them, and so is an email invitation.

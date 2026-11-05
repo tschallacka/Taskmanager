@@ -18,8 +18,8 @@ Any member can leave.
 3. Confirm with **Leave Team** in the dialog "Leave this team?".
 
 You land in your personal workspace, on the board list. You lose access to every board of the team at once. You
-can come back only with a valid [join code](/help/team/create-or-join-a-team), and you come back as a plain
-member.
+can come back with a valid [join code](/help/team/create-or-join-a-team), as a plain member, or through a new email
+invitation from an owner or admin, as a member or an admin.
 
 Two cases to know:
 

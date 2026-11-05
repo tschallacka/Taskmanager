@@ -13,7 +13,7 @@ export interface PersonView {
   tasks: { id: string, title: string, projectId: string, projectName: string, dueOn: string | null }[]
 }
 
-/** The boards both people can open, newest first. Archived boards are left out. */
+/** The boards both people can open, by name. Archived boards are left out. */
 export async function sharedBoards(viewerId: string, targetId: string): Promise<SharedBoard[]> {
   const viewer = await reachOf(viewerId)
   const target = await reachOf(targetId)

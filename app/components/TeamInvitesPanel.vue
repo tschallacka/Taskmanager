@@ -66,8 +66,11 @@ async function copy(text: string) {
     data-team-invites
   >
     <div>
-      <p class="text-xs font-semibold uppercase tracking-wider text-muted">
+      <p class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted">
         Invite by email
+        <HelpHint page="team/invite-people-by-email">
+          Each link works for one email address and for 14 days. Owners can invite admins, admins can invite members.
+        </HelpHint>
       </p>
       <p class="mt-0.5 text-xs text-muted">
         They get a link that works for that address only. Someone without an account can create one with it.

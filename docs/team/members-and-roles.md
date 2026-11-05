@@ -17,8 +17,8 @@ with their role, and "(you)" on your own row. Every member of the team can see t
 | Role | Who they are |
 |---|---|
 | **owner** | Started the team, or was handed ownership. The team always needs at least one. |
-| **admin** | Helps run the team. Appears when an owner transfers ownership (the old owner becomes an admin). |
-| **member** | Everyone who joined with the join code. |
+| **admin** | Helps run the team. Becomes one by an owner's email invitation as admin, or when an owner transfers ownership (the old owner becomes an admin). |
+| **member** | Everyone who joined with the join code or accepted a member invitation. |
 
 ## What each role may do
 
@@ -31,6 +31,7 @@ with their role, and "(you)" on your own row. Every member of the team can see t
 | File a board under a customer, or back to team only | yes | yes | yes |
 | Rename the team | no | yes | yes |
 | Generate or rotate the join code | no | yes | yes |
+| Invite someone by email | no | yes, as a member | yes, as a member or an admin |
 | Remove a member | no | yes (not an owner) | yes |
 | Add, rename or remove customers, and make or revoke invitation links | no | yes | yes |
 | Change the board defaults | no | yes | yes |
@@ -45,12 +46,15 @@ does not hide it, the server still refuses: the rules above are checked there, n
 
 ## How people get a role
 
-- **Joining** always gives the role **member**. See [Create or join a team](/help/team/create-or-join-a-team).
+- **Joining with the join code** always gives the role **member**. See
+  [Create or join a team](/help/team/create-or-join-a-team).
+- **Accepting an email invitation** gives the role the inviter chose. Any owner or admin can invite a **member**.
+  Only an owner can invite an **admin**. Nobody can be invited as an owner.
 - **Starting a team** makes you its **owner**.
 - **Transferring ownership** makes the person you pick an owner and turns you into an admin.
 
-The Team page has no control that promotes a member to admin on its own, and none that demotes an admin. The only
-role change you can make from the page is the ownership transfer.
+The Team page has no control that promotes a member to admin on its own, and none that demotes an admin. Role
+changes from the page are the ownership transfer, and the role an owner picks when sending an invitation.
 
 ## Things that are easy to get wrong
 
@@ -66,5 +70,6 @@ role change you can make from the page is the ownership transfer.
 ## Doing the owner and admin tasks
 
 The steps for removing a member, transferring ownership and deleting a team are on
-[Leave, remove, transfer or delete](/help/team/leave-remove-transfer-delete).
+[Leave, remove, transfer or delete](/help/team/leave-remove-transfer-delete). Inviting people by email, and
+withdrawing an invitation, is on [Invite people to a team by email](/help/team/invite-people-by-email).
 <!-- /requires -->

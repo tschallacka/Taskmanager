@@ -216,9 +216,9 @@ function confirmDeleteTeam() {
 
 // What each role may do.
 const ROLE_HINTS: Record<string, string> = {
-  owner: 'Owner: can transfer ownership, remove members and rotate the join code.',
-  admin: 'Admin: can remove members and rotate the join code.',
-  member: 'Member: cannot remove people or rotate the join code.'
+  owner: 'Owner: can transfer ownership, invite members and admins by email, remove members and rotate the join code.',
+  admin: 'Admin: can invite members by email, remove members and rotate the join code.',
+  member: 'Member: cannot invite or remove people, or rotate the join code.'
 }
 
 // ─── Customers ───────────────────────────────────────────────
