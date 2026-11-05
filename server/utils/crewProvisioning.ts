@@ -33,7 +33,7 @@ export const CREW_PEOPLE = [
   { key: 'contact', name: 'Casey Customer', role: 'customer contact: sees only what is shared with the customer', team: 'contact' }
 ] as const
 
-export const BOARD_COLUMNS = ['Backlog', 'To do', 'In progress', 'Verify', 'Ready for live', 'Done', 'Bugs'] as const
+export const BOARD_COLUMNS = ['Backlog', 'To do', 'In progress', 'Verify PM', 'Verify UX', 'Verify CQ', 'Verify QA', 'Verify', 'Ready for live', 'Done', 'Blocked', 'Bugs'] as const
 
 // Every account gets a key with these two scopes. A contact's key has no team: the
 // contact is not a team member, and the personal workspace shows it the customer's own

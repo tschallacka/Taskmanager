@@ -86,7 +86,7 @@ test('attaching makes a shadow board in the crew team, with the crew board colum
   assert.equal(shadow!.name, shadowBoardName(board.real.slice(-12)))
   const columns = await db.select({ name: projectColumns.name }).from(projectColumns)
     .where(eq(projectColumns.projectId, shadow!.id)).orderBy(asc(projectColumns.position))
-  assert.deepEqual(columns.map(c => c.name), ['Backlog', 'To do', 'In progress', 'Verify', 'Ready for live', 'Done', 'Bugs'])
+  assert.deepEqual(columns.map(c => c.name), ['Backlog', 'To do', 'In progress', 'Verify PM', 'Verify UX', 'Verify CQ', 'Verify QA', 'Verify', 'Ready for live', 'Done', 'Blocked', 'Bugs'])
 })
 
 test('the same crew cannot be attached to a board twice', async () => {

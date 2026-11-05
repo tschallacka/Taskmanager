@@ -55,7 +55,7 @@ export const config = {
 }
 
 // The columns every board needs, in this order. The crew API creates them.
-export const COLUMNS = ['Backlog', 'To do', 'In progress', 'Verify', 'Ready for live', 'Done', 'Bugs']
+export const COLUMNS = ['Backlog', 'To do', 'In progress', 'Verify PM', 'Verify UX', 'Verify CQ', 'Verify QA', 'Verify', 'Ready for live', 'Done', 'Blocked', 'Bugs']
 
 /**
  * The forks of this crew: one file each in CREW_HOME/forks, as the board's "Fork the crew for this board"

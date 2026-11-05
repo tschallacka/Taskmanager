@@ -1,8 +1,8 @@
 // Which column moves reach agents, who hears them, and how many at once (GH #38 slice B).
 // Pure, no imports, so it tests on its own: notifyEvents.ts reads the database and sends.
 
-// The columns an agent always hears about when a card reaches them.
-export const AGENT_MOVE_COLUMNS = new Set(['verify', 'ready for live', 'done', 'bugs'])
+// The columns an agent always hears about when a card reaches them: the review gates, Blocked, Ready for live, Done and Bugs.
+export const AGENT_MOVE_COLUMNS = new Set(['verify', 'verify pm', 'verify ux', 'verify cq', 'verify qa', 'ready for live', 'done', 'blocked', 'bugs'])
 
 /** How long one run of moves on a board counts as one: the first notifies, the rest are counted. */
 export const MOVE_WINDOW_MS = 30_000
@@ -12,7 +12,7 @@ export function summaryFields(more: number): { count?: number } {
   return more > 0 ? { count: Math.min(999, Math.max(1, Math.floor(more))) } : {}
 }
 
-/** Whether a column is one of the four an agent always hears about, by its name. */
+/** Whether a column is one an agent always hears about, by its name. */
 export function isDefaultMoveColumn(name: string): boolean {
   return AGENT_MOVE_COLUMNS.has(name.toLowerCase())
 }

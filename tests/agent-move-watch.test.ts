@@ -16,6 +16,12 @@ test('the four default columns always reach agents, whatever the rules say', () 
   assert.equal(agentHearsMove({ id: 'z', name: 'Bugs' }, []), true)
 })
 
+test('the review gates and Blocked of the crew workflow reach agents too', () => {
+  for (const name of ['Verify PM', 'Verify UX', 'Verify CQ', 'Verify QA', 'Blocked']) {
+    assert.equal(agentHearsMove({ id: name, name }, []), true, name)
+  }
+})
+
 test('an ordinary column reaches agents only when an enabled rule chooses it', () => {
   assert.equal(agentHearsMove(todo, []), false)
   assert.equal(agentHearsMove(todo, [{ kind: 'task_moved', columnId: 'col-review' }]), false)
