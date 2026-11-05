@@ -38,6 +38,7 @@ export default defineEventHandler(async (event) => {
         lastUsedAt: key.lastUsedAt,
         expiresAt: key.expiresAt,
         teamId: key.teamId,
+        teamName: key.teamId ? workspaceName.get(key.teamId) ?? 'a team' : null,
         editable: key.teamId === null,
         allBoards: view?.allBoards ?? false,
         workspaces: view?.workspaces ?? [],

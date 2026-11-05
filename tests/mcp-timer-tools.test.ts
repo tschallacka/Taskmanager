@@ -25,7 +25,7 @@ const column = id('column')
 const taskA = id('task-a')
 const taskB = id('task-b')
 
-const context = { keyId: id('key'), keyName: 'timer test', userId: owner, teamId: team, customerId: null, projectId: null, scopes: ['boards:read', 'boards:write'] } as never
+const context = { keyId: id('key'), keyName: 'timer test', userId: owner, teamId: team, customerId: null, projectId: null, scopes: ['boards:read', 'boards:write'], reach: { allBoards: false, workspaceTeamIds: [team], boardIds: [] }, memberTeamIds: [team] } as never
 const tool = (name: string) => MCP_TIME_TOOLS.find(candidate => candidate.name === name)!
 
 before(async () => {
