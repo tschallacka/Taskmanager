@@ -266,7 +266,7 @@ async function remove(person: ProjectPerson) {
           <div class="flex min-w-0 flex-1 items-center gap-2.5">
             <UAvatar
               :src="person.image || undefined"
-              :alt="person.name || person.email"
+              :alt="person.name || person.email || ''"
               size="xs"
             />
             <div class="min-w-0">

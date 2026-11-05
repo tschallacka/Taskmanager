@@ -82,8 +82,8 @@ const assignee = computed(() => boardPerson(props.task.assigneeId))
 const assignItems = computed(() => [
   [{ label: 'Unassigned', icon: 'i-lucide-user-x', onSelect: () => emit('assign', props.task.id, null) }],
   boardPeople().map(person => ({
-    label: person.kind === 'customer' ? `${person.name || person.email} (customer)` : person.name || person.email,
-    avatar: { src: person.image ?? undefined, alt: person.name || person.email },
+    label: person.kind === 'customer' ? `${person.name || person.email || ''} (customer)` : person.name || person.email || '',
+    avatar: { src: person.image ?? undefined, alt: person.name || person.email || '' },
     onSelect: () => emit('assign', props.task.id, person.id)
   }))
 ])
@@ -317,9 +317,9 @@ const hasMeta = computed(() =>
         <UAvatar
           v-if="assignee && readonly"
           :src="assignee.image ?? undefined"
-          :alt="assignee.name || assignee.email"
+          :alt="assignee.name || assignee.email || ''"
           size="3xs"
-          :title="`Assigned to ${assignee.name || assignee.email}`"
+          :title="`Assigned to ${assignee.name || assignee.email || ''}`"
         />
       </span>
     </div>
@@ -335,8 +335,8 @@ const hasMeta = computed(() =>
           type="button"
           class="flex size-6 items-center justify-center rounded-full transition-colors"
           :class="assignee ? '' : 'border border-dashed border-dimmed text-dimmed hover:border-primary hover:text-primary'"
-          :aria-label="assignee ? `Assigned to ${assignee.name || assignee.email}, change` : 'Assign to someone'"
-          :title="assignee ? `Assigned to ${assignee.name || assignee.email}` : 'Assign to someone'"
+          :aria-label="assignee ? `Assigned to ${assignee.name || assignee.email || ''}, change` : 'Assign to someone'"
+          :title="assignee ? `Assigned to ${assignee.name || assignee.email || ''}` : 'Assign to someone'"
           data-card-assign
           @click.stop
           @keydown.enter.stop
@@ -345,7 +345,7 @@ const hasMeta = computed(() =>
           <UAvatar
             v-if="assignee"
             :src="assignee.image ?? undefined"
-            :alt="assignee.name || assignee.email"
+            :alt="assignee.name || assignee.email || ''"
             size="xs"
           />
           <UIcon

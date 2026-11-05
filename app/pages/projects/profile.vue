@@ -137,14 +137,14 @@ watch(projects, async (list) => {
             >
               <PersonCard
                 :person-id="person.id"
-                :name="person.name || person.email"
+                :name="person.name || person.email || ''"
                 :image="person.image"
                 class="min-w-0"
               >
                 <span class="flex min-w-0 items-center gap-2.5">
                   <UAvatar
                     :src="person.image ?? undefined"
-                    :alt="person.name || person.email"
+                    :alt="person.name || person.email || ''"
                     size="sm"
                   />
                   <span class="truncate">{{ person.name || person.email }}</span>

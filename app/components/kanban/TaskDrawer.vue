@@ -348,8 +348,8 @@ const assigneeItems = computed(() => [
   [{ label: 'Unassigned', icon: 'i-lucide-user-x', onSelect: () => patchTask({ assigneeId: null }, 'Could not change the assignee') }],
   people.value.map(person => ({
     // Customer contacts are told apart, since giving them work is a choice.
-    label: person.kind === 'customer' ? `${person.name || person.email} (customer)` : person.name || person.email,
-    avatar: { src: person.image ?? undefined, alt: person.name || person.email },
+    label: person.kind === 'customer' ? `${person.name || person.email || ''} (customer)` : person.name || person.email || '',
+    avatar: { src: person.image ?? undefined, alt: person.name || person.email || '' },
     onSelect: () => patchTask({ assigneeId: person.id }, 'Could not change the assignee')
   }))
 ])
@@ -695,9 +695,9 @@ const menuItems = computed(() => [[
                   color="neutral"
                   variant="ghost"
                   class="-ml-2 max-w-full"
-                  :avatar="assignee ? { src: assignee.image ?? undefined, alt: assignee.name || assignee.email } : undefined"
+                  :avatar="assignee ? { src: assignee.image ?? undefined, alt: assignee.name || assignee.email || '' } : undefined"
                   :icon="assignee ? undefined : 'i-lucide-user-plus'"
-                  :label="assignee ? (assignee.name || assignee.email) : 'No assignee'"
+                  :label="assignee ? (assignee.name || assignee.email || '') : 'No assignee'"
                   :ui="{ label: assignee ? 'text-default' : 'text-dimmed' }"
                 />
               </UDropdownMenu>

@@ -46,8 +46,9 @@ mentioned or invited.
 - **An address someone typed themselves.** When a team owner or a board admin invites `sam@example.com`, that address
   is listed on the invitation they sent, to them and to the people who may manage invitations. They typed it, so they
   already know it. It says nothing about the account that later accepts.
-- **The instance admin's Users list.** The admin page that hands out rights lists every account with its address, so
-  the admin can tell accounts apart.
+- **Finding an account by its full address.** The instance admin's **Accounts on this instance** window is masked like
+  every other list. The admin can still type a complete address to find that one account, because they supplied the
+  address. A partial address finds nothing.
 - **Mail sent to you.** Notification and invitation mail still goes to your address.
 - **Who finds you.** The slider decides whether an address shows. It does not make you searchable. The person card
   and profile still answer only for people you share a board with.

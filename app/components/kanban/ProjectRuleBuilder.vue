@@ -27,7 +27,7 @@ const actionKinds = kindList(ACTIONS, kind => kind === 'set_visibility' && !prop
 
 // Columns the board still has; a trashed column cannot be picked for a new rule.
 const columns = computed(() => boardColumns.value.filter(column => !isTrashed(column)).map(column => ({ id: column.id, name: column.name })))
-const people = computed(() => boardPeople().map(person => ({ id: person.id, name: person.name || person.email })))
+const people = computed(() => boardPeople().map(person => ({ id: person.id, name: person.name || person.email || '' })))
 const labels = computed(() => boardTagCounts.value.map(([tag]) => tag))
 
 const stored = props.rule ?? null

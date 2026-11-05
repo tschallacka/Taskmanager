@@ -10,7 +10,9 @@ This page is about the people on your instance and how they get in. Teams, their
 
 ## Accounts on this instance
 
-Open the workspace menu (the team switcher at the top of the sidebar) and choose **Accounts on this instance**. It lists every account, oldest first, with the instance admin marked **admin**.
+Open the workspace menu (the team switcher at the top of the sidebar) and choose **Accounts on this instance**. It lists every account, oldest first, with the instance admin marked **admin**. Each row shows the name and the organisations the account belongs to.
+
+Email addresses are private, for the instance admin too. A row shows an address only for your own account, or when its owner has let you see it (see [Who can see your email address](/help/workspace/email-privacy)). To find an account by its address, type the **complete** address in the search box: the one account with that address appears, with the address you typed. Anything else typed in the box filters the list by name or organisation. A partial address finds nothing.
 
 The only thing the window changes is **Can create organisations**. By default a new account can join a team with a code, or work in a customer's portal, but cannot start an organisation. Switch the right on for the people who should. Switching it off again stops new organisations only: the ones that person already owns stay. The switch is fixed for the instance admin.
 

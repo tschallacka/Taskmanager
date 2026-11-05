@@ -172,8 +172,8 @@ function subtaskProgress(taskId: string) {
               <UAvatar
                 v-if="personById(task.assigneeId)"
                 :src="personById(task.assigneeId)!.image ?? undefined"
-                :alt="personById(task.assigneeId)!.name || personById(task.assigneeId)!.email"
-                :title="personById(task.assigneeId)!.name || personById(task.assigneeId)!.email"
+                :alt="personById(task.assigneeId)!.name || personById(task.assigneeId)!.email || ''"
+                :title="personById(task.assigneeId)!.name || personById(task.assigneeId)!.email || ''"
                 size="2xs"
                 data-list-assignee
               />
