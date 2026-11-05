@@ -252,7 +252,7 @@ export async function approveRequest(
       type: 'guest_decision',
       invitationId: row.id,
       title: `${row.email} was approved for ${project.name}`,
-      body: emailed ? 'They got the invitation by email.' : 'Open the board\'s Share dialog to copy their link.'
+      body: emailed ? 'They got the invitation by email.' : 'No mail went out. Open the board\'s Share dialog and use Resend to get a link.'
     })
   }
   await announce(project)
@@ -298,6 +298,42 @@ export async function revokeInvitation(project: ShareProject, actorId: string, i
   }
   await db.update(projectGuestInvitations).set({ status: 'revoked' }).where(eq(projectGuestInvitations.id, row.id))
   await announce(project)
+}
+
+/**
+ * Sends an open invitation again. Only a hash of a link is kept, so the old link cannot be shown a second
+ * time: a fresh one replaces it, good for another 14 days. It is mailed when the instance can send mail and
+ * returned once otherwise. An admin may resend any open invitation, a manager guest their own. A request that
+ * still waits for approval has no link yet, so it cannot be resent.
+ */
+export async function resendInvitation(
+  project: ShareProject,
+  actorId: string,
+  invitationId: string,
+  linkFor: (token: string) => string
+) {
+  const authority = await requireShareAuthority(project, actorId)
+  requireWritable(project)
+  const [row] = await db.select().from(projectGuestInvitations).where(and(
+    eq(projectGuestInvitations.id, invitationId),
+    eq(projectGuestInvitations.projectId, project.id),
+    eq(projectGuestInvitations.status, 'open')
+  ))
+  if (!row) throw createError({ statusCode: 404, message: 'No open invitation like that' })
+  if (authority.kind !== 'admin' && row.invitedBy !== actorId) {
+    throw createError({ statusCode: 403, message: 'You can only resend invitations you made' })
+  }
+  const { token, tokenHash } = newInvitationToken()
+  const [renewed] = await db.update(projectGuestInvitations)
+    .set({ tokenHash, expiresAt: Date.now() + INVITATION_TTL_MS })
+    .where(and(eq(projectGuestInvitations.id, row.id), eq(projectGuestInvitations.status, 'open')))
+    .returning({ id: projectGuestInvitations.id })
+  if (!renewed) throw createError({ statusCode: 409, message: 'That invitation was used or withdrawn just now' })
+
+  const url = linkFor(token)
+  const emailed = await mailInvitation({ to: row.email, inviterName: await nameOf(actorId), what: `see the board ${project.name}`, url })
+  await announce(project)
+  return { id: row.id, email: row.email, url, emailed }
 }
 
 /** A project admin changes a guest's role, and a manager guest's domain. */

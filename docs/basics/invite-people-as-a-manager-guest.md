@@ -34,7 +34,9 @@ away.*
 
 The link works for that address only, and for 14 days. The person opens it, signs in or creates an account with that
 exact address, and clicks **Accept invitation**. Copy the link when it appears: the dialog keeps it only until you leave the board or reload the page. If
-you lose it, **Withdraw** the invitation and invite again.
+you lose it, click **Resend** on the invitation under **Who has access**. That makes a new link, valid for another
+14 days, and the old one stops working. The new link is mailed when the instance can send mail and shown in the dialog
+once otherwise.
 
 The domain match is exact. If your domain is `shop.com`, then `anna@shop.com` is at your domain. `anna@mail.shop.com`
 and `anna@notshop.com` are not. If the team gave you no domain, you ask for every address.
@@ -48,8 +50,9 @@ Nothing is sent to the person yet. The dialog says *Sent to the project admins. 
 it.* The request waits under **Who has access** as *Waiting for approval*. You can **Withdraw** it.
 
 You are told in your Inbox when the team decides: *... was approved for ...* or *... was not approved for ...*. The
-approval notice says that the invitation was mailed, or points you to the **Share** dialog for the link. The dialog does
-not list the link of an open invitation, so if no mail was sent and you did not copy it, ask a project admin to withdraw the invitation and invite the person again.
+approval notice says that the invitation was mailed, or that no mail went out. In that case the dialog does not hold
+the link, so click **Resend** on the invitation under **Who has access** to get a new one. You can resend only
+invitations you made.
 
 ## What you see under Who has access
 

@@ -42,6 +42,22 @@ async function send() {
   }
 }
 
+// A fresh link replaces the old one (only a hash is kept, so the old link cannot be shown again). It is
+// mailed when the instance can send mail, and shown here once otherwise.
+async function resend(invitation: OpenInvitation) {
+  busy.value = invitation.id
+  error.value = ''
+  try {
+    const answer = await untypedFetch<{ url: string, emailed: boolean }>(`${base.value}/${invitation.id}/resend`, { method: 'POST' })
+    issued.value = { id: invitation.id, email: invitation.email, role: invitation.role, url: answer.url, emailed: answer.emailed }
+    await load()
+  } catch (e) {
+    toast.add({ title: errorMessage(e, 'Could not resend that'), icon: 'i-lucide-alert-triangle', color: 'error' })
+  } finally {
+    busy.value = ''
+  }
+}
+
 async function withdraw(invitation: OpenInvitation) {
   busy.value = invitation.id
   try {
@@ -163,6 +179,16 @@ async function copy(text: string) {
             Invited as {{ invitation.role }} · open until {{ new Date(invitation.expiresAt).toLocaleDateString() }}
           </p>
         </div>
+        <UButton
+          v-if="invitation.canWithdraw"
+          label="Resend"
+          size="xs"
+          color="neutral"
+          variant="ghost"
+          :disabled="busy === invitation.id"
+          data-invite-resend
+          @click="resend(invitation)"
+        />
         <UButton
           v-if="invitation.canWithdraw"
           label="Withdraw"

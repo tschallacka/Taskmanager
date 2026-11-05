@@ -59,8 +59,10 @@ The guest opens the link, which says *You're invited*, signs in or creates an ac
 The dialog refuses an address that already sees the board and an address that is not valid. On an archived board you
 cannot invite, approve or change a guest: unarchive it first.
 
-Copy the link when it appears. The dialog keeps it only until you leave the board or reload the page. If you lose it, **Withdraw** the
-invitation under **Who has access** and invite the address again.
+Copy the link when it appears. The dialog keeps it only until you leave the board or reload the page. If you lose it,
+click **Resend** on the invitation under **Who has access**. That makes a new link, valid for another 14 days, and the
+old one stops working. It is mailed when the instance can send mail and shown once otherwise. A project admin can
+resend any open invitation, a manager guest only their own. A request that still waits for approval has no link yet.
 
 ## The two roles
 

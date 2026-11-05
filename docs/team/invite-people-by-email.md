@@ -36,7 +36,7 @@ What you see next depends on whether the instance can send mail.
   or it failed." Click **Copy** and send the link yourself.
 
 Either way the link is shown only now. Taskmanager stores a fingerprint of it, not the link. If someone loses it,
-invite the address again. Invitations still waiting are listed under the form with the address, the role and an
+click **Resend** on its row. Invitations still waiting are listed under the form with the address, the role and an
 "open until" date.
 
 You cannot invite someone who is already in the team ("That person is already on the team."). The check works only
@@ -95,7 +95,10 @@ The instance admin closes sign-up; the setting is not on any team page.
 ## Expiry, withdrawing and inviting again
 
 - **Expiry.** A link works for 14 days. Then the invitation drops off the list and the link shows the expired
-  message. It cannot be extended: invite the address again.
+  message. Resending is for a link that is still open, so for an expired one invite the address again.
+- **Resend.** Click **Resend** on a row. It makes a new link, valid for another 14 days, and the old link stops
+  working at once. The new link is mailed when the instance can send mail, and shown once otherwise. An owner can
+  resend any open invitation, an admin only the ones they sent.
 - **Withdraw.** Click **Withdraw** on a row. The link stops working at once. An owner can withdraw any open
   invitation. An admin can withdraw only the ones they sent, and does not see the button on the others.
 - **Invite again.** A new invitation for an address replaces the open one, so only one link per person is live. That

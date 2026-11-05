@@ -139,6 +139,23 @@ test('a project admin invites anyone; the link is returned once and is bound to 
   assert.equal(await isLiveAddressedInvitation(tokenOf(again.url)), true)
 })
 
+test('resending an open invitation gives a fresh link and ends the old one; a manager guest resends only their own', async () => {
+  const first = await invites.inviteGuest(project(), owner, { email: 'resend.me@elsewhere.com', role: 'editor' }, link)
+  const again = await invites.resendInvitation(project(), owner, first.id, link)
+  assert.equal(again.id, first.id)
+  assert.equal(again.email, 'resend.me@elsewhere.com')
+  assert.notEqual(tokenOf(again.url), tokenOf(first.url))
+  assert.equal(await isLiveAddressedInvitation(tokenOf(first.url)), false, 'the old link no longer works')
+  assert.equal(await isLiveAddressedInvitation(tokenOf(again.url)), true)
+
+  // The owner made this invitation, so a manager guest and a plain guest may not resend it.
+  await refuses(invites.resendInvitation(project(), manager, first.id, link), 403)
+  await refuses(invites.resendInvitation(project(), editor, first.id, link), 403)
+
+  await invites.revokeInvitation(project(), owner, first.id)
+  await refuses(invites.resendInvitation(project(), owner, first.id, link), 404)
+})
+
 test('only a project admin or a manager guest may share; a plain guest and a plain member may not', async () => {
   await refuses(invites.inviteGuest(project(), editor, { email: 'x@y.com', role: 'editor' }, link), 403)
   await refuses(invites.inviteGuest(project(), plain, { email: 'x@y.com', role: 'editor' }, link), 403)

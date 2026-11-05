@@ -203,6 +203,18 @@ function withdraw(invitation: Invitation) {
 }
 
 const approvedLink = ref<{ email: string, url: string, emailed: boolean } | null>(null)
+
+// A fresh link replaces the old one (only a hash is kept, so the old link cannot be shown again). It is
+// mailed when the instance can send mail, and shown here once otherwise.
+function resend(invitation: Invitation) {
+  return act(`i:${invitation.id}`, async () => {
+    const answer = await untypedFetch<{ url: string, emailed: boolean }>(`${base.value}/guests/invitations/${invitation.id}/resend`, {
+      method: 'POST', headers: realtimeHeaders(), body: {}
+    })
+    approvedLink.value = { email: invitation.email, url: answer.url, emailed: Boolean(answer.emailed) }
+  }, 'Could not resend that')
+}
+
 async function decide(invitation: Invitation, approve: boolean) {
   await act(`i:${invitation.id}`, async () => {
     const answer = await untypedFetch<{ url?: string, emailed?: boolean }>(`${base.value}/guests/invitations/${invitation.id}/${approve ? 'approve' : 'decline'}`, {
@@ -629,6 +641,16 @@ watch(open, (isOpen) => {
                       {{ invitation.status === 'awaiting_approval' ? `Waiting for approval · asked by ${invitation.invitedByName ?? 'a manager guest'}` : `Invited as ${GUEST_LABEL[invitation.role].toLowerCase()}` }}
                     </p>
                   </div>
+                  <UButton
+                    v-if="invitation.status === 'open' && (authority === 'admin' || mine(invitation))"
+                    label="Resend"
+                    size="xs"
+                    color="neutral"
+                    variant="ghost"
+                    :disabled="busy === `i:${invitation.id}`"
+                    data-share-resend
+                    @click="resend(invitation)"
+                  />
                   <template v-if="invitation.status === 'awaiting_approval' && authority === 'admin'">
                     <UButton
                       label="Approve"
