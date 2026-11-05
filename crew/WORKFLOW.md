@@ -39,6 +39,7 @@ Rules that hold everywhere:
 6. When a merge or rebase stops on conflicts, use the `git-merge-resolving` skill.
 7. Use the `git-worktrees` skill for your own checkout (Phase 3, step 3).
 8. Use `interactive-shell` for any program that needs a terminal: prompts, installers, full-screen programs. Never run those headless.
+9. **No test may fail (Q68).** Run the project's test command (named in `PROJECT-RULES.md`) before you hand work on. A test that fails is never skipped, deleted, loosened or left for someone else, and that holds when it fails without your change. A test that fails because a prerequisite is missing (a server, a browser, a variable) is changed to skip with the reason stated, so the suite cannot fail for that. When you do not know why a test fails after 30 minutes, you follow "A failing test nobody can explain" in section 6.
 
 Where the tools come from: the AI text editor, tailpipe, `interactive-shell`, `git-worktrees` and `git-merge-resolving` are in https://github.com/tschallacka/ai-skills, and CodeGraph is in its upstream project, https://github.com/colbymchenry/codegraph. The crew installer (`init.mjs`) checks for them on every run. When one is missing it prints a warning and the install command, and it installs nothing itself. The `unslop` skill is one of the Owner's own Claude skills: it ships with the kit (`unslop.SKILL.md`), and `init.mjs` copies it into the skills folder when it is missing.
 
@@ -64,6 +65,7 @@ Where the tools come from: the AI text editor, tailpipe, `interactive-shell`, `g
 | Feedback Cato | Cato | Subtask from the final review |
 | blocked | Anyone | Waiting; the blocker is linked |
 | split help | Pia | She cannot split the task into subtasks and needs Cato to do it |
+| test failing | Anyone who sees a failing test they cannot explain | A test fails and nobody knows why. The task is `Blocked`. Pia raises it with Cato. Cato removes the tag when the suite passes |
 
 ## 4. Timing: the rules for every agent
 
@@ -76,6 +78,7 @@ Where the tools come from: the AI text editor, tailpipe, `interactive-shell`, `g
    - Cato intake: 10 minutes per request.
    - Pia triage of one task: 30 minutes. Pia verify check: 15 minutes.
    - Worker, one subtask: 60 minutes of work, then report even if not done.
+   - Anyone finding why a test fails: 30 minutes. Pia, before she raises it with Cato: 15 minutes. Cato: 30 minutes.
    - Usher, one review pass: 30 minutes. Nina: 30 minutes. Quincy: 45 minutes.
    - Cato final review: 30 minutes per merge request.
    - Cato splitting a task for Pia: 15 minutes per task.
@@ -122,11 +125,11 @@ Where the tools come from: the AI text editor, tailpipe, `interactive-shell`, `g
 2. Read the brief and the subtasks, and work them in the order Pia numbered them, finishing one before starting the next. **Do not assume: if anything is unclear, ask Pia first.** Wait for the answer working on another subtask if there is one, else `Blocked`.
 3. Work in your own branch and worktree (your cubicle: own database, redis and tools). One pull request per main task, named with the task number first: `Taskmanager-TASKID TITLE` (TASKID is the main task's number, TITLE is its title). Subtasks share the parent's branch.
 4. Never push to the main branch, never merge, never touch another worker's database.
-5. Finish: tag every finished subtask `verify CQ` and `verify QA`, and also `verify UX` when the subtask modified a UX element (see section 3). Attach evidence (test output, a screenshot, the pull request link), move the main task to `Verify PM`, assign Pia, log the time.
+5. Finish: run the whole test suite and see it pass (hard rule 9). Tag every finished subtask `verify CQ` and `verify QA`, and also `verify UX` when the subtask modified a UX element (see section 3). Attach evidence (the test output with its pass and fail counts, a screenshot, the pull request link), move the main task to `Verify PM`, assign Pia, log the time.
 
 ### Phase 4: Verify PM (Pia)
 
-1. Check against the brief and the acceptance lines: every subtask carries `verify CQ` and `verify QA`, plus `verify UX` where it modified a UX element, evidence attached, the pull request exists and is named right, no "I think it is done".
+1. Check against the brief and the acceptance lines: every subtask carries `verify CQ` and `verify QA`, plus `verify UX` where it modified a UX element, evidence attached, the pull request exists and is named right, no "I think it is done". The test output in the evidence shows 0 failures. Output with a failure goes back to the worker, whatever caused it.
 2. Anything missing: back to the worker as a subtask, task to `In progress`.
 3. Send the task through every gate, in this order: `Verify UX`, `Verify CQ`, `Verify QA`. A UX element is anything a user sees or interacts with: a screen, a component, a text, a layout, a style, a form, an error message, an email. Pia corrects a `verify UX` tag the worker got wrong, in either direction.
    - Any subtask has `verify UX`: assign Usher and move to `Verify UX`.
@@ -168,7 +171,18 @@ All subtasks complete, tested, evidence attached, `CQ approved` and `QA approved
 1. Reviews the whole merge request strictly and fairly: weak points, failures, scope.
 2. Each issue is a narrow subtask tagged `Feedback Cato`. Narrow means a cheap model can finish it without choices left open.
 3. Issues found: assign the main task to Pia and move it to `Backlog`. It goes back through triage (Phase 2), not to `Verify PM`, because Cato knows more than Pia and his feedback can open branches of work nobody planned. Pia triages the `Feedback Cato` subtasks like any new task: she splits, orders and assigns them. The fixed task then passes every gate again, with `Verify UX` only when a UX element was modified.
-4. No issues: Cato merges (only Cato merges), moves the task to `Done`, and tells the Owner in a customer-visible update.
+4. No issues: Cato merges (only Cato merges), moves the task to `Done`, and tells the Owner in a customer-visible update. Before he merges he runs the whole test suite on the merge request branch and sees 0 failures.
+
+### A failing test nobody can explain (any phase)
+
+Hard rule 9 applies to every agent. This is what happens when it cannot be followed alone.
+
+1. **Whoever sees the failure** has 30 minutes to find the cause and fix it. A cause is a sentence that names the file and the line, or the missing prerequisite. "Flaky" and "environment" are not causes.
+2. **No cause after 30 minutes:** post an update with the exact test name, the exact failure line from the output, the command that ran, and what was tried, one line per attempt. Tag the task `test failing`, tag `@pia`, move it to `Blocked` and take the next task. A reviewer who sees the failure does the same, whatever gate the task is in.
+3. **Pia** has 15 minutes. If she can say why, she writes the cause and the fix into the task as a subtask and unblocks it. If she cannot, she copies the update to a task assigned to Cato, tags `@cato` and `test failing`, and leaves the original task in `Blocked`. She does not ask a worker to skip, delete or loosen the test.
+4. **Cato** has 30 minutes. He either finds and fixes the cause himself, or rewrites it as subtasks under the no-ambiguity rules, assigns the task to Pia and moves it to `Backlog`. When he cannot find a cause either, he tells the Owner in a customer-visible update: the test, the failure line and what was tried. The Owner decides. Nobody changes the test before that.
+5. **The tag comes off** only when the suite passes: Cato removes `test failing`, then Pia unblocks the original task.
+6. A task never moves to `Verify` or `Done` while a test fails. A failure that was already there before the task started is still raised this way, and the worker names that in the update.
 
 ## 7. Additions to the Owner's first description
 
@@ -209,6 +223,8 @@ Decided by the Owner:
 - **Q64.** `unslop` ships with the kit (`unslop.SKILL.md`, read from the Owner's `~/.claude/skills/unslop`). `init.mjs` copies it into the skills folder when it is missing.
 - **Q65.** Cato can be any agent in any state, including one that has no crew yet and is about to start one. So the Boss text comes with the MCP instructions for every key whose owner can run a crew: the instance admin (the only person who can create a crew), or anyone who has created a live crew or attached one to a board. It does not wait for a crew to exist. With no crew yet, the text tells Cato to ask the Owner to create one and give the board a crew, and to do nothing else until then.
 
+- **Q68.** No test may fail. Every agent runs the project's test command before handing work on. A test that needs something that is not there (a server, a browser, a variable) skips with the reason stated, so the suite cannot fail for a missing prerequisite. When nobody can say why a test fails, Pia raises it with Cato (hard rule 9 and "A failing test nobody can explain" in section 6). Decided 2026-11-05, after the arnotes suite was brought to 0 failures.
+
 ## 10. Work still to do in the kit and the app (tracked as tasks)
 
 1. Done (2026-11-05): MCP tools `start_timer` and `stop_timer` (Q57).
@@ -218,5 +234,5 @@ Decided by the Owner:
 5. Running a person on OpenRouter or Ollama (Q59b). A person on a Claude model stays an agent definition file. As far as I know, a subagent runs on the provider of the session that starts it, so a person on OpenRouter or Ollama has to be its own Claude Code process, started with environment variables that point at the provider. I have not tested this. From community guides, not from the official documentation: Ollama 0.14.0 and later answers the Anthropic Messages API at `http://localhost:11434`; OpenRouter takes the key in `ANTHROPIC_AUTH_TOKEN` with `ANTHROPIC_API_KEY` left empty, and the guides disagree on the base URL (`https://openrouter.ai/api` or `https://openrouter.ai/api/v1`); the haiku, sonnet and opus model slots must all be mapped to the chosen model, or the unmapped slots fail with "model not found". Check these against the OpenRouter, Ollama and Claude Code documentation before building.
 6. Done for new crew boards (2026-11-05): board columns `Verify PM`, `Verify UX`, `Verify CQ`, `Verify QA` and `Blocked` in the crew's board template.
 7. Usher, Nina and Quincy in the crew skill's cast table and the init script. Cato is not launched.
-8. The tags in section 3, created on the crew board.
+8. The tags in section 3 (including `test failing`), created on the crew board. The test rule (hard rule 9) in `PROMPTS.md.tmpl`, `CREW.md.tmpl`, `PROJECT-RULES.md.tmpl` and Cato's text (`crewBossSkill.ts`): done 2026-11-05.
 9. Change the kit so Pia starts the workers and the reviewers, and Boss starts only Pia. This replaces the `WAKE` comment that Boss checks and acts on (`PROMPTS.md.tmpl`, `CREW.md.tmpl`, `channel.mjs`). Pia then runs as her own Claude Code session.

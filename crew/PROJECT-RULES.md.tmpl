@@ -10,6 +10,7 @@ Replace the examples below with your own facts; delete lines that do not apply.
 - Dev log: `<command> > {{crew_dir}}/dev.log 2>&1` (the log watcher reads it, optional)
 - Lint (run on your own files before you report): `<for example: npx eslint <files>>`
 - Typecheck / tests (Boss runs them before publishing): `<for example: npm run typecheck && npm test>`
+- **No test may fail.** Every worker and reviewer runs the test command above before handing work on, and the output with its pass and fail counts goes in the task update. A test that needs something that is not there (a server, a browser, a variable) skips and says why. Nobody skips, deletes or loosens a test that fails for another reason. Not knowing why it fails goes to Pia (tag `test failing`), and from Pia to Boss.
 
 ## Editing files
 

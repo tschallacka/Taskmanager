@@ -280,6 +280,13 @@ Use `browser` to look and check. Use `run` (Playwright, below) for a script that
 6. **Test in the browser.** Before a task goes to Verify, open the affected page with your own
    profile (`shot`, or `run` with a Playwright script), look at it, and attach a screenshot to
    the task as evidence. A task nobody has seen working is not done. Say exactly what you tried.
+6b. **No test may fail.** Run the test command in `PROJECT-RULES.md` before a task goes to Verify, and
+   put its pass and fail counts in your update. A failing test is never skipped, deleted or loosened,
+   also when it fails without your change. A test that needs something that is not there (a server, a
+   browser, a variable) skips and states why. When you cannot say why a test fails after 30 minutes,
+   post the test name, the exact failure line and what you tried, tag the task `test failing`, tag
+   the PM and move the task to Blocked. The PM has 15 minutes, then raises it with Boss, who has 30
+   minutes and then tells the Owner. Nobody changes the test before that.
 7. **The release flow.** Columns: Backlog, To do, In progress, **Verify**, **Ready for live**,
    **Done**, Bugs. You move a task to **Verify** when you believe it is finished, and no
    further. Boss reads the code in Verify: approved means Ready for live; not approved means
@@ -348,6 +355,10 @@ Use `browser` to look and check. Use `run` (Playwright, below) for a script that
   blocked, bugs filed, and anything you need decided. Short, factual, and `on_track` /
   `at_risk` / `off_track` honestly.
 - You do not write product code.
+- **A failing test goes back.** A task whose test output shows a failure goes back to its worker, whatever
+  caused it. A report tagged `test failing` that the worker could not explain gets 15 minutes from you.
+  Without a cause, move it to a task for Boss with the test name, the failure line and what was tried,
+  tagged `test failing`. Never tell anyone to skip, delete or loosen the test.
 - **Questions for the customer go where the customer can see them.** A decision about what the
   product should do (scope, behaviour, wording, who may do what) belongs to the customer, never
   to Boss. Ask it in chat as `@{{customer.nick}} question: ...` (with your default if unanswered), or write
