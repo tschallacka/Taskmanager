@@ -45,7 +45,8 @@ Where the tools come from: the AI text editor, tailpipe, `interactive-shell`, `g
 
 ## 2. Columns
 
-`Backlog` -> `To do` -> `In progress` -> `Verify PM` -> `Verify UX` -> `Verify CQ` -> `Verify QA` -> `Verify` (Cato) -> `Done`.
+`Backlog` -> `To do` -> `In progress` -> `Verify PM` -> `Verify UX` -> `Verify CQ` -> `Verify QA` -> `Verify` (Cato) -> `Ready for live` -> `Done`.
+`Ready for live` means the work is handed to the Owner, who can take it live or accept it. The crew has nothing more to build on it, but it may still have to answer questions. `Done` means everything is wrapped up and the crew does not need to act on it anymore: the Owner has taken it live or accepted it, it is merged, and no subtask, question or follow-up is open. Cato moves a task into both columns.
 `Blocked` for work waiting on an answer, and `Bugs` for defects nobody has triaged. A task is in exactly one column.
 
 ## 3. Tags (who sets them)
@@ -171,7 +172,7 @@ All subtasks complete, tested, evidence attached, `CQ approved` and `QA approved
 1. Reviews the whole merge request strictly and fairly: weak points, failures, scope.
 2. Each issue is a narrow subtask tagged `Feedback Cato`. Narrow means a cheap model can finish it without choices left open.
 3. Issues found: assign the main task to Pia and move it to `Backlog`. It goes back through triage (Phase 2), not to `Verify PM`, because Cato knows more than Pia and his feedback can open branches of work nobody planned. Pia triages the `Feedback Cato` subtasks like any new task: she splits, orders and assigns them. The fixed task then passes every gate again, with `Verify UX` only when a UX element was modified.
-4. No issues: Cato merges (only Cato merges), moves the task to `Done`, and tells the Owner in a customer-visible update. Before he merges he runs the whole test suite on the merge request branch and sees 0 failures.
+4. No issues: Cato merges (only Cato merges), moves the task to `Ready for live`, and tells the Owner in a customer-visible update that it is theirs to take live. When the Owner has taken it live or accepted it, and nothing is left open for the crew, Cato moves it to `Done`. Before he merges he runs the whole test suite on the merge request branch and sees 0 failures.
 
 ### A failing test nobody can explain (any phase)
 
@@ -199,7 +200,7 @@ Hard rule 9 applies to every agent. This is what happens when it cannot be follo
 
 ## 8. What the code does today (checked 2026-11-05)
 
-- Every crew member's Claude Code agent definition is written with `model: haiku`. There is no setting for a model per role, and no setting for a model source such as OpenRouter. So a crew you saw running Opus or Sonnet was changed or launched some other way than this kit.
+- The model of each crew member comes from `models` in `crew.json` and defaults to `haiku` (section 10, item 4). That works for Claude only: a person set to OpenRouter or Ollama gets no agent definition yet.
 - The people have display names (Wren Worker, Wade Worker) and chat nicks (`wren`, `wade`), and their keys are the same: `wren`, `wick`, `wynn`, `wade`. `@wade` is matched against the account's display name or its first name (`server/utils/notifyEvents.ts:87`), so it works when the account is named "Wade Worker".
 - A mention leaves a stored `mention` notification for each person on the board it names (Q58), so an agent that is asleep between wake-ups finds it in `list_notifications`. The live event still goes only to an agent that is watching its event stream (`agentEventHub.watches`).
 - A crew board made after 2026-11-05 has the columns Backlog, To do, In progress, Verify PM, Verify UX, Verify CQ, Verify QA, Verify, Ready for live, Done, Blocked and Bugs, and an agent hears a card moving into any review gate or Blocked. Boards made before that keep their old columns. The kit documents describe the gates (`CREW.md.tmpl` rules 7 and 7b, `PIA-UX.md.tmpl`, `NITPICKER.md.tmpl`, `USHER.md.tmpl`, `QUINCY.md.tmpl`, `SKILL.md`). Quincy is in the cast (key `quincy`), in the crew API, in forks and in `init.mjs`. A crew made before Quincy existed gets his account on its next rotate; a fork made before then has no Quincy until it is forked again. Nina's key is `nina` and Pia's is `pia` (renamed 2026-11-05, Q70).
@@ -227,12 +228,15 @@ Decided by the Owner:
 
 - **Q70.** Rename the keys `pm` to `pia` and `nitpicker` to `nina`, so keys, usernames and chat nicks agree. Done 2026-11-05, with the same migrations as Q60: the server moves account addresses, key names and fork rows when it starts, and the kit moves an old crew home (`creds.json`, `crew.json`, profiles, channel and listen state) the first time it loads. `NITPICKER.md.tmpl` is `NINA.md.tmpl`. A forks file from the board that was stored before the rename keeps the old keys in `CREW_HOME/forks`: hand over a fresh one from the board.
 
+- **Q71.** `Ready for live` stays. It means the work is handed to the Owner, who can take it live or accept it. `Done` means everything is wrapped up and the crew does not need to act on it anymore. Cato merges and moves a task to `Ready for live`, and moves it to `Done` once the Owner has taken it live or accepted it and nothing is left open (section 2, Phase 9).
+- **Q59a (guidance).** The kit gives guidance per provider in the style of "`haiku` for Claude": the cheap tier by name where the provider has one, the criteria where it does not, and one step up when a person needs it (`README.md`, "Models").
+
 ## 10. Work still to do in the kit and the app (tracked as tasks)
 
 1. Done (2026-11-05): MCP tools `start_timer` and `stop_timer` (Q57).
 2. Done (2026-11-05): a stored mention notification for project members only (Q58).
 3. Done (2026-11-05): rename the person keys to `wren`, `wick`, `wynn`, `wade` and `usher`, and migrate the data of existing crews (Q60, Q66).
-4. A model setting per person in `crew.json` (Q59a). It names a provider (`claude`, `openrouter` or `ollama`) and a model, both chosen by the Owner. When it is unset, the person gets the cheap but functional tier of the provider in use. The kit stores no model names of its own, and `init.mjs` stops writing `model: haiku`.
+4. Done for Claude (2026-11-05): a model setting per person in `crew.json` (Q59a), `models`, with guidance per provider in `README.md` ("Models"). It names a provider (`claude`, `openrouter` or `ollama`) and a model, both chosen by the Owner. When it is unset, the person gets `haiku`, Claude Code's name for the cheap tier, and `default` in `models` changes that for everyone not named. `init.mjs` writes the model into the agent definitions and `PROMPTS.md` uses it for the `Agent` calls and for Pia's `claude --model`. A person set to `openrouter` or `ollama` gets no agent definition and a warning, until item 5 is built.
 5. Running a person on OpenRouter or Ollama (Q59b). A person on a Claude model stays an agent definition file. As far as I know, a subagent runs on the provider of the session that starts it, so a person on OpenRouter or Ollama has to be its own Claude Code process, started with environment variables that point at the provider. I have not tested this. From community guides, not from the official documentation: Ollama 0.14.0 and later answers the Anthropic Messages API at `http://localhost:11434`; OpenRouter takes the key in `ANTHROPIC_AUTH_TOKEN` with `ANTHROPIC_API_KEY` left empty, and the guides disagree on the base URL (`https://openrouter.ai/api` or `https://openrouter.ai/api/v1`); the haiku, sonnet and opus model slots must all be mapped to the chosen model, or the unmapped slots fail with "model not found". Check these against the OpenRouter, Ollama and Claude Code documentation before building.
 6. Done for new crew boards (2026-11-05): board columns `Verify PM`, `Verify UX`, `Verify CQ`, `Verify QA` and `Blocked` in the crew's board template.
 7. Done (2026-11-05): Usher, Nina and Quincy in the crew skill's cast table, the init script, the crew API and the forks. Cato is not launched.

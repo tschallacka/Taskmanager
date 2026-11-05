@@ -370,8 +370,52 @@ describe('CREW_HOME and the agent types', () => {
     assert.match(pia, /^---\nname: acme-pia-planner\ndescription: ".+"\nmodel: haiku\n---\n/)
     assert.ok(pia.includes(`CREW_HOME=${dir} node ${KIT}/`), 'the definition carries the resolved CREW_HOME')
     const prompts = readFileSync(join(dir, 'PROMPTS.md'), 'utf8')
-    assert.match(prompts, /\| `wren` \| Wren Worker \| wren \| `acme-wren-worker` \|/)
+    assert.match(prompts, /\| `wren` \| Wren Worker \| wren \| `acme-wren-worker` \| claude: haiku \|/)
     assert.ok(prompts.includes(`CREW_HOME=${dir} node ${KIT}/listen.mjs pia 60`), 'commands carry CREW_HOME')
+  })
+
+  test('crew.json models set the model per person; another provider gets no agent definition and a warning', () => {
+    const home = mkdtempSync(join(SCRATCH, 'kit-home-'))
+    made.push(home)
+    const dir = crewIn(home)
+    writeFileSync(join(dir, 'crew.json'), JSON.stringify({
+      team: 'Acme Crew',
+      crew: { slug: 'acme' },
+      board: { url: 'http://127.0.0.1:9' },
+      models: { default: 'haiku', usher: 'sonnet', wick: { provider: 'ollama', model: 'small-local' }, pm: { model: 'opus' } }
+    }))
+    const out = run(home, 'init.mjs', '~/crew-home/acme')
+    const agents = join(home, '.claude', 'agents')
+    assert.match(readFileSync(join(agents, 'acme-usher-xander.md'), 'utf8'), /\nmodel: sonnet\n/)
+    assert.match(readFileSync(join(agents, 'acme-wren-worker.md'), 'utf8'), /\nmodel: haiku\n/)
+    assert.match(readFileSync(join(agents, 'acme-pia-planner.md'), 'utf8'), /\nmodel: opus\n/, 'an old key in models is read as the new one')
+    assert.ok(!readdirSync(agents).includes('acme-wick-worker.md'), 'no definition for a provider the kit does not start')
+    assert.match(out.stdout, /WARN acme-wick-worker is set to ollama \(small-local\)/)
+    const prompts = readFileSync(join(dir, 'PROMPTS.md'), 'utf8')
+    assert.match(prompts, /\| `usher` \| Usher Xander \| usher \| `acme-usher-xander` \| claude: sonnet \|/)
+    assert.match(prompts, /\| `wick` \| Wick Worker \| wick \| `acme-wick-worker` \| ollama: small-local \|/)
+    assert.ok(prompts.includes('claude --model opus --add-dir'), 'Pia starts on her own model')
+  })
+
+  test('a mistake in models is a FAIL line, and that person gets the default', () => {
+    const home = mkdtempSync(join(SCRATCH, 'kit-home-'))
+    made.push(home)
+    const dir = crewIn(home)
+    writeFileSync(join(dir, 'crew.json'), JSON.stringify({
+      team: 'Acme Crew',
+      crew: { slug: 'acme' },
+      board: { url: 'http://127.0.0.1:9' },
+      models: { wren: { provider: 'nope' }, quincy: 'has space', usher: 42 }
+    }))
+    const out = run(home, 'init.mjs', '~/crew-home/acme')
+    assert.match(out.stdout, /FAIL crew\.json: models\.wren: the provider "nope" is not one of claude, openrouter, ollama/)
+    assert.match(out.stdout, /FAIL crew\.json: models\.quincy: the model must be a name/)
+    assert.match(out.stdout, /FAIL crew\.json: models\.usher must be a model name or/)
+    assert.equal(out.status, 1)
+    const agents = join(home, '.claude', 'agents')
+    for (const file of ['acme-wren-worker.md', 'acme-quincy-average.md', 'acme-usher-xander.md']) {
+      assert.match(readFileSync(join(agents, file), 'utf8'), /\nmodel: haiku\n/, file)
+    }
   })
 
   test('init never overwrites a definition it did not write', () => {

@@ -1,6 +1,6 @@
 ---
 name: taskmanager-crew
-description: Run a crew of cheap Haiku agents (a project manager, four workers, a usability tester, a code quality reviewer, each with its own browser profile) that build and test ANY product on a Taskmanager board, with Claude as the customer and code reviewer, an optional log watcher, and a chat line for meetings. Use when asked to "set up the crew", "have the haiku workers build X", "start a UX review", or to continue a crew run.
+description: Run a crew of cheap agents (Haiku unless the Owner picks another model per person) (a project manager, four workers, a usability tester, a code quality reviewer, each with its own browser profile) that build and test ANY product on a Taskmanager board, with Claude as the customer and code reviewer, an optional log watcher, and a chat line for meetings. Use when asked to "set up the crew", "have the haiku workers build X", "start a UX review", or to continue a crew run.
 ---
 
 # Taskmanager crew
@@ -45,11 +45,12 @@ Columns: Backlog, To do, In progress, **Verify**, **Ready for live**, **Done**, 
    worker -> PM -> usher -> nina -> Quincy -> PM -> you. The tags are listed in `CREW.md` rule 7b.
 3. **You review the code in Verify**: read the diff of the owned files (do not trust the summary),
    run lint and the typecheck, look at the screenshot, **try it yourself** in a browser. Approved:
-   move to **Ready for live**. Not approved: post written feedback as subtasks tagged `Feedback Cato`,
+   move to **Ready for live**, which hands the work to the user. Not approved: post written feedback as subtasks tagged `Feedback Cato`,
    assign the task to the PM and move it to **Backlog**. Be critical: send work back when it is not up to standard.
 4. **Only you publish**, and only tasks in Ready for live, following the release steps in
-   `PROJECT-RULES.md` (backup, schema change, typecheck and lint, commit, push). Then move the
-   tasks to **Done**.
+   `PROJECT-RULES.md` (backup, schema change, typecheck and lint, commit, push). Move a task to **Done**
+   when everything is wrapped up and the crew does not need to act on it anymore: it is published or
+   accepted by the user, and no subtask, question or follow-up is open.
 5. Workers and the PM never commit, push, or touch the database.
 6. Bugs: anyone files a `[BUG]` task in the Bugs column; the PM assigns it, a worker fixes it and
    moves it through Verify like anything else.
@@ -60,7 +61,7 @@ Columns: Backlog, To do, In progress, **Verify**, **Ready for live**, **Done**, 
 - **Start Pia, and only Pia.** She needs her own Claude Code session (a subagent cannot start other agents), so
   start it in a real terminal with the `interactive-shell` skill, as `$CREW_HOME/PROMPTS.md` says under "Starting
   Pia", and send her prompt as her first message. Pia starts the workers, the reviewers and the log watcher herself
-  with the prompts in that file (`Agent`, `subagent_type` from the table at its top, `model: haiku`,
+  with the prompts in that file (`Agent`, `subagent_type` from the table at its top, `model` from the same table,
   `run_in_background: true`). You do not start them, do not watch them and are not the go-between for their
   messages. Each member is its own agent type (`init.mjs` writes them). On "Agent type not found", restart Claude
   Code (`claude --continue`): never start a member without its `subagent_type`.

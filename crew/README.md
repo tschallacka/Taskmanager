@@ -21,7 +21,7 @@ response is the crew's `creds.json`; nothing else is set up by hand.
 3. Run `CREW_HOME=<the crew's home folder> node init.mjs`. It checks the machine (Node, a browser, and the skills and MCP servers the hard rules name, see "Tools the workflow's hard rules need" below),
    renders the agents' documents (`CREW.md`, `PROMPTS.md`, ...) from the `*.tmpl` files, and writes one
    Claude Code agent definition per member into `~/.claude/agents` (`$CLAUDE_CONFIG_DIR/agents` when
-   that is set): `<crew slug>-<person>.md`, such as `acme-pia-planner.md`, with `model: haiku`.
+   that is set): `<crew slug>-<person>.md`, such as `acme-pia-planner.md`, with the model from `crew.json` (see "Models"; `haiku` when none is set).
    `PROMPTS.md` names each one as the `subagent_type` to launch it with, so Boss can tell the members
    apart. It never overwrites a definition it did not write. **Run init before Boss's Claude Code
    session starts**: Claude Code reads the definitions when a session starts (an open session picks
@@ -48,6 +48,41 @@ Environment:
   own sandbox cannot start (for example inside a systemd sandbox). The host decides.
 - `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`: skip the optional browser download in `npm install`
   (it is also fine to skip it when `CHROMIUM` is set).
+
+## Models (one per person)
+
+Each person runs on the model you choose in `crew.json`. The kit names no model version, because the names change.
+
+```json
+"models": {
+  "default": { "provider": "claude", "model": "haiku" },
+  "usher": "sonnet",
+  "wick": { "provider": "claude", "model": "sonnet" }
+}
+```
+
+- A person with no entry gets `default`, and without `default` that is `claude` with `haiku`.
+- A string is a Claude model. An object names the `provider` (`claude`, `openrouter` or `ollama`) and the `model`.
+- The keys are the people: `pia`, `wren`, `wick`, `wynn`, `wade`, `usher`, `nina`, `quincy` and `watcher`. Cato is
+  not launched by the kit: he runs on whatever model you chat with.
+- `init.mjs` writes the model into each person's agent definition, and `PROMPTS.md` uses it for the `Agent` calls
+  and for Pia's `claude --model`. After a change, run `init.mjs` again and start the sessions again: Claude Code
+  reads agent definitions when a session starts. A mistake in `models` is printed as a FAIL line, and that person
+  gets the default meanwhile.
+
+Guidance: start every person on the cheap tier of the provider, and move one person up at a time.
+
+| Provider | Cheap tier (the default for everyone) | One step up | Status |
+| --- | --- | --- | --- |
+| `claude` | `haiku`, Claude Code's name for the small, cheap Claude model (it follows the newest one) | `sonnet`, then `opus` | Works: an agent definition with `model:`. Full model ids work too |
+| `openrouter` | A small, cheap model that supports tool calling | The next size up from the same family | Not started by the kit yet |
+| `ollama` | A small local model that supports tool calling and holds a whole task text in its context | A larger local model | Not started by the kit yet |
+
+How to tell when a person needs a step up: the same task keeps returning through the same gate (the third return
+goes to Cato already, `WORKFLOW.md` section 7), or Pia's weekly time figure shows one person far slower than the
+rest. Change one person, run the crew for a while, and compare. A person set to `openrouter` or `ollama` gets no agent
+definition and `init.mjs` says so, because a definition would silently run on Claude. `WORKFLOW.md` section 10 (item 5)
+has the approach for those providers and says what is not tested.
 
 ## Tools the workflow's hard rules need
 

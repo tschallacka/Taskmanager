@@ -177,7 +177,9 @@ starts only her (`PROMPTS.md`, "Starting Pia"). When a card needs a person who i
 `task_assigned`, a worker after a `reply` that answers a question, a reviewer when a card enters their gate), she:
 
 1. Starts that person with the `Agent` tool: `subagent_type` from the table at the top of `PROMPTS.md`,
-   `model: haiku`, `run_in_background: true`, and that person's prompt from `PROMPTS.md` with their key and nick.
+   `model` from the same table (the Owner's choice per person), `run_in_background: true`, and that person's prompt
+   from `PROMPTS.md` with their key and nick. A person whose provider is not `claude` has no agent type: leave them
+   alone and tell Boss.
 2. Or, when that person's agent still exists (it handed back), resumes it with `SendMessage`: "resume your loop:
    card <card id> is yours, read it with get_task".
 3. On "Agent type not found" she stops and tells Boss. She never starts anyone without a `subagent_type`.
@@ -302,10 +304,12 @@ Use `browser` to look and check. Use `run` (Playwright, below) for a script that
    assigned to the PM, who gives it to a worker. The task returns to **Verify PM** after every gate. Nobody
    sets another person's tag: the PM checks in the task's activity log who set an approval.
    When every gate has approved, the PM moves the task to **Verify**, assigned to Boss. Boss reads the code
-   in Verify: approved means Ready for live; not approved means written feedback on the task, as subtasks
+   in Verify: approved means Ready for live, which hands the work to the Owner (the customer-visible update says
+   so); not approved means written feedback on the task, as subtasks
    tagged `Feedback Cato`, and back to the PM (the task goes through triage again). Only Boss
-   publishes to live, and only tasks in Ready for live; published tasks go to Done. Nobody else
-   moves a task into Ready for live or Done.
+   publishes to live, and only tasks in Ready for live. A task goes to Done when everything is wrapped up and
+   the crew does not need to act on it anymore: it is published or accepted by the Owner, and no subtask,
+   question or follow-up is open. Nobody else moves a task into Ready for live or Done.
 7b. **Tags.** A tag is a label on a task or subtask. Labels are free text on the board, so there is nothing
    to create: type them exactly as written here, in lower case where shown.
 

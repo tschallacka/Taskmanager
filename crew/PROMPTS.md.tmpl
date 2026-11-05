@@ -2,21 +2,24 @@
 
 Who starts whom: Boss starts Pia, and only Pia. Pia starts the workers, the reviewers and the optional log
 watcher herself, as `Agent` calls with `subagent_type` set to that person's agent type from the table,
-`model: "haiku"` and `run_in_background: true`. Boss does not start them, does not watch them and is never the
+`model` set to that person's model from the table, and `run_in_background: true`. Boss does not start them, does not watch them and is never the
 go-between for their messages. Each agent reads the crew documents itself. Rendered from `PROMPTS.md.tmpl`; the
 values come from `crew.json`.
 
-| Key | Person | Chat nick | `subagent_type` |
-|---|---|---|---|
-| `pia` | {{people.pia}} | {{nicks.pia}} | (not an `Agent` call: her own session, see "Starting Pia") |
-| `wren` | {{people.wren}} | {{nicks.wren}} | `{{agents.wren}}` |
-| `wick` | {{people.wick}} | {{nicks.wick}} | `{{agents.wick}}` |
-| `wynn` | {{people.wynn}} | {{nicks.wynn}} | `{{agents.wynn}}` |
-| `wade` | {{people.wade}} | {{nicks.wade}} | `{{agents.wade}}` |
-| `usher` | {{people.usher}} | {{nicks.usher}} | `{{agents.usher}}` |
-| `nina` | {{people.nina}} | {{nicks.nina}} | `{{agents.nina}}` |
-| `quincy` | {{people.quincy}} | {{nicks.quincy}} | `{{agents.quincy}}` |
-| (optional) | {{people.watcher}} | | `{{agents.watcher}}` |
+| Key | Person | Chat nick | `subagent_type` | Provider: model |
+|---|---|---|---|---|
+| `pia` | {{people.pia}} | {{nicks.pia}} | (not an `Agent` call: her own session, see "Starting Pia") | {{models.pia.provider}}: {{models.pia.model}} |
+| `wren` | {{people.wren}} | {{nicks.wren}} | `{{agents.wren}}` | {{models.wren.provider}}: {{models.wren.model}} |
+| `wick` | {{people.wick}} | {{nicks.wick}} | `{{agents.wick}}` | {{models.wick.provider}}: {{models.wick.model}} |
+| `wynn` | {{people.wynn}} | {{nicks.wynn}} | `{{agents.wynn}}` | {{models.wynn.provider}}: {{models.wynn.model}} |
+| `wade` | {{people.wade}} | {{nicks.wade}} | `{{agents.wade}}` | {{models.wade.provider}}: {{models.wade.model}} |
+| `usher` | {{people.usher}} | {{nicks.usher}} | `{{agents.usher}}` | {{models.usher.provider}}: {{models.usher.model}} |
+| `nina` | {{people.nina}} | {{nicks.nina}} | `{{agents.nina}}` | {{models.nina.provider}}: {{models.nina.model}} |
+| `quincy` | {{people.quincy}} | {{nicks.quincy}} | `{{agents.quincy}}` | {{models.quincy.provider}}: {{models.quincy.model}} |
+| (optional) | {{people.watcher}} | | `{{agents.watcher}}` | {{models.watcher.provider}}: {{models.watcher.model}} |
+
+The models are set per person in `crew.json` (`{{kit_dir}}/README.md`, "Models"). A person set to a provider other
+than `claude` has no agent type: the kit does not start those yet, so Pia leaves them alone and tells Boss.
 
 The agent types are named per crew, so Pia can tell her members apart when she resumes, messages or
 stops one. `init.mjs` writes their definitions into Claude Code's `agents` folder. Claude Code reads
@@ -43,8 +46,11 @@ real terminal, so never start it headless. In that terminal:
 ```
 export CREW_HOME={{crew_dir}}
 mkdir -p {{crew_dir}}/pia-session && cd {{crew_dir}}/pia-session
-claude --add-dir {{crew_dir}} --add-dir {{kit_dir}}
+claude --model {{models.pia.model}} --add-dir {{crew_dir}} --add-dir {{kit_dir}}
 ```
+
+`--model` is her model from the table above. It applies when her provider is `claude`; for another provider the
+kit has no way to start her yet, so Boss tells the Owner instead of starting her on Claude.
 
 For channel mode, add the `.mcp.json` for key `pia` that `{{kit_dir}}/README.md` ("Channels") shows to that folder
 first, and start `claude` with `--dangerously-load-development-channels server:taskmanager-crew` after the other

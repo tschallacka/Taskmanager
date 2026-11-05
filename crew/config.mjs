@@ -101,6 +101,50 @@ const slugify = text => String(text).toLowerCase().normalize('NFKD').replace(/[^
 // The members Pia starts as agents (Pia herself runs in her own session), the optional log watcher included.
 export const CAST = ['pia', 'wren', 'wick', 'wynn', 'wade', 'usher', 'nina', 'quincy', 'watcher']
 
+// The model each person runs on is the Owner's choice, set per person in crew.json under "models" (README, "Models").
+// The kit fixes no model name: a person with no entry gets "haiku", which is Claude Code's name for the cheap tier of
+// Claude, not a model version. "default" in crew.json applies to everyone who is not named.
+export const PROVIDERS = ['claude', 'openrouter', 'ollama']
+const CHEAP_CLAUDE = { provider: 'claude', model: 'haiku' }
+const MODEL_NAME = /^[A-Za-z0-9][\w.:/@-]{0,99}$/
+
+/**
+ * Every cast member's { provider, model } from the "models" of crew.json. A string is a Claude model
+ * (`"usher": "sonnet"`); an object names both (`{ "provider": "claude", "model": "sonnet" }`). What is wrong with
+ * an entry is returned in `problems`, and that person gets the default instead.
+ */
+export function resolveModels(rawModels) {
+  const given = renameKeys(rawModels && typeof rawModels === 'object' ? rawModels : {})
+  const models = {}
+  const problems = []
+  const fallback = given.default === undefined ? CHEAP_CLAUDE : parseModel(given.default, 'default', problems) ?? CHEAP_CLAUDE
+  for (const key of CAST) models[key] = given[key] === undefined ? fallback : parseModel(given[key], key, problems) ?? fallback
+  return { models, problems }
+}
+
+function parseModel(entry, key, problems) {
+  const object = typeof entry === 'string' ? { model: entry } : entry
+  if (!object || typeof object !== 'object' || Array.isArray(object)) {
+    problems.push(`models.${key} must be a model name or { "provider": ..., "model": ... }`)
+    return null
+  }
+  const provider = object.provider ?? 'claude'
+  if (!PROVIDERS.includes(provider)) {
+    problems.push(`models.${key}: the provider "${provider}" is not one of ${PROVIDERS.join(', ')}`)
+    return null
+  }
+  const model = object.model ?? (provider === 'claude' ? CHEAP_CLAUDE.model : undefined)
+  if (typeof model !== 'string' || !MODEL_NAME.test(model)) {
+    problems.push(`models.${key}: the model must be a name of letters, digits and . _ : / @ - (it is written into an agent definition)`)
+    return null
+  }
+  return { provider, model }
+}
+
+const resolvedModels = resolveModels(raw.models)
+config.models = resolvedModels.models
+export const modelProblems = resolvedModels.problems
+
 /**
  * Each member's Claude Code agent type, such as acme-pia-planner: the crew slug first, so two crews
  * on one machine never share one. init.mjs writes the definitions; PROMPTS.md names them.

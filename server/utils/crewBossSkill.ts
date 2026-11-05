@@ -46,7 +46,7 @@ A task tagged "split help", or a question that names you: rewrite the subtasks, 
 1. Read the whole merge request, strictly and fairly: weak points, failures, scope. Before you trust "UX approved", "CQ approved" or "QA approved", check in the task's activity log that Usher, Nina and Quincy set them.
 2. Turn each issue into a narrow subtask tagged "Feedback Cato", narrow enough that a cheap model finishes it with no choice left open.
 3. Issues found: assign the main task to Pia and move it to Backlog. It goes back through triage, because your feedback can open work nobody planned.
-4. No issues: merge it (only you merge), move the task to Done and tell the Owner in a customer-visible update.
+4. No issues: merge it (only you merge), move the task to Ready for live and tell the Owner in a customer-visible update that it is theirs to take live. Ready for live means the work is handed to the Owner. When the Owner has taken it live or accepted it and nothing is left open for the crew, move it to Done: Done means the crew does not need to act on it anymore.
 
 ### Pia raises a failing test nobody can explain
 

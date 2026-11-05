@@ -9,7 +9,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, chmodS
 import { execSync } from 'node:child_process'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { CAST, agentNames, config, here, kitDir, loadForks, templateValues } from './config.mjs'
+import { CAST, agentNames, config, here, kitDir, loadForks, modelProblems, templateValues } from './config.mjs'
 
 const ok = m => console.log(`  ok   ${m}`)
 const warn = m => console.log(`  WARN ${m}`)
@@ -126,6 +126,14 @@ for (const file of readdirSync(kitDir).filter(f => f.endsWith('.tmpl'))) {
 console.log('\nAgent types')
 const agentsDir = join(process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude'), 'agents')
 mkdirSync(agentsDir, { recursive: true })
+for (const problem of modelProblems) fail(`crew.json: ${problem}`)
+// A person on Claude is an agent definition. OpenRouter and Ollama need a Claude Code process of their own that the
+// kit does not start yet (README, "Models"), so no definition is written for them: it would silently run on Claude.
+const skipsProvider = (who, { provider, model }) => {
+  if (provider === 'claude') return false
+  warn(`${who} is set to ${provider} (${model}): the kit does not start that provider yet, so it writes no agent definition for ${who} (README, "Models")`)
+  return true
+}
 const DUTIES = {
   pia: 'project manager. Plans the board, steers the workers, pre-checks Verify.',
   wren: 'worker. Builds the tasks assigned to it on the board.',
@@ -143,12 +151,14 @@ for (const key of CAST) {
     continue
   }
   const person = config.people[key]
+  const { model } = config.models[key]
+  if (skipsProvider(name, config.models[key])) continue
   const keyNote = key === 'watcher' ? '' : ` (key ${key})`
   const description = `${person}${keyNote}, ${DUTIES[key] ?? DUTIES.wren} Crew "${config.team}", Taskmanager board "${config.board.name}". Launch prompt in ${here}PROMPTS.md.`
   writeFileSync(file, `---
 name: ${name}
 description: ${JSON.stringify(description)}
-model: haiku
+model: ${model}
 ---
 
 ${marker}
@@ -192,11 +202,13 @@ for (const { file, data } of forks) {
       continue
     }
     const base = config.people[member.key] ?? member.name
+    const chosen = config.models[member.key] ?? config.models.wren
+    if (skipsProvider(name, chosen)) continue
     const description = `${member.name}, ${DUTIES[member.key] ?? DUTIES.wren} Forked from crew "${config.team}" for the board "${boardName}". Launch prompt in ${here}PROMPTS.md.`
     writeFileSync(agentFile, `---
 name: ${name}
 description: ${JSON.stringify(description)}
-model: haiku
+model: ${chosen.model}
 ---
 
 ${marker}
