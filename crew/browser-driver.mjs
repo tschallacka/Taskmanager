@@ -183,7 +183,7 @@ export function parseRequest(text) {
   const args = req.args ?? {}
   if (typeof args !== 'object' || args === null || Array.isArray(args)) throw new BrowserError('args must be an object')
   const who = cmd === 'status' || cmd === 'shutdown' ? null : req.who
-  if (who !== null && !validWho(who)) throw new BrowserError('WHO must be a short lowercase name, such as w1')
+  if (who !== null && !validWho(who)) throw new BrowserError('WHO must be a short lowercase name, such as wren')
   checkArgs(cmd, args)
   return { cmd, who, args }
 }
@@ -225,7 +225,7 @@ export function parseCli(argv) {
   } else {
     who = rest.shift() ?? null
     cmd = rest.shift()
-    if (who !== null && !validWho(who)) throw new BrowserError('WHO must be a short lowercase name, such as w1')
+    if (who !== null && !validWho(who)) throw new BrowserError('WHO must be a short lowercase name, such as wren')
   }
   if (!cmd) throw new BrowserError(USAGE)
   const need = (count) => {

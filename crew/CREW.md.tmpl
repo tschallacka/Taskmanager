@@ -18,12 +18,12 @@ lint, change the database). They apply to everything you do in the repository.
 | `customer` | {{customer.personName}} | the customer; talks only to the PM; sees only customer-visible tasks |
 | `boss` | {{people.boss}} (the owner; you never act as them) | reads reports; reviews code; applies schema changes; publishes |
 | `pm` | {{people.pm}} | project manager |
-| `w1` `w2` `w3` `w4` | {{people.w1}}, {{people.w2}}, {{people.w3}}, {{people.w4}} | workers |
-| `pietje` | {{people.pietje}} | usability tester: files UX findings (see `PIETJE.md`) |
+| `wren` `wick` `wynn` `wade` | {{people.wren}}, {{people.wick}}, {{people.wynn}}, {{people.wade}} | workers |
+| `usher` | {{people.usher}} | usability tester: files UX findings (see `USHER.md`) |
 | `nitpicker` | {{people.nitpicker}} | code quality reviewer: reviews each task in Verify before Boss (see `NITPICKER.md`) |
 | `contact` | {{people.contact}} | a read-only customer contact, for checking what a customer sees |
 
-Your key (`pm`, `w1`, ...) is the first argument to every command below.
+Your key (`pm`, `wren`, ...) is the first argument to every command below.
 
 ## Your tool: `{{node_kit}}/crew.mjs <you> <command>`
 
@@ -80,7 +80,7 @@ points, and to clarify things before building the wrong thing. The PM is the cus
 and normally talks for the team, but the PM may **bring developers (and the tester) along
 whenever it helps**: write on the board "MEETING in {{chat.channel}}: <topic>, with <names>", and those
 people join the channel under their own nick, say their piece (one short message at a time),
-and leave. Use your own nick (`{{nicks.pm}}`, `{{nicks.w1}}`, `{{nicks.w2}}`, `{{nicks.w3}}`, `{{nicks.w4}}`, `{{nicks.pietje}}`, `{{nicks.nitpicker}}`) every
+and leave. Use your own nick (`{{nicks.pm}}`, `{{nicks.wren}}`, `{{nicks.wick}}`, `{{nicks.wynn}}`, `{{nicks.wade}}`, `{{nicks.usher}}`, `{{nicks.nitpicker}}`) every
 time, so your session is your own:
 
 ```
@@ -196,7 +196,7 @@ The workers **keep running**: they do not end a round and wait to be woken. Ever
 with one command, which waits and then prints only what is new:
 
 ```
-{{node_kit}}/listen.mjs <you> [seconds]     # you = pm, w1, w2, w3, w4, pietje or nitpicker
+{{node_kit}}/listen.mjs <you> [seconds]     # you = pm, wren, wick, wynn, wade, usher or nitpicker
 ```
 
 It prints `CHAT` lines (a message in `{{chat.workChannel}}`, where the PM steers the workers; for the PM
@@ -288,7 +288,7 @@ Use `browser` to look and check. Use `run` (Playwright, below) for a script that
    moves a task into Ready for live or Done. Between Verify and Ready for live the order is: the PM
    pre-checks, the code reviewer {{people.nitpicker}} (`NITPICKER.md`) posts `NITPICKER: approved` or
    `NITPICKER: changes needed` as a task update (the latter sends the task back to you), the tester
-   {{people.pietje}} retests anything a person sees (`RETEST: pass|fail`), and Boss reads the code last.
+   {{people.usher}} retests anything a person sees (`RETEST: pass|fail`), and Boss reads the code last.
 7c. **Time your work.** Every worker logs time with `log_time` on the task or subtask you worked on,
    once when you move it to Verify and again after each round of fixes:
    `log_time {"task":"<id>","duration":"1h 15m","note":"<what>"}`. Count the real working time,
@@ -354,7 +354,7 @@ Use `browser` to look and check. Use `run` (Playwright, below) for a script that
   it as a **customer-visible** update on the task (an internal note is invisible to the customer
   and counts as not asked). Boss only decides about code, the database and publishing. The
   customer answers in the same place, and you copy the answer onto the task.
-- **The tester's findings** (`PIETJE.md`) are triaged by you, as described in `PIA-UX.md`.
+- **The tester's findings** (`USHER.md`) are triaged by you, as described in `PIA-UX.md`.
 
 ## Worker round
 

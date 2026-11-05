@@ -16,7 +16,7 @@ import { here, loadCreds } from './config.mjs'
 
 const who = process.argv[2]
 if (!who || !/^[a-z0-9]+$/.test(who)) {
-  console.error('usage: node channel.mjs <who>   (pm, w1..w4, or a key of crew.json)')
+  console.error('usage: node channel.mjs <who>   (pm, wren, wick, wynn, wade, usher, or a key of crew.json)')
   process.exit(2)
 }
 

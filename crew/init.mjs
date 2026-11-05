@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Step 1 of the setup. Checks what the crew needs, writes the documents the agents read
-// (CREW.md, PIETJE.md, NITPICKER.md, PIA-UX.md, PROMPTS.md, BRIEF.md, PROJECT-RULES.md) from their
+// (CREW.md, USHER.md, NITPICKER.md, PIA-UX.md, PROMPTS.md, BRIEF.md, PROJECT-RULES.md) from their
 // *.tmpl files with the values of crew.json, writes fonts.conf when a font directory is given,
 // and writes one Claude Code agent definition per member into ~/.claude/agents. Safe to run
 // again: it overwrites generated documents (edit the .tmpl, not the output) but never
@@ -128,8 +128,8 @@ const agentsDir = join(process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude
 mkdirSync(agentsDir, { recursive: true })
 const DUTIES = {
   pm: 'project manager. Plans the board, steers the workers, pre-checks Verify.',
-  w1: 'worker. Builds the tasks assigned to it on the board.',
-  pietje: 'usability tester. Tries the product as a first-time user and files [UX] findings for the PM.',
+  wren: 'worker. Builds the tasks assigned to it on the board.',
+  usher: 'usability tester. Tries the product as a first-time user and files [UX] findings for the PM.',
   nitpicker: 'code quality reviewer. Reviews the diff of each task in Verify before Boss does.',
   watcher: 'log watcher (optional). Reads the dev logs and reports what matters; changes nothing.'
 }
@@ -143,7 +143,7 @@ for (const key of CAST) {
   }
   const person = config.people[key]
   const keyNote = key === 'watcher' ? '' : ` (key ${key})`
-  const description = `${person}${keyNote}, ${DUTIES[key] ?? DUTIES.w1} Crew "${config.team}", Taskmanager board "${config.board.name}". Launch prompt in ${here}PROMPTS.md.`
+  const description = `${person}${keyNote}, ${DUTIES[key] ?? DUTIES.wren} Crew "${config.team}", Taskmanager board "${config.board.name}". Launch prompt in ${here}PROMPTS.md.`
   writeFileSync(file, `---
 name: ${name}
 description: ${JSON.stringify(description)}
@@ -191,7 +191,7 @@ for (const { file, data } of forks) {
       continue
     }
     const base = config.people[member.key] ?? member.name
-    const description = `${member.name}, ${DUTIES[member.key] ?? DUTIES.w1} Forked from crew "${config.team}" for the board "${boardName}". Launch prompt in ${here}PROMPTS.md.`
+    const description = `${member.name}, ${DUTIES[member.key] ?? DUTIES.wren} Forked from crew "${config.team}" for the board "${boardName}". Launch prompt in ${here}PROMPTS.md.`
     writeFileSync(agentFile, `---
 name: ${name}
 description: ${JSON.stringify(description)}

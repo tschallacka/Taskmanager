@@ -59,7 +59,7 @@ function home(): string {
   const dir = mkdtempSync(join(tmpdir(), 'crew-tm-'))
   homes.push(dir)
   writeFileSync(join(dir, 'crew.json'), JSON.stringify({ product: { name: 'Scratch' } }))
-  writeFileSync(join(dir, 'creds.json'), JSON.stringify({ base, team: { id: 't1' }, people: { w2: { apiKey: 'arn_fake_key_for_tests', email: 'w2@example.test', password: 'unused' } } }))
+  writeFileSync(join(dir, 'creds.json'), JSON.stringify({ base, team: { id: 't1' }, people: { wick: { apiKey: 'arn_fake_key_for_tests', email: 'w2@example.test', password: 'unused' } } }))
   mkdirSync(join(dir, 'scripts'))
   for (const [name, body] of Object.entries(SCRIPTS)) writeFileSync(join(dir, 'scripts', `${name}.mjs`), body)
   return dir
@@ -83,9 +83,9 @@ function realEnv(): Record<string, string> {
 
 type Result = { code: number | null, signal: string | null, stdout: string, stderr: string }
 
-// Starts `tm.mjs w2 run <script>` in the home, with the given environment added.
+// Starts `tm.mjs wick run <script>` in the home, with the given environment added.
 function start(dir: string, script: string, env: Record<string, string>): { child: ChildProcess, exited: Promise<Result> } {
-  const child = spawn(process.execPath, [TM, 'w2', 'run', join(dir, 'scripts', `${script}.mjs`)], {
+  const child = spawn(process.execPath, [TM, 'wick', 'run', join(dir, 'scripts', `${script}.mjs`)], {
     env: { ...process.env, CREW_HOME: dir, CREW_ACCEPT_DIALOGS: '', ...env },
     stdio: ['ignore', 'pipe', 'pipe']
   })
@@ -244,7 +244,7 @@ stand('the call after a stopped call starts normally', async () => {
 
 real('SIGTERM on a real run leaves no Chromium with the profile', async () => {
   const dir = home()
-  const profile = join(dir, 'profiles', 'w2')
+  const profile = join(dir, 'profiles', 'wick')
   const run = start(dir, 'wait', realEnv())
   assert.ok(await until(() => processesWith(profile).length > 0, 30000), 'Chromium started')
   await sleep(500)

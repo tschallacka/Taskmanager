@@ -7,7 +7,7 @@
 //   BOARD a task newly assigned to you on the development board, or a new Inbox item
 //         (a comment on your task, a move, an assignment, a question for you)
 // Prints "quiet" when nothing arrived. Run it in a loop; see "Listening" in CREW.md.
-//   node listen.mjs <pm|w1|w2|w3|w4|pietje> [seconds]
+//   node listen.mjs <pm|wren|wick|wynn|wade|usher> [seconds]
 //
 // The first run for a person reads the whole channel history so they know the context.
 // History is OLD: a "standing down" line in it is not an order.
@@ -20,14 +20,14 @@ const [who, secs] = process.argv.slice(2)
 const me = creds.people[who]
 const nick = config.nicks[who]
 if (!me || !nick) {
-  console.error('usage: node listen.mjs <pm|w1|w2|w3|w4|pietje> [seconds]')
+  console.error('usage: node listen.mjs <pm|wren|wick|wynn|wade|usher> [seconds]')
   process.exit(64)
 }
 
 const WAIT = Number(secs ?? process.env.WAIT ?? 60) * 1000
 const CHAT = config.chat.client
 const { channel, workChannel } = config.chat
-const CHANNELS = who === 'pm' ? [workChannel, channel] : who === 'pietje' ? [channel] : [workChannel]
+const CHANNELS = who === 'pm' ? [workChannel, channel] : who === 'usher' ? [channel] : [workChannel]
 const boardId = creds.board.id
 
 mkdirSync(`${here}.listen`, { recursive: true })

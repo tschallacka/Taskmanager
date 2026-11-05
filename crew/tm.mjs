@@ -13,7 +13,7 @@
 //                                                  it default-exports async ({ page, ctx, BASE, APP }) => {}
 //                                                  BASE = the board app, APP = the product under test
 //
-// <who> is a key from creds.json: boss pm w1 w2 w3 w4 pietje customer contact. Use your own.
+// <who> is a key from creds.json: boss pm wren wick wynn wade usher customer contact. Use your own.
 import { chromium } from 'playwright'
 import { readFileSync, mkdirSync, existsSync, lstatSync, openSync, fstatSync, readSync, closeSync, constants } from 'node:fs'
 import { isatty } from 'node:tty'

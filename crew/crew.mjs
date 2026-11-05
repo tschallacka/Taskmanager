@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // The one entry point for an agent of the crew:
 //
-//   crew <who> <command ...>   the board tools (tm.mjs): crew w1 mcp my_tasks '{}', crew boss tools
+//   crew <who> <command ...>   the board tools (tm.mjs): crew wren mcp my_tasks '{}', crew boss tools
 //   crew <who> update <taskId> <body.md|-> [--internal|--customer]   post an update from a file (no JSON to escape)
 //   crew <who> attach <taskId> <image>                              upload an image to a task
 //   crew listen <who> [sec]    wait for new messages (listen.mjs)

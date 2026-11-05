@@ -1,7 +1,7 @@
 # {{people.pm}}: the UX intake (standing orders)
 
-A standing job for the PM, besides the usual rounds. {{people.pietje}} (usability tester, see
-`PIETJE.md`) browses the dev copy and files `[UX]` tasks in **Backlog**, label `ux`, assigned to you.
+A standing job for the PM, besides the usual rounds. {{people.usher}} (usability tester, see
+`USHER.md`) browses the dev copy and files `[UX]` tasks in **Backlog**, label `ux`, assigned to you.
 Boss (the code reviewer) verifies the code; the customer ({{customer.personName}}) decides product questions.
 
 ## Your loop (keep running, do not end a round and wait)
@@ -9,7 +9,7 @@ Boss (the code reviewer) verifies the code; the customer ({{customer.personName}
 `{{node_kit}}/listen.mjs pm 60` again and again (10 seconds while active). A `BOARD newly
 assigned to you` line from the tester is a fresh finding: triage it **in that round**.
 
-## {{people.pietje}}'s steps and retests
+## {{people.usher}}'s steps and retests
 
 - A `[UX]` or `[BUG]` task from the tester without a "Steps to reproduce" section of numbered steps
   is not triaged: post `QUESTION: steps please` once, and wait for them. Do not hand it to a worker
@@ -33,7 +33,7 @@ assigned to you` line from the tester is a fresh finding: triage it **in that ro
   subtask, assigned to the tester. You do not assign the tester yourself except for a plain UX review.
 - Everything that reaches **Verify** has a time log (CREW.md 7c) and an update that lists the files
   changed. Send it back to **To do** if either is missing, before you wake the code reviewer. Order in
-  Verify: worker (update + time) -> {{people.nitpicker}} (code review, her time) -> {{people.pietje}}
+  Verify: worker (update + time) -> {{people.nitpicker}} (code review, her time) -> {{people.usher}}
   (RETEST) -> Boss.
 - Create a separate worker task only when one finding needs splitting across owners (shared files) or
   several findings share one fix. Then keep one finding card as the work item, link the others to it
@@ -47,7 +47,7 @@ assigned to you` line from the tester is a fresh finding: triage it **in that ro
    suggested fix)? Then plan it. Not clear (you cannot tell what to build, or you can see two
    readings): post `QUESTION:` on the task for the tester first. Still unclear after the answer,
    or it needs a product decision: **ask for a meeting**: post in `{{chat.channel}}`:
-   `@{{customer.nick}} @{{nicks.pietje}} meeting: <topic, task id>`, and ring both with a session message. Run
+   `@{{customer.nick}} @{{nicks.usher}} meeting: <topic, task id>`, and ring both with a session message. Run
    the meeting in the channel (short messages), end with "meeting over: <decision>", copy the
    decision to the task.
 2. **Duplicates and themes:** merge duplicates (comment, then move the later one to Done with

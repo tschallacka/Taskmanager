@@ -71,7 +71,7 @@ function home() {
   const dir = mkdtempSync(join(tmpdir(), 'crew-update-'))
   dirs.push(dir)
   writeFileSync(join(dir, 'crew.json'), JSON.stringify({ board: { url: base } }))
-  writeFileSync(join(dir, 'creds.json'), JSON.stringify({ base, team: { id: 't1' }, people: { w2: { apiKey: 'arn_fake_key_for_tests', email: 'w2@example.test', password: 'unused' } } }))
+  writeFileSync(join(dir, 'creds.json'), JSON.stringify({ base, team: { id: 't1' }, people: { wick: { apiKey: 'arn_fake_key_for_tests', email: 'w2@example.test', password: 'unused' } } }))
   return dir
 }
 
@@ -84,11 +84,11 @@ function file(dir: string, name: string, bytes: string | Buffer) {
 
 type Run = { status: number | null, stdout: string, stderr: string }
 
-// Runs `crew w2 <args>` with the given stdin and CREW_HOME, and resolves with its exit code and output.
+// Runs `crew wick <args>` with the given stdin and CREW_HOME, and resolves with its exit code and output.
 function crew(args: string[], options: { input?: string, dir?: string } = {}): Promise<Run> {
   const dir = options.dir ?? home()
   return new Promise((resolve) => {
-    const child = spawn(process.execPath, [CREW, 'w2', ...args], { env: { ...process.env, CREW_HOME: dir } })
+    const child = spawn(process.execPath, [CREW, 'wick', ...args], { env: { ...process.env, CREW_HOME: dir } })
     let stdout = ''
     let stderr = ''
     child.stdout.setEncoding('utf8')
@@ -287,7 +287,7 @@ test('invalid UTF-8 and NUL bytes are refused; a leading BOM is dropped and CRLF
 test('stdin on a terminal is refused with exit 64 instead of waiting', async () => {
   if (spawnSync('script', ['--version']).error) return // no script(1) here: the rule is still in tm.mjs
   const dir = home()
-  const run = spawnSync('script', ['-qec', `${process.execPath} ${CREW} w2 update task1 -`, '/dev/null'], {
+  const run = spawnSync('script', ['-qec', `${process.execPath} ${CREW} wick update task1 -`, '/dev/null'], {
     encoding: 'utf8',
     env: { ...process.env, CREW_HOME: dir },
     timeout: 30000
@@ -307,7 +307,7 @@ test('an unreachable board exits 69 with one plain line: no stack, no key, no ad
   const dir = mkdtempSync(join(tmpdir(), 'crew-update-'))
   dirs.push(dir)
   writeFileSync(join(dir, 'crew.json'), JSON.stringify({}))
-  writeFileSync(join(dir, 'creds.json'), JSON.stringify({ base: `http://127.0.0.1:${closed}`, team: { id: 't1' }, people: { w2: { apiKey: 'arn_fake_key_for_tests', email: 'w2@example.test', password: 'unused' } } }))
+  writeFileSync(join(dir, 'creds.json'), JSON.stringify({ base: `http://127.0.0.1:${closed}`, team: { id: 't1' }, people: { wick: { apiKey: 'arn_fake_key_for_tests', email: 'w2@example.test', password: 'unused' } } }))
   const run = await crew(['update', 'task1', file(dir, 'note.md', 'hello\n')], { dir })
   assert.equal(run.status, 69)
   assert.match(run.stderr, /is unreachable: try again/)

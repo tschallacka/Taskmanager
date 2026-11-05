@@ -123,7 +123,7 @@ test('a boards key cannot manage crews', { skip }, async () => {
 
 test('a member cannot mint a crews:manage key', { skip }, async () => {
   await ready()
-  const member = await signIn(`${slug}-w1@crew.invalid`, 'not-the-password')
+  const member = await signIn(`${slug}-wren@crew.invalid`, 'not-the-password')
   assert.notEqual(member.status, 200, 'a wrong password is refused')
 })
 
@@ -138,7 +138,7 @@ test('create makes the crew and returns its people once', { skip }, async () => 
   await ready()
   created = await call('POST', '/api/crews', adminKey, { slug, name: 'Scratch crew', product: { name: 'Scratch product' } })
   assert.equal(created.status, 201, created.text.slice(0, 300))
-  for (const key of ['boss', 'pm', 'w1', 'w2', 'w3', 'w4', 'pietje', 'nitpicker', 'customer', 'contact']) {
+  for (const key of ['boss', 'pm', 'wren', 'wick', 'wynn', 'wade', 'usher', 'nitpicker', 'customer', 'contact']) {
     const person = created.json.people[key]
     assert.ok(person, `person ${key} is in the response`)
     assert.match(person.email, new RegExp(`^${slug}-${key}@crew\\.invalid$`))
@@ -176,7 +176,7 @@ test('GET returns the crew without secrets', { skip }, async () => {
 
 test('a crew key cannot manage crews, and a crew member cannot mint one', { skip }, async () => {
   await ready()
-  const w1 = created.json.people.w1
+  const w1 = created.json.people.wren
   const asKey = await call('GET', `/api/crews/${slug}`, w1.apiKey)
   assert.ok([401, 403, 404].includes(asKey.status), `got ${asKey.status}`)
   const session = await signIn(w1.email, w1.password)
@@ -187,13 +187,13 @@ test('a crew key cannot manage crews, and a crew member cannot mint one', { skip
 
 test('a crew staff key works on the agent API', { skip }, async () => {
   await ready()
-  const list = await call('POST', '/api/mcp', created.json.people.w1.apiKey, { jsonrpc: '2.0', id: 1, method: 'tools/list' })
+  const list = await call('POST', '/api/mcp', created.json.people.wren.apiKey, { jsonrpc: '2.0', id: 1, method: 'tools/list' })
   assert.equal(list.status, 200)
 })
 
 test('a crew account joins no other team by code', { skip }, async () => {
   await ready()
-  const w2 = created.json.people.w2
+  const w2 = created.json.people.wick
   const session = await signIn(w2.email, w2.password)
   const mine = await call('GET', '/api/auth/organization/list', undefined, undefined, session.cookie)
   assert.equal(mine.status, 200)
@@ -211,7 +211,7 @@ test('a crew account joins no other team by code', { skip }, async () => {
 
 test('a crew account accepts no invitation to a team or a customer', { skip }, async () => {
   await ready()
-  const w3 = created.json.people.w3
+  const w3 = created.json.people.wynn
   const session = await signIn(w3.email, w3.password)
   // A customer invitation, made by the admin for the crew's own customer.
   // The crew's own customer is the one the admin invites to; the admin works in the crew team.
@@ -233,15 +233,15 @@ test('a crew account accepts no invitation to a team or a customer', { skip }, a
 })
 
 test('no mail goes to a .invalid address; a real one is still handed on', { skip: false }, async () => {
-  assert.deepEqual(deliverableRecipients(`${slug}-w1@crew.invalid`), [])
-  assert.deepEqual(deliverableRecipients(`a@example.com, ${slug}-w1@crew.invalid`), ['a@example.com'])
+  assert.deepEqual(deliverableRecipients(`${slug}-wren@crew.invalid`), [])
+  assert.deepEqual(deliverableRecipients(`a@example.com, ${slug}-wren@crew.invalid`), ['a@example.com'])
   // Nothing to deliver: no transport is touched, so no error and no log.
-  await sendMail({ to: `${slug}-w1@crew.invalid`, subject: 'x', text: 'secret body', html: '<p>secret body</p>' })
+  await sendMail({ to: `${slug}-wren@crew.invalid`, subject: 'x', text: 'secret body', html: '<p>secret body</p>' })
 })
 
 test('log_time works with a crew key on a task and on a subtask', { skip }, async () => {
   await ready()
-  const w1Key = created.json.people.w1.apiKey
+  const w1Key = created.json.people.wren.apiKey
   const board = created.json.crew.boardId
   const made = await mcp(w1Key, 'create_task', { board, column: 'To do', title: 'scratch task' })
   assert.equal(made.json?.result?.isError, undefined, made.text.slice(0, 300))
@@ -258,10 +258,10 @@ test('log_time works with a crew key on a task and on a subtask', { skip }, asyn
 
 test('rotate gives new keys and passwords and kills the old ones', { skip }, async () => {
   await ready()
-  const old = created.json.people.w1
+  const old = created.json.people.wren
   const rotated = await call('POST', '/api/crews', adminKey, { slug, name: 'Scratch crew', product: { name: 'Scratch product' }, rotate: true })
   assert.equal(rotated.status, 200, rotated.text.slice(0, 300))
-  const fresh = rotated.json.people.w1
+  const fresh = rotated.json.people.wren
   assert.notEqual(fresh.apiKey, old.apiKey)
   assert.equal((await call('POST', '/api/mcp', old.apiKey, { jsonrpc: '2.0', id: 1, method: 'tools/list' })).status, 401)
   assert.equal((await call('POST', '/api/mcp', fresh.apiKey, { jsonrpc: '2.0', id: 1, method: 'tools/list' })).status, 200)
@@ -275,8 +275,8 @@ test('disable cuts the crew off at once', { skip }, async () => {
   assert.equal(reply.status, 200)
   const view = await call('GET', `/api/crews/${slug}`, adminKey)
   assert.ok(view.json.disabledAt, 'disabledAt is set')
-  assert.equal((await call('POST', '/api/mcp', created.json.people.w1.apiKey, { jsonrpc: '2.0', id: 1, method: 'tools/list' })).status, 401)
-  assert.notEqual((await signIn(created.json.people.w1.email, created.json.people.w1.password)).status, 200)
+  assert.equal((await call('POST', '/api/mcp', created.json.people.wren.apiKey, { jsonrpc: '2.0', id: 1, method: 'tools/list' })).status, 401)
+  assert.notEqual((await signIn(created.json.people.wren.email, created.json.people.wren.password)).status, 200)
 })
 
 test('a disabled crew is 409 without rotate and live again with it', { skip }, async () => {
@@ -293,5 +293,5 @@ test('purge removes the crew; a second purge finds nothing', { skip }, async () 
   assert.equal(reply.status, 200)
   purged = true
   assert.equal((await call('GET', `/api/crews/${slug}`, adminKey)).status, 404)
-  assert.equal((await signIn(created.json.people.w1.email, created.json.people.w1.password)).status, 401)
+  assert.equal((await signIn(created.json.people.wren.email, created.json.people.wren.password)).status, 401)
 })

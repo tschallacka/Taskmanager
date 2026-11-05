@@ -26,8 +26,8 @@ response is the crew's `creds.json`; nothing else is set up by hand.
    apart. It never overwrites a definition it did not write. **Run init before Boss's Claude Code
    session starts**: Claude Code reads the definitions when a session starts (an open session picks
    them up at its next message). If Boss gets "Agent type not found", restart it with `claude --continue`.
-4. Run the tools as one of the people: `node crew.mjs boss tools`, `node crew.mjs w1 mcp my_tasks '{}'`,
-   `node crew.mjs w1 shot /projects/<boardId> out.png`. (The archive keeps no execute bit, so `./crew.mjs`
+4. Run the tools as one of the people: `node crew.mjs boss tools`, `node crew.mjs wren mcp my_tasks '{}'`,
+   `node crew.mjs wren shot /projects/<boardId> out.png`. (The archive keeps no execute bit, so `./crew.mjs`
    answers "permission denied"; `node crew.mjs` always works.)
 
 The home folder is `CREW_HOME` (default: this folder). Everything the kit writes goes there
@@ -99,7 +99,7 @@ plain `http://` is accepted only for `localhost`, a `*.localhost` name, `127.0.0
 1. `cd` into the kit folder and run `npm install` (it installs `@modelcontextprotocol/sdk`, Node 20 or newer).
 2. The member must be provisioned: `creds.json` in `CREW_HOME` has `base` and `people.<key>.apiKey`. The channel
    also reads `crew.json` in `CREW_HOME` (a sample is in `crew.config.example.json`).
-3. In the folder where you start `claude`, add `.mcp.json` (one member per folder; `<who>` is the key, `pm`, `w1`, `boss`...):
+3. In the folder where you start `claude`, add `.mcp.json` (one member per folder; `<who>` is the key, `pm`, `wren`, `boss`...):
 
    ```json
    {
@@ -285,7 +285,7 @@ accounts, after which their definitions and the file are yours to delete.
 
 The old file names (`tm.mjs`, `listen.mjs`, ...) still work.
 
-Post long text from a file, not inline JSON: write the Markdown to a file and run `crew w1 update <taskId> body.md`. An update is internal (staff only) unless `--customer` is given; a customer contact's update is customer-visible whatever the flag says, because the server decides. The board prints `posted as internal` or `posted as customer`. An empty body, a file over 200 KB, invalid UTF-8 or NUL bytes exit 65; a missing file, a symlink or a non-file exits 66; an unknown flag exits 64; a board that cannot be reached exits 69 (try again). The one-line form is `crew w1 mcp post_task_update`, with a JSON object holding the id and the body.
+Post long text from a file, not inline JSON: write the Markdown to a file and run `crew wren update <taskId> body.md`. An update is internal (staff only) unless `--customer` is given; a customer contact's update is customer-visible whatever the flag says, because the server decides. The board prints `posted as internal` or `posted as customer`. An empty body, a file over 200 KB, invalid UTF-8 or NUL bytes exit 65; a missing file, a symlink or a non-file exits 66; an unknown flag exits 64; a board that cannot be reached exits 69 (try again). The one-line form is `crew wren mcp post_task_update`, with a JSON object holding the id and the body.
 
 ## The shared browser
 

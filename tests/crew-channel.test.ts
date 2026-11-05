@@ -136,15 +136,15 @@ function makeHome(base: string, opts: { state?: string, who?: string } = {}) {
   writeFileSync(join(home, 'crew.json'), JSON.stringify({ product: { name: 'Test' } }))
   writeFileSync(join(home, 'creds.json'), JSON.stringify({
     base,
-    people: { w2: { key: 'w2', apiKey: KEY }, pm: { key: 'pm', apiKey: KEY }, boss: { key: 'boss', apiKey: KEY } }
+    people: { wick: { key: 'wick', apiKey: KEY }, pm: { key: 'pm', apiKey: KEY }, boss: { key: 'boss', apiKey: KEY } }
   }))
   if (opts.state !== undefined) {
-    writeFileSync(join(home, `channel-${opts.who ?? 'w2'}.state.json`), JSON.stringify({ last_event_id: opts.state }))
+    writeFileSync(join(home, `channel-${opts.who ?? 'wick'}.state.json`), JSON.stringify({ last_event_id: opts.state }))
   }
   return home
 }
 
-async function startChannel(home: string, who = 'w2', extraEnv: Record<string, string> = {}) {
+async function startChannel(home: string, who = 'wick', extraEnv: Record<string, string> = {}) {
   const { Client, StdioClientTransport } = await loadSdk()
   const stderr: string[] = []
   const transport = new StdioClientTransport({
@@ -187,7 +187,7 @@ async function withChannel(
 ) {
   const srv = await fakeSse()
   const home = makeHome(`http://127.0.0.1:${srv.port}`, opts)
-  const ch = await startChannel(home, opts.who ?? 'w2', opts.env)
+  const ch = await startChannel(home, opts.who ?? 'wick', opts.env)
   try {
     await body({ srv, ch, home })
     assert.ok(!ch.stderr().includes(KEY), 'the key must never reach stderr')
@@ -347,7 +347,7 @@ test('an unblocked summary says how many more tasks it stands for', async () => 
 
 test('the resume point never passes an event still held in a merge group', async () => {
   await withChannel(async ({ srv, ch, home }) => {
-    const state = join(home, 'channel-w2.state.json')
+    const state = join(home, 'channel-wick.state.json')
     const saved = () => JSON.parse(readFileSync(state, 'utf8')).last_event_id
     await until(() => srv.connected())
     srv.send(frame(1, { kind: 'task_assigned', task: 'H1', board: 'B1', from: 'pia', origin: 'person', title: 'held' }))
@@ -475,7 +475,7 @@ test('a base URL that is plain http and not local is refused at start; localhost
   const remote = makeHome('http://example.com')
   const local = makeHome('http://localhost:9')
   try {
-    const refused = spawnSync(process.execPath, [join(KIT_DIR, 'channel.mjs'), 'w2'], {
+    const refused = spawnSync(process.execPath, [join(KIT_DIR, 'channel.mjs'), 'wick'], {
       env: { HOME: process.env.HOME ?? '', CREW_HOME: remote }, encoding: 'utf8', timeout: 10_000
     })
     assert.equal(refused.status, 78)
@@ -483,7 +483,7 @@ test('a base URL that is plain http and not local is refused at start; localhost
     assert.ok(!refused.stderr.includes(KEY) && !refused.stdout.includes(KEY))
 
     // stdin is closed at once, so a channel that starts ends by itself with exit 0.
-    const allowed = spawnSync(process.execPath, [join(KIT_DIR, 'channel.mjs'), 'w2'], {
+    const allowed = spawnSync(process.execPath, [join(KIT_DIR, 'channel.mjs'), 'wick'], {
       env: { HOME: process.env.HOME ?? '', CREW_HOME: local }, encoding: 'utf8', input: '', timeout: 10_000
     })
     assert.notEqual(allowed.status, 78)
@@ -507,7 +507,7 @@ test('a closed frame ends the channel with the reason on stderr and no reconnect
 
 test('ids stay full width, and a backlog_cut resets the resume point to 0', async () => {
   await withChannel(async ({ srv, ch, home }) => {
-    const state = join(home, 'channel-w2.state.json')
+    const state = join(home, 'channel-wick.state.json')
     await until(() => srv.connected())
     srv.send(frame('1700000000001', { kind: 'task_assigned', task: 'I1', board: 'B1', from: 'pia', origin: 'person', title: 'big id' }))
     await until(() => ch.notes[0])
@@ -614,7 +614,7 @@ test('a dropped connection reconnects with Last-Event-ID equal to the last id se
     srv.send(frame(1, { kind: 'task_assigned', task: 'R1', board: 'B1', from: 'pia', origin: 'person', title: 'one' }))
     srv.send(frame(2, { kind: 'task_assigned', task: 'R2', board: 'B1', from: 'pia', origin: 'person', title: 'two' }))
     await until(() => ch.notes.length >= 2)
-    assert.equal(JSON.parse(readFileSync(join(home, 'channel-w2.state.json'), 'utf8')).last_event_id, '2')
+    assert.equal(JSON.parse(readFileSync(join(home, 'channel-wick.state.json'), 'utf8')).last_event_id, '2')
 
     srv.drop()
     await until(() => srv.seen.length === 2)
@@ -623,7 +623,7 @@ test('a dropped connection reconnects with Last-Event-ID equal to the last id se
     srv.send(frame(3, { kind: 'task_assigned', task: 'R3', board: 'B1', from: 'pia', origin: 'person', title: 'three' }))
     await until(() => ch.notes.length >= 3)
     assert.equal(ch.notes[2].meta.task, 'R3')
-    assert.equal(JSON.parse(readFileSync(join(home, 'channel-w2.state.json'), 'utf8')).last_event_id, '3')
+    assert.equal(JSON.parse(readFileSync(join(home, 'channel-wick.state.json'), 'utf8')).last_event_id, '3')
   })
 })
 

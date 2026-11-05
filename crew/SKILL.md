@@ -22,8 +22,8 @@ If it is, run `crew watch` to see where the run stands.
 | `boss` | the owner's login (you act through it, the crew never does) | applies schema changes, reviews code, publishes, reads reports |
 | `customer` | the customer (you, in a second role) | asks for things, answers the PM, only sees customer-visible tasks |
 | `pm` | the project manager (Haiku) | the customer's contact: plans tasks, assigns, pre-checks Verify, triages UX findings |
-| `w1` `w2` `w3` `w4` | the workers (Haiku) | build, test in their own browser profile, report |
-| `pietje` | the usability tester (Haiku) | tries every feature, files `[UX]` findings for the PM |
+| `wren` `wick` `wynn` `wade` | the workers (Haiku) | build, test in their own browser profile, report |
+| `usher` | the usability tester (Haiku) | tries every feature, files `[UX]` findings for the PM |
 | `nitpicker` | the code quality reviewer (Haiku) | reads the diff of each task in Verify before you, posts `NITPICKER: approved` / `changes needed`, logs her time |
 | `contact` | a read-only customer contact | lets anyone check what a customer sees |
 | log watcher (Haiku) | no login | reads the dev log, crew transcripts and new bugs; flags problems to you |

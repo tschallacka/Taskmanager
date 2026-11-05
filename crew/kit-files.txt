@@ -9,11 +9,11 @@ CHANGELOG.md
 CREW.md.tmpl
 NITPICKER.md.tmpl
 PIA-UX.md.tmpl
-PIETJE.md.tmpl
 PROJECT-RULES.md.tmpl
 PROMPTS.md.tmpl
 README.md
 SKILL.md
+USHER.md.tmpl
 WORKFLOW.md
 browser-driver.mjs
 browser.mjs
@@ -25,6 +25,7 @@ fonts.conf.tmpl
 guard.sh
 home.mjs
 init.mjs
+keys.mjs
 listen.mjs
 package.json
 postbrief.mjs

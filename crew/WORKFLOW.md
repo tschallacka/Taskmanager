@@ -26,7 +26,7 @@ Rules that hold everywhere:
   - One outcome per subtask. Two outcomes are two subtasks.
   - A reader who finds something with two readings does not pick one. They post the exact words that have two readings to Pia (Pia to Cato), mark the task `blocked`, and take the next task. The writer answers by rewriting the original text, so the next reader meets no ambiguity either.
 - **Who starts whom, and who talks to whom.** Cato starts Pia. Pia starts her workers and her reviewers herself. Cato does not start them, does not watch what they do, and is never the go-between for their messages: workers and reviewers talk to Pia, and Pia talks to Cato. Cato learns about the work from the board (his tasks, the Verify column) and from Pia's summaries. When Pia is unavailable, something is wrong and Cato restarts her. Pia is unavailable when her session has ended or stopped, or when a task assigned to her has had no update, move or tag from her for two of Cato's wake-ups. If she is unavailable again after one restart, Cato tells the Owner. Cato does not do her work in the meantime. In the same way, Pia restarts a worker or a reviewer who is unavailable.
-- Each person has a real username in Taskmanager (`wade`, `wren`, `pia`, `pietje`, `nina`, `quincy`, `cato`), never `w1` or `w2`. `@wade` in a task update puts a notification in Wade's inbox, but only when Wade is a member of the project the task is on. A Wade on another project is not tagged (Q58).
+- Each person has a real username in Taskmanager (`wade`, `wren`, `pia`, `usher`, `nina`, `quincy`, `cato`), never `w1` or `w2`. `@wade` in a task update puts a notification in Wade's inbox, but only when Wade is a member of the project the task is on. A Wade on another project is not tagged (Q58).
 - Markers (tags that approve something) may only be set by their owner, see the tag table. Pia checks who set a marker in the task's activity log before she trusts it.
 
 ### Hard rules for every agent
@@ -186,10 +186,10 @@ All subtasks complete, tested, evidence attached, `CQ approved` and `QA approved
 ## 8. What the code does today (checked 2026-11-05)
 
 - Every crew member's Claude Code agent definition is written with `model: haiku`. There is no setting for a model per role, and no setting for a model source such as OpenRouter. So a crew you saw running Opus or Sonnet was changed or launched some other way than this kit.
-- The people have display names (Wren Worker, Wade Worker) and chat nicks (`wren`, `wade`), but their keys are `w1` to `w4`. `@wade` is matched against the account's display name or its first name (`server/utils/notifyEvents.ts:87`), so it works when the account is named "Wade Worker".
-- A mention reaches an agent only as a live event, and only while that agent is watching its event stream (`agentEventHub.watches`). An agent that is asleep between wake-ups gets nothing from the mention itself. Verified in the code; I did not run a live test.
+- The people have display names (Wren Worker, Wade Worker) and chat nicks (`wren`, `wade`), and their keys are the same: `wren`, `wick`, `wynn`, `wade`. `@wade` is matched against the account's display name or its first name (`server/utils/notifyEvents.ts:87`), so it works when the account is named "Wade Worker".
+- A mention leaves a stored `mention` notification for each person on the board it names (Q58), so an agent that is asleep between wake-ups finds it in `list_notifications`. The live event still goes only to an agent that is watching its event stream (`agentEventHub.watches`).
 - A crew board made after 2026-11-05 has the columns Backlog, To do, In progress, Verify PM, Verify UX, Verify CQ, Verify QA, Verify, Ready for live, Done, Blocked and Bugs, and an agent hears a card moving into any review gate or Blocked. Boards made before that keep their old columns. The kit documents (`CREW.md.tmpl`, `PIA-UX.md.tmpl`, `NITPICKER.md.tmpl`, `SKILL.md`) still describe the old release flow through Verify and Ready for live, and Quincy is not in the kit yet. Usher and Nina have templates but are not in the crew skill's cast table.
-- The agents have `log_time` and `list_time` over MCP, but no tool to start or stop a running timer.
+- The agents have `log_time`, `list_time`, `start_timer` and `stop_timer` over MCP.
 - Today Boss starts the workers: the PM writes a `WAKE` comment, Boss checks who wrote it, and Boss starts or resumes the worker (`PROMPTS.md.tmpl`, "Boss's loop in channel mode"). This workflow moves that to Pia. As far as I know a subagent cannot start another subagent, so Pia has to run as her own Claude Code session and not as a subagent of Cato. I have not tested that.
 
 ## 9. Decisions
@@ -199,7 +199,7 @@ Decided by the Owner:
 - **Q56, Cato's model and how Cato learns the crew.** Cato runs on whatever model the Owner picks, or the model the Owner is chatting with: Sonnet, Opus, Gemma and so on. The kit does not launch Cato or set his model. The crew skill for Cato comes through the Taskmanager MCP server: its `initialize` answer carries Cato's instructions (`server/utils/crewBossSkill.ts`) for any key whose owner created a live crew or attached a crew to a board. The crew's own accounts never get them. Cato's text covers intake, a help request from Pia and the final review, so the session knows how to behave with the crew without a skill file being installed.
 - **Q57.** Yes: add `start_timer` and `stop_timer` MCP tools. Section 4 then means them literally.
 - **Q58.** Yes: a mention is stored as a notification in the agent's inbox. It reaches only members of the project the task is on. A `@wade` on one board never tags a Wade on another board.
-- **Q60.** Yes: rename the keys `w1` to `w4` to `wren`, `wick`, `wynn`, `wade`.
+- **Q60.** Yes: rename the keys `w1` to `w4` to `wren`, `wick`, `wynn`, `wade`, and with Q66 `pietje` to `usher`. Done 2026-11-05. The server moves the account addresses, key names and fork rows of existing crews when it starts. The kit moves an old crew home (`creds.json`, browser profiles, channel and listen state) the first time it loads.
 - **Q61.** Keep the section 4 numbers as ceilings. Real times will be shorter. Re-evaluate once the time logs hold real data (Pia's weekly figure).
 - **Q62.** After Cato rejects a task it goes back to triage with Pia, not to `Verify PM`. Cato knows more than Pia, so his feedback can open branches of work nobody planned.
 - **Q63.** Every task passes all gates. The one exception is UX: it is skipped when no UX element was modified, because there is nothing for Usher to check.
@@ -211,12 +211,12 @@ Decided by the Owner:
 
 ## 10. Work still to do in the kit and the app (tracked as tasks)
 
-1. MCP tools `start_timer` and `stop_timer` (Q57).
-2. A stored mention notification for project members only (Q58).
-3. Rename the person keys to `wren`, `wick`, `wynn`, `wade`, and migrate the credential files of existing crews (Q60).
+1. Done (2026-11-05): MCP tools `start_timer` and `stop_timer` (Q57).
+2. Done (2026-11-05): a stored mention notification for project members only (Q58).
+3. Done (2026-11-05): rename the person keys to `wren`, `wick`, `wynn`, `wade` and `usher`, and migrate the data of existing crews (Q60, Q66).
 4. A model setting per person in `crew.json` (Q59a). It names a provider (`claude`, `openrouter` or `ollama`) and a model, both chosen by the Owner. When it is unset, the person gets the cheap but functional tier of the provider in use. The kit stores no model names of its own, and `init.mjs` stops writing `model: haiku`.
 5. Running a person on OpenRouter or Ollama (Q59b). A person on a Claude model stays an agent definition file. As far as I know, a subagent runs on the provider of the session that starts it, so a person on OpenRouter or Ollama has to be its own Claude Code process, started with environment variables that point at the provider. I have not tested this. From community guides, not from the official documentation: Ollama 0.14.0 and later answers the Anthropic Messages API at `http://localhost:11434`; OpenRouter takes the key in `ANTHROPIC_AUTH_TOKEN` with `ANTHROPIC_API_KEY` left empty, and the guides disagree on the base URL (`https://openrouter.ai/api` or `https://openrouter.ai/api/v1`); the haiku, sonnet and opus model slots must all be mapped to the chosen model, or the unmapped slots fail with "model not found". Check these against the OpenRouter, Ollama and Claude Code documentation before building.
-6. Board columns `Verify PM`, `Verify UX`, `Verify CQ`, `Verify QA` and `Blocked` in the crew's board template.
+6. Done for new crew boards (2026-11-05): board columns `Verify PM`, `Verify UX`, `Verify CQ`, `Verify QA` and `Blocked` in the crew's board template.
 7. Usher, Nina and Quincy in the crew skill's cast table and the init script. Cato is not launched.
 8. The tags in section 3, created on the crew board.
 9. Change the kit so Pia starts the workers and the reviewers, and Boss starts only Pia. This replaces the `WAKE` comment that Boss checks and acts on (`PROMPTS.md.tmpl`, `CREW.md.tmpl`, `channel.mjs`). Pia then runs as her own Claude Code session.

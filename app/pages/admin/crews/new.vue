@@ -263,8 +263,8 @@ const setupSteps = computed<HelperStep[]>(() => [
   {
     id: 'check',
     title: 'Check that a crew member reaches the board',
-    why: `Asks the board for the tasks of ${creds.value?.people.w1?.name ?? 'worker 1'}, with that worker's own key.`,
-    command: `cd ~/crew-kit && CREW_HOME=${crewDir.value} node crew.mjs w1 mcp my_tasks '{}'`,
+    why: `Asks the board for the tasks of ${creds.value?.people.wren?.name ?? 'worker 1'}, with that worker's own key.`,
+    command: `cd ~/crew-kit && CREW_HOME=${crewDir.value} node crew.mjs wren mcp my_tasks '{}'`,
     expect: 'One line: {"total":0,"tasks":[]}. No tasks is right: nothing is assigned yet.',
     trouble: [
       `"ERROR true": the board refused the key, so the creds.json in ${crewDir.value} is not this crew's. Press Back on this page to "Make it", download the creds file again and redo step 5. If this page was closed in between, open New crew again, fill in the same short name, and press "Give it new keys" when it says the crew exists.`,
@@ -291,7 +291,7 @@ function sessionCommands(who: string): string {
 // start needs no channel: Boss launches everyone, the PM included, with the listen-loop prompts.
 function bossMessage(alongside: boolean): string {
   const people = creds.value?.people ?? {}
-  const team = ['pm', 'w1', 'w2', 'w3', 'w4', 'pietje', 'nitpicker'].map(key => people[key]?.name ?? key).join(', ')
+  const team = ['pm', 'wren', 'wick', 'wynn', 'wade', 'usher', 'nitpicker'].map(key => people[key]?.name ?? key).join(', ')
   const dir = crewDir.value
   return [
     alongside
@@ -314,7 +314,7 @@ const startPlain = computed(() => {
 const startChannels = computed(() => {
   const people = creds.value?.people ?? {}
   const pm = people.pm?.name ?? 'the project manager'
-  const workers = ['w1', 'w2', 'w3', 'w4', 'pietje', 'nitpicker'].map(key => people[key]?.name ?? key).join(', ')
+  const workers = ['wren', 'wick', 'wynn', 'wade', 'usher', 'nitpicker'].map(key => people[key]?.name ?? key).join(', ')
   return [
     {
       id: 'boss',

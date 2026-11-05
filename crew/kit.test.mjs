@@ -141,7 +141,7 @@ describe('crew <who> browser, end to end (real Chromium, fake board)', { skip: S
   let env
   let dir
 
-  test('setup: a fake board, a crew folder with a login for w1 and w2 and a wrong one for w3', async () => {
+  test('setup: a fake board, a crew folder with a login for wren and wick and a wrong one for wynn', async () => {
     board = await startBoard()
     base = `http://127.0.0.1:${board.address().port}`
     home = mkdtempSync(join(SCRATCH, 'kit-'))
@@ -153,9 +153,9 @@ describe('crew <who> browser, end to end (real Chromium, fake board)', { skip: S
       base,
       team: { id: 'team-1' },
       people: {
-        w1: { email: 'w1@crew.test', password: PASSWORDS.w1, apiKey: 'not-used-here' },
-        w2: { email: 'w2@crew.test', password: PASSWORDS.w2, apiKey: 'not-used-here' },
-        w3: { email: 'w3@crew.test', password: WRONG, apiKey: 'not-used-here' }
+        wren: { email: 'w1@crew.test', password: PASSWORDS.w1, apiKey: 'not-used-here' },
+        wick: { email: 'w2@crew.test', password: PASSWORDS.w2, apiKey: 'not-used-here' },
+        wynn: { email: 'w3@crew.test', password: WRONG, apiKey: 'not-used-here' }
       }
     }))
     env = { ...process.env, CREW_HOME: home, CREW_BROWSER_DIR: dir, CREW_BROWSER_CHROMIUM: CHROMIUM }
@@ -164,31 +164,31 @@ describe('crew <who> browser, end to end (real Chromium, fake board)', { skip: S
   })
 
   test('the first command starts the browser, logs the person in, and prints the page', async () => {
-    const out = await crew(env, ['w1', 'browser', 'goto', `${base}/page`])
+    const out = await crew(env, ['wren', 'browser', 'goto', `${base}/page`])
     assert.equal(out.code, 0, out.stderr)
     assert.equal(out.stdout, `${base}/page - Kit page`)
-    const check = await crew(env, ['w1', 'browser', 'goto', `${base}/check`])
+    const check = await crew(env, ['wren', 'browser', 'goto', `${base}/check`])
     assert.equal(check.code, 0, check.stderr)
-    const title = await crew(env, ['w1', 'browser', 'eval', 'document.title'])
+    const title = await crew(env, ['wren', 'browser', 'eval', 'document.title'])
     assert.equal(title.stdout, 'session', 'w1 is signed in, as the board sees it')
     assert.equal(check.stdout, `${base}/check - session`)
-    const tabs = await crew(env, ['w1', 'browser', 'tabs'])
+    const tabs = await crew(env, ['wren', 'browser', 'tabs'])
     assert.equal(JSON.parse(tabs.stdout).includes('main'), true)
   })
 
   test('another person on the same origin has a login of their own', async () => {
-    const w1 = await crew(env, ['w1', 'browser', 'eval', 'document.title'])
-    const w2 = await crew(env, ['w2', 'browser', 'goto', `${base}/check`])
+    const w1 = await crew(env, ['wren', 'browser', 'eval', 'document.title'])
+    const w2 = await crew(env, ['wick', 'browser', 'goto', `${base}/check`])
     assert.equal(w2.code, 0, w2.stderr)
-    const w2title = await crew(env, ['w2', 'browser', 'eval', 'document.title'])
+    const w2title = await crew(env, ['wick', 'browser', 'eval', 'document.title'])
     assert.equal(w2title.stdout, 'session', 'w2 is signed in, as the board sees it')
     assert.equal(w1.stdout, 'session', 'w1 keeps her own login')
   })
 
   test('a failed sign-in is one line, and no password appears in it', async () => {
-    const out = await crew(env, ['w3', 'browser', 'goto', `${base}/page`])
+    const out = await crew(env, ['wynn', 'browser', 'goto', `${base}/page`])
     assert.equal(out.code, 1)
-    assert.equal(out.stderr, 'could not sign in as w3 (HTTP 401)')
+    assert.equal(out.stderr, 'could not sign in as wynn (HTTP 401)')
     assert.ok(!out.stderr.includes(WRONG) && !out.stdout.includes(WRONG))
   })
 
@@ -202,7 +202,7 @@ describe('crew <who> browser, end to end (real Chromium, fake board)', { skip: S
     const out = await crew(env, ['browser', 'status'])
     assert.equal(out.code, 0, out.stderr)
     const people = JSON.parse(out.stdout)
-    const w1 = people.find(person => person.who === 'w1')
+    const w1 = people.find(person => person.who === 'wren')
     assert.ok(w1, 'w1 is listed')
     assert.ok(w1.tabs.includes('main'))
     assert.equal(typeof w1.idle_seconds, 'number')
@@ -212,11 +212,11 @@ describe('crew <who> browser, end to end (real Chromium, fake board)', { skip: S
 
   test('shot writes a PNG under the work folder, and refuses a file outside it', async () => {
     const inside = join(home, 'work', 'kit-check.png')
-    const out = await crew(env, ['w1', 'browser', 'shot', inside])
+    const out = await crew(env, ['wren', 'browser', 'shot', inside])
     assert.equal(out.code, 0, out.stderr)
     const head = readFileSync(inside).subarray(0, 8)
     assert.deepEqual([...head], [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
-    const outside = await crew(env, ['w1', 'browser', 'shot', join(home, '..', 'elsewhere.png')])
+    const outside = await crew(env, ['wren', 'browser', 'shot', join(home, '..', 'elsewhere.png')])
     assert.equal(outside.code, 1)
     assert.match(outside.stderr, /outside the allowed folders/)
   })
@@ -232,7 +232,7 @@ describe('crew <who> browser, end to end (real Chromium, fake board)', { skip: S
       if (Date.now() > until) assert.fail('the driver noticed the crash')
       await sleep(200)
     }
-    const out = await crew(env, ['w1', 'browser', 'goto', `${base}/check`])
+    const out = await crew(env, ['wren', 'browser', 'goto', `${base}/check`])
     assert.equal(out.code, 0, out.stderr)
     assert.equal(out.stdout, `${base}/check - session`, 'signed in again')
     assert.match(out.stderr, /note: the shared browser stopped and was started again/)
@@ -240,7 +240,7 @@ describe('crew <who> browser, end to end (real Chromium, fake board)', { skip: S
   })
 
   test('done forgets the person, and shutdown stops the browser for everyone', async () => {
-    const done = await crew(env, ['w2', 'browser', 'done'])
+    const done = await crew(env, ['wick', 'browser', 'done'])
     assert.equal(done.stdout, 'done')
     const down = await crew(env, ['browser', 'shutdown'])
     assert.equal(down.code, 0, down.stderr)
@@ -299,7 +299,7 @@ describe('a password goes only to the board', { skip: SKIP }, () => {
     made.push(dir)
     const boardBase = `http://127.0.0.1:${board.address().port}`
     const otherBase = `http://127.0.0.1:${other.address().port}`
-    const creds = { base: boardBase, team: { id: 'team-1' }, people: { w1: { email: 'w1@crew.test', password: PASSWORDS.w1 } } }
+    const creds = { base: boardBase, team: { id: 'team-1' }, people: { wren: { email: 'w1@crew.test', password: PASSWORDS.w1 } } }
     const running = serve({
       dir,
       chromium: CHROMIUM,
@@ -312,7 +312,7 @@ describe('a password goes only to the board', { skip: SKIP }, () => {
     })
     try {
       await waitUntil(async () => (await request({ dir, cmd: 'status', start: false, seam: false })) !== null, 20000, 'the in-process driver')
-      const went = await request({ dir, who: 'w1', cmd: 'goto', args: { url: `${boardBase}/page` }, start: false, seam: false })
+      const went = await request({ dir, who: 'wren', cmd: 'goto', args: { url: `${boardBase}/page` }, start: false, seam: false })
       assert.equal(went.result, `${boardBase}/page - Kit page`)
       assert.equal(board.signIns, 1, 'the board saw the one sign-in')
       assert.equal(other.signIns ?? 0, 0, 'the other site saw no sign-in')
@@ -370,7 +370,7 @@ describe('CREW_HOME and the agent types', () => {
     assert.match(pia, /^---\nname: acme-pia-planner\ndescription: ".+"\nmodel: haiku\n---\n/)
     assert.ok(pia.includes(`CREW_HOME=${dir} node ${KIT}/`), 'the definition carries the resolved CREW_HOME')
     const prompts = readFileSync(join(dir, 'PROMPTS.md'), 'utf8')
-    assert.match(prompts, /\| `w1` \| Wren Worker \| wren \| `acme-wren-worker` \|/)
+    assert.match(prompts, /\| `wren` \| Wren Worker \| wren \| `acme-wren-worker` \|/)
     assert.ok(prompts.includes(`CREW_HOME=${dir} node ${KIT}/listen.mjs pm 60`), 'commands carry CREW_HOME')
   })
 
@@ -393,7 +393,7 @@ describe('CREW_HOME and the agent types', () => {
     crew: { slug: 'acme', name: 'Acme Crew' },
     board: { id: 'b1', name: 'Internal Tools' },
     members: [
-      { key: 'w1', name: 'Wren Worker (Internal Tools)', agentType: 'internal-tools-wren', email: 'acme-f1-w1@crew.invalid', password: 'pw-one', apiKey: 'arn_forkone' },
+      { key: 'wren', name: 'Wren Worker (Internal Tools)', agentType: 'internal-tools-wren', email: 'acme-f1-wren@crew.invalid', password: 'pw-one', apiKey: 'arn_forkone' },
       { key: 'pm', name: 'Pia Planner (Internal Tools)', agentType: 'internal-tools-pia', email: 'acme-f1-pm@crew.invalid', password: 'pw-two', apiKey: 'arn_forktwo' }
     ]
   }
@@ -421,7 +421,7 @@ describe('CREW_HOME and the agent types', () => {
     made.push(home)
     const dir = crewIn(home)
     const source = join(home, 'nope.json')
-    writeFileSync(source, JSON.stringify({ members: [{ key: 'w1' }] }))
+    writeFileSync(source, JSON.stringify({ members: [{ key: 'wren' }] }))
     const out = run(home, 'init.mjs', '~/crew-home/acme', '--forks', source)
     assert.match(out.stdout, /FAIL .+nope\.json: it is not a forks file/)
     assert.ok(!existsSync(join(dir, 'forks', 'nope.json')))
@@ -434,12 +434,12 @@ describe('CREW_HOME and the agent types', () => {
     mkdirSync(join(dir, 'forks'), { recursive: true })
     writeFileSync(join(dir, 'forks', 'one.json'), JSON.stringify(forkFile))
     writeFileSync(join(dir, 'forks', 'broken.json'), '{ not json')
-    writeFileSync(join(dir, 'creds.json'), JSON.stringify({ base: 'http://127.0.0.1:9', people: { w1: { email: 'w1@crew.test', password: 'p', apiKey: 'arn_crewkey' } } }))
+    writeFileSync(join(dir, 'creds.json'), JSON.stringify({ base: 'http://127.0.0.1:9', people: { wren: { email: 'w1@crew.test', password: 'p', apiKey: 'arn_crewkey' } } }))
     const script = `import('${join(KIT, 'config.mjs')}').then(m => console.log(JSON.stringify({ people: m.loadCreds().people, forks: m.loadForks().map(f => f.file) })))`
     const out = spawnSync(process.execPath, ['-e', script], { encoding: 'utf8', env: { ...process.env, HOME: home, CREW_HOME: dir } })
     const answer = JSON.parse(out.stdout)
     assert.deepEqual(answer.forks, ['one.json'], 'a broken file is left out, not fatal')
-    assert.equal(answer.people.w1.apiKey, 'arn_crewkey')
+    assert.equal(answer.people.wren.apiKey, 'arn_crewkey')
     assert.equal(answer.people['internal-tools-wren'].apiKey, 'arn_forkone')
     assert.equal(answer.people['internal-tools-pia'].email, 'acme-f1-pm@crew.invalid')
   })

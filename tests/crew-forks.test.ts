@@ -77,7 +77,7 @@ test('an agent type is the board, then the person first name', () => {
 })
 
 test('only the working members are forked: not Boss, not the customer logins', () => {
-  assert.deepEqual(FORK_PEOPLE.map(p => p.key), ['pm', 'w1', 'w2', 'w3', 'w4', 'pietje', 'nitpicker'])
+  assert.deepEqual(FORK_PEOPLE.map(p => p.key), ['pm', 'wren', 'wick', 'wynn', 'wade', 'usher', 'nitpicker'])
 })
 
 let forkedA: Awaited<ReturnType<typeof forkCrew>>
@@ -138,7 +138,7 @@ test('forking again is refused until it is a rotate, and a rotate gives new keys
 })
 
 test('a board forked has its forks listed, one that is not has none', async () => {
-  assert.deepEqual((await forksOfLink(linkA.id)).map(f => f.key), ['pm', 'w1', 'w2', 'w3', 'w4', 'pietje', 'nitpicker'])
+  assert.deepEqual((await forksOfLink(linkA.id)).map(f => f.key), ['pm', 'wren', 'wick', 'wynn', 'wade', 'usher', 'nitpicker'])
   assert.deepEqual(await forksOfLink(linkB.id), [])
 })
 

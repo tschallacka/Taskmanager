@@ -721,7 +721,7 @@ export function githubAudience(kind: GithubEventKind, role: { owner: boolean, pm
   return kind !== 'pipeline_passed' || inVerify
 }
 
-/** A person of a crew, with the key the crew gave them (pm, boss, w1...). */
+/** A person of a crew, with the key the crew gave them (pm, boss, wren...). */
 export interface CrewPerson { userId: string, key: string }
 
 export interface GithubLookups extends AudienceLookups {

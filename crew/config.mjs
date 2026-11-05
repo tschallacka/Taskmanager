@@ -7,6 +7,7 @@
 // URLs, people and chat settings; creds.json holds the accounts and keys the board made.
 import { readFileSync, existsSync, readdirSync } from 'node:fs'
 import { crewHome, kitDir } from './home.mjs'
+import { migrateCrewHome, renameKeys } from './keys.mjs'
 
 export { kitDir }
 const home = crewHome()
@@ -23,7 +24,11 @@ if (!configFile) {
   process.exit(78)
 }
 
+// A crew home made before the person keys were renamed (w1..w4, pietje) is moved to the new ones here.
+migrateCrewHome(home)
 const raw = JSON.parse(readFileSync(configFile, 'utf8'))
+raw.people = renameKeys(raw.people)
+raw.nicks = renameKeys(raw.nicks)
 
 // Defaults for everything optional, so a short config works.
 export const config = {
@@ -36,11 +41,11 @@ export const config = {
   },
   customer: { name: 'The Customer', personName: 'Casey Customer', nick: 'customer', ...raw.customer },
   people: {
-    boss: 'Boss', pm: 'Pia Planner', w1: 'Wren Worker', w2: 'Wick Worker', w3: 'Wynn Worker', w4: 'Wade Worker',
-    pietje: 'Usher Xander', nitpicker: 'Nina Nitpick', contact: 'Casey Contact', watcher: 'Log Watcher',
+    boss: 'Boss', pm: 'Pia Planner', wren: 'Wren Worker', wick: 'Wick Worker', wynn: 'Wynn Worker', wade: 'Wade Worker',
+    usher: 'Usher Xander', nitpicker: 'Nina Nitpick', contact: 'Casey Contact', watcher: 'Log Watcher',
     ...raw.people
   },
-  nicks: { pm: 'pia', w1: 'wren', w2: 'wick', w3: 'wynn', w4: 'wade', pietje: 'usher', nitpicker: 'nitpicker', ...raw.nicks },
+  nicks: { pm: 'pia', wren: 'wren', wick: 'wick', wynn: 'wynn', wade: 'wade', usher: 'usher', nitpicker: 'nitpicker', ...raw.nicks },
   // The chat line is optional and off by default: with no client, meetings and steering go
   // through the board (board messages, `list_messages`).
   chat: { client: '', channel: '#crew', workChannel: '#crewwork', ...raw.chat },
@@ -94,7 +99,7 @@ export function loadCreds() {
 const slugify = text => String(text).toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
 
 // The members Boss launches as agents, the optional log watcher included.
-export const CAST = ['pm', 'w1', 'w2', 'w3', 'w4', 'pietje', 'nitpicker', 'watcher']
+export const CAST = ['pm', 'wren', 'wick', 'wynn', 'wade', 'usher', 'nitpicker', 'watcher']
 
 /**
  * Each member's Claude Code agent type, such as acme-pia-planner: the crew slug first, so two crews
@@ -108,7 +113,7 @@ const shellWord = text => (/^[\w@%+=:,./-]+$/.test(text) ? text : `'${text.repla
 /**
  * Flat view of the config for templates: {{product.name}}, {{chat.channel}}, {{crew_dir}} ...
  * {{node_kit}} starts a kit command with this crew's CREW_HOME, so it works from any session:
- * `{{node_kit}}/crew.mjs w1 tools` renders as `CREW_HOME=<crew home> node <kit folder>/crew.mjs w1 tools`,
+ * `{{node_kit}}/crew.mjs wren tools` renders as `CREW_HOME=<crew home> node <kit folder>/crew.mjs wren tools`,
  * with both paths written out in full.
  */
 export function templateValues() {
