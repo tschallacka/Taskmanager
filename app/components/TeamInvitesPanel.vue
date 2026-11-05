@@ -7,7 +7,7 @@ import { errorMessage, untypedFetch } from '~/utils/untypedFetch'
 // sign up even when sign-up is closed.
 const props = defineProps<{ teamId: string, isOwner: boolean }>()
 
-interface OpenInvitation { id: string, email: string, role: string, createdAt: number, expiresAt: number }
+interface OpenInvitation { id: string, email: string, role: string, createdAt: number, expiresAt: number, canWithdraw: boolean }
 interface Issued { id: string, email: string, role: string, url: string, emailed: boolean }
 
 const toast = useToast()
@@ -164,6 +164,7 @@ async function copy(text: string) {
           </p>
         </div>
         <UButton
+          v-if="invitation.canWithdraw"
           label="Withdraw"
           size="xs"
           color="neutral"

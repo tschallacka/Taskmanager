@@ -5,11 +5,13 @@ const route = useRoute()
 const token = computed(() => String(route.params.token ?? ''))
 const { session, isPending: sessionPending } = useAuth()
 
-// A customer link works for whoever opens it; a team or board invitation was sent to one address.
+// A customer link works for whoever opens it. A team or board invitation was sent to one address, which this
+// page never learns: whoever was invited has to know it. `forYou` says whether the account signed in now is
+// the invited one, and is null when nobody is signed in.
 type InvitationPreview
   = | { kind: 'customer', customerName: string, organizationName: string }
-    | { kind: 'team', email: string, organizationName: string, inviterName: string | null, role: string }
-    | { kind: 'board', email: string, projectName: string, inviterName: string | null, role: string }
+    | { kind: 'team', organizationName: string, inviterName: string | null, role: string, forYou: boolean | null }
+    | { kind: 'board', projectName: string, inviterName: string | null, role: string, forYou: boolean | null }
 
 // Reading the invitation also sets the cookie that lets its recipient create an
 // account where sign-up is otherwise closed, so it has to happen in the browser.
@@ -27,6 +29,13 @@ const loadMessage = computed(() => {
 
 const accepting = ref(false)
 const acceptError = ref('')
+
+// An invitation is not a sign-in: it never switches the account. When the wrong account is signed in, sign
+// out and come back to this same link.
+async function switchAccount() {
+  await authClient.signOut()
+  window.location.reload()
+}
 
 async function accept() {
   accepting.value = true
@@ -103,10 +112,10 @@ async function accept() {
             Signed in as <span class="text-zinc-200">{{ session.user.email }}</span>.
           </p>
           <UAlert
-            v-if="invitation.kind !== 'customer' && session.user.email.toLowerCase() !== invitation.email"
+            v-if="invitation.kind !== 'customer' && invitation.forYou === false"
             color="warning"
             variant="subtle"
-            :description="`This invitation was sent to ${invitation.email}. Sign in with that address to accept it.`"
+            description="This invitation was sent to another address than the one of this account. Sign out and use the invited address, or create an account with it."
           />
           <UAlert
             v-if="acceptError"
@@ -115,6 +124,17 @@ async function accept() {
             :description="acceptError"
           />
           <UButton
+            v-if="invitation.kind !== 'customer' && invitation.forYou === false"
+            block
+            size="lg"
+            color="neutral"
+            variant="outline"
+            @click="switchAccount"
+          >
+            Sign out
+          </UButton>
+          <UButton
+            v-else
             block
             size="lg"
             color="primary"
@@ -124,15 +144,38 @@ async function accept() {
             Accept invitation
           </UButton>
         </template>
-        <UButton
-          v-else
-          block
-          size="lg"
-          color="primary"
-          :to="`/login?invite=${encodeURIComponent(token)}`"
-        >
-          Sign in or create an account
-        </UButton>
+        <template v-else-if="invitation.kind === 'customer'">
+          <UButton
+            block
+            size="lg"
+            color="primary"
+            :to="`/login?invite=${encodeURIComponent(token)}`"
+          >
+            Sign in or create an account
+          </UButton>
+        </template>
+        <template v-else>
+          <p class="text-sm text-zinc-400 text-center">
+            Use the email address this invitation was sent to. Anyone else cannot use it.
+          </p>
+          <UButton
+            block
+            size="lg"
+            color="primary"
+            :to="`/login?invite=${encodeURIComponent(token)}`"
+          >
+            I have an account: sign in
+          </UButton>
+          <UButton
+            block
+            size="lg"
+            color="neutral"
+            variant="outline"
+            :to="`/login?invite=${encodeURIComponent(token)}&signup=1`"
+          >
+            Create an account
+          </UButton>
+        </template>
       </template>
     </div>
   </div>

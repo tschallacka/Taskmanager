@@ -27,7 +27,8 @@ const hasAlternatives = computed(() => isDiscordEnabled.value || isGitHubEnabled
 
 // `credentials` is the password form; the other two replace it in the same card.
 const step = ref<'credentials' | 'email-code' | 'two-factor'>('credentials')
-const mode = ref<'sign-in' | 'sign-up'>('sign-in')
+// An invitation page sends someone without an account straight to sign-up (`signup=1`).
+const mode = ref<'sign-in' | 'sign-up'>(inviteToken.value && route.query.signup === '1' ? 'sign-up' : 'sign-in')
 const name = ref('')
 const email = ref('')
 const password = ref('')
@@ -155,7 +156,8 @@ onMounted(async () => {
             {{ codeSent ? `We sent a code to ${email}.` : 'We will email you a one-time code.' }}
           </template>
           <template v-else-if="inviteToken">
-            Sign in or create an account to accept your invitation.
+            Sign in or create an account to accept your invitation. Use the email address it was sent to, or a
+            sign-in provider that reports that address.
           </template>
           <template v-else>
             Your projects and tasks stay on this server.

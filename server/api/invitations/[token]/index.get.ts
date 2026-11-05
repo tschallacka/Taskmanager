@@ -2,6 +2,7 @@ import { db } from '../../../db'
 import { customerInvitations, customers, organization } from '../../../db/schema'
 import { eq } from 'drizzle-orm'
 import { hashInvitationToken, INVITATION_COOKIE } from '../../../utils/customers'
+import { auth } from '../../../lib/auth'
 import { lookupAddressedInvitation } from '../../../utils/invitations'
 
 // What an invitation link is for, readable before signing in: the invite page
@@ -25,9 +26,13 @@ export default defineEventHandler(async (event) => {
     if (addressed === 'used') throw createError({ statusCode: 410, message: 'This invitation has already been used' })
     if (addressed === 'expired') throw createError({ statusCode: 410, message: 'This invitation has expired' })
     rememberToken()
+    // The address stays out of the answer: whoever holds the link has to know it, not read it here.
+    // `forYou` only says whether the account signed in right now (if any) is the one invited.
+    const session = await auth.api.getSession({ headers: event.headers }).catch(() => null)
+    const forYou = session ? session.user.email.trim().toLowerCase() === addressed.email : null
     return addressed.kind === 'team'
-      ? { kind: 'team' as const, email: addressed.email, organizationName: addressed.organizationName, inviterName: addressed.inviterName, role: addressed.role }
-      : { kind: 'board' as const, email: addressed.email, projectName: addressed.projectName, inviterName: addressed.inviterName, role: addressed.role }
+      ? { kind: 'team' as const, organizationName: addressed.organizationName, inviterName: addressed.inviterName, role: addressed.role, forYou }
+      : { kind: 'board' as const, projectName: addressed.projectName, inviterName: addressed.inviterName, role: addressed.role, forYou }
   }
 
   const [row] = await db

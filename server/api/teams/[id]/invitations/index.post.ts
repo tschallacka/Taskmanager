@@ -1,11 +1,11 @@
-import { and, eq, isNull } from 'drizzle-orm'
+import { and, eq, gt, isNull } from 'drizzle-orm'
 import { db } from '../../../../db'
 import { member, organization, teamInvitations, user } from '../../../../db/schema'
 import { requireTeamRole } from '../../../../utils/auth-helpers'
 import { INVITATION_TTL_MS, newInvitationToken } from '../../../../utils/customers'
 import { isInvalidDomain } from '../../../../utils/crewAccounts'
 import { accountByEmail, normalizeEmail } from '../../../../utils/guests'
-import { inviteUrl, mailInvitation } from '../../../../utils/invitations'
+import { inviteUrl, mailInvitation, mayManageTeamInvitation } from '../../../../utils/invitations'
 import { genId } from '../../../../utils/projects'
 
 // Invites an address to join the team. Owners and admins invite members; only an owner invites an
@@ -33,7 +33,18 @@ export default defineEventHandler(async (event) => {
   }
 
   // A new invitation replaces an open one for the same address, so only one link per person is live.
+  // That is a withdrawal too, so an admin cannot replace an invitation someone else sent.
   const now = Date.now()
+  const replaced = await db.select({ invitedBy: teamInvitations.invitedBy }).from(teamInvitations).where(and(
+    eq(teamInvitations.organizationId, teamId),
+    eq(teamInvitations.email, email),
+    isNull(teamInvitations.acceptedAt),
+    isNull(teamInvitations.revokedAt),
+    gt(teamInvitations.expiresAt, now)
+  ))
+  if (replaced.some(open => !mayManageTeamInvitation(actor.role, actorId, open.invitedBy))) {
+    throw createError({ statusCode: 403, message: 'An invitation for that address from someone else is still open. An owner or the person who sent it can withdraw it first' })
+  }
   await db.update(teamInvitations).set({ revokedAt: now }).where(and(
     eq(teamInvitations.organizationId, teamId),
     eq(teamInvitations.email, email),

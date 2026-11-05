@@ -7,7 +7,7 @@ import { db } from '../db'
 import { customerInvitations, member, organization, user } from '../db/schema'
 import { generateJoinCode } from './auth-helpers'
 import { hashInvitationToken, INVITATION_COOKIE } from './customers'
-import { isLiveAddressedInvitation } from './invitations'
+import { lookupAddressedInvitation } from './invitations'
 import { genId } from './projects'
 
 function slugFor(name: string): string {
@@ -73,8 +73,13 @@ export function invitationTokenFrom(headers: Headers | undefined): string | null
   return null
 }
 
-/** Whether a token belongs to an invitation that is still open. */
-export async function isLiveInvitation(token: string | null): Promise<boolean> {
+/**
+ * Whether a closed instance admits a new account because of an invitation link. A customer link admits whoever
+ * holds it. A team or board invitation was sent to one address, so it admits only an account made with exactly
+ * that address, so a link alone makes no stray account. An account made through a sign-in provider (Google,
+ * GitHub, Discord, single sign-on) also needs the provider to say it verified that address.
+ */
+export async function admitsSignUp(token: string | null, email: string, provider: { verified: boolean } | null): Promise<boolean> {
   if (!token) return false
   const [row] = await db
     .select({ id: customerInvitations.id, acceptedAt: customerInvitations.acceptedAt })
@@ -84,6 +89,9 @@ export async function isLiveInvitation(token: string | null): Promise<boolean> {
       gt(customerInvitations.expiresAt, Date.now())
     ))
   if (row && !row.acceptedAt) return true
-  // A team or a board can invite an address too, and that person may create an account on a closed instance.
-  return isLiveAddressedInvitation(token)
+  // A team or a board invites one address; only an account made with that address is admitted.
+  const addressed = await lookupAddressedInvitation(token)
+  if (typeof addressed === 'string') return false
+  if (email.trim().toLowerCase() !== addressed.email) return false
+  return !provider || provider.verified
 }

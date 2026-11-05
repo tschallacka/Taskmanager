@@ -15,7 +15,7 @@ they accept they become a member (or an admin). It differs from the
 | Who can use it | Anyone signed in who has the code | The account with the invited address |
 | How often | As often as they like, until you rotate it | Once |
 | Role they get | Member | Member or admin, as you chose |
-| Person without an account | Must sign up first, which a closed instance refuses | Can create an account through the link, even when sign-up is closed |
+| Person without an account | Must sign up first, which a closed instance refuses | Can create an account with the invited address through the link, even when sign-up is closed |
 | Lifetime | Until rotated | 14 days |
 
 ## Invite someone
@@ -54,20 +54,27 @@ Nobody can be invited as an owner. Ownership moves by transfer, see
 
 ## What the invited person sees
 
-The link opens a page that says "You're invited" and, for example, "Sam Lee invited you to join Acme."
+The link opens a page that says "You're invited" and, for example, "Sam Lee invited you to join Acme." The page
+never shows the invited address. Whoever opens the link has to know it. An invitation is also no sign-in: opening
+the link does not sign anyone in, and it does not look at which account is signed in until you press a button.
 
-- **Not signed in:** one button, **Sign in or create an account**. It leads to the login page. Whichever way they
-  sign in or sign up, they come back to the invitation.
-- **Signed in:** "Signed in as ..." and the button **Accept invitation**.
+- **Not signed in, with an account:** **I have an account: sign in**. They sign in as usual, with the invited
+  address, and come back to the invitation.
+- **Not signed in, without an account:** **Create an account**. They must use the invited address, typed again
+  by hand, or a sign-in provider that reports it (Google, GitHub, Discord or your single sign-on, when the
+  instance offers them). A provider counts only when it says it verified the address. Then they come back to the
+  invitation.
+- **Signed in with the invited address:** "Signed in as ..." and the button **Accept invitation**. The team is
+  added to that account.
 
 On accepting, the team becomes their active workspace and the project list opens. The link is then spent.
 
 ## Wrong account, second use, expired link
 
-- **Signed in with another address.** The page warns "This invitation was sent to sam@example.com. Sign in with that
-  address to accept it." **Accept invitation** stays clickable and gives the same message. Nothing is spent, so the
-  right account can still use the link. Capitals do not matter. The invitation page has no sign-out button, so the
-  person signs out in the app first, or opens the link in a private window.
+- **Signed in with another address.** The page says the invitation was sent to another address than the one of this
+  account, without naming it, and offers **Sign out**. Nothing is spent, so the right account can still use the
+  link. Capitals do not matter. An invitation matches the account's own address; an account has no extra
+  addresses (aliases) that would match.
 - **Used twice.** The first account to accept takes the link. A second try shows "This invitation has already been
   used or has expired." Withdrawn and expired links show the same message.
 - **A link that never existed**, for instance with a typo, shows "This invitation link is not valid."
@@ -76,22 +83,24 @@ On accepting, the team becomes their active workspace and the project list opens
 
 ## When sign-up is closed
 
-A team invitation still lets its person create an account on an instance that refuses new accounts. Opening the
-link stores the invitation in a cookie for 24 hours, and while that cookie holds an unspent, unexpired invitation
-an account can be created, by password, email code or single sign-on. The login page shows its **Create an
-account** link when you reach it through an invitation link, even if sign-up is closed.
+A team invitation still lets its person create an account on an instance that refuses new accounts, but only an
+account with the invited address. Opening the link stores it in a cookie for 24 hours, so it survives the trip
+through a sign-in provider. When an account is created, the instance checks that the cookie holds an unspent,
+unexpired invitation **and** that the new account's address is the invited one. Any other address is refused with
+"Sign-up is closed here", so a link alone leaves no stray account behind. The same holds for password, email code
+and single sign-on. With a sign-in provider the address comes from the provider and must be marked verified.
 
-The check at sign-up asks only whether the invitation is open, not whether the new account uses the invited
-address. An account made with another address cannot accept the invitation, so the person needs the invited one.
 The instance admin closes sign-up; the setting is not on any team page.
 
 ## Expiry, withdrawing and inviting again
 
 - **Expiry.** A link works for 14 days. Then the invitation drops off the list and the link shows the expired
   message. It cannot be extended: invite the address again.
-- **Withdraw.** Click **Withdraw** on a row. The link stops working at once. Any owner or admin can withdraw any open
-  invitation, not only their own.
-- **Invite again.** A new invitation for an address replaces the open one, so only one link per person is live.
+- **Withdraw.** Click **Withdraw** on a row. The link stops working at once. An owner can withdraw any open
+  invitation. An admin can withdraw only the ones they sent, and does not see the button on the others.
+- **Invite again.** A new invitation for an address replaces the open one, so only one link per person is live. That
+  replaces a withdrawal too, so an admin cannot invite an address whose open invitation someone else sent. The
+  message says so, and an owner or the sender withdraws it first.
 - **Already accepted.** Withdrawing does nothing for someone who is in. To take them out, see
   [Leave, remove, transfer or delete](/help/team/leave-remove-transfer-delete).
 

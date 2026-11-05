@@ -31,9 +31,10 @@ export default defineEventHandler(async (event) => {
   }
   if (addressed !== 'missing') {
     if (session.user.email.trim().toLowerCase() !== addressed.email) {
+      // The address is not repeated here: the person who was invited knows it.
       throw createError({
         statusCode: 403,
-        message: `This invitation was sent to ${addressed.email}. Sign in with that address to accept it.`
+        message: 'This invitation was sent to another address than the one of the account you are signed in with. Sign in with the invited address to accept it.'
       })
     }
 

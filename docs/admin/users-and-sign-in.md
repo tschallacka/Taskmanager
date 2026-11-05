@@ -60,9 +60,11 @@ Three kinds of invitation link open an account on a closed instance. Each works 
 - **A team invitation by email.** An owner or admin types an address under **Invite by email** on the team's **Members** page. The link works for the account with that address only, and the person joins the team as a member, or as an admin when an owner invited them as one.
 - **A board invitation.** Someone who may share a board invites an address to it as a guest. This is the same mechanism and the same link page as the team invitation.
 
-Opening any of these links makes the server keep the link's token in a cookie for 24 hours. While that cookie holds an unspent, unexpired link, an account can be created, with a password, an email code or an OAuth sign-in alike. Once the link is used, withdrawn or expired, it lets nobody in.
+Opening any of these links makes the server keep the link's token in a cookie for 24 hours, so it survives a trip through a sign-in provider. A customer link admits whoever holds it: while the cookie holds an unspent, unexpired link, an account can be created, with a password, an email code or an OAuth sign-in alike.
 
-The check when an account is created does not compare addresses. Someone can create an account with a different address than the one invited, but that account cannot accept an address-bound link. A customer link has no address, so any account can accept it.
+A team or board invitation is bound to an address. When an account is created, the instance checks that the cookie holds a live invitation and that the new account's address is the invited one, capitals aside. Any other address is refused, so a link alone leaves no stray account. An account made through a sign-in provider (Google, GitHub, Discord, OIDC) also needs the provider to report that address as verified. The invitation page does not show the address, so whoever opens the link has to know it. Once the link is used, withdrawn or expired, it lets nobody in.
+
+An existing account accepts a team or board invitation only while signed in with the invited address. An account has no extra addresses (aliases) that would match.
 
 Team invitations are mailed when the server has `SMTP_HOST` and `SMTP_FROM` set. Without them nothing is sent, and the inviter gets the link on screen to pass on.
 

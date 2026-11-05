@@ -10,7 +10,7 @@ import { db } from '../db'
 import * as schema from '../db/schema'
 import { mailEnabled, sendMail } from './mailer'
 import { eq } from 'drizzle-orm'
-import { ensureOwnerOrganization, invitationTokenFrom, isFirstUser, isLiveInvitation } from '../utils/ownerOrganization'
+import { admitsSignUp, ensureOwnerOrganization, invitationTokenFrom, isFirstUser } from '../utils/ownerOrganization'
 import { crewAccountLive, isCrewUser, isInvalidDomain } from '../utils/crewAccounts'
 
 const baseURL = process.env.BETTER_AUTH_URL || 'http://localhost:3000'
@@ -182,8 +182,18 @@ export const auth = betterAuth({
             throw new APIError('BAD_REQUEST', { message: 'That address cannot be used.' })
           }
           const first = await isFirstUser()
-          if (!first && signUpDisabled && !(await isLiveInvitation(invitationTokenFrom(ctx?.headers ?? ctx?.request?.headers)))) {
-            throw new APIError('FORBIDDEN', { message: 'Sign-up is closed here. Ask for an invitation link.' })
+          if (!first && signUpDisabled) {
+            // An account made through a provider (Google, GitHub, Discord, OIDC) arrives on its callback route
+            // with the address the provider reports, and has to be one the provider verified.
+            const viaProvider = /\/callback\//.test(ctx?.path ?? '')
+            const admitted = await admitsSignUp(
+              invitationTokenFrom(ctx?.headers ?? ctx?.request?.headers),
+              user.email,
+              viaProvider ? { verified: user.emailVerified === true } : null
+            )
+            if (!admitted) {
+              throw new APIError('FORBIDDEN', { message: 'Sign-up is closed here. Ask for an invitation link and use the address it was sent to.' })
+            }
           }
           return {
             data: {

@@ -83,6 +83,14 @@ export async function isLiveAddressedInvitation(token: string): Promise<boolean>
   return Boolean(board)
 }
 
+/**
+ * Who may withdraw or replace an open team invitation: an owner, whatever the invitation, and an admin only
+ * an invitation they sent themselves. An admin acts for themselves; the owner acts for the team.
+ */
+export function mayManageTeamInvitation(role: string, actorId: string, invitedBy: string | null): boolean {
+  return role === 'owner' || (role === 'admin' && invitedBy === actorId)
+}
+
 /** The address of the app as an invitee reaches it. */
 export function appOrigin(event: H3Event): string {
   return (process.env.BETTER_AUTH_URL || getRequestURL(event).origin).replace(/\/$/, '')
