@@ -165,7 +165,7 @@ async function handleMessage(message: JsonRpcMessage, context: ApiKeyContext) {
         const outOfScope = toolsForScopes(ALL_SCOPES).find(candidate => candidate.name === name)
         if (!outOfScope) return failure(id, ErrorCode.MethodNotFound, `Unknown tool "${name}".`)
         return toolFailure(id, hasScope(context, outOfScope.scope)
-          ? `This API key is limited to one ${context.projectId ? 'board' : 'customer'}, and "${name}" works across the whole workspace, so it is not open to it.`
+          ? `This API key is limited to ${context.customerId ? 'one customer' : 'some boards'}, and "${name}" works across the whole workspace, so it is not open to it.`
           : `This API key does not carry the "${outOfScope.scope}" permission that "${name}" requires.`)
       }
 

@@ -3,6 +3,8 @@
 // nothing else: the server's `tools/list`, its scope checks and the setup guide's
 // catalogue all read from here.
 import type { ApiKeyScope } from '../db/schema'
+import { isNarrowedReach } from './api-keys'
+import type { KeyReach } from './api-keys'
 import { MCP_BOARD_TOOLS } from './mcpBoardTools'
 import { MCP_FIELD_TOOLS } from './mcpFieldTools'
 import { MCP_GITHUB_TOOLS } from './mcpGithubTools'
@@ -55,7 +57,7 @@ export const WORKSPACE_WIDE_TOOLS: ReadonlySet<string> = new Set([
 ])
 
 /** The tools one key is given: those its permissions allow, less the workspace-wide ones when it is limited. */
-export function toolsForKey(key: { scopes: ApiKeyScope[], customerId: string | null, projectId: string | null }): McpToolDefinition[] {
-  const limited = Boolean(key.customerId || key.projectId)
+export function toolsForKey(key: { scopes: ApiKeyScope[], customerId: string | null, reach: KeyReach }): McpToolDefinition[] {
+  const limited = isNarrowedReach(key.customerId, key.reach)
   return toolsForScopes(key.scopes).filter(tool => !limited || !WORKSPACE_WIDE_TOOLS.has(tool.name))
 }

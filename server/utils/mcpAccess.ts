@@ -5,47 +5,64 @@
 // them (a contact sees only what is marked for customers), and may change only
 // what that audience may change. Anything hidden from them is hidden from the
 // agent, and anything the app would refuse them is refused here.
-import { and, eq, inArray, or, sql } from 'drizzle-orm'
+import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm'
 import { projects, projectTasks } from '../db/schema'
 import type { Project } from '../db/schema'
+import { isNarrowedReach } from './api-keys'
 import type { ApiKeyContext } from './api-keys'
-import { audienceFor, customerIdsOf, sessionProjectFilter } from './auth-helpers'
+import { customerIdsOf, projectAccessFilter, sessionProjectFilter } from './auth-helpers'
 import type { Audience } from './auth-helpers'
 import { guestProjectIdsOf } from './guests'
 import { McpToolError } from './mcpToolKit'
 
-/** Whether the key is limited to one customer's boards or to one board. */
-export function isNarrowedKey(context: Pick<ApiKeyContext, 'customerId' | 'projectId'>): boolean {
-  return Boolean(context.customerId || context.projectId)
+/** Whether the key is cut down to one customer's boards, or to single boards and not to a whole workspace. */
+export function isNarrowedKey(context: Pick<ApiKeyContext, 'customerId' | 'reach'>): boolean {
+  return isNarrowedReach(context.customerId, context.reach)
 }
 
 /**
- * The boards this key's person can open: the same filter the browser uses, cut down to the
- * one board or customer a limited key is pinned to.
+ * The boards this key may reach. The owner's open boards (every workspace they are a member of, their
+ * personal boards, and the boards of the customers and guests they are let onto) are the outer limit.
+ * The key's own grants pick from them: Select all, whole workspaces, single boards. Because the outer
+ * limit is checked on every call, a grant stops working as soon as its owner loses access to the board.
  */
 export async function boardFilter(context: ApiKeyContext) {
-  const open = sessionProjectFilter(
-    context.userId,
-    context.teamId,
-    await customerIdsOf(context.userId),
-    await guestProjectIdsOf(context.userId)
-  )
-  const reach = context.projectId
-    ? and(open, eq(projects.id, context.projectId))
-    : context.customerId ? and(open, eq(projects.customerId, context.customerId)) : open
+  const { userId, reach, memberTeamIds } = context
+  const customerIds = await customerIdsOf(userId)
+  const guestIds = await guestProjectIdsOf(userId)
+  const open = or(
+    memberTeamIds.length ? inArray(projects.teamId, memberTeamIds) : undefined,
+    and(eq(projects.userId, userId), isNull(projects.teamId)),
+    customerIds.length ? inArray(projects.customerId, customerIds) : undefined,
+    guestIds.length ? inArray(projects.id, guestIds) : undefined
+  )!
+
+  const grants = [
+    reach.allBoards ? open : undefined,
+    ...reach.workspaceTeamIds.map(teamId => teamId
+      ? projectAccessFilter(userId, teamId)
+      : sessionProjectFilter(userId, null, customerIds, guestIds)),
+    reach.boardIds.length ? inArray(projects.id, reach.boardIds) : undefined
+  ]
+  const granted = or(...grants) ?? sql`false`
+  const narrowed = context.customerId ? and(granted, eq(projects.customerId, context.customerId)) : granted
+  const reachable = and(open, narrowed)
+
   // A crew's read reach on the real boards it works on; only a plain read call carries it.
-  const granted = context.readGrantedBoardIds ?? []
-  return granted.length ? or(reach, inArray(projects.id, granted)) : reach
+  const crewRead = context.readGrantedBoardIds ?? []
+  return crewRead.length ? or(reachable, inArray(projects.id, crewRead)) : reachable
 }
 
 /**
- * How the person relates to a board: on its team, or a customer's contact. A board a crew reads
- * through its crew link counts as the team's, so the crew sees every task on it; it can only be
- * reached by a read call, so nothing it may not do is ever asked of it.
+ * How the person relates to a board: staff on a board of a workspace they are a member of, and on their
+ * own personal boards; a customer's contact everywhere else. A board a crew reads through its crew link
+ * counts as the team's, so the crew sees every task on it; it can only be reached by a read call, so
+ * nothing it may not do is ever asked of it.
  */
 export function audienceOf(context: ApiKeyContext, board: Pick<Project, 'userId' | 'teamId'> & { id?: string }): Audience {
   if (board.id && context.readGrantedBoardIds?.includes(board.id)) return 'staff'
-  return audienceFor(context.userId, context.teamId, board)
+  if (board.teamId) return context.memberTeamIds.includes(board.teamId) ? 'staff' : 'customer'
+  return board.userId === context.userId ? 'staff' : 'customer'
 }
 
 /** Refuses what only a board's team may do, naming what was attempted. */
