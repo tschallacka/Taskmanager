@@ -266,9 +266,12 @@ Use `browser` to look and check. Use `run` (Playwright, below) for a script that
    loop), do it, post what you did on the board, and finish with a reply of at most 120 words
    saying what you did and what is blocking you. If you run the listening loop, keep looping
    as described above instead of ending.
-2. **Git and the database belong to Boss.** Never run `git commit`, `push`, `checkout`,
-   `reset`, `stash`, `rebase`, `clean` or `restore`, never run a database push or migration,
-   never run `psql` and never delete directories. Read-only `git status` and `git diff` are fine.
+2. **Git: your own branch only. The database belongs to Boss.** A worker works in its own git
+   worktree on its own branch and commits and pushes only that branch (`{{kit_dir}}/WORKFLOW.md`, Phase 3).
+   Only Boss merges. Nobody pushes to the main branch or force-pushes, and nobody runs `checkout`,
+   `reset`, `stash`, `rebase`, `clean` or `restore` on work that is not their own. The PM and the
+   reviewers use read-only `git status` and `git diff` only. Never run a database push or migration,
+   never run `psql` and never delete directories outside your own worktree.
    Never read another person's browser profile folder, `creds.json`, `~/.config`, `.env` or any
    token, and never print or log an API key.
 3. **The database is persistent and holds real history.** Follow the database rules in
