@@ -1,6 +1,7 @@
 // The live cases of the update tools (GH #37, slice A): the real MCP endpoint of a running dev server, with real
 // keys. Env-gated like agent-events.test.ts, so a plain run skips them:
-//   UPDATE_TOOLS_LIVE=1 UPDATE_TOOLS_BASE=http://localhost:3000 UPDATE_TOOLS_KEY=<staff key, board A> \
+//   UPDATE_TOOLS_LIVE=1 UPDATE_TOOLS_KEY=<staff key, board A> \
+//   [UPDATE_TOOLS_BASE=<dev server>; by default TEST_BASE_URL or the nuxt dev of this checkout] \
 //   UPDATE_TOOLS_TASK=<card on board A> UPDATE_TOOLS_OTHER_TASK=<another card on board A> \
 //   [UPDATE_TOOLS_READ_KEY=<key with boards:read only, same workspace>] \
 //   [UPDATE_TOOLS_OTHER_TEAM_KEY=<key of another team or workspace>] \
@@ -8,14 +9,15 @@
 // The keys are read from the environment and never printed. Every update a case posts is deleted again.
 import { describe, test } from 'node:test'
 import assert from 'node:assert/strict'
+import { resolveTestBase } from './helpers/testBase'
 
-const BASE = process.env.UPDATE_TOOLS_BASE ?? 'http://localhost:3000'
+const BASE = resolveTestBase('UPDATE_TOOLS_BASE')
 const KEY = process.env.UPDATE_TOOLS_KEY ?? ''
 const TASK = process.env.UPDATE_TOOLS_TASK ?? ''
 const OTHER_TASK = process.env.UPDATE_TOOLS_OTHER_TASK ?? ''
 const READ_KEY = process.env.UPDATE_TOOLS_READ_KEY ?? ''
 const OTHER_TEAM_KEY = process.env.UPDATE_TOOLS_OTHER_TEAM_KEY ?? ''
-const LIVE = process.env.UPDATE_TOOLS_LIVE === '1' && !!KEY && !!TASK && !!OTHER_TASK
+const LIVE = process.env.UPDATE_TOOLS_LIVE === '1' && !!KEY && !!TASK && !!OTHER_TASK && !!BASE
 
 interface Reply {
   isError: boolean

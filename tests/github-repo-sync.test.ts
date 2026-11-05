@@ -4,7 +4,7 @@
 // The rules run on their own:
 //   node --import tsx --test tests/github-repo-sync.test.ts
 // The routes run against a dev server when these are set (otherwise those cases skip):
-//   GH_SYNC_TEST_BASE (default http://localhost:3000)
+//   GH_SYNC_TEST_BASE (or TEST_BASE_URL; by default the nuxt dev of this checkout, read from .nuxt/nuxt.lock)
 //   GH_SYNC_TEST_OWNER_EMAIL, GH_SYNC_TEST_OWNER_PASSWORD  the owner of GH_SYNC_TEST_PROJECT (a personal project works)
 //   GH_SYNC_TEST_PROJECT  a project that owner may change
 //   GH_SYNC_TEST_REPO  an owner/repo the GitHub owner allowlist accepts and that is NOT yet linked to that project
@@ -13,6 +13,7 @@
 // The link, and a second scratch project made for the cross-project cases, are removed at the end.
 import { test, after } from 'node:test'
 import assert from 'node:assert/strict'
+import { noBaseReason, resolveTestBase } from './helpers/testBase'
 import { MAX_NOTE_INPUT, branchesLimitWords, loginsHelpWords, loginsSaveNote, managesRepoSync, splitLogins, parseBranches, parseColumnName, parseLogins, sharedBranch, sharedBranchMessage, syncStatusWords } from '../shared/utils/githubRepoSync'
 
 // ── Logins ───────────────────────────────────────────────────────────
@@ -156,16 +157,16 @@ test('the logins note refuses to look at a paste over its length cap, and says i
 
 // ── Routes, against a dev server ────────────────────────────────────
 
-const BASE = process.env.GH_SYNC_TEST_BASE ?? 'http://localhost:3000'
+const BASE = resolveTestBase('GH_SYNC_TEST_BASE')
 const OWNER = process.env.GH_SYNC_TEST_OWNER_EMAIL
 const OWNER_PASSWORD = process.env.GH_SYNC_TEST_OWNER_PASSWORD
 const MEMBER = process.env.GH_SYNC_TEST_MEMBER_EMAIL
 const MEMBER_PASSWORD = process.env.GH_SYNC_TEST_MEMBER_PASSWORD
 const PROJECT = process.env.GH_SYNC_TEST_PROJECT
 const REPO = process.env.GH_SYNC_TEST_REPO
-const skip = OWNER && OWNER_PASSWORD && PROJECT && REPO
-  ? false
-  : 'set the GH_SYNC_TEST_* variables to run the route cases'
+const skip = !(OWNER && OWNER_PASSWORD && PROJECT && REPO)
+  ? 'set the GH_SYNC_TEST_* variables to run the route cases'
+  : BASE ? false : noBaseReason('GH_SYNC_TEST_BASE')
 const memberSkip = MEMBER && MEMBER_PASSWORD ? false : 'no second staff account set: GH_SYNC_TEST_MEMBER_EMAIL'
 
 async function call(method: string, path: string, cookie?: string, body?: unknown): Promise<{ status: number, json: any }> {

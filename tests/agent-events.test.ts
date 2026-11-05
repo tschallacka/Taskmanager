@@ -1,9 +1,10 @@
 // The agent event stream (CH1). The hub, the audience, the frames and the stream lifecycle
 // run on their own; the live cases need a dev server and a key that is not valid:
 //   node --env-file-if-exists=.env --import tsx --test tests/agent-events.test.ts
-// Set AGENT_EVENTS_LIVE=1 to run them (AGENT_EVENTS_BASE, default http://localhost:3000).
+// Set AGENT_EVENTS_LIVE=1 to run them (AGENT_EVENTS_BASE, TEST_BASE_URL or the nuxt dev of this checkout).
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { noBaseReason, resolveTestBase } from './helpers/testBase'
 import {
   AgentEventHub, audienceOfEvent, cleanEventText, deliverableTo, emitAgentEventWith, emitInBackground,
   crewPeopleFrom, emitGithubEventWith, frameOfEvent, GITHUB_EVENT_KINDS, githubAudience, parseLastEventId, replyRecipients, stillMember,
@@ -108,16 +109,18 @@ const key = (keyId: string, userId: string, teamId: string | null = null): Strea
 
 // ── Live: a request with no valid key is refused ──────────────────────
 
-const LIVE = process.env.AGENT_EVENTS_LIVE === '1'
-const BASE_URL = process.env.AGENT_EVENTS_BASE ?? 'http://localhost:3000'
+const BASE_URL = resolveTestBase('AGENT_EVENTS_BASE')
+const LIVE_SKIP: string | false = process.env.AGENT_EVENTS_LIVE !== '1'
+  ? 'set AGENT_EVENTS_LIVE=1 to run the live cases'
+  : BASE_URL ? false : noBaseReason('AGENT_EVENTS_BASE')
 
-test('live: a request with no key is refused with 401', { skip: !LIVE }, async () => {
+test('live: a request with no key is refused with 401', { skip: LIVE_SKIP }, async () => {
   const res = await fetch(`${BASE_URL}/api/agent/events`)
   assert.equal(res.status, 401)
   await res.body?.cancel()
 })
 
-test('live: a key that is not in the database is refused with 401', { skip: !LIVE }, async () => {
+test('live: a key that is not in the database is refused with 401', { skip: LIVE_SKIP }, async () => {
   const res = await fetch(`${BASE_URL}/api/agent/events`, { headers: { Authorization: 'Bearer arn_not-a-real-key' } })
   assert.equal(res.status, 401)
   await res.body?.cancel()

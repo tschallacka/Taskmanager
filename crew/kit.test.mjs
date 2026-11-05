@@ -26,7 +26,7 @@ const KIT = dirname(fileURLToPath(import.meta.url))
 const CREW = join(KIT, 'crew.mjs')
 const DRIVER = join(KIT, 'browser-driver.mjs')
 const NOT_SHIPPED = /\.test\.mjs$|^\.|^kit-files\.txt$/
-const SECRET_OR_RUN = /^(creds|crew|crew\.config)\.json$|\.log$/
+const SECRET_OR_RUN = /^(creds|crew|crew\.config|package-lock)\.json$|\.log$/
 
 describe('the kit file list', () => {
   const listed = readFileSync(join(KIT, 'kit-files.txt'), 'utf8')

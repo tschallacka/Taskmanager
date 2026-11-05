@@ -11,6 +11,8 @@
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "lint": "eslint .",
+    "test": "TSX_TSCONFIG_PATH=.nuxt/tsconfig.server.json node --env-file-if-exists=.env --import tsx --test --test-concurrency=1 --test-force-exit \"tests/*.test.ts\"",
+    "test:crew": "cd crew && node --test",
     "typecheck": "nuxt typecheck",
     "db:push": "drizzle-kit push --force"
   },

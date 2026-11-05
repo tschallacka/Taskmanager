@@ -8,6 +8,7 @@ import { like } from 'drizzle-orm'
 import { db } from '../server/db'
 import { crewApiAudit } from '../server/db/schema'
 import assert from 'node:assert/strict'
+import { noBaseReason, resolveTestBase } from './helpers/testBase'
 import {
   auditPeer, clientAddress, denialKeyCount, DENIALS_PER_MINUTE, limitedStatus, MAX_RATE_KEYS,
   noteDenial, overDenialLimit, rateKey
@@ -99,12 +100,14 @@ test('a refusal is counted for its minute only: after a minute the bucket is cle
 // Every call carries this run's tag in its path, and the audit rows with that tag are deleted after.
 const LIVE = process.env.CREW_GATE_LIVE === '1'
 const LOOPBACK_SERVER = process.env.CREW_TEST_LOCAL_PEER === 'loopback'
+const BASE = resolveTestBase('CREW_TEST_BASE')
 const TAG = `b${Date.now().toString(36)}`
 const TEST_PATH = `/api/crews/bucket-test-${TAG}`
 
 function bucketSkip(): string | false {
   if (!LIVE) return 'set CREW_GATE_LIVE=1 (with the crew gate schema applied) to run live cases'
   if (!LOOPBACK_SERVER) return 'needs a dev server that sees a loopback peer: set CREW_TEST_LOCAL_PEER=loopback'
+  if (!BASE) return noBaseReason('CREW_TEST_BASE')
   return false
 }
 
@@ -122,12 +125,11 @@ after(async () => {
 })
 
 test('live: ten remote 404s from one client do not lock out the local caller', { skip: bucketSkip() }, async () => {
-  const base = process.env.CREW_TEST_BASE ?? 'http://localhost:3000'
   for (let i = 0; i < DENIALS_PER_MINUTE + 2; i++) {
-    const res = await fetch(`${base}${TEST_PATH}-${i}`, { headers: { 'X-Forwarded-For': '198.51.100.50', 'X-Real-IP': '198.51.100.50' } })
+    const res = await fetch(`${BASE}${TEST_PATH}-${i}`, { headers: { 'X-Forwarded-For': '198.51.100.50', 'X-Real-IP': '198.51.100.50' } })
     assert.equal(res.status, 404, 'a remote refusal is always 404, never 429')
   }
-  const local = await fetch(`${base}${TEST_PATH}-local`)
+  const local = await fetch(`${BASE}${TEST_PATH}-local`)
   assert.notEqual(local.status, 429, 'the local bucket is untouched')
   assert.equal(local.status, 401)
 })

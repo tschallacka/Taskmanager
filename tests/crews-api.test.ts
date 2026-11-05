@@ -3,7 +3,7 @@
 // server. The instance admin signs in with an account given in the environment, mints the
 // keys the tests need, and deletes them again. Scratch crews carry the `scratch-` prefix
 // and are purged at the end.
-//   CREW_TEST_BASE (default http://localhost:3000)
+//   CREW_TEST_BASE (or TEST_BASE_URL; by default the nuxt dev of this checkout, read from .nuxt/nuxt.lock)
 //   CREW_TEST_ADMIN_EMAIL, CREW_TEST_ADMIN_PASSWORD  an instance admin (scratch account)
 //   node --env-file-if-exists=.env --import tsx --test --test-force-exit tests/crews-api.test.ts
 // Without the admin variables the file is skipped. A request that reads as remote to the
@@ -11,11 +11,14 @@
 import { test, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { deliverableRecipients, sendMail } from '../server/lib/mailer'
+import { noBaseReason, resolveTestBase } from './helpers/testBase'
 
-const BASE = process.env.CREW_TEST_BASE ?? 'http://localhost:3000'
+const BASE = resolveTestBase('CREW_TEST_BASE')
 const ADMIN_EMAIL = process.env.CREW_TEST_ADMIN_EMAIL
 const ADMIN_PASSWORD = process.env.CREW_TEST_ADMIN_PASSWORD
-const skip = ADMIN_EMAIL && ADMIN_PASSWORD ? false : 'set CREW_TEST_ADMIN_EMAIL and CREW_TEST_ADMIN_PASSWORD to run'
+const skip = !(ADMIN_EMAIL && ADMIN_PASSWORD)
+  ? 'set CREW_TEST_ADMIN_EMAIL and CREW_TEST_ADMIN_PASSWORD to run'
+  : BASE ? false : noBaseReason('CREW_TEST_BASE')
 
 const stamp = Date.now().toString(36)
 const slug = `scratch-${stamp}`

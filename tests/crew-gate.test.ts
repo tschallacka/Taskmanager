@@ -1,8 +1,9 @@
 // The crew API gate (BRIEF-crew-feature 2b). The policy cases run on their own; the live
 // cases need the crew_api_gate and crew_api_audit tables and a dev server:
 //   node --env-file-if-exists=.env --import tsx --test tests/crew-gate.test.ts
-// Set CREW_GATE_LIVE=1 to run the live cases (CREW_TEST_BASE, default http://localhost:3000).
+// Set CREW_GATE_LIVE=1 to run the live cases (CREW_TEST_BASE, TEST_BASE_URL or the nuxt dev of this checkout).
 import { test, after } from 'node:test'
+import { noBaseReason, resolveTestBase } from './helpers/testBase'
 import assert from 'node:assert/strict'
 import { eq, like } from 'drizzle-orm'
 import { db } from '../server/db'
@@ -129,7 +130,7 @@ test('failed attempts are rate-limited per bucket', () => {
 
 const LIVE = process.env.CREW_GATE_LIVE === '1'
 const LOOPBACK_SERVER = process.env.CREW_TEST_LOCAL_PEER === 'loopback'
-const BASE = process.env.CREW_TEST_BASE ?? 'http://localhost:3000'
+const BASE = resolveTestBase('CREW_TEST_BASE')
 const TAG = `t${Date.now().toString(36)}`
 const TEST_PATH = `/api/crews/gate-test-${TAG}`
 const createdKeyIds: string[] = []
@@ -138,6 +139,7 @@ const createdKeyIds: string[] = []
 function liveSkip(needsLoopback = false): string | false {
   if (!LIVE) return 'set CREW_GATE_LIVE=1 (with the crew gate schema applied) to run live cases'
   if (needsLoopback && !LOOPBACK_SERVER) return 'needs a dev server that sees a loopback peer: set CREW_TEST_LOCAL_PEER=loopback'
+  if (!BASE) return noBaseReason('CREW_TEST_BASE')
   return false
 }
 

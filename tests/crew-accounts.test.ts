@@ -1,7 +1,7 @@
 // Crew accounts: the reserved .invalid space is refused on every public route, the
 // crew provisioning helper makes @crew.invalid accounts in-process, and it never adopts
-// an account it did not make. Run against a dev server (CREW_TEST_BASE, default
-// http://localhost:3000):
+// an account it did not make. The route cases run against a dev server: CREW_TEST_BASE,
+// TEST_BASE_URL, or the nuxt dev of this checkout (read from .nuxt/nuxt.lock):
 //   node --env-file-if-exists=.env --import tsx --test tests/crew-accounts.test.ts
 import { test, after } from 'node:test'
 import assert from 'node:assert/strict'
@@ -11,8 +11,12 @@ import { db } from '../server/db'
 import { crews, organization, user } from '../server/db/schema'
 import { createCrewAccount, isCrewAddress, isInvalidDomain } from '../server/utils/crewAccounts'
 import { genId } from '../server/utils/projects'
+import { noBaseReason, resolveTestBase } from './helpers/testBase'
 
-const BASE = process.env.CREW_TEST_BASE ?? 'http://localhost:3000'
+const BASE = resolveTestBase('CREW_TEST_BASE')
+// The sign-up and sign-in cases need a running dev server. With none, they skip and say so, instead of failing on a refused connection.
+const serverUp = BASE ? await fetch(`${BASE}/api/auth/ok`, { signal: AbortSignal.timeout(2000) }).then(res => res.ok).catch(() => false) : false
+const noServer = serverUp ? false : BASE ? `no dev server answers at ${BASE}: start nuxt dev in this checkout, or fix CREW_TEST_BASE` : noBaseReason('CREW_TEST_BASE')
 const tag = Date.now().toString(36)
 const PASSWORD = `probe-${randomBytes(18).toString('base64url')}`
 const userEmails: string[] = []
@@ -78,7 +82,7 @@ test('the address rules', () => {
   assert.equal(isCrewAddress('a@crew.invalid.example.com'), false)
 })
 
-test('public sign-up refuses the .invalid space in every form', async () => {
+test('public sign-up refuses the .invalid space in every form', { skip: noServer }, async () => {
   const cases = [...RESERVED_FORMS, 'foo@example.invalid', 'x@notcrew.invalid']
   for (const [index, form] of cases.entries()) {
     const local = `c${index}-${tag}`
@@ -92,7 +96,7 @@ test('public sign-up refuses the .invalid space in every form', async () => {
   }
 })
 
-test('legitimate internationalised domains still sign up', async () => {
+test('legitimate internationalised domains still sign up', { skip: noServer }, async () => {
   for (const domain of ['xn--bcher-kva.de', 'xn--r8jz45g.jp']) {
     const email = `idn-${tag}@${domain}`
     try {
@@ -104,7 +108,7 @@ test('legitimate internationalised domains still sign up', async () => {
   }
 })
 
-test('normal public sign-up is unchanged', async () => {
+test('normal public sign-up is unchanged', { skip: noServer }, async () => {
   const email = `probe-${tag}@example.com`
   userEmails.push(email)
   const res = await signUp(email)
@@ -128,7 +132,7 @@ test('the user update hook refuses an .invalid address too', async () => {
   assert.equal(still?.email, email, 'the refused change left the address alone')
 })
 
-test('the helper makes a crew account that signs in, and refuses what it must', async () => {
+test('the helper makes a crew account that signs in, and refuses what it must', { skip: noServer }, async () => {
   const [org] = await db.select({ id: organization.id }).from(organization).limit(1)
   assert.ok(org, 'the dev database needs one organization for the crew row')
   const crewId = genId()

@@ -108,7 +108,9 @@ test('every fork key is limited to exactly its own shadow board, in the crew tea
 })
 
 test('a fork reads its own shadow board and the one real board behind it, nothing else', async () => {
-  const [wren] = await db.select().from(user).where(eq(user.name, 'Wren Worker (Internal Tools)'))
+  // This run's own fork, found through its board link: other crews in the dev database have a Wren of the same name.
+  const [wren] = await db.select({ id: crewBoardMembers.userId }).from(crewBoardMembers)
+    .where(and(eq(crewBoardMembers.linkId, linkA.id), eq(crewBoardMembers.personKey, 'wren')))
   const context = { keyId: 'k', keyName: 'k', userId: wren!.id, teamId: crewTeam, customerId: null, projectId: linkA.shadowProjectId, scopes: ['boards:read', 'boards:write'] as ('boards:read' | 'boards:write')[] }
   assert.deepEqual(await readGrantedBoardIds(context), [boardA])
   const reach = async (grant: string[]) =>

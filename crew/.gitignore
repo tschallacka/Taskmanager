@@ -4,6 +4,7 @@ profiles/
 work/
 backups/
 node_modules/
+package-lock.json
 *.log
 .listen/
 .watch-state.json

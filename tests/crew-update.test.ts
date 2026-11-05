@@ -2,16 +2,21 @@
 // localhost: no real board is touched and no browser starts. Run:
 //   node --import tsx --test tests/crew-update.test.ts
 // The child process is spawned asynchronously: the fake board lives in this process and must keep answering.
-import { test, before, after } from 'node:test'
+import { test as nodeTest, before, after, type TestContext } from 'node:test'
 import assert from 'node:assert/strict'
 import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { mkdtempSync, writeFileSync, readFileSync, rmSync, symlinkSync } from 'node:fs'
+import { existsSync, mkdtempSync, writeFileSync, readFileSync, rmSync, symlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawn, spawnSync } from 'node:child_process'
 
 const CREW = join(process.cwd(), 'crew', 'crew.mjs')
+// crew.mjs loads Playwright from the kit's own dependencies (crew/node_modules, gitignored), so on a fresh
+// checkout, in CI or in the nix and docker builds these tests skip instead of failing on import.
+// To run them: cd crew && npm install
+const SKIP = existsSync(join(process.cwd(), 'crew', 'node_modules', 'playwright', 'package.json')) ? false : 'crew/node_modules is missing: run cd crew && npm install to enable these tests'
+const test = (name: string, fn: (t: TestContext) => unknown) => nodeTest(name, { skip: SKIP }, fn)
 const LIMIT = 200 * 1024
 
 type Call = { name: string, auth: string | undefined, args: { id: string, body: string, visibility?: string } }
@@ -284,15 +289,21 @@ test('invalid UTF-8 and NUL bytes are refused; a leading BOM is dropped and CRLF
   assert.equal(calls[0].args.body, 'hi\r\nthere\r\n')
 })
 
-test('stdin on a terminal is refused with exit 64 instead of waiting', async () => {
-  if (spawnSync('script', ['--version']).error) return // no script(1) here: the rule is still in tm.mjs
+test('stdin on a terminal is refused with exit 64 instead of waiting', async (t) => {
+  // python3 gives the command a real terminal on stdin (the slave side of a pty), on Linux and macOS alike,
+  // and needs none of its own. script(1) does, and a run under CI has none. pty.spawn is not used: on macOS it
+  // keeps waiting for the terminal to close after the command has exited.
+  const holdTerminal = 'import pty, subprocess, sys\nmaster, slave = pty.openpty()\nrun = subprocess.run(sys.argv[1:], stdin=slave, capture_output=True, text=True)\nsys.stdout.write(run.stdout + run.stderr)\nsys.exit(run.returncode)'
+  if (spawnSync('python3', ['--version']).error) return t.skip('python3 is needed to give the command a terminal')
   const dir = home()
-  const run = spawnSync('script', ['-qec', `${process.execPath} ${CREW} wick update task1 -`, '/dev/null'], {
+  const run = spawnSync('python3', ['-c', holdTerminal, process.execPath, CREW, 'wick', 'update', 'task1', '-'], {
     encoding: 'utf8',
     env: { ...process.env, CREW_HOME: dir },
+    input: '',
     timeout: 30000
   })
   assert.notEqual(run.signal, 'SIGTERM', 'the command waited on the terminal')
+  assert.equal(run.status, 64)
   assert.match(run.stdout + run.stderr, /give the text on stdin/)
 })
 
@@ -330,7 +341,7 @@ test('an HTTP error or a non-JSON reply exits 69 with a hint to try again, and n
 // The documents show the file form for a long update and never an inline JSON update as the example.
 test('the kit documents show the body-file update as the default', () => {
   const docs: [string, RegExp][] = [
-    ['CREW.md.tmpl', /node \{\{kit_dir\}\}\/crew\.mjs <you> update <taskId> /],
+    ['CREW.md.tmpl', /\{\{node_kit\}\}\/crew\.mjs <you> update <taskId> /],
     ['PROMPTS.md.tmpl', /crew\.mjs W update <taskId> \{\{crew_dir\}\}\/work\/W\/update\.md/],
     ['README.md', /crew <who> update <taskId> /]
   ]
