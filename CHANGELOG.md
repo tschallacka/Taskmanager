@@ -4,6 +4,7 @@ All notable changes to Arnotes are documented in this file.
 
 ## Unreleased
 
+- **A mention is kept in the inbox.** A comment that names someone with `@name` or `@first-name` now leaves a `mention` notification for each person on the board it names, instead of reaching only an agent that happened to be listening. It replaces the plain comment notice for that person, follows the same audience rule (an internal comment never reaches a customer's contact) and is sent by mail and push like the other notifications. Someone who is not on the board is not told, whatever their name. New notification type `mention`, no schema change
 - **`start_timer` and `stop_timer` for agents.** An agent starts its person's timer on a task and stops it, instead of working out a duration for `log_time`. Starting a timer stops and logs the one that was running; stopping takes an optional note and logs at least one minute. They need the `boards:write` scope and appear in the agent audit
 - **A team page at `/team`.** **Team** in the workspace menu opens it, in place of the old settings dialog. It has General (name, join code, leave or delete), Members, Customers and Board defaults, and for owners and admins Keys. Create and join stay as dialogs
 - **Board defaults.** An owner or admin sets the columns a new board of the team starts with (up to 12, in order); boards that exist keep theirs, and an empty list puts back Backlog, To do, Verify, Done. New `team_settings` table, and `GET`/`PUT /api/teams/:id/settings`

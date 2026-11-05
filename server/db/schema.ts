@@ -440,7 +440,7 @@ export const taskFieldValues = pgTable(
 // `guest_request` asks a project admin to approve a guest invitation; `guest_decision` tells the
 // guest manager who asked what became of it.
 // `task_added` goes to those who asked to hear about every new task on a board.
-export const NOTIFICATION_TYPES = ['assigned', 'comment', 'message', 'reply', 'update', 'guest_request', 'guest_decision', 'task_added'] as const
+export const NOTIFICATION_TYPES = ['assigned', 'comment', 'message', 'reply', 'update', 'guest_request', 'guest_decision', 'task_added', 'mention'] as const
 export type NotificationType = typeof NOTIFICATION_TYPES[number]
 
 export const notifications = pgTable(

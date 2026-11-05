@@ -3,7 +3,7 @@ import { errorMessage, untypedFetch } from '~/utils/untypedFetch'
 
 export interface NotificationItem {
   id: string
-  type: 'assigned' | 'comment' | 'message' | 'reply' | 'update' | 'guest_request' | 'guest_decision' | 'task_added'
+  type: 'assigned' | 'comment' | 'message' | 'reply' | 'update' | 'guest_request' | 'guest_decision' | 'task_added' | 'mention'
   /** For a guest request: the invitation, and what became of it. Approve and Decline show only while it waits. */
   invitationId?: string | null
   invitationStatus?: 'open' | 'awaiting_approval' | 'accepted' | 'declined' | 'revoked' | null

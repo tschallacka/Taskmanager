@@ -41,7 +41,13 @@ async function tellAssigned(project: Project, task: Task, actorId: string | null
 /** An update was posted on a task: its assignee and the others who have written on it hear. */
 export async function notifyComment(project: Project, task: Task, actorId: string | null, body: string, internal: boolean, replyToId: string | null = null) {
   const writers = await db.select({ id: taskComments.id, userId: taskComments.userId, body: taskComments.body }).from(taskComments).where(eq(taskComments.taskId, task.id))
+  // Someone the comment names gets a mention in the inbox, kept whether or not an agent of theirs is
+  // listening, and is not also told it as a plain comment. Only people on the board can be named: the
+  // list is the board's own, and `notify` drops anyone who may not read the comment.
+  const mentioned = body.includes('@') ? await mentionedIn(project, body, actorId) : new Set<string>()
   const recipients = [...new Set([...(task.assigneeId ? [task.assigneeId] : []), ...(task.createdBy ? [task.createdBy] : []), ...writers.map(writer => writer.userId)])]
+    .filter(id => !mentioned.has(id))
+  const from = await nameOf(actorId)
   await notify({
     project,
     task,
@@ -49,11 +55,21 @@ export async function notifyComment(project: Project, task: Task, actorId: strin
     type: 'comment',
     recipients,
     staffOnly: internal,
-    title: `${await nameOf(actorId)} commented on "${task.title}"`,
+    title: `${from} commented on "${task.title}"`,
+    body: notificationExcerpt(body)
+  })
+  await notify({
+    project,
+    task,
+    actorId,
+    type: 'mention',
+    recipients: [...mentioned],
+    staffOnly: internal,
+    title: `${from} mentioned you on "${task.title}"`,
     body: notificationExcerpt(body)
   })
   // Agents hear of a mention, and of a reply: to the people on the card, to those who commented on it, and to the author replied to.
-  emitInBackground(() => tellAgentsOfComment(project, task, actorId, body, { internal, replyToId, owners: [task.assigneeId, task.createdBy], writers }))
+  emitInBackground(() => tellAgentsOfComment(project, task, actorId, body, { internal, replyToId, owners: [task.assigneeId, task.createdBy], writers, mentioned }))
 }
 
 /**
@@ -67,11 +83,11 @@ async function tellAgentsOfComment(
   task: Task,
   actorId: string | null,
   body: string,
-  comment: { internal: boolean, replyToId: string | null, owners: (string | null | undefined)[], writers: ReplyWriter[] }
+  comment: { internal: boolean, replyToId: string | null, owners: (string | null | undefined)[], writers: ReplyWriter[], mentioned: Set<string> }
 ) {
   const customerVisible = !comment.internal && task.visibility === 'customer'
   const from = await nameOf(actorId)
-  const mentioned = body.includes('@') ? await mentionedIn(project, body, actorId) : new Set<string>()
+  const mentioned = new Set([...comment.mentioned].filter(id => agentEventHub.watches(id)))
   for (const id of mentioned) {
     await emitAgentEventAsync(id, { kind: 'mention', board: project, task, from, customerVisible })
   }
@@ -87,7 +103,7 @@ async function tellAgentsOfComment(
 async function mentionedIn(project: Project, body: string, actorId: string | null): Promise<Set<string>> {
   const found = new Set<string>()
   for (const person of await projectPeople(project)) {
-    if (person.id === actorId || !agentEventHub.watches(person.id)) continue
+    if (person.id === actorId) continue
     const names = [person.name, person.name.split(/\s+/)[0] ?? ''].filter(name => name.length > 0)
     if (names.some(name => namedIn(body, name))) found.add(person.id)
   }
