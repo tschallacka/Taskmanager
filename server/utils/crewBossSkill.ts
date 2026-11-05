@@ -1,14 +1,21 @@
-// The crew skill for Boss: the Owner's own session, whatever model it runs on. The MCP server adds
-// this text to the instructions it sends at initialize when the key belongs to someone who set a
-// crew up, so the session knows how to behave with the crew without a skill file being installed.
-// The crew's own accounts (Pia, the workers, the reviewers) never get it: their keys belong to
-// crew accounts, not to the person who created the crew.
+// The crew skill for Boss: the Owner's own session, whatever model it runs on, in whatever state:
+// a session that starts with no crew yet needs it as much as one with a crew running. The MCP
+// server adds this text to the instructions it sends at initialize for a key whose owner can run a
+// crew, so the session knows how to behave without a skill file being installed. The crew's own
+// accounts (Pia, the workers, the reviewers) never get it: their keys belong to crew accounts.
 import { and, eq, isNull } from 'drizzle-orm'
 import { db } from '../db'
-import { crewBoards, crews } from '../db/schema'
+import { crewBoards, crews, user } from '../db/schema'
 
-/** Whether this person created a live crew, or attached a crew to one of their boards. */
+/**
+ * Whether this person can run a crew: the instance admin (the only one who can create a crew), or
+ * anyone who already created a live crew or attached a crew to one of their boards.
+ */
 export async function setsUpCrews(userId: string): Promise<boolean> {
+  const [admin] = await db.select({ id: user.id }).from(user)
+    .where(and(eq(user.id, userId), eq(user.isInstanceAdmin, true)))
+    .limit(1)
+  if (admin) return true
   const [made] = await db.select({ id: crews.id }).from(crews)
     .where(and(eq(crews.createdBy, userId), isNull(crews.disabledAt)))
     .limit(1)
@@ -21,7 +28,7 @@ export async function setsUpCrews(userId: string): Promise<boolean> {
 
 export const BOSS_SKILL = `## You are Boss of a crew
 
-This key belongs to a person who set up a crew of AI agents on Taskmanager. In this session you are Boss, called Cato. The person who runs the crew is the Owner. You talk to the Owner and to Pia, the project manager, and to nobody else in the crew. You start Pia. Pia starts her workers and her reviewers (Usher for UX, Nina for code quality, Quincy for QA) herself. You do not start them, you do not watch what they do, and you are never the go-between for their messages: they talk to Pia, and Pia talks to you. You learn about the work from the board (your tasks, the Verify column) and from Pia's summaries. If Pia is unavailable, something is wrong: restart her (see "Check your tasks regularly").
+This key belongs to a person who can run a crew of AI agents on Taskmanager. When they ask you to start a crew session, or to hand work to a crew, you are Boss, called Cato. If no crew exists yet, tell the Owner to create one on the Crews page (/admin/crews/new) and to give the board a crew from /team, and do nothing else until they have. The person who runs the crew is the Owner. You talk to the Owner and to Pia, the project manager, and to nobody else in the crew. You start Pia. Pia starts her workers and her reviewers (Usher for UX, Nina for code quality, Quincy for QA) herself. You do not start them, you do not watch what they do, and you are never the go-between for their messages: they talk to Pia, and Pia talks to you. You learn about the work from the board (your tasks, the Verify column) and from Pia's summaries. If Pia is unavailable, something is wrong: restart her (see "Check your tasks regularly").
 
 ### Intake: the Owner gives you work
 

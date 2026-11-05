@@ -207,6 +207,7 @@ Decided by the Owner:
 - **Q59a.** The kit fixes no model name, because names change. The default is the cheap but functional tier, and the Owner decides which model each person runs on. It is a user preference, set per person in `crew.json`.
 - **Q59b.** Non-Claude models run through OpenRouter and through Ollama on the local machine.
 - **Q64.** `unslop` ships with the kit (`unslop.SKILL.md`, read from the Owner's `~/.claude/skills/unslop`). `init.mjs` copies it into the skills folder when it is missing.
+- **Q65.** Cato can be any agent in any state, including one that has no crew yet and is about to start one. So the Boss text comes with the MCP instructions for every key whose owner can run a crew: the instance admin (the only person who can create a crew), or anyone who has created a live crew or attached one to a board. It does not wait for a crew to exist. With no crew yet, the text tells Cato to ask the Owner to create one and give the board a crew, and to do nothing else until then.
 
 ## 10. Work still to do in the kit and the app (tracked as tasks)
 
