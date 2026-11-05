@@ -326,7 +326,7 @@ async function copySkill() {
               <p class="text-xs text-muted">
                 For an agent of your own, not Sprocket: each Sprocket run gets a short-lived key of its own.
                 Start Claude Code on the agent's machine from a terminal where you ran
-                <code class="font-mono">export TASKMANAGER_API_KEY=arn_…</code>, then paste this. It connects
+                <code class="font-mono">export TASKMANAGER_API_KEY=arn_…</code>, then paste this. Put the export line in your shell profile too (~/.zshrc on a Mac, ~/.bashrc on Linux), so a new terminal has the key. It connects
                 the MCP server and installs the crew kit and its skill, using the key only as that variable.
               </p>
               <pre class="text-xs font-mono bg-elevated/50 border border-default rounded-md p-3 overflow-x-auto max-h-64">{{ instructions }}</pre>

@@ -49,8 +49,14 @@ export function mcpAddCommand(origin: string): string {
  * runs, because each line is a command of its own.
  */
 export function mcpReplaceCommand(origin: string, token = 'arn_your_key_here'): string {
-  return `${exportKeyCommand(token)}\nclaude mcp remove --scope user taskmanager 2>/dev/null\n${mcpAddCommand(origin)}`
+  return `${PROFILE_STEP}\n${exportKeyCommand(token)}\nclaude mcp remove --scope user taskmanager 2>/dev/null\n${mcpAddCommand(origin)}`
 }
+
+/**
+ * The profile step, as shell comments at the top of a copied command, so it travels with the copy:
+ * a new terminal then starts with the new key, and the comment does nothing when pasted.
+ */
+export const PROFILE_STEP = '# Also put the export line below in your shell profile, in place of any older TASKMANAGER_API_KEY line:\n# ~/.zshrc on a Mac, ~/.bashrc on Linux. Then open a new terminal before you start claude.'
 
 /** Where the variable has to live, so a new terminal or a restarted agent still finds the key. */
 export const KEY_VARIABLE_HOME = 'Put the export line in the shell profile of the terminal that starts Claude Code: ~/.zshrc on a Mac, ~/.bashrc on Linux. An app that starts Claude Code with environment settings of its own needs TASKMANAGER_API_KEY in those settings instead; a shell profile is not read there.'

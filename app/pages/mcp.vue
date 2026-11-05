@@ -24,7 +24,7 @@ function scopeLabel(scope: string): string {
 const origin = computed(() => (import.meta.client ? window.location.origin : ''))
 const endpoint = computed(() => `${origin.value}/api/mcp`)
 
-const claudeCodeCommand = computed(() => `${exportKeyCommand()}\n${mcpAddCommand(origin.value)}`)
+const claudeCodeCommand = computed(() => `${PROFILE_STEP}\n${exportKeyCommand()}\n${mcpAddCommand(origin.value)}`)
 
 const claudeCodeReplaceCommand = computed(() => mcpReplaceCommand(origin.value))
 
