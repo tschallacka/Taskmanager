@@ -187,6 +187,12 @@ async function teamIdsOf(userId: string): Promise<string[]> {
   return rows.map(row => row.teamId)
 }
 
+/** Whether a key is cut down to one customer's boards, or to single boards and not to a whole workspace. */
+export function isNarrowedReach(customerId: string | null, reach: KeyReach): boolean {
+  if (customerId) return true
+  return !reach.allBoards && reach.workspaceTeamIds.length === 0 && reach.boardIds.length > 0
+}
+
 export function hasScope(context: ApiKeyContext, scope: ApiKeyScope): boolean {
   return context.scopes.includes(scope)
 }

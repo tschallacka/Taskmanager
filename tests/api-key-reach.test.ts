@@ -12,7 +12,7 @@ import type { ApiKeyContext, KeyReach } from '../server/utils/api-keys'
 Object.assign(globalThis, { createError })
 
 const { db } = await import('../server/db')
-const { apiKeys, apiKeyBoards, apiKeyWorkspaces, member, organization, projects, user } = await import('../server/db/schema')
+const { apiKeys, apiKeyBoards, apiKeyWorkspaces, member, organization, projectGuests, projects, user } = await import('../server/db/schema')
 const { boardFilter, audienceOf } = await import('../server/utils/mcpAccess')
 const { isNarrowedReach } = await import('../server/utils/api-keys')
 
@@ -122,10 +122,10 @@ test('a grant on a board the owner has no access to reaches nothing', async () =
 })
 
 test('a board is lost to a key as soon as its owner leaves the workspace', async () => {
-  const context = await contextFor(keys.fixed, { allBoards: false, workspaceTeamIds: [], boardIds: [boards.a1] })
   await db.delete(member).where(eq(member.userId, owner))
   try {
-    assert.deepEqual(await reachableIds(context, [boards.a1]), [])
+    // Memberships are read per call, so the owner's context is built again after the change.
+    assert.deepEqual(await reachableIds(await contextFor(keys.fixed, { allBoards: false, workspaceTeamIds: [], boardIds: [boards.a1] }), [boards.a1]), [])
   } finally {
     await db.insert(member).values({ id: id('member-a-again'), organizationId: teamA, userId: owner, role: 'owner', createdAt: at })
   }
@@ -136,6 +136,15 @@ test('a board in another workspace is a customer board to the key, a board in th
   assert.equal(audienceOf(context, { id: boards.a1, userId: owner, teamId: teamA }), 'staff')
   assert.equal(audienceOf(context, { id: boards.personal, userId: owner, teamId: null }), 'staff')
   assert.equal(audienceOf(context, { id: boards.b1, userId: owner, teamId: teamB }), 'customer')
+})
+
+test('a workspace where the owner is only a guest is a customer audience, and its board is reached as a guest board', async () => {
+  const guestBoard = id('board-guest')
+  await addBoard(guestBoard, teamB)
+  await db.insert(projectGuests).values({ id: id('guest-row'), projectId: guestBoard, userId: owner, role: 'editor', addedBy: owner, createdAt: now })
+  const context = await contextFor(keys.all, { allBoards: true, workspaceTeamIds: [], boardIds: [] })
+  assert.ok((await reachableIds(context, [guestBoard])).includes(guestBoard))
+  assert.equal(audienceOf(context, { id: guestBoard, userId: owner, teamId: teamB }), 'customer')
 })
 
 test('a key is narrowed when it has single boards and no whole workspace, or a customer', () => {

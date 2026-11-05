@@ -6,7 +6,8 @@
 // what that audience may change. Anything hidden from them is hidden from the
 // agent, and anything the app would refuse them is refused here.
 import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm'
-import { projects, projectTasks } from '../db/schema'
+import { organization, projects, projectTasks } from '../db/schema'
+import { db } from '../db'
 import type { Project } from '../db/schema'
 import { isNarrowedReach } from './api-keys'
 import type { ApiKeyContext } from './api-keys'
@@ -63,6 +64,40 @@ export function audienceOf(context: ApiKeyContext, board: Pick<Project, 'userId'
   if (board.id && context.readGrantedBoardIds?.includes(board.id)) return 'staff'
   if (board.teamId) return context.memberTeamIds.includes(board.teamId) ? 'staff' : 'customer'
   return board.userId === context.userId ? 'staff' : 'customer'
+}
+
+export interface ReachedWorkspace {
+  /** NULL is the owner's personal workspace. */
+  teamId: string | null
+  name: string
+}
+
+/**
+ * The workspaces a key reaches, so a board can be put in one of them. Select all reaches every
+ * workspace the owner is in and the personal one; a grant reaches its workspaces and the workspaces of
+ * its boards. A workspace the owner has left counts for nothing.
+ */
+export async function workspacesReachedBy(context: ApiKeyContext): Promise<ReachedWorkspace[]> {
+  let teamIds: (string | null)[]
+  if (context.reach.allBoards) {
+    teamIds = [null, ...context.memberTeamIds]
+  } else {
+    const teams = new Set<string | null>(context.reach.workspaceTeamIds)
+    if (context.reach.boardIds.length) {
+      const rows = await db.select({ teamId: projects.teamId }).from(projects).where(inArray(projects.id, context.reach.boardIds))
+      for (const row of rows) teams.add(row.teamId)
+    }
+    teamIds = [...teams]
+  }
+  const kept = teamIds.filter(teamId => teamId === null || context.memberTeamIds.includes(teamId))
+  const named = new Map<string, string>()
+  const withTeam = kept.filter((teamId): teamId is string => teamId !== null)
+  if (withTeam.length) {
+    for (const row of await db.select({ id: organization.id, name: organization.name }).from(organization).where(inArray(organization.id, withTeam))) {
+      named.set(row.id, row.name)
+    }
+  }
+  return kept.map(teamId => ({ teamId, name: teamId === null ? 'Personal' : named.get(teamId) ?? 'Team' }))
 }
 
 /** Refuses what only a board's team may do, naming what was attempted. */

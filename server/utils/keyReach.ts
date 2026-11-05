@@ -7,6 +7,7 @@ import { db } from '../db'
 import { agentAudit, apiKeyBoards, apiKeyWorkspaces, apiKeys, member, organization, projects } from '../db/schema'
 import type { ApiKey, ApiKeyScope } from '../db/schema'
 import type { ApiKeyContext } from './api-keys'
+import { workspaceTopic } from './realtime'
 import { boardFilter } from './mcpAccess'
 import { genId } from './projects'
 
@@ -153,6 +154,20 @@ export async function reachViewsOf(keys: ApiKey[]): Promise<Map<string, KeyReach
     })
   }
   return views
+}
+
+/**
+ * The live-refresh topic a write goes to. A write on a board refreshes the workspace the board is in,
+ * which need not be the key's own workspace; without a board, the key's workspace.
+ */
+export function workspaceTopicOfWrite(userId: string, boardTeamId: string | null | undefined, keyTeamId: string | null): string {
+  return workspaceTopic(userId, boardTeamId === undefined ? keyTeamId : boardTeamId)
+}
+
+/** The workspace a board is in, or undefined when no board has that id. */
+export async function workspaceOfBoard(projectId: string): Promise<string | null | undefined> {
+  const [row] = await db.select({ teamId: projects.teamId }).from(projects).where(eq(projects.id, projectId))
+  return row ? row.teamId : undefined
 }
 
 /** One line in the agent audit about a key the owner changed. Best effort: a failure is logged and swallowed. */
