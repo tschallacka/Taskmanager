@@ -216,12 +216,21 @@ function resend(invitation: Invitation) {
   }, 'Could not resend that')
 }
 
-async function decide(invitation: Invitation, approve: boolean) {
+// Declining asks for an optional word for the guest manager who asked, so they know why.
+const decliningId = ref<string | null>(null)
+const declineNote = ref('')
+function startDecline(invitation: Invitation) {
+  decliningId.value = invitation.id
+  declineNote.value = ''
+}
+
+async function decide(invitation: Invitation, approve: boolean, note?: string) {
   await act(`i:${invitation.id}`, async () => {
     const answer = await untypedFetch<{ url?: string, emailed?: boolean }>(`${base.value}/guests/invitations/${invitation.id}/${approve ? 'approve' : 'decline'}`, {
-      method: 'POST', headers: realtimeHeaders(), body: {}
+      method: 'POST', headers: realtimeHeaders(), body: approve || !note?.trim() ? {} : { note: note.trim() }
     })
     if (approve && answer?.url) approvedLink.value = { email: invitation.email, url: answer.url, emailed: Boolean(answer.emailed) }
+    decliningId.value = null
   }, 'Could not decide that')
 }
 
@@ -672,7 +681,7 @@ watch(open, (isOpen) => {
                       color="neutral"
                       variant="soft"
                       :disabled="busy === `i:${invitation.id}`"
-                      @click="decide(invitation, false)"
+                      @click="startDecline(invitation)"
                     />
                   </template>
                   <UButton
@@ -691,6 +700,39 @@ watch(open, (isOpen) => {
                 >
                   “{{ invitation.reason }}”
                 </p>
+                <div
+                  v-if="decliningId === invitation.id"
+                  class="mt-2 space-y-2 pl-11"
+                  data-share-decline-note
+                >
+                  <UTextarea
+                    v-model="declineNote"
+                    :rows="2"
+                    :maxlength="300"
+                    autofocus
+                    placeholder="Optional: tell them why, so they know what to do next"
+                    class="w-full"
+                    data-share-decline-note-input
+                  />
+                  <div class="flex gap-2">
+                    <UButton
+                      label="Decline request"
+                      size="xs"
+                      color="error"
+                      :loading="busy === `i:${invitation.id}`"
+                      data-share-decline-confirm
+                      @click="decide(invitation, false, declineNote)"
+                    />
+                    <UButton
+                      label="Cancel"
+                      size="xs"
+                      color="neutral"
+                      variant="ghost"
+                      :disabled="busy === `i:${invitation.id}`"
+                      @click="decliningId = null"
+                    />
+                  </div>
+                </div>
               </li>
             </ul>
             <p

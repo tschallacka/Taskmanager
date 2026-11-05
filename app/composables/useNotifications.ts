@@ -179,12 +179,12 @@ export function useNotifications() {
 
   /**
    * A project admin approves or declines a guest manager's request from the inbox. An approval answers
-   * with the invitation link (once) and whether it was mailed.
+   * with the invitation link (once) and whether it was mailed. A decline may carry a word for the guest manager.
    */
-  async function decideGuestRequest(item: NotificationItem, approve: boolean): Promise<{ url?: string, emailed?: boolean }> {
+  async function decideGuestRequest(item: NotificationItem, approve: boolean, note?: string): Promise<{ url?: string, emailed?: boolean }> {
     const base = `/api/projects/${item.projectId}/guests/invitations/${item.invitationId}`
     const answer = await request<{ url?: string, emailed?: boolean }>(`${base}/${approve ? 'approve' : 'decline'}`, {
-      method: 'POST', headers: realtimeHeaders(), body: {}
+      method: 'POST', headers: realtimeHeaders(), body: approve || !note?.trim() ? {} : { note: note.trim() }
     })
     await load()
     return answer ?? {}

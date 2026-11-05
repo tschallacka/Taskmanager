@@ -15,16 +15,25 @@ onMounted(load)
 
 // A guest manager's request for a person outside their domain is decided here, by a project admin.
 const deciding = ref<string | null>(null)
+// The request whose Decline asks for an optional word for the person who asked, and what was typed.
+const declining = ref<string | null>(null)
+const declineNote = ref('')
 // The link of an invitation just approved, when no mail could carry it.
 const approvedLinks = ref<Record<string, string>>({})
 
-async function decide(item: NotificationItem, approve: boolean) {
+function startDecline(item: NotificationItem) {
+  declining.value = item.id
+  declineNote.value = ''
+}
+
+async function decide(item: NotificationItem, approve: boolean, note?: string) {
   if (deciding.value) return
   deciding.value = item.id
   try {
     if (!item.readAt) markRead([item.id])
-    const answer = await decideGuestRequest(item, approve)
+    const answer = await decideGuestRequest(item, approve, note)
     if (approve && answer.url && !answer.emailed) approvedLinks.value = { ...approvedLinks.value, [item.id]: answer.url }
+    declining.value = null
     toast.add({
       title: approve ? `${item.invitationEmail ?? 'The guest'} is invited` : 'Request declined',
       description: approve ? (answer.emailed ? 'They got the invitation by email.' : 'Copy the link below and send it to them.') : undefined,
@@ -398,7 +407,7 @@ async function sendTest() {
                   </p>
                   <div
                     v-if="item.type === 'guest_request' && item.invitationStatus === 'awaiting_approval'"
-                    class="mt-2 flex gap-2"
+                    class="mt-2 flex flex-wrap gap-2"
                     data-guest-request-actions
                     @click.stop
                   >
@@ -418,8 +427,42 @@ async function sendTest() {
                       variant="soft"
                       :disabled="deciding === item.id"
                       data-guest-decline
-                      @click="decide(item, false)"
+                      @click="startDecline(item)"
                     />
+                    <div
+                      v-if="declining === item.id"
+                      class="basis-full space-y-2"
+                      data-guest-decline-note
+                    >
+                      <UTextarea
+                        v-model="declineNote"
+                        :rows="2"
+                        :maxlength="300"
+                        autofocus
+                        placeholder="Optional: tell them why, so they know what to do next"
+                        class="w-full"
+                        data-guest-decline-note-input
+                      />
+                      <div class="flex gap-2">
+                        <UButton
+                          label="Decline request"
+                          icon="i-lucide-user-x"
+                          size="xs"
+                          color="error"
+                          :loading="deciding === item.id"
+                          data-guest-decline-confirm
+                          @click="decide(item, false, declineNote)"
+                        />
+                        <UButton
+                          label="Cancel"
+                          size="xs"
+                          color="neutral"
+                          variant="ghost"
+                          :disabled="deciding === item.id"
+                          @click="declining = null"
+                        />
+                      </div>
+                    </div>
                   </div>
                   <p
                     v-else-if="item.type === 'guest_request' && item.invitationStatus"

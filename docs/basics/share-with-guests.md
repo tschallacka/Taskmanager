@@ -94,7 +94,10 @@ Inbox item has **Approve** and **Decline** buttons, and so does the request in *
 - **Approve** turns it into a normal invitation. If your instance can send mail, the link is mailed. Otherwise it is
   shown for you to copy, in the Inbox item or under **Who has access**, and only in that browser view. The manager
   guest who asked gets an Inbox message that it was approved.
-- **Decline** closes it, and the manager guest is told. Neither place has a field for a note to them.
+- **Decline** opens a small box, in the Inbox and in **Share** alike. Write a word for the manager guest, up to 300
+  characters, such as why that person cannot be invited, then press **Decline request**. The note is optional: with the
+  box empty the manager guest is still told the request was not approved. They see the note in their own inbox.
+  **Cancel** closes the box and leaves the request waiting.
 
 ## Change or remove a guest
 
