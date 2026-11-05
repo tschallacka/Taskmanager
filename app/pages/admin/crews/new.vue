@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { guessCrewHome, shellCrewHome } from '~/utils/crewHome'
+
 definePageMeta({ layout: 'app' })
 
 useSeoMeta({ title: 'New crew' })
@@ -179,7 +181,8 @@ interface HelperStep {
 const origin = import.meta.client ? window.location.origin : ''
 const base = computed(() => creds.value?.base ?? origin)
 // Every crew gets a home folder of its own, so a second crew on the same computer sits next to it.
-const crewDir = computed(() => `~/crew-home/${form.slug}`)
+const crewHome = ref('')
+const crewDir = computed(() => crewHome.value || guessCrewHome(form.slug))
 
 const checkSteps = computed<HelperStep[]>(() => [
   {
@@ -280,7 +283,7 @@ const setupSteps = computed<HelperStep[]>(() => [
 const startClaude = computed(() => `export CREW_HOME=${crewDir.value}\nclaude --add-dir ${crewDir.value} ~/crew-kit`)
 
 function sessionCommands(who: string): string {
-  const command = crewChannelCommand(who, `$HOME/crew-home/${form.slug}`)
+  const command = crewChannelCommand(who, shellCrewHome(crewDir.value))
   const channel = command.replace(/\nclaude (.*)$/, '')
   const flags = command.match(/\nclaude (.*)$/)?.[1] ?? ''
   const dir = `~/crew-sessions/${form.slug}-${who}`
@@ -712,6 +715,11 @@ const nextHint = computed(() => {
           v-else-if="step === 3"
           class="space-y-3"
         >
+          <CrewHomeField
+            :key="form.slug"
+            v-model="crewHome"
+            :slug="form.slug"
+          />
           <div class="rounded-lg border border-default p-4 space-y-3 text-sm">
             <p class="font-medium text-default">
               How this step works
