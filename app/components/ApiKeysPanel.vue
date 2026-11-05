@@ -344,7 +344,7 @@ function expiryLabel(key: ApiKeySummary): string {
               Already connected? One paste replaces the key: it sets the new key, removes the old server and adds it
               again. Restart Claude Code from a terminal that has the new key, since a running session keeps the old one.
             </p>
-            <div class="flex gap-2">
+            <div class="flex flex-col sm:flex-row gap-2">
               <pre class="flex-1 min-w-0 text-xs font-mono bg-default border border-default rounded-md px-3 py-2 whitespace-pre-wrap break-all">{{ replaceCommand }}</pre>
               <UButton
                 :icon="replaceCopied ? 'i-lucide-check' : 'i-lucide-copy'"
