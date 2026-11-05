@@ -27,7 +27,7 @@ export const CREW_PEOPLE = [
   { key: 'w2', name: 'Wick Worker', role: 'worker 2', team: 'member' },
   { key: 'w3', name: 'Wynn Worker', role: 'worker 3', team: 'member' },
   { key: 'w4', name: 'Wade Worker', role: 'worker 4', team: 'member' },
-  { key: 'pietje', name: 'Pietje Precies', role: 'usability tester: browses the dev copy, tries every feature', team: 'member' },
+  { key: 'pietje', name: 'Peter Precise', role: 'usability tester: browses the dev copy, tries every feature', team: 'member' },
   { key: 'nitpicker', name: 'Nina Nitpick', role: 'code quality reviewer: reviews pull requests, times her review', team: 'member' },
   { key: 'customer', name: 'Scrappy Customer', role: 'the customer: asks for things, never sees internal tasks', team: 'contact' },
   { key: 'contact', name: 'Casey Customer', role: 'customer contact: sees only what is shared with the customer', team: 'contact' }

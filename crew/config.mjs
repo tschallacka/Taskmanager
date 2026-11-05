@@ -37,10 +37,10 @@ export const config = {
   customer: { name: 'The Customer', personName: 'Casey Customer', nick: 'customer', ...raw.customer },
   people: {
     boss: 'Boss', pm: 'Pia Planner', w1: 'Wren Worker', w2: 'Wick Worker', w3: 'Wynn Worker', w4: 'Wade Worker',
-    pietje: 'Pietje Precies', nitpicker: 'Nina Nitpick', contact: 'Casey Contact', watcher: 'Log Watcher',
+    pietje: 'Peter Precise', nitpicker: 'Nina Nitpick', contact: 'Casey Contact', watcher: 'Log Watcher',
     ...raw.people
   },
-  nicks: { pm: 'pia', w1: 'wren', w2: 'wick', w3: 'wynn', w4: 'wade', pietje: 'pietje', nitpicker: 'nitpicker', ...raw.nicks },
+  nicks: { pm: 'pia', w1: 'wren', w2: 'wick', w3: 'wynn', w4: 'wade', pietje: 'peter', nitpicker: 'nitpicker', ...raw.nicks },
   // The chat line is optional and off by default: with no client, meetings and steering go
   // through the board (board messages, `list_messages`).
   chat: { client: '', channel: '#crew', workChannel: '#crewwork', ...raw.chat },
