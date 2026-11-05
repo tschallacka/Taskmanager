@@ -11,7 +11,7 @@
 
 import assert from 'node:assert/strict'
 import { execFile, spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import http from 'node:http'
 import { randomBytes } from 'node:crypto'
 import { homedir, tmpdir } from 'node:os'
@@ -486,6 +486,179 @@ describe('CREW_HOME and the agent types', () => {
     assert.equal(answer.people.wren.apiKey, 'arn_crewkey')
     assert.equal(answer.people['internal-tools-wren'].apiKey, 'arn_forkone')
     assert.equal(answer.people['internal-tools-pia'].email, 'acme-f1-pia@crew.invalid')
+  })
+})
+
+// ---------- crew update: the kit folder and the owner files (no browser needed) ----------
+
+describe('crew update: the kit folder and the owner files', () => {
+  const kitFilesOf = dir => readFileSync(join(dir, 'kit-files.txt'), 'utf8').split('\n').map(line => line.trim()).filter(line => line && !line.startsWith('#'))
+  const editFile = (path, change) => writeFileSync(path, change(readFileSync(path, 'utf8')))
+
+  // A copy of the kit's listed files, as a folder the crew runs from.
+  function copyKit(dest, from = KIT) {
+    mkdirSync(dest, { recursive: true })
+    for (const name of [...kitFilesOf(from), 'kit-files.txt']) copyFileSync(join(from, name), join(dest, name))
+  }
+  function writeConfig(crew, url) {
+    writeFileSync(join(crew.home, 'crew.json'), JSON.stringify({ team: 'Test Crew', crew: { slug: 'test' }, product: { name: 'Test', repo: '' }, board: { url } }))
+  }
+  function newCrew() {
+    const root = mkdtempSync(join(SCRATCH, 'kit-update-'))
+    made.push(root)
+    const crew = { root, home: join(root, 'home'), claude: join(root, 'claude') }
+    mkdirSync(crew.home)
+    mkdirSync(crew.claude)
+    writeConfig(crew, 'http://127.0.0.1:9')
+    return crew
+  }
+  const runScript = (file, args, crew) => new Promise(resolve => execFile(process.execPath, [file, ...args], {
+    env: { ...process.env, CREW_HOME: crew.home, CLAUDE_CONFIG_DIR: crew.claude },
+    timeout: 120000
+  }, (error, stdout, stderr) => resolve({ code: error ? error.code ?? 1 : 0, stdout, stderr })))
+  const updateKit = (dir, crew, args = []) => runScript(join(dir, 'update.mjs'), args, crew)
+
+  // The kit folder the crew runs from: a copy of this kit, rendered once by init. init's FAIL line about
+  // playwright is expected in a copy with no node_modules, and these tests do not check it.
+  async function installedKit(crew) {
+    const dir = join(crew.root, 'kitA')
+    copyKit(dir)
+    await runScript(join(dir, 'init.mjs'), [], crew)
+    return dir
+  }
+  // A newer kit: a changed CHANGELOG line about the server, a changed template line, watch.mjs removed.
+  function newerKit(dirA, crew) {
+    const dir = join(crew.root, 'kitB')
+    copyKit(dir, dirA)
+    editFile(join(dir, 'CHANGELOG.md'), text => `${text}\n- Test line for the server/ side.\n`)
+    editFile(join(dir, 'PROJECT-RULES.md.tmpl'), text => text.replace('Replace the examples below', 'Replace the examples here'))
+    rmSync(join(dir, 'watch.mjs'))
+    editFile(join(dir, 'kit-files.txt'), text => text.replace(/^watch\.mjs\n/m, ''))
+    return dir
+  }
+  const ownerFile = crew => join(crew.home, 'PROJECT-RULES.md')
+  const backupsOf = crew => readdirSync(join(crew.home, 'backups')).filter(name => name.startsWith('update-'))
+  function snapshot(dir, base = dir, out = {}) {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name)
+      if (entry.isDirectory()) snapshot(path, base, out)
+      else out[path.slice(base.length)] = readFileSync(path, 'utf8')
+    }
+    return out
+  }
+
+  test('a kit folder that matches the kit changes nothing', async () => {
+    const crew = newCrew()
+    const dirA = await installedKit(crew)
+    const before = snapshot(crew.home)
+    const out = await updateKit(dirA, crew, ['--from', KIT, '--kit', dirA])
+    assert.equal(out.code, 0, out.stderr)
+    assert.match(out.stdout, /is up to date/)
+    assert.deepEqual(snapshot(crew.home), before, 'the crew home is the same after the check')
+    assert.deepEqual(backupsOf(crew), [], 'no backup when nothing changed')
+  })
+
+  test('--check reports an available update and writes nothing', async () => {
+    const crew = newCrew()
+    const dirA = await installedKit(crew)
+    const dirB = newerKit(dirA, crew)
+    const before = snapshot(crew.home)
+    const out = await updateKit(dirA, crew, ['--check', '--from', dirB, '--kit', dirA])
+    assert.equal(out.code, 1, out.stderr)
+    assert.match(out.stdout, /An update is available/)
+    assert.deepEqual(snapshot(crew.home), before)
+    assert.doesNotMatch(readFileSync(join(dirA, 'CHANGELOG.md'), 'utf8'), /Test line/, 'the kit is not changed by a check')
+  })
+
+  test('an update installs the newer kit, merges the owner file and lists the server-side change', async () => {
+    const crew = newCrew()
+    const dirA = await installedKit(crew)
+    const dirB = newerKit(dirA, crew)
+    editFile(ownerFile(crew), text => `${text}\nOwner line kept.\n`)
+    const out = await updateKit(dirA, crew, ['--from', dirB, '--kit', dirA])
+    assert.match(out.stdout, /PROJECT-RULES\.md: your edits and the new template merged cleanly/, out.stdout + out.stderr)
+    assert.equal(existsSync(join(dirA, 'watch.mjs')), false, 'a file the new kit no longer ships is removed')
+    assert.match(readFileSync(join(dirA, 'CHANGELOG.md'), 'utf8'), /Test line for the server\/ side/)
+    const owner = readFileSync(ownerFile(crew), 'utf8')
+    assert.match(owner, /Owner line kept\./, 'owner text is not lost')
+    assert.match(owner, /Replace the examples here/, 'the new template line is in')
+    assert.doesNotMatch(owner, /<<<<<<</)
+    assert.match(out.stdout, /server side, not changed here: Test line for the server\/ side\./)
+    const [backup] = backupsOf(crew)
+    assert.ok(backup, 'a backup folder was made')
+    assert.ok(existsSync(join(crew.home, 'backups', backup, 'kit', 'watch.mjs')), 'the removed file is in the backup')
+    const manifest = JSON.parse(readFileSync(join(crew.home, 'crew-kit.json'), 'utf8'))
+    assert.ok(manifest.files['update.mjs'], 'the install is recorded')
+    const again = await updateKit(dirA, crew, ['--check', '--from', dirB, '--kit', dirA])
+    assert.equal(again.code, 0, again.stdout)
+  })
+
+  test('an owner edit on the line the template changed is a conflict: the owner file is kept', async () => {
+    const crew = newCrew()
+    const dirA = await installedKit(crew)
+    const dirB = newerKit(dirA, crew)
+    editFile(ownerFile(crew), text => text.replace('Replace the examples below', 'Replace the examples by hand'))
+    const out = await updateKit(dirA, crew, ['--from', dirB, '--kit', dirA])
+    assert.equal(out.code, 1)
+    assert.match(out.stdout, /CONFLICT PROJECT-RULES\.md/)
+    const owner = readFileSync(ownerFile(crew), 'utf8')
+    assert.match(owner, /Replace the examples by hand/, 'the owner text is kept')
+    assert.doesNotMatch(owner, /<<<<<<</)
+    const [backup] = backupsOf(crew)
+    assert.match(readFileSync(join(crew.home, 'backups', backup, 'PROJECT-RULES.md.merged'), 'utf8'), /<<<<<<</, 'the merge with markers is set aside')
+  })
+
+  test('a crew home with no recorded template keeps its owner file and sets the new one aside', async () => {
+    const crew = newCrew()
+    const dirA = await installedKit(crew)
+    const dirB = newerKit(dirA, crew)
+    rmSync(join(crew.home, 'kit-base'), { recursive: true, force: true })
+    editFile(ownerFile(crew), text => `${text}\nOwner line kept.\n`)
+    const out = await updateKit(dirA, crew, ['--from', dirB, '--kit', dirA])
+    assert.match(out.stdout, /WARN PROJECT-RULES\.md: the template it came from is not recorded/)
+    assert.match(readFileSync(ownerFile(crew), 'utf8'), /Owner line kept\./)
+    const [backup] = backupsOf(crew)
+    assert.match(readFileSync(join(crew.home, 'backups', backup, 'PROJECT-RULES.md.new'), 'utf8'), /Replace the examples here/)
+  })
+
+  test('a kit without update.mjs is refused and the kit folder is left alone', async () => {
+    const crew = newCrew()
+    const dirA = await installedKit(crew)
+    const dirB = newerKit(dirA, crew)
+    rmSync(join(dirB, 'update.mjs'))
+    editFile(join(dirB, 'kit-files.txt'), text => text.replace(/^update\.mjs\n/m, ''))
+    const out = await updateKit(dirA, crew, ['--from', dirB, '--kit', dirA])
+    assert.equal(out.code, 3)
+    assert.match(out.stderr, /cannot update itself/)
+    assert.ok(existsSync(join(dirA, 'watch.mjs')))
+    assert.deepEqual(backupsOf(crew), [])
+  })
+
+  test('without --from the kit comes from the board, and its version is reported', async () => {
+    const crew = newCrew()
+    const dirA = await installedKit(crew)
+    const dirB = newerKit(dirA, crew)
+    const archive = join(crew.root, 'kit.tar.gz')
+    const packed = spawnSync('tar', ['-czf', archive, '-C', dirB, ...kitFilesOf(dirB)], { encoding: 'utf8' })
+    assert.equal(packed.status, 0, packed.stderr)
+    const body = readFileSync(archive)
+    const server = http.createServer((req, res) => {
+      if (req.url !== '/crew/kit.tar.gz') {
+        res.statusCode = 404
+        return res.end('')
+      }
+      res.setHeader('x-crew-kit-version', 'abc123def456')
+      res.end(body)
+    })
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+    try {
+      writeConfig(crew, `http://127.0.0.1:${server.address().port}`)
+      const out = await updateKit(dirA, crew)
+      assert.match(out.stdout, /\(version abc123def456\)/, out.stdout + out.stderr)
+      assert.match(readFileSync(join(dirA, 'CHANGELOG.md'), 'utf8'), /Test line for the server/)
+    } finally {
+      server.close()
+    }
   })
 })
 

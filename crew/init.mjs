@@ -9,7 +9,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, chmodS
 import { execSync } from 'node:child_process'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { CAST, agentNames, config, here, kitDir, loadForks, modelProblems, templateValues } from './config.mjs'
+import { CAST, OWNER_FILES, agentNames, config, here, kitDir, loadForks, modelProblems, renderTemplate, templateValues } from './config.mjs'
 
 const ok = m => console.log(`  ok   ${m}`)
 const warn = m => console.log(`  WARN ${m}`)
@@ -102,7 +102,7 @@ console.log('\nWriting')
 mkdirSync(`${here}work`, { recursive: true })
 mkdirSync(`${here}backups`, { recursive: true })
 const values = templateValues()
-const render = text => text.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (all, key) => (key in values ? values[key] : all))
+const render = text => renderTemplate(text, values)
 
 // The templates ship in the kit folder; the documents are written to CREW_HOME.
 for (const file of readdirSync(kitDir).filter(f => f.endsWith('.tmpl'))) {
@@ -111,13 +111,17 @@ for (const file of readdirSync(kitDir).filter(f => f.endsWith('.tmpl'))) {
     if (!config.fontDir) continue
   }
   // Documents the owner edits by hand are written once.
-  if ((out === 'PROJECT-RULES.md' || out === 'BRIEF.md') && existsSync(`${here}${out}`)) {
+  if (OWNER_FILES.includes(out) && existsSync(`${here}${out}`)) {
     ok(`${out} exists, kept`)
     continue
   }
   const text = render(readFileSync(`${kitDir}/${file}`, 'utf8'))
   const left = text.match(/\{\{[^}]+\}\}/g)
   writeFileSync(`${here}${out}`, text)
+  if (OWNER_FILES.includes(out)) {
+    mkdirSync(`${here}kit-base`, { recursive: true, mode: 0o700 })
+    writeFileSync(`${here}kit-base/${out}`, text, { mode: 0o600 })
+  }
   ok(`${out}${left ? `  (unfilled: ${[...new Set(left)].join(' ')})` : ''}`)
 }
 

@@ -339,6 +339,6 @@ Limits, which the design does not remove:
 
 ## Updating
 
-Get the new kit (`/crew/kit.tar.gz`) and unpack it over this folder. Your state is in `CREW_HOME`,
-and the kit's changes are in `CHANGELOG.md`. Run `node init.mjs` again (from the kit folder) to render the documents
-from the new templates. The kit's `x-crew-kit-version` response header names the build.
+`crew update` brings the kit folder up to date with the kit the board serves. `crew update --check` says whether an update is waiting and writes nothing. `crew update --from <folder or kit.tar.gz>` installs a kit you already have. Your state stays in `CREW_HOME`.
+Every kit file it replaces or removes is first copied to `CREW_HOME/backups/update-<time>/kit`. The owner's files (`PROJECT-RULES.md`, `BRIEF.md`) are merged from the template they came from, kept in `CREW_HOME/kit-base`, so your edits and a template change both survive. When both change the same line, your file is kept, the merge with markers is set aside in the backup, and the update says CONFLICT. The skill copies in the Claude skills folder are refreshed only while they still match the old kit. Then `init` renders the documents from the new templates, and the install is recorded in `CREW_HOME/crew-kit.json`.
+The kit's changes are in `CHANGELOG.md`; a line about the Taskmanager server is listed in the report, never made here. A kit from before this command has no `update.mjs`: unpack the new kit into a folder of its own and run `node update.mjs --kit <the old kit folder>` from there. Exit codes: 0 up to date or installed, 1 an update is waiting (`--check`), or a CONFLICT or FAIL needs a hand, 3 the kit could not be fetched or is refused.

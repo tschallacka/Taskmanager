@@ -154,6 +154,14 @@ export const agentNames = Object.fromEntries(CAST.map(key => [key, `${slugify(co
 // A path as one shell word, quoted only when it has to be.
 const shellWord = text => (/^[\w@%+=:,./-]+$/.test(text) ? text : `'${text.replace(/'/g, `'\\''`)}'`)
 
+// The documents the owner edits by hand. init writes each once and keeps it; update merges the new template into it.
+export const OWNER_FILES = ['PROJECT-RULES.md', 'BRIEF.md']
+
+/** Fills {{key}} from the template values; a key with no value stays as it is. */
+export function renderTemplate(text, values = templateValues()) {
+  return text.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (all, key) => (key in values ? values[key] : all))
+}
+
 /**
  * Flat view of the config for templates: {{product.name}}, {{chat.channel}}, {{crew_dir}} ...
  * {{node_kit}} starts a kit command with this crew's CREW_HOME, so it works from any session:
