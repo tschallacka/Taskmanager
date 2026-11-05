@@ -43,75 +43,10 @@ const curlCheck = computed(() =>
   + `  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'`
 )
 
-const skill = computed(() => `---
-name: taskmanager
-description: Read and write the user's Taskmanager kanban boards through the Taskmanager MCP server. Use whenever the user asks about their projects, boards or tasks.
----
-
-# Working with Taskmanager
-
-Taskmanager is a kanban board app for projects and tasks. A board has columns —
-kanban stages such as Backlog, To do, Verify, Done — holding tasks; a task has a
-title, a Markdown description, labels and a running log of short updates written
-in inline Markdown.
-
-## Boards
-
-- \`list_boards\` then \`get_board\` gives you the board as it is drawn: columns in
-  order, and in each the tasks with their title, labels and the first line of the
-  description. Do that before creating or moving anything, so board, column and
-  task names match what is really there.
-- \`get_board\` stays small on purpose. Narrow it with \`columns\` when you only care
-  about one stage, pass \`detail: 'titles'\` for a cheap overview, and read the one
-  task you actually need with \`get_task\` — that is where the full description and
-  the update thread live. \`detail: 'full'\` returns every description at once and
-  is rarely what you want.
-- \`create_task\` needs a board, a column and a title. Put detail in the Markdown
-  description, not the title, and pass \`labels\` rather than writing them into
-  the text. \`list_task_labels\` shows which labels already exist.
-- \`move_task\` is how a task changes stage — moving it into Done is what
-  "finished" means here. \`update_task\` replaces whole fields, so read the task
-  first when editing part of a description.
-- Pointing at one exact thing is easiest with a link: paste the URL of a board,
-  or a board with a task open (\`/projects/<id>?task=<id>\`) into \`get_board\` or
-  \`get_task\` and it resolves to that resource — no title to describe, no id to
-  retype.
-- A task's updates are the user's own log — "on staging", "customer came back
-  with feedback", "needs another pass". \`get_task\` reads them, but there is no
-  tool to post one and you should not try to work around that: record what you
-  did in your reply, and change the description only when the user asks.
-- \`delete_column\` and \`delete_task\` move things to the board's trash rather
-  than removing them; \`restore_column\` and \`restore_task\` undo either, and the
-  user can do the same from **Show trashed** on the board. The trash empties
-  itself after 7 days.
-- There is no \`delete_board\`. Deleting a board takes its columns, tasks and
-  updates with it, so it stays with the user in the app.
-- Deleting is still rarely the answer: a finished task belongs in Done via
-  \`move_task\`. Say what you are deleting before you delete it, and restore a
-  mistake rather than recreating it — a restored task keeps its updates.
-
-## Secrets
-
-A project can keep its secrets (environment variables such as API keys) in a
-vault. With the \`secrets:read\` and \`secrets:write\` permissions:
-
-- \`list_project_secrets\` gives the names, never the values.
-- \`get_project_env\` gives the \`.env\` text for what the user may read. The server
-  cannot write files for you: write that text to the project's \`.env\` yourself, and
-  make sure the file is git-ignored.
-- \`set_project_secrets\` adds or changes secrets by name, one or many, and
-  \`delete_project_secret\` removes one. Only project managers may change them.
-
-Never put a value into a task, a message or chat.
-
-## Habits
-
-- Ground every answer about the boards in what the tools returned; never guess
-  at content you have not read.
-- Match the user's existing tags and labels rather than inventing near-duplicates
-  (\`#meeting\` vs \`#meetings\`).
-- Say briefly what you changed after a write. Do not paste raw tool JSON back.
-`)
+// The skill is generated on the server from the tools it really offers (server/utils/agentSkill.ts),
+// so this page never carries a copy that can go stale.
+const { data: skillText, status: skillStatus } = useFetch<string>('/api/settings/skill', { server: false, lazy: true, responseType: 'text' })
+const skill = computed(() => skillText.value ?? '')
 
 const copiedKey = ref<string | null>(null)
 
@@ -353,6 +288,7 @@ async function copy(text: string, id: string) {
               variant="ghost"
               size="xs"
               class="ml-auto"
+              :disabled="!skill"
               @click="copy(skill, 'skill')"
             />
           </div>
@@ -362,7 +298,7 @@ async function copy(text: string, id: string) {
               <code class="font-mono">.claude/skills/taskmanager/SKILL.md</code> in a project, or
               <code class="font-mono">~/.claude/skills/taskmanager/SKILL.md</code> to have it everywhere.
             </p>
-            <pre class="text-xs font-mono bg-elevated/50 border border-default rounded-md p-3 overflow-x-auto max-h-96">{{ skill }}</pre>
+            <pre class="text-xs font-mono bg-elevated/50 border border-default rounded-md p-3 overflow-x-auto max-h-96">{{ skillStatus === 'error' ? 'The skill could not be loaded. Reload the page.' : skill || 'Loading...' }}</pre>
           </div>
         </div>
 

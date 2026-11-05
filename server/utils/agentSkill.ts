@@ -40,7 +40,10 @@ const GROUPS: { title: string, match: (tool: McpToolDefinition) => boolean, note
   { title: 'Goals and portfolios', match: tool => /_(goals?|portfolios?)$/.test(tool.name) },
   { title: 'Status updates', match: tool => /status_update/.test(tool.name) },
   { title: 'Messages', match: tool => /message/.test(tool.name) && !/notification/.test(tool.name) },
-  { title: 'Time', match: tool => /time$/.test(tool.name) }
+  { title: 'Time', match: tool => /time$|_timer$/.test(tool.name),
+    note: 'One timer runs per person. start_timer stops a running one first and logs it; stop_timer logs what it measured.' },
+  { title: 'Help', match: tool => /_help$/.test(tool.name),
+    note: 'Use search_help before answering a question about how Taskmanager itself works; read_help gives a page in full.' }
 ]
 
 /** The first sentence of a description, enough to choose a tool by. */
