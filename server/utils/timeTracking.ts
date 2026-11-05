@@ -118,7 +118,7 @@ export async function currentTimer(userId: string) {
  * nearest minute with a floor of one and a ceiling of a day. Nothing running is
  * not an error: it returns null.
  */
-export async function stopTimer(userId: string, options: { day?: string, now?: number } = {}) {
+export async function stopTimer(userId: string, options: { day?: string, now?: number, note?: string } = {}) {
   const [timer] = await db.select().from(timeTimers).where(eq(timeTimers.userId, userId))
   if (!timer) return null
 
@@ -134,7 +134,7 @@ export async function stopTimer(userId: string, options: { day?: string, now?: n
     userId,
     minutes,
     day: options.day ?? new Date(timer.startedAt).toISOString().slice(0, 10),
-    note: ''
+    note: options.note ?? ''
   })
 }
 

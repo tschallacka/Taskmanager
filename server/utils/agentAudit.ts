@@ -111,6 +111,10 @@ const SUMMARIES: Record<string, Summary> = {
   create_portfolio: v => `Created the portfolio ${quote(v.name)}`,
   update_portfolio: v => `Changed the portfolio ${quote(v.name)}`,
   log_time: v => `Logged ${v.entry?.duration} on the task`,
+  start_timer: v => v.stopped
+    ? `Started a timer on the task and logged ${v.stopped.duration} from the one before`
+    : 'Started a timer on the task',
+  stop_timer: v => v.stopped ? `Stopped the timer and logged ${v.entry?.duration}` : 'Stopped no timer, none was running',
   set_project_secrets: secretsSummary,
   delete_project_secret: v => `Deleted the secret ${v.name}`,
   get_project_env: v => `Read the .env: ${plural(v.names?.length ?? 0, 'variable')}`

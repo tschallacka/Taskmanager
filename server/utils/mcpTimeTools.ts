@@ -1,7 +1,7 @@
 // Agent tools for time tracking: log time against a task, and read what has been
 // logged. Entries belong to the person who owns the API key.
 import { formatDuration } from '#shared/utils/duration'
-import { entriesWhere, loadEntries, logEntry, parseEntryDay, parseEntryMinutes, parseEntryNote, parseRange } from './timeTracking'
+import { entriesWhere, loadEntries, logEntry, parseEntryDay, parseEntryMinutes, parseEntryNote, parseRange, startTimer, stopTimer } from './timeTracking'
 import { accessibleBoards, findStaffBoard, findTask } from './mcpBoardTools'
 import { isNarrowedKey } from './mcpAccess'
 import { McpToolError, asToolError, optionalString, requireString } from './mcpToolKit'
@@ -100,6 +100,53 @@ export const MCP_TIME_TOOLS: McpToolDefinition[] = [
           board: entry.projectName,
           ...(entry.note ? { note: entry.note } : {})
         }))
+      }
+    }
+  },
+  {
+    name: 'start_timer',
+    title: 'Start a timer on a task',
+    description: 'Start a running timer on a task, as the key\'s owner. One timer runs at a time: a timer already running is stopped first and what it measured is logged, and that entry comes back as "stopped". Stop the timer with stop_timer when the work ends.',
+    scope: 'boards:write',
+    readOnly: false,
+    resource: 'time',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        task: { type: 'string', description: 'The task id, or a link to the task copied from the app.' }
+      },
+      required: ['task']
+    },
+    async handler(args, context) {
+      const { task, board } = await findTask(requireString(args, 'task'), context, { staff: 'time tracking' })
+      const stopped = await startTimer(context.userId, task.id)
+      return {
+        started: true,
+        board: { id: board.id, name: board.name },
+        task: { id: task.id, title: task.title },
+        ...(stopped ? { stopped: { id: stopped.id, day: stopped.day, duration: formatDuration(stopped.minutes), minutes: stopped.minutes } } : {})
+      }
+    }
+  },
+  {
+    name: 'stop_timer',
+    title: 'Stop the running timer',
+    description: 'Stop the running timer of the key\'s owner and log what it measured, rounded to the nearest minute with a floor of one minute. Give an optional "note" naming the activity (triage, build, ux review). Nothing running is not an error: "stopped" is false.',
+    scope: 'boards:write',
+    readOnly: false,
+    resource: 'time',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        note: { type: 'string', description: 'What the time was spent on.' }
+      }
+    },
+    async handler(args, context) {
+      const entry = await stopTimer(context.userId, { note: parseEntryNote(optionalString(args, 'note')) })
+      if (!entry) return { stopped: false }
+      return {
+        stopped: true,
+        entry: { id: entry.id, taskId: entry.taskId, day: entry.day, duration: formatDuration(entry.minutes), minutes: entry.minutes, ...(entry.note ? { note: entry.note } : {}) }
       }
     }
   }

@@ -59,7 +59,8 @@ A task has a thread of short updates.
 - **Messages:** `list_messages` reads a board's conversations; `post_message` writes or replies.
 - **Status updates:** `list_status_updates` reads a board's history; `post_status_update` sets the board's health
   (on track, at risk, off track) and records what you wrote.
-- **Time:** `list_time` reads logged time; `log_time` logs time on a task, as you.
+- **Time:** `list_time` reads logged time; `log_time` logs time on a task, as you. `start_timer` starts your timer on a
+  task (and logs the one that was running); `stop_timer` stops it and logs the time, with an optional note.
 - **Custom fields:** `list_fields` shows a board's fields; `create_field` adds one. Fields can be set when creating or
   updating a task.
 - **My tasks and inbox:** `my_tasks` is your assigned tasks across boards; `list_notifications` and
