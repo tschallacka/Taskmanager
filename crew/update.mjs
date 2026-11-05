@@ -7,12 +7,12 @@
 // (PROJECT-RULES.md, BRIEF.md) are merged from the template they came from (kept in CREW_HOME/kit-base),
 // the skill copies are refreshed only where they still match the old kit, init renders the documents, and the
 // server-side changes in CHANGELOG.md are listed, never made. CREW_HOME's own files (creds.json, crew.json,
-// forks, profiles, logs) are never touched.
+// forks, profiles, logs) are never touched. A copy that fails puts the kit folder back from the backup.
 //
 // Three steps, each run by the newest code available: the command you run fetches and compares; the archive's
 // own update.mjs (--apply) copies the files; the updated kit's update.mjs (--finish) merges, refreshes and renders.
-// Exit codes: 0 up to date or installed, 1 an update is available (--check) or something needs a hand (a
-// CONFLICT, a WARN that asks for a look, an init FAIL), 3 the kit could not be fetched or is refused.
+// Exit codes: 0 up to date or installed; 1 an update is waiting (--check), or something needs a hand (a CONFLICT,
+// a FAIL from init, or an install that was put back); 3 the kit could not be fetched or is refused.
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
@@ -21,13 +21,15 @@ import { dirname, join, resolve } from 'node:path'
 import { kitDir } from './home.mjs'
 
 const NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
-// What a kit never ships and an update never touches: tests, dotfiles, the list itself, logins, runs.
-const NOT_KIT = /\.test\.mjs$|^\.|^kit-files\.txt$|^(creds|crew|crew\.config|package-lock|crew-kit)\.json$|\.log$/
+// What a kit never ships: tests, dotfiles, logins, runs, and the archive itself.
+const NOT_KIT = /\.test\.mjs$|^\.|^(creds|crew|crew\.config|package-lock|crew-kit)\.json$|\.log$|^kit\.tar\.gz$/
 const SHAPE = /\.(mjs|md|tmpl|json|sh)$|^fonts\.conf/
+// The list of kit files travels with a folder kit (not with the board's archive), so it is installed when present.
+const LIST = 'kit-files.txt'
 const MANIFEST = 'crew-kit.json'
 const ARGS = process.argv.slice(2)
 
-const shipsName = name => NAME.test(name) && !NOT_KIT.test(name)
+const shipsName = name => name === LIST || (NAME.test(name) && !NOT_KIT.test(name))
 const sha = path => createHash('sha256').update(readFileSync(path)).digest('hex')
 const readText = path => (existsSync(path) ? readFileSync(path, 'utf8') : null)
 const readJson = path => {
@@ -47,17 +49,32 @@ function plainFile(path) {
   return path
 }
 function listedNames(dir) {
-  const file = join(dir, 'kit-files.txt')
+  const file = join(dir, LIST)
   if (!existsSync(file)) return null
   return readFileSync(file, 'utf8').split('\n').map(line => line.trim()).filter(line => line && !line.startsWith('#'))
 }
+// The one check for every source (folder, .tar.gz file, the board's archive): each name a kit ships, once,
+// and a regular file in the staging folder. A name outside the folder is refused before anything is read.
+function checkStaged(stage, names) {
+  const seen = new Set()
+  for (const name of names) {
+    if (!shipsName(name)) throw new Error(`"${name}" is not a file a kit ships`)
+    if (seen.has(name)) throw new Error(`"${name}" is listed twice`)
+    seen.add(name)
+    plainFile(join(stage, name))
+  }
+}
 
-// The kit the update installs: a folder, a .tar.gz file, or the board's archive. Its files are copied or
-// extracted into `stage`, and only plain file names the kit ships are accepted.
+// The kit the update installs, copied or extracted into `stage`.
 async function fetchKit(from, board, stage) {
   if (from && lstatSync(from).isDirectory()) {
     const names = listedNames(from) ?? readdirSync(from).filter(name => SHAPE.test(name) && !NOT_KIT.test(name))
+    if (existsSync(join(from, LIST)) && !names.includes(LIST)) names.push(LIST)
+    for (const name of names) {
+      if (!shipsName(name)) throw new Error(`${join(from, LIST)} lists "${name}", which a kit does not ship`)
+    }
     for (const name of names) copyFileSync(plainFile(join(from, name)), join(stage, name))
+    checkStaged(stage, names)
     return { label: from, version: 'folder', names }
   }
   let archive
@@ -88,7 +105,7 @@ async function fetchKit(from, board, stage) {
   const extract = spawnSync('tar', ['-xzf', archivePath, '-C', stage, ...names], { stdio: 'pipe' })
   if (extract.status !== 0) throw new Error(`extracting ${label} failed`)
   rmSync(archivePath)
-  for (const name of names) plainFile(join(stage, name))
+  checkStaged(stage, names)
   return { label, version, names }
 }
 
@@ -97,63 +114,100 @@ async function front() {
   const check = ARGS.includes('--check')
   const from = valueOf('--from') ? resolve(valueOf('--from')) : undefined
   const target = resolve(valueOf('--kit') ?? kitDir)
-  mkdirSync(join(here, 'work'), { recursive: true })
-  const stage = mkdtempSync(join(here, 'work', 'update-'))
-  let kit
+  const stage = mkdtempSync(join(here, '.update-'))
+  let moved = false
   try {
-    kit = await fetchKit(from, config.board.url, stage)
-  } catch (error) {
-    rmSync(stage, { recursive: true, force: true })
-    console.error(`crew update: ${error.message}`)
-    return 3
+    let kit
+    try {
+      kit = await fetchKit(from, config.board.url, stage)
+    } catch (error) {
+      console.error(`crew update: ${error.message}`)
+      return 3
+    }
+    const manifest = readJson(join(here, MANIFEST))
+    const owned = new Set([...Object.keys(manifest?.files ?? {}), ...(listedNames(target) ?? [])])
+    const removed = [...owned].filter(name => name !== LIST && shipsName(name) && !kit.names.includes(name) && existsSync(join(target, name))).sort()
+    const changed = kit.names.filter(name => !existsSync(join(target, name)) || sha(join(target, name)) !== sha(join(stage, name))).sort()
+    if (!changed.length && !removed.length) {
+      console.log(`The crew kit in ${target} is up to date: version ${kit.version} from ${kit.label}. Nothing changed.`)
+      return 0
+    }
+    const summary = `${changed.length} file(s) to replace, ${removed.length} to remove`
+    if (check) {
+      console.log(`An update is available for ${target}: ${summary} (${kit.label}, version ${kit.version}). Run crew update to install it.`)
+      return 1
+    }
+    if (!kit.names.includes('update.mjs')) {
+      console.error(`crew update: ${kit.label} has no update.mjs, so it cannot update itself. Unpack it by hand (README, "Updating").`)
+      return 3
+    }
+    const backupDir = join(here, 'backups', `update-${stamp()}`)
+    mkdirSync(join(backupDir, 'kit'), { recursive: true, mode: 0o700 })
+    mkdirSync(join(backupDir, 'local'), { recursive: true, mode: 0o700 })
+    for (const name of [...changed, ...removed]) {
+      if (existsSync(join(target, name))) copyFileSync(join(target, name), join(backupDir, 'kit', name))
+    }
+    // A kit file whose content is not what the last install wrote was edited by hand: keep that copy too.
+    const localEdits = changed.filter(name => manifest?.files?.[name] && existsSync(join(target, name)) && sha(join(target, name)) !== manifest.files[name])
+    for (const name of localEdits) copyFileSync(join(target, name), join(backupDir, 'local', name))
+    renameSync(stage, join(backupDir, 'staged'))
+    moved = true
+    const planFile = join(backupDir, 'plan.json')
+    writeFileSync(planFile, `${JSON.stringify({ kitDir: target, backupDir, names: kit.names, changed, removed, localEdits, version: kit.version, label: kit.label }, null, 2)}\n`, { mode: 0o600 })
+    console.log(`Installing ${kit.label} (version ${kit.version}) into ${target}: ${summary}. Backup: ${backupDir}`)
+    const run = spawnSync(process.execPath, [join(backupDir, 'staged', 'update.mjs'), '--apply', planFile], { stdio: 'inherit', env: process.env })
+    return run.status ?? 1
+  } finally {
+    if (!moved) rmSync(stage, { recursive: true, force: true })
   }
-  const manifest = readJson(join(here, MANIFEST))
-  const owned = new Set([...Object.keys(manifest?.files ?? {}), ...(listedNames(target) ?? [])])
-  const removed = [...owned].filter(name => shipsName(name) && !kit.names.includes(name) && existsSync(join(target, name))).sort()
-  const changed = kit.names.filter(name => !existsSync(join(target, name)) || sha(join(target, name)) !== sha(join(stage, name))).sort()
-  if (!changed.length && !removed.length) {
-    rmSync(stage, { recursive: true, force: true })
-    console.log(`The crew kit in ${target} is up to date: version ${kit.version} from ${kit.label}. Nothing changed.`)
-    return 0
+}
+
+// Puts back the files a failed install had touched, from the backup taken before it. A file that was new has
+// no backup and is removed again. Returns how many were put back.
+function rollback(plan, names) {
+  let count = 0
+  for (const name of names) {
+    const dest = join(plan.kitDir, name)
+    const old = join(plan.backupDir, 'kit', name)
+    try {
+      if (existsSync(old)) {
+        if (existsSync(dest)) chmodSync(dest, 0o644)
+        copyFileSync(old, dest)
+        count++
+      } else if (existsSync(dest)) {
+        unlinkSync(dest)
+        count++
+      }
+    } catch (error) {
+      console.error(`crew update: could not put back ${dest}: ${error.message}. The backup is ${old}`)
+    }
   }
-  const summary = `${changed.length} file(s) to replace, ${removed.length} to remove`
-  if (check) {
-    rmSync(stage, { recursive: true, force: true })
-    console.log(`An update is available for ${target}: ${summary} (${kit.label}, version ${kit.version}). Run crew update to install it.`)
-    return 1
-  }
-  if (!kit.names.includes('update.mjs')) {
-    rmSync(stage, { recursive: true, force: true })
-    console.error(`crew update: ${kit.label} has no update.mjs, so it cannot update itself. Unpack it by hand (README, "Updating").`)
-    return 3
-  }
-  const backupDir = join(here, 'backups', `update-${stamp()}`)
-  mkdirSync(join(backupDir, 'kit'), { recursive: true, mode: 0o700 })
-  mkdirSync(join(backupDir, 'local'), { recursive: true, mode: 0o700 })
-  for (const name of [...changed, ...removed]) {
-    if (existsSync(join(target, name))) copyFileSync(join(target, name), join(backupDir, 'kit', name))
-  }
-  // A kit file whose content is not what the last install wrote was edited by hand: keep that copy too.
-  const localEdits = changed.filter(name => manifest?.files?.[name] && existsSync(join(target, name)) && sha(join(target, name)) !== manifest.files[name])
-  for (const name of localEdits) copyFileSync(join(target, name), join(backupDir, 'local', name))
-  renameSync(stage, join(backupDir, 'staged'))
-  const planFile = join(backupDir, 'plan.json')
-  writeFileSync(planFile, `${JSON.stringify({ kitDir: target, backupDir, names: kit.names, changed, removed, localEdits, version: kit.version, label: kit.label }, null, 2)}\n`, { mode: 0o600 })
-  console.log(`Installing ${kit.label} (version ${kit.version}) into ${target}: ${summary}. Backup: ${backupDir}`)
-  const run = spawnSync(process.execPath, [join(backupDir, 'staged', 'update.mjs'), '--apply', planFile], { stdio: 'inherit', env: process.env })
-  return run.status ?? 1
+  return count
 }
 
 // Runs from the archive's copy of this file: copies the planned files into the kit folder, then hands over
-// to the installed copy, which finishes the update with its own config and templates.
+// to the installed copy, which finishes the update with its own config and templates. A failed copy is undone.
 function apply(planFile) {
   const plan = JSON.parse(readFileSync(planFile, 'utf8'))
   const staged = join(dirname(planFile), 'staged')
-  for (const name of plan.changed) {
-    copyFileSync(plainFile(join(staged, name)), join(plan.kitDir, name))
-    chmodSync(join(plan.kitDir, name), 0o644)
+  const touched = []
+  try {
+    for (const name of plan.changed) {
+      const source = plainFile(join(staged, name))
+      const dest = join(plan.kitDir, name)
+      touched.push(name)
+      copyFileSync(source, dest)
+      chmodSync(dest, 0o644)
+    }
+    for (const name of plan.removed) {
+      touched.push(name)
+      unlinkSync(join(plan.kitDir, name))
+    }
+  } catch (error) {
+    const count = rollback(plan, touched)
+    console.error(`crew update: installing the kit failed (${error.message}). ${count} file(s) of the kit folder were put back from ${join(plan.backupDir, 'kit')}, so the kit is as it was. The update is not done: fix the cause and run crew update again.`)
+    return 1
   }
-  for (const name of plan.removed) unlinkSync(join(plan.kitDir, name))
   const run = spawnSync(process.execPath, [join(plan.kitDir, 'update.mjs'), '--finish', planFile], { stdio: 'inherit', env: process.env })
   return run.status ?? 1
 }
@@ -182,8 +236,12 @@ async function finish(planFile) {
       saveBase(out, theirs)
       lines.push(`${out}: already matches the new template`)
     } else if (base === null) {
-      writeFileSync(join(plan.backupDir, `${out}.new`), theirs)
-      lines.push(`WARN ${out}: the template it came from is not recorded, so it cannot be merged. Kept as it is. The new template is in ${join(plan.backupDir, `${out}.new`)}; compare the two by hand. The next update merges.`)
+      // No record of the template this file came from. The new template becomes the base now, so the next
+      // update merges from here; the template changes made before now are not pulled in.
+      const newFile = join(plan.backupDir, `${out}.new`)
+      writeFileSync(newFile, theirs)
+      saveBase(out, theirs)
+      lines.push(`WARN ${out}: no template was recorded for this file, so the new template cannot be merged into it now. Kept as it is. The new template is in ${newFile} and is now recorded as the base, so the next update merges from here. Template changes made before this one are not brought in: compare with that file by hand.`)
     } else if (base === theirs) {
       lines.push(`${out}: the template did not change; kept`)
     } else if (ours === base) {
@@ -192,13 +250,13 @@ async function finish(planFile) {
       saveBase(out, theirs)
       lines.push(`${out}: updated from the new template (no edits of yours were in it)`)
     } else {
-      const ours$ = join(mergeDir, `${out}.ours`)
-      const base$ = join(mergeDir, `${out}.base`)
-      const theirs$ = join(mergeDir, `${out}.theirs`)
-      writeFileSync(ours$, ours)
-      writeFileSync(base$, base)
-      writeFileSync(theirs$, theirs)
-      const merge = spawnSync('git', ['merge-file', '-p', ours$, base$, theirs$], { encoding: 'utf8' })
+      const oursPath = join(mergeDir, `${out}.ours`)
+      const basePath = join(mergeDir, `${out}.base`)
+      const theirsPath = join(mergeDir, `${out}.theirs`)
+      writeFileSync(oursPath, ours)
+      writeFileSync(basePath, base)
+      writeFileSync(theirsPath, theirs)
+      const merge = spawnSync('git', ['merge-file', '-p', oursPath, basePath, theirsPath], { encoding: 'utf8' })
       if (merge.status === 0) {
         copyFileSync(join(here, out), join(plan.backupDir, out))
         writeFileSync(join(here, out), merge.stdout)
