@@ -79,6 +79,12 @@ export function loadForks() {
   })
 }
 
+/** The cast role a fork plays, from its agent type: `taskmanager-wren` plays `wren`. Null when it names none. */
+export function forkRole(agentType) {
+  const last = String(agentType).split('-').pop()
+  return CAST.includes(last) ? last : null
+}
+
 export function loadCreds() {
   const file = `${here}creds.json`
   if (!existsSync(file)) {
@@ -90,7 +96,7 @@ export function loadCreds() {
   creds.people ??= {}
   for (const { data } of loadForks()) {
     for (const person of data.members) {
-      if (!creds.people[person.agentType]) creds.people[person.agentType] = { name: person.name, email: person.email, password: person.password, apiKey: person.apiKey, fork: data.board?.name ?? true }
+      if (!creds.people[person.agentType]) creds.people[person.agentType] = { name: person.name, email: person.email, password: person.password, apiKey: person.apiKey, fork: data.board?.name ?? true, role: forkRole(person.agentType), boardId: data.shadowBoard?.id ?? null }
     }
   }
   return creds
