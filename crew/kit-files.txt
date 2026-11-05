@@ -11,6 +11,7 @@ NITPICKER.md.tmpl
 PIA-UX.md.tmpl
 PROJECT-RULES.md.tmpl
 PROMPTS.md.tmpl
+QUINCY.md.tmpl
 README.md
 SKILL.md
 USHER.md.tmpl

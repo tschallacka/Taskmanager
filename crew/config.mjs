@@ -42,10 +42,10 @@ export const config = {
   customer: { name: 'The Customer', personName: 'Casey Customer', nick: 'customer', ...raw.customer },
   people: {
     boss: 'Boss', pm: 'Pia Planner', wren: 'Wren Worker', wick: 'Wick Worker', wynn: 'Wynn Worker', wade: 'Wade Worker',
-    usher: 'Usher Xander', nitpicker: 'Nina Nitpick', contact: 'Casey Contact', watcher: 'Log Watcher',
+    usher: 'Usher Xander', nitpicker: 'Nina Nitpick', quincy: 'Quincy Average', contact: 'Casey Contact', watcher: 'Log Watcher',
     ...raw.people
   },
-  nicks: { pm: 'pia', wren: 'wren', wick: 'wick', wynn: 'wynn', wade: 'wade', usher: 'usher', nitpicker: 'nitpicker', ...raw.nicks },
+  nicks: { pm: 'pia', wren: 'wren', wick: 'wick', wynn: 'wynn', wade: 'wade', usher: 'usher', nitpicker: 'nitpicker', quincy: 'quincy', ...raw.nicks },
   // The chat line is optional and off by default: with no client, meetings and steering go
   // through the board (board messages, `list_messages`).
   chat: { client: '', channel: '#crew', workChannel: '#crewwork', ...raw.chat },
@@ -99,7 +99,7 @@ export function loadCreds() {
 const slugify = text => String(text).toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
 
 // The members Boss launches as agents, the optional log watcher included.
-export const CAST = ['pm', 'wren', 'wick', 'wynn', 'wade', 'usher', 'nitpicker', 'watcher']
+export const CAST = ['pm', 'wren', 'wick', 'wynn', 'wade', 'usher', 'nitpicker', 'quincy', 'watcher']
 
 /**
  * Each member's Claude Code agent type, such as acme-pia-planner: the crew slug first, so two crews

@@ -29,6 +29,7 @@ export const CREW_PEOPLE = [
   { key: 'wade', name: 'Wade Worker', role: 'worker 4', team: 'member' },
   { key: 'usher', name: 'Usher Xander', role: 'usability tester: browses the dev copy, tries every feature', team: 'member' },
   { key: 'nitpicker', name: 'Nina Nitpick', role: 'code quality reviewer: reviews pull requests, times her review', team: 'member' },
+  { key: 'quincy', name: 'Quincy Average', role: 'QA: uses the finished task like a customer or a blind agent', team: 'member' },
   { key: 'customer', name: 'Scrappy Customer', role: 'the customer: asks for things, never sees internal tasks', team: 'contact' },
   { key: 'contact', name: 'Casey Customer', role: 'customer contact: sees only what is shared with the customer', team: 'contact' }
 ] as const

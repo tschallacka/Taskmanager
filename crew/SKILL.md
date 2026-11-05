@@ -23,8 +23,9 @@ If it is, run `crew watch` to see where the run stands.
 | `customer` | the customer (you, in a second role) | asks for things, answers the PM, only sees customer-visible tasks |
 | `pm` | the project manager (Haiku) | the customer's contact: plans tasks, assigns, pre-checks Verify, triages UX findings |
 | `wren` `wick` `wynn` `wade` | the workers (Haiku) | build, test in their own browser profile, report |
-| `usher` | the usability tester (Haiku) | tries every feature, files `[UX]` findings for the PM |
-| `nitpicker` | the code quality reviewer (Haiku) | reads the diff of each task in Verify before you, posts `NITPICKER: approved` / `changes needed`, logs her time |
+| `usher` | Usher Xander, the usability tester (Haiku) | reviews a task in `Verify UX`, tries every feature, files `[UX]` findings for the PM |
+| `nitpicker` | Nina Nitpick, the code quality reviewer (Haiku) | reviews a task in `Verify CQ`, files `CQ violation` subtasks, tags `CQ approved` |
+| `quincy` | Quincy Average, QA (Haiku) | uses a task in `Verify QA` like a customer or a blind agent, files `QA violation` subtasks, tags `QA approved` |
 | `contact` | a read-only customer contact | lets anyone check what a customer sees |
 | log watcher (Haiku) | no login | reads the dev log, crew transcripts and new bugs; flags problems to you |
 
@@ -33,14 +34,19 @@ If it is, run `crew watch` to see where the run stands.
 Columns: Backlog, To do, In progress, **Verify**, **Ready for live**, **Done**, Bugs.
 
 1. The PM puts ready tasks in To do, the rest in Backlog. A worker moves a task to In progress,
-   builds it, tests it in the browser, attaches a screenshot, posts an update and moves it to **Verify**.
-2. The PM pre-checks Verify (diff, lint, screenshot, time log) and sends clearly wrong work back to
-   To do. Then the nitpicker reviews the diff (`NITPICKER:` verdict), and the tester retests anything
-   a person sees (`RETEST: pass|fail`). Only then do you look: worker -> nitpicker -> tester -> you.
+   builds it, tests it in the browser, attaches a screenshot, runs the tests (none may fail), posts an
+   update and moves it to **Verify PM**.
+2. The PM checks it in **Verify PM** (diff, lint, evidence, time log) and sends clearly wrong work back
+   to To do. Then it passes the gates, each owned by one person, and returns to **Verify PM** after
+   each: **Verify UX** (the usher, only when a subtask is tagged `verify UX`), **Verify CQ** (the
+   nitpicker) and **Verify QA** (Quincy). Each reviewer files problems as subtasks (`UX violation`,
+   `CQ violation`, `QA violation`) and tags the task `UX approved`, `CQ approved` or `QA approved`
+   when nothing is left. Only then does the PM move it to **Verify** for you:
+   worker -> PM -> usher -> nitpicker -> Quincy -> PM -> you. The tags are listed in `CREW.md` rule 7b.
 3. **You review the code in Verify**: read the diff of the owned files (do not trust the summary),
    run lint and the typecheck, look at the screenshot, **try it yourself** in a browser. Approved:
-   move to **Ready for live**. Not approved: post written feedback on the task and move it to
-   **To do**. Be critical: send work back when it is not up to standard.
+   move to **Ready for live**. Not approved: post written feedback as subtasks tagged `Feedback Cato`,
+   assign the task to the PM and move it to **Backlog**. Be critical: send work back when it is not up to standard.
 4. **Only you publish**, and only tasks in Ready for live, following the release steps in
    `PROJECT-RULES.md` (backup, schema change, typecheck and lint, commit, push). Then move the
    tasks to **Done**.

@@ -291,7 +291,7 @@ function sessionCommands(who: string): string {
 // start needs no channel: Boss launches everyone, the PM included, with the listen-loop prompts.
 function bossMessage(alongside: boolean): string {
   const people = creds.value?.people ?? {}
-  const team = ['pm', 'wren', 'wick', 'wynn', 'wade', 'usher', 'nitpicker'].map(key => people[key]?.name ?? key).join(', ')
+  const team = ['pm', 'wren', 'wick', 'wynn', 'wade', 'usher', 'nitpicker', 'quincy'].map(key => people[key]?.name ?? key).join(', ')
   const dir = crewDir.value
   return [
     alongside
@@ -314,7 +314,7 @@ const startPlain = computed(() => {
 const startChannels = computed(() => {
   const people = creds.value?.people ?? {}
   const pm = people.pm?.name ?? 'the project manager'
-  const workers = ['wren', 'wick', 'wynn', 'wade', 'usher', 'nitpicker'].map(key => people[key]?.name ?? key).join(', ')
+  const workers = ['wren', 'wick', 'wynn', 'wade', 'usher', 'nitpicker', 'quincy'].map(key => people[key]?.name ?? key).join(', ')
   return [
     {
       id: 'boss',

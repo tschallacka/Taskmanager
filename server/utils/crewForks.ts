@@ -19,7 +19,7 @@ import { issueKey } from './keyIssue'
 import { genId } from './projects'
 
 /** The members that work on a board. Boss stays one for the whole crew, and the customer logins belong to the product. */
-const FORKED_KEYS = ['pm', 'wren', 'wick', 'wynn', 'wade', 'usher', 'nitpicker']
+const FORKED_KEYS = ['pm', 'wren', 'wick', 'wynn', 'wade', 'usher', 'nitpicker', 'quincy']
 export const FORK_PEOPLE = CREW_PEOPLE.filter(person => FORKED_KEYS.includes(person.key))
 
 export interface ForkedMember {

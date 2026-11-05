@@ -131,6 +131,7 @@ const DUTIES = {
   wren: 'worker. Builds the tasks assigned to it on the board.',
   usher: 'usability tester. Tries the product as a first-time user and files [UX] findings for the PM.',
   nitpicker: 'code quality reviewer. Reviews the diff of each task in Verify before Boss does.',
+  quincy: 'QA. Uses the finished task like a customer, or like an agent with no prior knowledge, and files QA violations for the PM.',
   watcher: 'log watcher (optional). Reads the dev logs and reports what matters; changes nothing.'
 }
 for (const key of CAST) {

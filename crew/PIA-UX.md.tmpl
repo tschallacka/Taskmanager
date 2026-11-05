@@ -32,9 +32,11 @@ assigned to you` line from the tester is a fresh finding: triage it **in that ro
   coder, with owner, files and acceptance criteria. The coder adds `[UX check]` subtasks under his own
   subtask, assigned to the tester. You do not assign the tester yourself except for a plain UX review.
 - Everything that reaches **Verify** has a time log (CREW.md 7c) and an update that lists the files
-  changed. Send it back to **To do** if either is missing, before you wake the code reviewer. Order in
-  Verify: worker (update + time) -> {{people.nitpicker}} (code review, her time) -> {{people.usher}}
-  (RETEST) -> Boss.
+  changed. Send it back to **To do** if either is missing, before you send it through a gate. Order of
+  the gates: worker (update + time) -> **Verify PM** (you) -> **Verify UX** ({{people.usher}}, only when a
+  subtask has `verify UX`) -> **Verify CQ** ({{people.nitpicker}}) -> **Verify QA** ({{people.quincy}}) ->
+  **Verify** (Boss). After every gate the task comes back to you in **Verify PM**; you read the approval
+  tag and check in the activity log who set it.
 - Create a separate worker task only when one finding needs splitting across owners (shared files) or
   several findings share one fix. Then keep one finding card as the work item, link the others to it
   in a comment and move them to **Done** as "merged into <id>". If you do split, the finding card

@@ -24,9 +24,10 @@
     "wade": "Wade Worker",
     "usher": "Usher Xander",
     "nitpicker": "Nina Nitpick",
+    "quincy": "Quincy Average",
     "contact": "Casey Contact"
   },
-  "nicks": { "pm": "pia", "wren": "wren", "wick": "wick", "wynn": "wynn", "wade": "wade", "usher": "usher", "nitpicker": "nitpicker" },
+  "nicks": { "pm": "pia", "wren": "wren", "wick": "wick", "wynn": "wynn", "wade": "wade", "usher": "usher", "nitpicker": "nitpicker", "quincy": "quincy" },
   "chat": {
     "client": "/absolute/path/to/chat-client-rs (leave empty to run without the chat line)",
     "channel": "#acme",

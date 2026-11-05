@@ -19,8 +19,9 @@ lint, change the database). They apply to everything you do in the repository.
 | `boss` | {{people.boss}} (the owner; you never act as them) | reads reports; reviews code; applies schema changes; publishes |
 | `pm` | {{people.pm}} | project manager |
 | `wren` `wick` `wynn` `wade` | {{people.wren}}, {{people.wick}}, {{people.wynn}}, {{people.wade}} | workers |
-| `usher` | {{people.usher}} | usability tester: files UX findings (see `USHER.md`) |
-| `nitpicker` | {{people.nitpicker}} | code quality reviewer: reviews each task in Verify before Boss (see `NITPICKER.md`) |
+| `usher` | {{people.usher}} | usability tester: reviews a task in `Verify UX`, files UX findings (see `USHER.md`) |
+| `nitpicker` | {{people.nitpicker}} | code quality reviewer: reviews a task in `Verify CQ` (see `NITPICKER.md`) |
+| `quincy` | {{people.quincy}} | QA: uses a task in `Verify QA` like a customer (see `QUINCY.md`) |
 | `contact` | {{people.contact}} | a read-only customer contact, for checking what a customer sees |
 
 Your key (`pm`, `wren`, ...) is the first argument to every command below.
@@ -80,7 +81,7 @@ points, and to clarify things before building the wrong thing. The PM is the cus
 and normally talks for the team, but the PM may **bring developers (and the tester) along
 whenever it helps**: write on the board "MEETING in {{chat.channel}}: <topic>, with <names>", and those
 people join the channel under their own nick, say their piece (one short message at a time),
-and leave. Use your own nick (`{{nicks.pm}}`, `{{nicks.wren}}`, `{{nicks.wick}}`, `{{nicks.wynn}}`, `{{nicks.wade}}`, `{{nicks.usher}}`, `{{nicks.nitpicker}}`) every
+and leave. Use your own nick (`{{nicks.pm}}`, `{{nicks.wren}}`, `{{nicks.wick}}`, `{{nicks.wynn}}`, `{{nicks.wade}}`, `{{nicks.usher}}`, `{{nicks.nitpicker}}`, `{{nicks.quincy}}`) every
 time, so your session is your own:
 
 ```
@@ -196,7 +197,7 @@ The workers **keep running**: they do not end a round and wait to be woken. Ever
 with one command, which waits and then prints only what is new:
 
 ```
-{{node_kit}}/listen.mjs <you> [seconds]     # you = pm, wren, wick, wynn, wade, usher or nitpicker
+{{node_kit}}/listen.mjs <you> [seconds]     # you = pm, wren, wick, wynn, wade, usher, nitpicker or quincy
 ```
 
 It prints `CHAT` lines (a message in `{{chat.workChannel}}`, where the PM steers the workers; for the PM
@@ -287,15 +288,36 @@ Use `browser` to look and check. Use `run` (Playwright, below) for a script that
    post the test name, the exact failure line and what you tried, tag the task `test failing`, tag
    the PM and move the task to Blocked. The PM has 15 minutes, then raises it with Boss, who has 30
    minutes and then tells the Owner. Nobody changes the test before that.
-7. **The release flow.** Columns: Backlog, To do, In progress, **Verify**, **Ready for live**,
-   **Done**, Bugs. You move a task to **Verify** when you believe it is finished, and no
-   further. Boss reads the code in Verify: approved means Ready for live; not approved means
-   written feedback on the task and back to **To do** (read it and fix exactly that). Only Boss
+7. **The release flow.** Columns: Backlog, To do, In progress, **Verify PM**, **Verify UX**, **Verify CQ**,
+   **Verify QA**, **Verify**, **Ready for live**, **Done**, Blocked, Bugs. You move a task to **Verify PM**
+   when you believe it is finished, and no further. After that the PM sends it through the gates in this
+   order, and each gate is owned by one person:
+   - **Verify UX**: {{people.usher}} (`USHER.md`). Only when a subtask carries the tag `verify UX`, otherwise the
+     task skips this gate. He tags `UX approved`.
+   - **Verify CQ**: {{people.nitpicker}} (`NITPICKER.md`). Never skipped. She tags `CQ approved`.
+   - **Verify QA**: {{people.quincy}} (`QUINCY.md`). Never skipped. He tags `QA approved`.
+   A reviewer's finding is a subtask under the task, tagged `UX violation`, `CQ violation` or `QA violation`,
+   assigned to the PM, who gives it to a worker. The task returns to **Verify PM** after every gate. Nobody
+   sets another person's tag: the PM checks in the task's activity log who set an approval.
+   When every gate has approved, the PM moves the task to **Verify**, assigned to Boss. Boss reads the code
+   in Verify: approved means Ready for live; not approved means written feedback on the task, as subtasks
+   tagged `Feedback Cato`, and back to the PM (the task goes through triage again). Only Boss
    publishes to live, and only tasks in Ready for live; published tasks go to Done. Nobody else
-   moves a task into Ready for live or Done. Between Verify and Ready for live the order is: the PM
-   pre-checks, the code reviewer {{people.nitpicker}} (`NITPICKER.md`) posts `NITPICKER: approved` or
-   `NITPICKER: changes needed` as a task update (the latter sends the task back to you), the tester
-   {{people.usher}} retests anything a person sees (`RETEST: pass|fail`), and Boss reads the code last.
+   moves a task into Ready for live or Done.
+7b. **Tags.** A tag is a label on a task or subtask. Labels are free text on the board, so there is nothing
+   to create: type them exactly as written here, in lower case where shown.
+
+   | Tag | Set by | Meaning |
+   | --- | --- | --- |
+   | `research required`, `triage required` | Boss | the PM reads up before anyone builds |
+   | `verify UX` | worker (the PM may change it) | the finished subtask changed something a person sees |
+   | `verify CQ`, `verify QA` | worker | on every finished subtask |
+   | `UX violation`, `CQ violation`, `QA violation` | {{people.usher}}, {{people.nitpicker}}, {{people.quincy}} | a subtask: one problem to fix |
+   | `UX approved`, `CQ approved`, `QA approved` | the same reviewer | the whole task passed that gate |
+   | `Feedback Cato` | Boss | a subtask from the final review |
+   | `blocked` | anyone | waiting; the blocker is linked |
+   | `split help` | the PM | she cannot split the task and needs Boss to |
+   | `test failing` | anyone | a test fails and nobody knows why; the task is in Blocked |
 7c. **Time your work.** Every worker logs time with `log_time` on the task or subtask you worked on,
    once when you move it to Verify and again after each round of fixes:
    `log_time {"task":"<id>","duration":"1h 15m","note":"<what>"}`. Count the real working time,

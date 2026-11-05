@@ -141,7 +141,7 @@ test('create makes the crew and returns its people once', { skip }, async () => 
   await ready()
   created = await call('POST', '/api/crews', adminKey, { slug, name: 'Scratch crew', product: { name: 'Scratch product' } })
   assert.equal(created.status, 201, created.text.slice(0, 300))
-  for (const key of ['boss', 'pm', 'wren', 'wick', 'wynn', 'wade', 'usher', 'nitpicker', 'customer', 'contact']) {
+  for (const key of ['boss', 'pm', 'wren', 'wick', 'wynn', 'wade', 'usher', 'nitpicker', 'quincy', 'customer', 'contact']) {
     const person = created.json.people[key]
     assert.ok(person, `person ${key} is in the response`)
     assert.match(person.email, new RegExp(`^${slug}-${key}@crew\\.invalid$`))

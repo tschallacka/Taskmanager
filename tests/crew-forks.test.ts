@@ -15,6 +15,7 @@ const { db } = await import('../server/db')
 const schema = await import('../server/db/schema')
 const { apiKeys, crewBoardMembers, crews, member, organization, projects, user } = schema
 const { attachCrew, detachCrew, findCrewLink } = await import('../server/utils/crewBoards')
+const { CREW_PEOPLE } = await import('../server/utils/crewProvisioning')
 const { FORK_PEOPLE, forkAgentType, forkCrew, forksOfLink, removeForks } = await import('../server/utils/crewForks')
 const { createOrRotateCrew, crewView, disableCrew } = await import('../server/utils/crewProvisioning')
 const { readGrantedBoardIds } = await import('../server/utils/crewBoardAccess')
@@ -77,25 +78,25 @@ test('an agent type is the board, then the person first name', () => {
 })
 
 test('only the working members are forked: not Boss, not the customer logins', () => {
-  assert.deepEqual(FORK_PEOPLE.map(p => p.key), ['pm', 'wren', 'wick', 'wynn', 'wade', 'usher', 'nitpicker'])
+  assert.deepEqual(FORK_PEOPLE.map(p => p.key), ['pm', 'wren', 'wick', 'wynn', 'wade', 'usher', 'nitpicker', 'quincy'])
 })
 
 let forkedA: Awaited<ReturnType<typeof forkCrew>>
 
 test('forking makes one account per member, named for the board, in the crew and its team', async () => {
   forkedA = await forkCrew({ crew, link: linkA, boardName: 'Internal Tools', rotate: false })
-  assert.equal(forkedA.length, 7)
+  assert.equal(forkedA.length, FORK_PEOPLE.length)
   assert.ok(forkedA.some(m => m.agentType === 'internal-tools-wren'))
   for (const forked of forkedA) {
     assert.ok(forked.password.length >= 20 && forked.apiKey.startsWith('arn_'))
     assert.match(forked.email, /@crew\.invalid$/)
   }
   const accounts = await db.select().from(user).where(inArray(user.id, await forkIds(linkA.id)))
-  assert.equal(accounts.length, 7)
+  assert.equal(accounts.length, FORK_PEOPLE.length)
   assert.ok(accounts.every(a => a.crewId === crewId))
   assert.ok(accounts.some(a => a.name === 'Wren Worker (Internal Tools)'))
   const seats = await db.select().from(member).where(and(eq(member.organizationId, crewTeam), inArray(member.userId, accounts.map(a => a.id))))
-  assert.equal(seats.length, 7)
+  assert.equal(seats.length, FORK_PEOPLE.length)
 })
 
 test('every fork key is limited to exactly its own shadow board, in the crew team', async () => {
@@ -125,7 +126,7 @@ test('forking again is refused until it is a rotate, and a rotate gives new keys
   await rejects(forkCrew({ crew, link: linkA, boardName: 'Internal Tools', rotate: false }), 409)
   const before = await forkIds(linkA.id)
   const rotated = await forkCrew({ crew, link: linkA, boardName: 'Internal Tools', rotate: true })
-  assert.equal(rotated.length, 7)
+  assert.equal(rotated.length, FORK_PEOPLE.length)
   assert.deepEqual((await forkIds(linkA.id)).sort(), before.sort())
   for (const old of forkedA) {
     assert.deepEqual(await db.select().from(apiKeys).where(eq(apiKeys.keyHash, hashApiKey(old.apiKey))), [], 'the old key is gone')
@@ -140,7 +141,7 @@ test('forking again is refused until it is a rotate, and a rotate gives new keys
 })
 
 test('a board forked has its forks listed, one that is not has none', async () => {
-  assert.deepEqual((await forksOfLink(linkA.id)).map(f => f.key), ['pm', 'wren', 'wick', 'wynn', 'wade', 'usher', 'nitpicker'])
+  assert.deepEqual((await forksOfLink(linkA.id)).map(f => f.key), ['pm', 'wren', 'wick', 'wynn', 'wade', 'usher', 'nitpicker', 'quincy'])
   assert.deepEqual(await forksOfLink(linkB.id), [])
 })
 
@@ -153,7 +154,7 @@ test('the crew own rotate leaves the forks and their limited keys untouched', as
   const keysOf = async () => (await db.select({ hash: apiKeys.keyHash, projectId: apiKeys.projectId }).from(apiKeys)
     .where(inArray(apiKeys.userId, await forkIds(linkA.id)))).sort((a, b) => a.hash.localeCompare(b.hash))
   const before = await keysOf()
-  assert.equal(before.length, 7)
+  assert.equal(before.length, FORK_PEOPLE.length)
 
   const caller = { userId: boss, keyId: null, keyName: 'test' }
   const rotated = await createOrRotateCrew({ slug: crew.slug, name: crew.name, product: { name: 'Fork product' }, rotate: true }, caller)
@@ -165,7 +166,7 @@ test('the crew own rotate leaves the forks and their limited keys untouched', as
   assert.ok(before.every(k => k.projectId === linkA.shadowProjectId))
   // And the crew's own people are now there beside them, without the forks among them.
   const view = await crewView(crew)
-  assert.equal(view.people.length, 10)
+  assert.equal(view.people.length, CREW_PEOPLE.length)
 })
 
 test('disabling the crew cuts every fork off: their keys are gone', async () => {
@@ -180,7 +181,7 @@ test('taking the crew off the board removes its forks, and leaves the forks of a
   const gone = await forkIds(linkA.id)
   await detachCrew((await findCrewLink(realTeam, linkA.id))!)
   assert.equal((await db.select().from(user).where(inArray(user.id, gone))).length, 0)
-  assert.equal((await forkIds(linkB.id)).length, 7)
+  assert.equal((await forkIds(linkB.id)).length, FORK_PEOPLE.length)
   await removeForks(linkB.id)
   assert.equal((await forkIds(linkB.id)).length, 0)
 })
