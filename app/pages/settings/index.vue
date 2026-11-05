@@ -275,6 +275,9 @@ function swatchStyle(color: string, selected: boolean) {
           <!-- Passkeys and two-factor -->
           <SecurityPanel />
 
+          <!-- Who may see this address -->
+          <EmailPrivacyPanel />
+
           <!-- Appearance -->
           <div class="rounded-xl border border-default bg-default overflow-hidden">
             <div class="px-5 py-3 border-b border-default bg-elevated/40">

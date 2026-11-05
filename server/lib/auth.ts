@@ -12,6 +12,7 @@ import { mailEnabled, sendMail } from './mailer'
 import { eq } from 'drizzle-orm'
 import { admitsSignUp, ensureOwnerOrganization, invitationTokenFrom, isFirstUser } from '../utils/ownerOrganization'
 import { crewAccountLive, isCrewUser, isInvalidDomain } from '../utils/crewAccounts'
+import { scrubMemberEmails } from '../utils/emailPrivacy'
 
 const baseURL = process.env.BETTER_AUTH_URL || 'http://localhost:3000'
 
@@ -138,6 +139,16 @@ export const auth = betterAuth({
           message: 'This account uses two-factor authentication. Sign in with your password or a passkey.'
         })
       }
+    }),
+    // The team's member list carries every member's address. Each one stays only when its owner lets this
+    // viewer see it, so the Members page cannot be used to read addresses that were meant to stay private.
+    after: createAuthMiddleware(async (ctx) => {
+      if (!ctx.path.startsWith('/organization/')) return
+      const returned = ctx.context.returned
+      if (!returned || typeof returned !== 'object' || !('members' in returned)) return
+      const session = await getSessionFromCtx(ctx)
+      const scrubbed = await scrubMemberEmails(session?.user.id ?? null, returned)
+      if (scrubbed !== returned) return ctx.json(scrubbed)
     })
   },
   user: {

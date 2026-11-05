@@ -9,7 +9,8 @@ import { errorMessage, untypedFetch } from '~/utils/untypedFetch'
 // The server decides every one of those rules; this only shows them and sends the changes.
 type GuestRole = 'editor' | 'manager'
 
-interface Guest { userId: string, name: string, email: string, image: string | null, role: GuestRole, allowedDomain: string | null }
+// An address is null when its owner keeps it private from this reader (Settings, "Who can see my email address").
+interface Guest { userId: string, name: string, email: string | null, image: string | null, role: GuestRole, allowedDomain: string | null }
 interface Invitation {
   id: string
   email: string
@@ -26,7 +27,7 @@ interface Listing {
   guests: Guest[]
   invitations: Invitation[]
 }
-interface StaffPerson { id: string, name: string, email: string, image: string | null, teamRole: 'owner' | 'admin' | 'member', isProjectOwner: boolean, role: 'manager' | 'member' | null, explicit: boolean }
+interface StaffPerson { id: string, name: string, email: string | null, image: string | null, teamRole: 'owner' | 'admin' | 'member', isProjectOwner: boolean, role: 'manager' | 'member' | null, explicit: boolean }
 interface InviteAnswer { id: string, email: string, status: 'open' | 'awaiting_approval', url?: string, emailed?: boolean }
 
 const props = defineProps<{
@@ -92,8 +93,8 @@ function domainOf(address: string): string {
 }
 
 // A public mail provider is never offered as a manager guest's domain.
-function suggestedDomain(address: string): string {
-  const domain = domainOf(address)
+function suggestedDomain(address: string | null): string {
+  const domain = domainOf(address ?? '')
   return isPublicMailDomain(domain) ? '' : domain
 }
 
@@ -528,7 +529,10 @@ watch(open, (isOpen) => {
                   <p class="truncate text-sm text-default">
                     {{ person.name }}
                   </p>
-                  <p class="truncate text-xs text-muted">
+                  <p
+                    v-if="person.email"
+                    class="truncate text-xs text-muted"
+                  >
                     {{ person.email }}
                   </p>
                 </div>
@@ -558,7 +562,10 @@ watch(open, (isOpen) => {
                       {{ guest.name }}
                       <span class="ml-1 rounded bg-elevated px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted">Guest</span>
                     </p>
-                    <p class="truncate text-xs text-muted">
+                    <p
+                      v-if="guest.email"
+                      class="truncate text-xs text-muted"
+                    >
                       {{ guest.email }}
                     </p>
                   </div>

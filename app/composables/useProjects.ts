@@ -92,7 +92,7 @@ export interface ProjectTask {
 export interface ProjectPerson {
   id: string
   name: string
-  email: string
+  email: string | null
   image: string | null
   kind: 'staff' | 'customer'
 }

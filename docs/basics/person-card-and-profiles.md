@@ -22,7 +22,7 @@ The card closes when you move away.
 ## What the card shows
 
 - The person's picture and name.
-- Their email address, only when the server allows it (see below).
+- Their email address, only when they have chosen to let you see it (see below).
 - **Collaborating with you on 3 projects**, or *1 project*. This counts the boards you can both open. An archived board is
   not counted.
 - **View profile**, which opens their profile page.
@@ -38,8 +38,9 @@ Two things follow from that:
 
 - Even for a person you share a board with, you only learn about the boards you both open, and about tasks you are
   allowed to read on them.
-- A person's email address is shown to you only if you work on at least one of those boards as a team member, or if it is
-  your own address. A customer's contact or a guest sees the name but no address.
+- A person's email address is shown to you only when they let you see it. Each person sets that themselves, and the
+  default is that nobody but them sees it. See [Who can see your email address](/help/workspace/email-privacy). Your own
+  address is always shown to you.
 
 ## The profile page
 

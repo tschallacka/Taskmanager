@@ -50,8 +50,8 @@ The team can also assign a task to you, which shows you as its assignee.
 
 - Change a task, including one you added yourself: edit, move, complete or delete it.
 - Change who sees a task or comment, or edit or delete someone else's comment.
-- See the team's other boards, its Team page or its internal notes. You do see the name and email address of the
-  team members who work on your boards.
+- See the team's other boards, its Team page or its internal notes. You do see the name of the team members who
+  work on your boards. Their email address you see only if they chose to share it as far as guests.
 - Rename the board, or file it under another customer.
 
 ## If you lose access

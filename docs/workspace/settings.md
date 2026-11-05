@@ -51,6 +51,13 @@ a password, so there is no password sign-in for a code to protect.**
 If a step fails you see a message such as **That code did not match**. Nothing is turned on until the code you type
 matches.
 
+## Who can see my email address
+
+A slider with five steps decides who may see your email address on this instance: **Only me**, **Managers**, **Team
+members**, **Guests** and **Everyone**. The default is **Only me**. Each step adds one more group of people, and the
+change is saved when you let go of the slider. The page [Who can see your email address](/help/workspace/email-privacy)
+says exactly who each step covers and where addresses appear.
+
 ## Appearance
 
 - **Theme**: a button switches between **Light mode** and **Dark mode**. The same switch is in the account menu at the

@@ -1,5 +1,5 @@
 // The person card: what one person may see of another. Only people who share a board are found, an
-// address is shown to the people who work on a board with them, and on a board the viewer only reads as a
+// address stays hidden unless its owner allows it (see email-privacy.test.ts), and on a board the viewer only reads as a
 // guest, what is marked private does not exist. Needs the dev database and the Nuxt aliases. Run:
 //   TSX_TSCONFIG_PATH=.nuxt/tsconfig.server.json DATABASE_URL=postgresql://arnotes:arnotes@localhost:5433/arnotes node --import tsx --test tests/person-card.test.ts
 import { after, before, test } from 'node:test'
@@ -54,11 +54,12 @@ after(async () => {
   await db.$client.end()
 })
 
-test('a teammate sees the shared board, the address and every open task assigned to the person', async () => {
+test('a teammate sees the shared board and every open task assigned to the person, but not the address', async () => {
   const view = await personView(owner, plain)
   assert.ok(view)
   assert.deepEqual(view.boards.map(b => [b.id, b.staff]), [[board, true]])
-  assert.equal(view.person.email, `${plain}@staff.test`)
+  // The default is private: not even a team owner sees an address its owner has not shared.
+  assert.equal(view.person.email, null)
   assert.deepEqual(view.tasks.map(t => t.id).sort(), [id('internal'), id('shared')].sort())
 })
 

@@ -12,6 +12,7 @@ import { mailInvitation } from './invitations'
 import { listProjectPeople, vaultRoleOf } from './projectMembers'
 import { genId } from './projects'
 import { publish, publishToUser, userTopic, workspaceTopic } from './realtime'
+import { maskEmails } from './emailPrivacy'
 
 export interface ShareProject {
   id: string
@@ -369,7 +370,7 @@ export async function removeGuest(project: ShareProject, adminId: string, guestU
 export interface GuestListing {
   /** What the caller may do: admins see everything, a manager guest only what they made. */
   me: { kind: 'admin' } | { kind: 'guest-manager', allowedDomain: string | null }
-  guests: { userId: string, name: string, email: string, image: string | null, role: GuestRole, allowedDomain: string | null }[]
+  guests: { userId: string, name: string, email: string | null, image: string | null, role: GuestRole, allowedDomain: string | null }[]
   invitations: { id: string, email: string, role: GuestRole, status: 'open' | 'awaiting_approval', reason: string | null, invitedBy: string | null, invitedByName: string | null, createdAt: number, expiresAt: number }[]
 }
 
@@ -414,7 +415,9 @@ export async function listGuests(project: ShareProject, actorId: string): Promis
   const now = Date.now()
   return {
     me,
-    guests,
+    // A guest's address shows only when its owner lets this reader see it.
+    guests: (await maskEmails(actorId, guests.map(guest => ({ ...guest, id: guest.userId })), { sharesBoard: true, managesBoard: me.kind === 'admin' }))
+      .map(({ id: _id, ...guest }) => guest),
     invitations: invitations
       .filter(row => row.expiresAt > now)
       .filter(row => me.kind === 'admin' || row.invitedBy === actorId)

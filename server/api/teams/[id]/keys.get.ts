@@ -2,6 +2,7 @@ import { desc, eq, inArray } from 'drizzle-orm'
 import { db } from '../../../db'
 import { apiKeys, customers, projects, user } from '../../../db/schema'
 import { requireTeamRole } from '../../../utils/auth-helpers'
+import { maskEmails } from '../../../utils/emailPrivacy'
 
 /**
  * Every API key that works in this team, whoever made it: what it is limited to, who owns
@@ -18,6 +19,12 @@ export default defineEventHandler(async (event) => {
     .where(eq(apiKeys.teamId, teamId))
     .orderBy(desc(apiKeys.createdAt))
 
+  // An owner's address shows here only when they let the people who run this team see it.
+  const ownerEmails = new Map((await maskEmails(
+    event.context.session.user.id,
+    [...new Map(rows.map(row => [row.key.userId, { id: row.key.userId, email: row.ownerEmail }])).values()]
+  )).map(owner => [owner.id, owner.email]))
+
   const customerIds = [...new Set(rows.flatMap(row => (row.key.customerId ? [row.key.customerId] : [])))]
   const projectIds = [...new Set(rows.flatMap(row => (row.key.projectId ? [row.key.projectId] : [])))]
   const customerNames = new Map(customerIds.length
@@ -28,7 +35,7 @@ export default defineEventHandler(async (event) => {
     : [])
 
   return {
-    keys: rows.map(({ key, ownerName, ownerEmail }) => ({
+    keys: rows.map(({ key, ownerName }) => ({
       id: key.id,
       name: key.name,
       keyPrefix: key.keyPrefix,
@@ -36,7 +43,7 @@ export default defineEventHandler(async (event) => {
       createdAt: key.createdAt,
       lastUsedAt: key.lastUsedAt,
       expiresAt: key.expiresAt,
-      owner: { id: key.userId, name: ownerName, email: ownerEmail },
+      owner: { id: key.userId, name: ownerName, email: ownerEmails.get(key.userId) ?? null },
       limit: key.projectId
         ? { type: 'project' as const, id: key.projectId, name: projectNames.get(key.projectId) ?? 'a board' }
         : key.customerId

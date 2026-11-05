@@ -1,4 +1,5 @@
 import { addProjectMember, projectPersonRow, routeMembers } from '../../../../utils/projectMembers'
+import { maskEmails } from '../../../../utils/emailPrivacy'
 
 // Adds a team member to the project as a manager or a member. The answer is the
 // person's row, as the list shows it now.
@@ -10,5 +11,6 @@ export default defineEventHandler(async (event) => {
   }
 
   await addProjectMember(project, userId, 'ui', body.userId, body.role)
-  return projectPersonRow(project, body.userId)
+  const person = await projectPersonRow(project, body.userId)
+  return person ? (await maskEmails(userId, [person], { sharesBoard: true, managesBoard: true }))[0] : null
 })

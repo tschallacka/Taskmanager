@@ -2,6 +2,7 @@ import { db } from '../../../db'
 import { customerInvitations, customerMembers, user } from '../../../db/schema'
 import { and, asc, desc, eq, gt, isNull } from 'drizzle-orm'
 import { requireCustomer } from '../../../utils/customers'
+import { maskEmails } from '../../../utils/emailPrivacy'
 
 // Who logs in for a customer, and which invitation links are still open.
 export default defineEventHandler(async (event) => {
@@ -40,5 +41,11 @@ export default defineEventHandler(async (event) => {
         .orderBy(desc(customerInvitations.createdAt))
     : []
 
-  return { canManage, contacts, invitations }
+  // A contact's address shows only to a reader their owner lets see it. Whoever manages the customer counts as a manager.
+  const visible = await maskEmails(
+    event.context.session.user.id,
+    contacts.map(contact => ({ ...contact, id: contact.userId })),
+    { managesBoard: canManage }
+  )
+  return { canManage, contacts: visible.map(({ id: _id, ...contact }) => contact), invitations }
 })

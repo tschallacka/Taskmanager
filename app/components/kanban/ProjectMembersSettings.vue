@@ -8,7 +8,7 @@ type VaultRole = 'manager' | 'member'
 interface ProjectPerson {
   id: string
   name: string
-  email: string
+  email: string | null
   image: string | null
   teamRole: 'owner' | 'admin' | 'member'
   isProjectOwner: boolean

@@ -18,7 +18,10 @@ export const user = pgTable('user', {
   // and customer portals but cannot start an organisation of their own.
   canCreateOrganizations: boolean('can_create_organizations').notNull().default(false),
   // The crew this account belongs to. NULL for people.
-  crewId: text('crew_id').references((): AnyPgColumn => crews.id, { onDelete: 'set null' })
+  crewId: text('crew_id').references((): AnyPgColumn => crews.id, { onDelete: 'set null' }),
+  // Who may see this account's email address: only the owner of the address (the default), or, in steps,
+  // managers, team members, anyone who shares a board, everyone signed in. See utils/emailPrivacy.ts.
+  emailVisibility: text('email_visibility').notNull().default('owner')
 })
 
 export const session = pgTable('session', {

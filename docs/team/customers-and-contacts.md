@@ -22,7 +22,9 @@ Customers belong to a team. You cannot have customers in your personal workspace
   only ever sees the shared ones. See [What customers see](/help/team/what-customers-see).
 
 Contacts are not team members. They cannot see the team's other boards, the Team page or its join code. They do
-see the name and email address of the team members who work on a board they follow.
+see the name of the team members who work on a board they follow. A team member's email address stays private from
+a contact unless that team member has chosen to share it as far as guests. See
+[Who can see your email address](/help/workspace/email-privacy).
 
 ## Where customers are
 

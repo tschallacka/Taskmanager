@@ -3,6 +3,7 @@
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm'
 import { db } from '../db'
 import { projects, projectTasks, user } from '../db/schema'
+import { emailFor } from './emailPrivacy'
 import { reachOf } from './workspaces'
 
 export interface SharedBoard { id: string, name: string, /** The viewer works on it as staff, so may file work on it. */ staff: boolean }
@@ -37,8 +38,8 @@ export async function personView(viewerId: string, targetId: string): Promise<Pe
   const boards = await sharedBoards(viewerId, targetId)
   if (!boards.length && viewerId !== targetId) return null
 
-  // An address is shown to the people who work on a board with them, not to an outside reader.
-  const email = viewerId === targetId || boards.some(board => board.staff) ? account.email : null
+  // An address is shown when its owner lets this reader see it. They share a board, so the "guests" step applies.
+  const email = await emailFor(viewerId, account, { sharesBoard: true })
 
   const rows = boards.length
     ? await db

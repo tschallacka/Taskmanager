@@ -9,8 +9,10 @@ order: 30
 Everyone in a team has one of three roles. The role decides who may change the team itself. It does not limit
 which boards you can open: **every member can open every board of the team**, whatever their role.
 
-You find the list under **Team**, then **Members**. Each row shows the person's name and email address, a badge
-with their role, and "(you)" on your own row. Every member of the team can see these email addresses.
+You find the list under **Team**, then **Members**. Each row shows the person's name, a badge with their role, and
+"(you)" on your own row. A person's email address appears on their row only when they let you see it: by default
+nobody but them does, and each person can widen that to team owners and admins, to the whole team, or further. See
+[Who can see your email address](/help/workspace/email-privacy). Your own address is always shown on your own row.
 
 ## The three roles
 
