@@ -5,7 +5,7 @@
 // and writes one Claude Code agent definition per member into ~/.claude/agents. Safe to run
 // again: it overwrites generated documents (edit the .tmpl, not the output) but never
 // PROJECT-RULES.md or BRIEF.md once they exist.
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, chmodSync } from 'node:fs'
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, chmodSync, copyFileSync } from 'node:fs'
 import { execSync } from 'node:child_process'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -42,6 +42,53 @@ try {
 
 if (config.chat.client) existsSync(config.chat.client) ? ok('chat client found') : fail(`chat.client ${config.chat.client} does not exist`)
 else warn('no chat client configured: meetings in chat are skipped (everything else works)')
+
+// The tools the hard rules in WORKFLOW.md name. init never installs anything: it says what is
+// missing and where it comes from. The skills and their MCP servers come from one repository.
+const AI_SKILLS = 'https://github.com/tschallacka/ai-skills'
+const CODEGRAPH = 'https://github.com/colbymchenry/codegraph'
+const claudeHome = process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude')
+const skillDir = name => join(claudeHome, 'skills', name)
+// unslop is not in a repository: it ships with the kit (unslop.SKILL.md) and is copied into the
+// skills folder when it is not there yet. A copy of a file from the kit; nothing is downloaded.
+if (!existsSync(skillDir('unslop')) && existsSync(join(kitDir, 'unslop.SKILL.md'))) {
+  mkdirSync(skillDir('unslop'), { recursive: true })
+  copyFileSync(join(kitDir, 'unslop.SKILL.md'), join(skillDir('unslop'), 'SKILL.md'))
+  ok('unslop skill copied from the kit into the skills folder')
+}
+const skillBin = name => join(process.env.XDG_CONFIG_HOME || join(homedir(), '.config'), 'tsch-ai-skills', 'bin', name)
+const onPath = (command) => {
+  try {
+    execSync(`command -v ${command}`, { stdio: 'pipe' })
+    return true
+  } catch { return false }
+}
+const recommended = [
+  { name: 'AI text editor (skill + MCP)', have: existsSync(skillDir('ai-text-editor')) && existsSync(skillBin('ai-text-editor-mcp')), from: AI_SKILLS },
+  { name: 'interactive-shell (skill + MCP)', have: existsSync(skillDir('interactive-shell')) && existsSync(skillBin('interactive-shell-mcp')), from: AI_SKILLS },
+  { name: 'git-worktrees skill', have: existsSync(skillDir('git-worktrees')), from: AI_SKILLS },
+  { name: 'git-merge-resolving skill', have: existsSync(skillDir('git-merge-resolving')), from: AI_SKILLS },
+  { name: 'CodeGraph', have: onPath('codegraph'), from: CODEGRAPH },
+  { name: 'tailpipe (skill + MCP)', have: existsSync(skillDir('tailpipe')) && existsSync(skillBin('tailpipe-mcp')), from: AI_SKILLS },
+  { name: 'unslop skill', have: existsSync(skillDir('unslop')), from: null }
+]
+const missing = recommended.filter(tool => !tool.have)
+for (const tool of recommended) tool.have ? ok(tool.name) : warn(`${tool.name} is not installed`)
+if (missing.some(tool => tool.from === AI_SKILLS)) {
+  console.log(`\n  The AI text editor, interactive-shell, tailpipe and git skills come from ${AI_SKILLS}.`)
+  console.log('  Install them with the interactive installer (pick the skills and Claude Code as the destination):')
+  console.log('    npx --yes --package @tschallacka/ai-skills ai-skills-install')
+  console.log('  or, on Linux and macOS without npm:')
+  console.log('    curl -fsSL https://raw.githubusercontent.com/tschallacka/ai-skills/master/installer/bootstrap.sh | sh')
+}
+if (missing.some(tool => tool.from === CODEGRAPH)) {
+  console.log(`\n  CodeGraph comes from its upstream project, ${CODEGRAPH}. Install it with:`)
+  console.log('    npm i -g @colbymchenry/codegraph')
+  console.log('  or, on macOS and Linux without Node:')
+  console.log('    curl -fsSL https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.sh | sh')
+}
+if (missing.some(tool => tool.from === null)) console.log('\n  The unslop skill could not be copied: unslop.SKILL.md is missing from the kit folder. Re-download the kit.')
+if (missing.length) warn('the workflow\'s hard rules name these tools; agents cannot follow them until they are installed')
 
 let hasFonts = true
 try {

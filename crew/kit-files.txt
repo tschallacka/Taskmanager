@@ -29,5 +29,6 @@ package.json
 postbrief.mjs
 setup.mjs
 tm.mjs
+unslop.SKILL.md
 watch.mjs
 watchlogs.mjs

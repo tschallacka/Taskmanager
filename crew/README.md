@@ -18,7 +18,7 @@ response is the crew's `creds.json`; nothing else is set up by hand.
 1. Write `crew.json` in the crew's home folder (see `crew.config.example.json`): the product, the
    board URL, the people's names, the crew slug (`"crew": { "slug": "..." }`, lowercase letters, digits and dashes, the one `setup.mjs` needs) and, optionally, the chat line.
 2. Put `creds.json` (the response, mode 600) in the same folder.
-3. Run `CREW_HOME=<the crew's home folder> node init.mjs`. It checks the machine (Node, a browser),
+3. Run `CREW_HOME=<the crew's home folder> node init.mjs`. It checks the machine (Node, a browser, and the skills and MCP servers the hard rules name, see "Tools the workflow's hard rules need" below),
    renders the agents' documents (`CREW.md`, `PROMPTS.md`, ...) from the `*.tmpl` files, and writes one
    Claude Code agent definition per member into `~/.claude/agents` (`$CLAUDE_CONFIG_DIR/agents` when
    that is set): `<crew slug>-<person>.md`, such as `acme-pia-planner.md`, with `model: haiku`.
@@ -48,6 +48,22 @@ Environment:
   own sandbox cannot start (for example inside a systemd sandbox). The host decides.
 - `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`: skip the optional browser download in `npm install`
   (it is also fine to skip it when `CHROMIUM` is set).
+
+## Tools the workflow's hard rules need
+
+The workflow's hard rules (the AI text editor for every document, CodeGraph for code, tailpipe for long-running output, and the `git-worktrees`, `git-merge-resolving`, `interactive-shell` and `unslop` skills) only hold on a machine that has these installed. `init.mjs` checks for each one and prints a WARN line for every one that is missing. It never installs anything itself.
+
+- **AI text editor, interactive-shell, tailpipe, git-worktrees, git-merge-resolving.** These come from https://github.com/tschallacka/ai-skills. Run the interactive installer, choose these skills and choose Claude Code as the destination:
+
+      npx --yes --package @tschallacka/ai-skills ai-skills-install
+
+  Without npm, on Linux and macOS (on Windows run it inside Git Bash or WSL2):
+
+      curl -fsSL https://raw.githubusercontent.com/tschallacka/ai-skills/master/installer/bootstrap.sh | sh
+
+  `init.mjs` looks for the skill folder in `~/.claude/skills/<name>` and, for the editor, the shell and tailpipe, for the MCP server binary (`ai-text-editor-mcp`, `interactive-shell-mcp`, `tailpipe-mcp`) in `~/.config/tsch-ai-skills/bin` (`$XDG_CONFIG_HOME/tsch-ai-skills/bin` when that is set).
+- **CodeGraph.** It comes from its upstream project, https://github.com/colbymchenry/codegraph (not a fork). Install it with `npm i -g @colbymchenry/codegraph`, or on macOS and Linux without Node with `curl -fsSL https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.sh | sh`. `init.mjs` looks for `codegraph` on the PATH.
+- **unslop.** It is one of the Owner's own Claude skills, not part of a repository, so it ships with the kit as `unslop.SKILL.md`. When `~/.claude/skills/unslop` (`$CLAUDE_CONFIG_DIR/skills/unslop` when that is set) is missing, `init.mjs` copies the file there. Nothing is downloaded.
 
 ## Making the crew by hand
 

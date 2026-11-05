@@ -7,6 +7,7 @@ import type { ApiKeyContext } from '../../utils/api-keys'
 import { toolsForKey, toolsForScopes } from '../../utils/mcpRegistry'
 import { mayUseReadGrant, readGrantedBoardIds } from '../../utils/crewBoardAccess'
 import { recordAgentAction } from '../../utils/agentAudit'
+import { bossInstructions } from '../../utils/crewBossSkill'
 import { McpToolError } from '../../utils/mcpToolKit'
 import { API_KEY_SCOPES } from '../../db/schema'
 import type { ApiKeyScope } from '../../db/schema'
@@ -121,11 +122,14 @@ async function handleMessage(message: JsonRpcMessage, context: ApiKeyContext) {
         ? requested
         : LATEST_PROTOCOL_VERSION
 
+      // Boss's session also learns how to behave with its crew (see crewBossSkill.ts).
+      const boss = await bossInstructions(context.userId)
+
       return result(id, {
         protocolVersion,
         capabilities: { tools: { listChanged: false } },
         serverInfo: { name: SERVER_NAME, title: 'Taskmanager', version: SERVER_VERSION },
-        instructions: INSTRUCTIONS
+        instructions: boss ? `${INSTRUCTIONS}\n\n${boss}` : INSTRUCTIONS
       })
     }
 
