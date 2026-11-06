@@ -22,6 +22,7 @@ const crewName = ref<string | null>(null)
 const showLegend = ref(false)
 const lag = ref(0)
 const paused = ref(false)
+const noWebGL = ref(false)
 
 let scene: OfficeScene | null = null
 let timer: ReturnType<typeof setTimeout> | null = null
@@ -97,16 +98,18 @@ watch(speed, (value) => {
 })
 
 onMounted(async () => {
-  const { OfficeScene } = await import('~/office/office')
+  const { openOfficeScene } = await import('~/office/openScene')
   if (!host.value) return
-  scene = new OfficeScene(host.value, {
+  // No WebGL means no room: the header and the board still load, and the page says so where the room would be.
+  scene = openOfficeScene(host.value, {
     onTicker: addLine,
     onHover: (info) => {
       hover.value = info
     }
   })
+  noWebGL.value = !scene
   // In development the scene is reachable from the console, e.g. `__office.startPong()`.
-  if (import.meta.dev) (window as unknown as { __office?: OfficeScene }).__office = scene
+  if (import.meta.dev && scene) (window as unknown as { __office?: OfficeScene }).__office = scene
   start()
 })
 
@@ -235,6 +238,20 @@ useSeoMeta({ title: computed(() => (boardName.value ? `Office · ${boardName.val
         class="absolute inset-0"
         data-office-canvas
       />
+
+      <div
+        v-if="noWebGL"
+        class="absolute inset-0 flex items-center justify-center px-4"
+      >
+        <p class="text-center text-sm text-white">
+          This browser cannot show the 3D office.
+          <NuxtLink
+            v-if="!demoOnly"
+            :to="`/projects/${boardId}`"
+            class="whitespace-nowrap underline"
+          >Back to the board</NuxtLink>
+        </p>
+      </div>
 
       <p
         v-if="error"
