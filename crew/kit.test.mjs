@@ -148,7 +148,7 @@ describe('crew <who> browser, end to end (real Chromium, fake board)', { skip: S
     made.push(home)
     dir = join(home, 'work', 'browser')
     mkdirSync(join(home, 'work'), { recursive: true })
-    writeFileSync(join(home, 'crew.json'), JSON.stringify({ team: 'Test Crew', chromium: CHROMIUM }))
+    writeFileSync(join(home, 'crew.json'), JSON.stringify({ team: 'Test Crew', chromium: CHROMIUM, product: { name: 'Test', repo: '', appUrl: base } }))
     writeFileSync(join(home, 'creds.json'), JSON.stringify({
       base,
       team: { id: 'team-1' },
