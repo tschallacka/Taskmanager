@@ -15,6 +15,7 @@ Object.assign(globalThis, { defineEventHandler: (handler: unknown) => handler })
 const { db } = await import('../server/db')
 const { user, userEmail } = await import('../server/db/schema')
 const { default: listEmails } = await import('../server/api/account/emails/index.get')
+const { mailEnabled } = await import('../server/lib/mailer')
 
 const tag = randomBytes(4).toString('hex')
 const owner = `acc-${tag}-owner`
@@ -39,9 +40,10 @@ after(async () => {
 
 test('the list route answers a signed-in account with its extra addresses, confirmed or waiting', async () => {
   const event = { context: { session: { user: { id: owner } } } }
-  const rows = await (listEmails as unknown as (e: unknown) => Promise<{ id: string, email: string, verified: boolean }[]>)(event)
-  const byEmail = Object.fromEntries(rows.map(row => [row.email, row.verified]))
-  assert.equal(rows.length, 2)
+  const answer = await (listEmails as unknown as (e: unknown) => Promise<{ mailEnabled: boolean, emails: { id: string, email: string, verified: boolean }[] }>)(event)
+  const byEmail = Object.fromEntries(answer.emails.map(row => [row.email, row.verified]))
+  assert.equal(answer.mailEnabled, mailEnabled)
+  assert.equal(answer.emails.length, 2)
   assert.equal(byEmail[verifiedAddress], true)
   assert.equal(byEmail[waitingAddress], false)
 })

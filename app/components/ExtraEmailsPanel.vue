@@ -10,6 +10,7 @@ interface ExtraEmail {
 const toast = useToast()
 
 const emails = ref<ExtraEmail[]>([])
+const mailEnabled = ref<boolean | null>(null)
 const loading = ref(true)
 const newEmail = ref('')
 const adding = ref(false)
@@ -24,7 +25,9 @@ function reasonOf(error: unknown, fallback: string) {
 async function load() {
   loading.value = true
   try {
-    emails.value = await $fetch<ExtraEmail[]>('/api/account/emails')
+    const answer = await $fetch<{ mailEnabled: boolean, emails: ExtraEmail[] }>('/api/account/emails')
+    mailEnabled.value = answer.mailEnabled
+    emails.value = answer.emails
   } catch (error) {
     toast.add({ title: 'Could not load your extra addresses', description: reasonOf(error, ''), icon: 'i-lucide-alert-triangle', color: 'error' })
   } finally {
@@ -64,7 +67,10 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="space-y-3">
+  <div
+    id="extra-emails"
+    class="space-y-3"
+  >
     <div class="flex items-center gap-4">
       <div class="size-8 rounded-lg bg-elevated flex items-center justify-center shrink-0">
         <UIcon
@@ -84,7 +90,20 @@ onMounted(load)
     </div>
 
     <div class="pl-12 space-y-3">
-      <div class="flex gap-2">
+      <p
+        v-if="mailEnabled === false"
+        class="text-xs text-warning flex items-start gap-2"
+      >
+        <UIcon
+          name="i-lucide-mail-x"
+          class="size-4 shrink-0 mt-px"
+        />
+        {{ NO_MAIL_NOTICE }}
+      </p>
+      <div
+        v-if="canAddExtraEmail(mailEnabled)"
+        class="flex gap-2"
+      >
         <UInput
           v-model="newEmail"
           type="email"
