@@ -183,7 +183,7 @@ async function copy(text: string, id: string) {
                   @click="copy(claudeCodeCommand, 'cli')"
                 />
               </div>
-              <pre class="text-xs font-mono bg-elevated/50 border border-default rounded-md p-3 overflow-x-auto">{{ claudeCodeCommand }}</pre>
+              <pre class="text-xs font-mono bg-elevated/50 border border-default rounded-md p-3 whitespace-pre-wrap break-words">{{ claudeCodeCommand }}</pre>
               <p class="text-xs text-muted">
                 Then run <code class="font-mono">/mcp</code> inside Claude Code to confirm it connected.
               </p>
@@ -220,7 +220,7 @@ async function copy(text: string, id: string) {
                   @click="copy(jsonConfig, 'json')"
                 />
               </div>
-              <pre class="text-xs font-mono bg-elevated/50 border border-default rounded-md p-3 overflow-x-auto">{{ jsonConfig }}</pre>
+              <pre class="text-xs font-mono bg-elevated/50 border border-default rounded-md p-3 whitespace-pre-wrap break-words">{{ jsonConfig }}</pre>
             </div>
 
             <div class="px-5 py-4 space-y-2">
@@ -242,7 +242,7 @@ async function copy(text: string, id: string) {
                   @click="copy(curlCheck, 'curl')"
                 />
               </div>
-              <pre class="text-xs font-mono bg-elevated/50 border border-default rounded-md p-3 overflow-x-auto">{{ curlCheck }}</pre>
+              <pre class="text-xs font-mono bg-elevated/50 border border-default rounded-md p-3 whitespace-pre-wrap break-words">{{ curlCheck }}</pre>
               <p class="text-xs text-muted">
                 A list of tools means the key works. A <code class="font-mono">401</code> means it does not.
               </p>
