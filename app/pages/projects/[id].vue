@@ -166,33 +166,24 @@ async function unarchiveNow() {
   await unarchiveProject(project.id)
 }
 
-// Whether the person asked to hear about every new task here, read when the board opens.
-const boardWatch = useBoardWatch(() => projectId.value)
-watch(projectId, (id) => {
-  if (id && /^[a-z0-9]+$/i.test(id)) boardWatch.load()
+// The board's menu is the one the sidebar and the lists show (BoardMenu). The trash entry earns its
+// place only when there is something in it, or when it is already on, so there is a way back.
+// A board with nothing deleted looks exactly as it did before.
+function trashMenu() {
+  if (!(trashedCount.value > 0 || showTrashed.value)) return []
+  return [[{
+    label: showTrashed.value ? 'Hide trashed' : `Show trashed (${trashedCount.value})`,
+    icon: showTrashed.value ? 'i-lucide-eye-off' : 'i-lucide-trash-2',
+    onSelect: () => { toggleShowTrashed() }
+  }]]
+}
+
+// A rename started from a list opens the board with ?rename=1; it starts once the board is loaded.
+watch([() => route.query.rename, activeProject], ([rename, project]) => {
+  if (!rename || !project) return
+  navigateTo({ path: route.path, query: { ...route.query, rename: undefined }, replace: true })
+  startRename()
 }, { immediate: true })
-
-// The trash entry earns its place only when there is something in it — or when
-// it is already on, so there is a way back. A board with nothing deleted looks
-// exactly as it did before.
-const projectMenu = computed(() => {
-  const trash = trashedCount.value > 0 || showTrashed.value
-    ? [[{
-        label: showTrashed.value ? 'Hide trashed' : `Show trashed (${trashedCount.value})`,
-        icon: showTrashed.value ? 'i-lucide-eye-off' : 'i-lucide-trash-2',
-        onSelect: () => { toggleShowTrashed() }
-      }]]
-    : []
-
-  return [
-    [
-      { label: 'Rename project', icon: 'i-lucide-pencil', onSelect: startRename },
-      { label: boardWatch.watching.value ? 'Stop notifying me of new tasks' : 'Notify me of new tasks', icon: boardWatch.watching.value ? 'i-lucide-bell-off' : 'i-lucide-bell', onSelect: () => boardWatch.set(!boardWatch.watching.value) },
-      { label: 'Settings', icon: 'i-lucide-settings', onSelect: () => setView('settings') }
-    ],
-    ...trash
-  ]
-})
 
 // The open board knows its own columns, so the count is read from them live
 // rather than from the shape cached with the project list.
@@ -432,18 +423,13 @@ useSeoMeta({
           </template>
         </BoardShare>
 
-        <UDropdownMenu
+        <BoardMenu
           v-if="!isCustomerView"
-          :items="projectMenu"
-        >
-          <UButton
-            icon="i-lucide-ellipsis"
-            size="xs"
-            color="neutral"
-            variant="ghost"
-            aria-label="Project options"
-          />
-        </UDropdownMenu>
+          mode="button"
+          :board="{ id: projectId, name: activeProject?.name ?? '', audience: activeProject?.audience }"
+          :rename="startRename"
+          :extra="trashMenu"
+        />
       </div>
     </header>
 

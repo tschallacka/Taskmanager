@@ -2,15 +2,16 @@
 import { relativeTime } from '~/composables/useRelativeTime'
 import type { Project } from '~/composables/useProjects'
 import type { PinnedBoard } from '~/composables/usePins'
+import type { BoardMenuBoard } from '~/composables/useBoardMenu'
+import type { DropdownMenuItem } from '@nuxt/ui'
 import { taskCountLabel } from '#shared/utils/board'
 
 const { ready, projects, allTasks, deleteProject, renameProject } = useProjects()
 const route = useRoute()
 const { unread: inboxUnread } = useNotifications()
-const { pins, pinsLoaded, loadPins, isPinned, pinBoard, unpinBoard } = usePins()
+const { pins, pinsLoaded, loadPins, isPinned } = usePins()
 const { activeTeamId, isTeamAdmin } = useTeams()
 const { switchWorkspace } = useWorkspace()
-const toast = useToast()
 
 const activeId = computed(() => (route.params.id as string | undefined) ?? null)
 
@@ -40,14 +41,6 @@ function pinPlace(pin: PinnedBoard) {
 async function openPin(pin: PinnedBoard) {
   await switchWorkspace(pin.teamId)
   await navigateTo(`/projects/${pin.projectId}`)
-}
-
-async function togglePin(projectId: string) {
-  try {
-    await (isPinned(projectId) ? unpinBoard(projectId) : pinBoard(projectId))
-  } catch {
-    toast.add({ title: 'Could not change the pin', color: 'error' })
-  }
 }
 
 // Project creation lives on one surface only: /projects?new=1.
@@ -130,34 +123,35 @@ async function confirmDelete() {
   if (activeId.value === target.id) navigateTo('/projects')
 }
 
-// Anyone may pin a board they can open; a customer's board is the organisation's to rename or delete.
-function menuItems(project: Project) {
-  const pinned = isPinned(project.id)
-  const pin = [{
-    label: pinned ? 'Unpin' : 'Pin to sidebar',
-    icon: pinned ? 'i-lucide-pin-off' : 'i-lucide-pin',
-    onSelect: () => togglePin(project.id)
-  }]
-  if (project.audience === 'customer') return [pin]
-  const manage: { label: string, icon: string, onSelect: () => unknown }[] = [
-    { label: 'Rename', icon: 'i-lucide-pencil', onSelect: () => startRename(project) }
-  ]
-  // A team's owner or admin gives a board a crew; the Crews section of /team does the attaching.
+// The sidebar adds what only the sidebar does to a board's menu: give it a crew (a team's owner or
+// admin; the Crews section of /team does the attaching) and delete it.
+function sidebarMenuExtra(board: BoardMenuBoard): DropdownMenuItem[][] {
+  const groups: DropdownMenuItem[][] = []
   if (isTeamAdmin.value) {
-    manage.push({
+    groups.push([{
       label: 'Give it a crew',
       icon: 'i-lucide-users-round',
-      onSelect: () => { void navigateTo({ path: '/team', query: { section: 'crews', board: project.id, wizard: '1' } }) }
-    })
+      onSelect: () => { void navigateTo({ path: '/team', query: { section: 'crews', board: board.id, wizard: '1' } }) }
+    }])
   }
-  return [pin, manage, [
-    {
-      label: 'Delete project',
-      icon: 'i-lucide-trash-2',
-      color: 'error' as const,
-      onSelect: () => { deleteTarget.value = project }
-    }
-  ]]
+  groups.push([{
+    label: 'Delete project',
+    icon: 'i-lucide-trash-2',
+    color: 'error' as const,
+    onSelect: () => { deleteTarget.value = { id: board.id, name: board.name } }
+  }])
+  return groups
+}
+
+// A board listed here renames in its row; one from another workspace opens and renames itself.
+function renameInSidebar(board: BoardMenuBoard) {
+  if (projects.value.some(p => p.id === board.id)) startRename(board)
+  else navigateTo({ path: `/projects/${board.id}`, query: { rename: '1' } })
+}
+
+// A pinned board as a menu's board: its live name when the list has it.
+function pinAsBoard(pin: PinnedBoard): BoardMenuBoard {
+  return { id: pin.projectId, name: pinName(pin), audience: projects.value.find(p => p.id === pin.projectId)?.audience }
 }
 </script>
 
@@ -193,37 +187,44 @@ function menuItems(project: Project) {
       <div class="px-2 pb-1">
         <span class="text-xs font-semibold uppercase tracking-wider text-dimmed">Pinned</span>
       </div>
-      <div
+      <BoardMenu
         v-for="pin in pins"
         :key="pin.projectId"
-        class="group flex cursor-pointer items-start gap-2 rounded-lg px-2.5 py-1.5 transition-colors"
-        :class="activeId === pin.projectId ? 'bg-elevated' : 'hover:bg-elevated/60'"
-        data-pinned-board
-        @click="openPin(pin)"
+        mode="context"
+        :board="pinAsBoard(pin)"
+        :rename="renameInSidebar"
+        :extra="sidebarMenuExtra"
       >
-        <UIcon
-          name="i-lucide-pin"
-          class="mt-0.5 size-4 shrink-0"
-          :class="activeId === pin.projectId ? 'text-primary' : 'text-dimmed group-hover:text-muted'"
-        />
-        <div class="min-w-0 flex-1">
-          <p class="truncate text-sm font-medium leading-snug text-default">
-            {{ pinName(pin) }}
-          </p>
-          <p class="truncate text-xs text-muted">
-            {{ pinPlace(pin) }}
-          </p>
+        <div
+          class="group flex cursor-pointer items-start gap-2 rounded-lg px-2.5 py-1.5 transition-colors"
+          :class="activeId === pin.projectId ? 'bg-elevated' : 'hover:bg-elevated/60'"
+          tabindex="0"
+          data-pinned-board
+          @click="openPin(pin)"
+          @keydown.enter="openPin(pin)"
+        >
+          <UIcon
+            name="i-lucide-pin"
+            class="mt-0.5 size-4 shrink-0"
+            :class="activeId === pin.projectId ? 'text-primary' : 'text-dimmed group-hover:text-muted'"
+          />
+          <div class="min-w-0 flex-1">
+            <p class="truncate text-sm font-medium leading-snug text-default">
+              {{ pinName(pin) }}
+            </p>
+            <p class="truncate text-xs text-muted">
+              {{ pinPlace(pin) }}
+            </p>
+          </div>
+          <BoardMenu
+            mode="button"
+            :board="pinAsBoard(pin)"
+            :rename="renameInSidebar"
+            :extra="sidebarMenuExtra"
+            button-class="mt-0.5 shrink-0 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100"
+          />
         </div>
-        <UButton
-          icon="i-lucide-pin-off"
-          size="xs"
-          color="neutral"
-          variant="ghost"
-          class="mt-0.5 shrink-0 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
-          :aria-label="`Unpin ${pinName(pin)}`"
-          @click.stop="togglePin(pin.projectId)"
-        />
-      </div>
+      </BoardMenu>
       <div class="mb-2 border-b border-default pb-2" />
     </template>
 
@@ -265,44 +266,46 @@ function menuItems(project: Project) {
         @keydown.escape="renamingId = null"
         @blur="commitRename(project)"
       >
-      <div
+      <BoardMenu
         v-else
-        class="group flex cursor-pointer items-start gap-2 rounded-lg px-2.5 py-1.5 transition-colors"
-        :class="activeId === project.id ? 'bg-elevated' : 'hover:bg-elevated/60'"
-        @click="openProject(project.id)"
+        mode="context"
+        :board="project"
+        :rename="renameInSidebar"
+        :extra="sidebarMenuExtra"
       >
-        <UIcon
-          :name="project.customerId ? 'i-lucide-building-2' : 'i-lucide-kanban'"
-          class="mt-0.5 size-4 shrink-0"
-          :class="activeId === project.id ? 'text-primary' : 'text-dimmed group-hover:text-muted'"
-        />
-        <div class="min-w-0 flex-1">
-          <p class="truncate text-sm font-medium leading-snug text-default">
-            {{ project.name }}
-          </p>
-          <p
-            class="truncate text-xs text-muted"
-            :title="countTitle(project)"
-          >
-            {{ project.customerName ? `${project.customerName} · ` : '' }}{{ relativeTime(project.updatedAt) }} · {{ countLabel(project) }} {{ countsFor(project).total === 1 ? 'task' : 'tasks' }}
-          </p>
-        </div>
-        <!-- The menu keeps its slot even when invisible, so rows never jump on hover. -->
-        <UDropdownMenu
-          :items="menuItems(project)"
-          :content="{ align: 'start', collisionPadding: 12 }"
+        <div
+          class="group flex cursor-pointer items-start gap-2 rounded-lg px-2.5 py-1.5 transition-colors"
+          :class="activeId === project.id ? 'bg-elevated' : 'hover:bg-elevated/60'"
+          tabindex="0"
+          @click="openProject(project.id)"
+          @keydown.enter="openProject(project.id)"
         >
-          <UButton
-            icon="i-lucide-ellipsis"
-            size="xs"
-            color="neutral"
-            variant="ghost"
-            class="mt-0.5 shrink-0 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
-            aria-label="Project options"
-            @click.stop
+          <UIcon
+            :name="project.customerId ? 'i-lucide-building-2' : 'i-lucide-kanban'"
+            class="mt-0.5 size-4 shrink-0"
+            :class="activeId === project.id ? 'text-primary' : 'text-dimmed group-hover:text-muted'"
           />
-        </UDropdownMenu>
-      </div>
+          <div class="min-w-0 flex-1">
+            <p class="truncate text-sm font-medium leading-snug text-default">
+              {{ project.name }}
+            </p>
+            <p
+              class="truncate text-xs text-muted"
+              :title="countTitle(project)"
+            >
+              {{ project.customerName ? `${project.customerName} · ` : '' }}{{ relativeTime(project.updatedAt) }} · {{ countLabel(project) }} {{ countsFor(project).total === 1 ? 'task' : 'tasks' }}
+            </p>
+          </div>
+          <!-- The menu keeps its slot even when invisible, so rows never jump on hover. -->
+          <BoardMenu
+            mode="button"
+            :board="project"
+            :rename="renameInSidebar"
+            :extra="sidebarMenuExtra"
+            button-class="mt-0.5 shrink-0 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100"
+          />
+        </div>
+      </BoardMenu>
     </template>
 
     <UModal

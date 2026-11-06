@@ -3,8 +3,11 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { relativeTime } from '~/composables/useRelativeTime'
 import { tagChipClass } from '~/utils/tagColors'
 import { expandTagToken, type TagRequirement } from '#shared/utils/tags'
+import type { BoardMenuBoard } from '~/composables/useBoardMenu'
 
 const { searchBoards, allTasks } = useProjects()
+// The board rows of the results open a menu on right-click, like every other list of boards.
+const boardMenu = resolveComponent('BoardMenu')
 
 const open = useSearchModal()
 const query = ref('')
@@ -97,6 +100,7 @@ interface Row {
   meta?: string
   time?: string
   labels?: string[]
+  board?: BoardMenuBoard
   run: () => void
 }
 
@@ -125,6 +129,7 @@ const rows = computed<Row[]>(() => {
       section: 'Projects',
       icon: 'i-lucide-kanban',
       title: project.name,
+      board: project,
       run: () => openProject(project.id)
     })
   }
@@ -294,57 +299,62 @@ function smartSnippet(html: string): string {
               {{ row.section }}
             </p>
 
-            <button
-              type="button"
-              tabindex="-1"
-              class="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left"
-              :class="i === highlighted ? 'bg-elevated' : ''"
-              :data-active="i === highlighted"
-              @click="row.run()"
-              @mousemove="highlighted = i"
+            <component
+              :is="row.board ? boardMenu : 'div'"
+              v-bind="row.board ? { mode: 'context', board: row.board } : {}"
             >
-              <UIcon
-                :name="row.icon"
-                class="size-4 shrink-0"
-                :class="i === highlighted ? 'text-primary' : 'text-dimmed'"
-              />
-
-              <div class="min-w-0 flex-1">
-                <div class="flex items-center gap-2">
-                  <!-- eslint-disable vue/no-v-html -- `highlight` escapes its input -->
-                  <span
-                    class="truncate text-sm font-medium text-highlighted"
-                    v-html="highlight(row.title)"
-                  />
-                  <span
-                    v-for="label in row.labels"
-                    :key="label"
-                    class="hidden shrink-0 rounded px-1.5 py-px text-[0.6875rem] font-medium ring-1 ring-inset sm:inline"
-                    :class="[tagChipClass(label), matchedTags.has(label) ? 'font-semibold' : '']"
-                  >{{ label }}</span>
-                </div>
-                <p
-                  v-if="row.snippet"
-                  class="truncate text-xs text-muted"
-                  v-html="highlight(row.snippet)"
+              <button
+                type="button"
+                tabindex="-1"
+                class="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left"
+                :class="i === highlighted ? 'bg-elevated' : ''"
+                :data-active="i === highlighted"
+                @click="row.run()"
+                @mousemove="highlighted = i"
+              >
+                <UIcon
+                  :name="row.icon"
+                  class="size-4 shrink-0"
+                  :class="i === highlighted ? 'text-primary' : 'text-dimmed'"
                 />
-                <!-- eslint-enable vue/no-v-html -->
-              </div>
 
-              <span
-                v-if="row.meta"
-                class="hidden max-w-32 shrink-0 truncate text-xs text-dimmed sm:inline"
-              >{{ row.meta }}</span>
-              <span
-                v-if="row.time"
-                class="w-16 shrink-0 whitespace-nowrap text-right text-xs tabular-nums text-dimmed"
-              >{{ row.time }}</span>
-              <UIcon
-                name="i-lucide-corner-down-left"
-                class="size-3.5 shrink-0 text-dimmed"
-                :class="i === highlighted ? '' : 'invisible'"
-              />
-            </button>
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-2">
+                    <!-- eslint-disable vue/no-v-html -- `highlight` escapes its input -->
+                    <span
+                      class="truncate text-sm font-medium text-highlighted"
+                      v-html="highlight(row.title)"
+                    />
+                    <span
+                      v-for="label in row.labels"
+                      :key="label"
+                      class="hidden shrink-0 rounded px-1.5 py-px text-[0.6875rem] font-medium ring-1 ring-inset sm:inline"
+                      :class="[tagChipClass(label), matchedTags.has(label) ? 'font-semibold' : '']"
+                    >{{ label }}</span>
+                  </div>
+                  <p
+                    v-if="row.snippet"
+                    class="truncate text-xs text-muted"
+                    v-html="highlight(row.snippet)"
+                  />
+                  <!-- eslint-enable vue/no-v-html -->
+                </div>
+
+                <span
+                  v-if="row.meta"
+                  class="hidden max-w-32 shrink-0 truncate text-xs text-dimmed sm:inline"
+                >{{ row.meta }}</span>
+                <span
+                  v-if="row.time"
+                  class="w-16 shrink-0 whitespace-nowrap text-right text-xs tabular-nums text-dimmed"
+                >{{ row.time }}</span>
+                <UIcon
+                  name="i-lucide-corner-down-left"
+                  class="size-3.5 shrink-0 text-dimmed"
+                  :class="i === highlighted ? '' : 'invisible'"
+                />
+              </button>
+            </component>
           </template>
         </div>
 

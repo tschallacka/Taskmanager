@@ -177,12 +177,17 @@ async function confirmDelete() {
                   :data-portfolio-project="project.id"
                 >
                   <td class="px-4 py-2">
-                    <NuxtLink
-                      :to="`/projects/${project.id}`"
-                      class="font-medium text-default hover:underline"
+                    <BoardMenu
+                      mode="context"
+                      :board="project"
                     >
-                      {{ project.name }}
-                    </NuxtLink>
+                      <NuxtLink
+                        :to="`/projects/${project.id}`"
+                        class="font-medium text-default hover:underline"
+                      >
+                        {{ project.name }}
+                      </NuxtLink>
+                    </BoardMenu>
                   </td>
                   <td class="px-2 py-2">
                     <span class="flex items-center gap-1.5 text-xs text-muted">

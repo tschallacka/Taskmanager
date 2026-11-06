@@ -25,6 +25,22 @@ Click the board's name at the top of the board and type a new one; Enter saves, 
 **...** (*Project options*) then **Rename project**, the **...** on the board's row in the sidebar then **Rename**,
 or the **Name** field under **Settings**, **General**.
 
+## The board menu
+
+The same menu opens from every place a board is listed:
+
+- The **...** at the top right of the board.
+- The **...** on a pinned board in the sidebar, and on a board's row in the sidebar, in the portfolio table and in search
+  results. It shows when you hover over the row or focus it, and always on a touch screen.
+- A right-click on the board (or the context-menu key, or Shift+F10 on a focused row). On a touch screen, press and hold.
+
+The menu holds **Rename**, **Notify me of new tasks** (or **Stop notifying me of new tasks**), **Settings**, and
+**Pin to sidebar** (or **Unpin**). On the board it also lists **Show trashed** when there are trashed tasks. In the sidebar
+it adds **Give it a crew**, for a team's owner or admin, and **Delete project**. A customer's board offers only pinning.
+
+Rename from a list or search result opens the board and starts the rename there. Press Escape to close the menu; focus
+goes back to where it was.
+
 ## Description and health status
 
 Open the **Overview** tab.
