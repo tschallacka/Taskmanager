@@ -13,6 +13,7 @@ import { eq } from 'drizzle-orm'
 import { admitsSignUp, ensureOwnerOrganization, invitationTokenFrom, isFirstUser } from '../utils/ownerOrganization'
 import { crewAccountLive, isCrewUser, isInvalidDomain } from '../utils/crewAccounts'
 import { scrubMemberEmails } from '../utils/emailPrivacy'
+import { accountOfAddress, hasExtraAddresses, keepsSecondFactor, mainAddressForExtra } from '../utils/extraEmails'
 
 const baseURL = process.env.BETTER_AUTH_URL || 'http://localhost:3000'
 
@@ -131,6 +132,30 @@ export const auth = betterAuth({
         }
         return
       }
+      // Extra addresses are kept only while two-factor or a passkey guards the account, so these two cannot
+      // drop that guard while an extra address is still on the account.
+      if (ctx.path === '/two-factor/disable') {
+        const session = await getSessionFromCtx(ctx)
+        if (session && await hasExtraAddresses(session.user.id)) {
+          throw new APIError('FORBIDDEN', { message: 'Remove your extra addresses before you turn off two-factor.' })
+        }
+        return
+      }
+      if (ctx.path === '/passkey/delete-passkey') {
+        const session = await getSessionFromCtx(ctx)
+        const passkeyId = typeof ctx.body?.id === 'string' ? ctx.body.id : ''
+        if (session && await hasExtraAddresses(session.user.id) && !(await keepsSecondFactor(session.user.id, passkeyId))) {
+          throw new APIError('FORBIDDEN', { message: 'Remove your extra addresses before you remove your last passkey.' })
+        }
+        return
+      }
+      // An extra address signs in to its account: the password is checked against the main address.
+      if (ctx.path === '/sign-in/email') {
+        const email = typeof ctx.body?.email === 'string' ? ctx.body.email : ''
+        const main = email ? await mainAddressForExtra(email) : null
+        if (main) return { context: { body: { ...ctx.body, email: main } } }
+        return
+      }
       if (ctx.path !== '/sign-in/email-otp') return
       const email = typeof ctx.body?.email === 'string' ? ctx.body.email.toLowerCase() : ''
       const found = email ? await ctx.context.internalAdapter.findUserByEmail(email) : null
@@ -191,6 +216,11 @@ export const auth = betterAuth({
           // makes in-process (utils/crewAccounts.ts). No public route may make one.
           if (isInvalidDomain(user.email)) {
             throw new APIError('BAD_REQUEST', { message: 'That address cannot be used.' })
+          }
+          // An address another account holds as an extra one cannot start a new account (the extra address
+          // would then belong to two accounts).
+          if (await accountOfAddress(user.email)) {
+            throw new APIError('BAD_REQUEST', { message: 'That address is already in use.' })
           }
           const first = await isFirstUser()
           if (!first && signUpDisabled) {

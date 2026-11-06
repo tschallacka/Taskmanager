@@ -94,6 +94,25 @@ export const twoFactor = pgTable(
   table => [index('two_factor_user_id_idx').on(table.userId)]
 )
 
+// An extra address (an alias) on an account. It counts only once its owner has confirmed it through the
+// link sent to it (verifiedAt set). Pending rows may repeat an address; the checks look at verified ones.
+export const userEmail = pgTable(
+  'user_email',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+    email: text('email').notNull(),
+    verifiedAt: timestamp('verified_at'),
+    createdAt: timestamp('created_at').notNull()
+  },
+  table => [
+    index('user_email_user_id_idx').on(table.userId),
+    index('user_email_email_idx').on(table.email)
+  ]
+)
+
+export type UserEmail = typeof userEmail.$inferSelect
+
 export const organization = pgTable('organization', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
