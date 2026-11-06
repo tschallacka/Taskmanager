@@ -158,6 +158,14 @@ export const auth = betterAuth({
       }
       if (ctx.path !== '/sign-in/email-otp') return
       const email = typeof ctx.body?.email === 'string' ? ctx.body.email.toLowerCase() : ''
+      // An account with extra addresses is guarded by two-factor or a passkey as a whole, so an email code
+      // (which proves only inbox access) never signs in to it, whichever of its addresses was given.
+      const owner = email ? await accountOfAddress(email) : null
+      if (owner && await hasExtraAddresses(owner.userId)) {
+        throw new APIError('FORBIDDEN', {
+          message: 'This account has extra addresses. Sign in with your password or a passkey.'
+        })
+      }
       const found = email ? await ctx.context.internalAdapter.findUserByEmail(email) : null
       if ((found?.user as { twoFactorEnabled?: boolean } | undefined)?.twoFactorEnabled) {
         throw new APIError('FORBIDDEN', {
