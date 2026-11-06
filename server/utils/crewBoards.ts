@@ -65,7 +65,10 @@ export async function attachCrew(input: { crew: Crew, projectId: unknown, teamId
   const [real] = await db.select().from(projects).where(and(eq(projects.id, input.projectId), eq(projects.teamId, teamId)))
   if (!real) throw createError({ statusCode: 404, message: 'No such board in this team.' })
   if (real.archivedAt) throw createError({ statusCode: 400, message: 'An archived board cannot be given a crew.' })
-  if (real.teamId === crew.teamId) throw createError({ statusCode: 400, message: 'A crew\'s own board cannot be given a crew.' })
+  // Only the crew's own work board and its shadow board are refused: any other board of the team may take the crew,
+  // including one in the crew's own team. A shadow board is the crew's own board too, so it gets the same message.
+  const [shadowOf] = await db.select({ id: crewBoards.id }).from(crewBoards).where(eq(crewBoards.shadowProjectId, real.id))
+  if (real.id === crew.boardId || shadowOf) throw createError({ statusCode: 400, message: 'A crew\'s own board cannot be given a crew.' })
 
   const [already] = await db.select({ id: crewBoards.id }).from(crewBoards)
     .where(and(eq(crewBoards.crewId, crew.id), eq(crewBoards.projectId, real.id)))

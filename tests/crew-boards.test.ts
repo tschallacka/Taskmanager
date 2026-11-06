@@ -57,6 +57,8 @@ before(async () => {
     boardRow(board.archived, realTeam, { archivedAt: now }),
     boardRow(board.crewOwn, crewTeam)
   ])
+  // The crew's own work board is set once the boards exist: crews.board_id points at them.
+  await db.update(crews).set({ boardId: board.crewOwn }).where(eq(crews.id, crew.mine))
 })
 
 after(async () => {
