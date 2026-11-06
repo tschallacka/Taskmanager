@@ -855,3 +855,34 @@ describe('crew update: the kit folder and the owner files', () => {
 after(() => {
   for (const dir of made) rmSync(dir, { recursive: true, force: true })
 })
+
+describe('crew mentions: the updates that ask Boss something', async () => {
+  const { MENTION, newMentions } = await import('./mentions.mjs')
+  const task = { id: 't1', title: 'A card' }
+  const since = '2026-11-06T10:00:00.000Z'
+
+  test('finds @cato and @boss, in any case, and nothing else', () => {
+    assert.ok(MENTION.test('QUESTION @cato: which one?'))
+    assert.ok(MENTION.test('@Boss please merge'))
+    assert.ok(!MENTION.test('Cato merged it'))
+    assert.ok(!MENTION.test('mail cato@example.com'))
+    assert.ok(!MENTION.test('@catoni'))
+  })
+
+  test('prints a new mention once, and skips older updates and updates without one', () => {
+    const seen = new Set()
+    const updates = [
+      { id: 'u1', at: '2026-11-06T10:05:00.000Z', author: 'Pia', body: 'QUESTION @cato:\nwhich   one?' },
+      { id: 'u2', at: '2026-11-06T09:59:00.000Z', author: 'Pia', body: '@cato an old one' },
+      { id: 'u3', at: '2026-11-06T10:06:00.000Z', author: 'Wren', body: 'no mention here' }
+    ]
+    assert.deepEqual(newMentions(task, updates, since, seen), ['@cato on t1 "A card" by Pia: QUESTION @cato: which one?'])
+    assert.deepEqual(newMentions(task, updates, since, seen), [], 'the same update is not printed twice')
+  })
+
+  test('cuts a long update to 240 characters', () => {
+    const [line] = newMentions(task, [{ id: 'u4', at: since, author: 'Pia', body: `@cato ${'x'.repeat(400)}` }], since, new Set())
+    assert.ok(line.endsWith('…'))
+    assert.ok(line.length < 320)
+  })
+})
