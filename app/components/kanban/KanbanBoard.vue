@@ -13,7 +13,8 @@ const emit = defineEmits<{ openTask: [taskId: string] }>()
 const {
   board,
   boardColumns,
-  isCustomerView,
+  isCustomerView: isCustomerContact,
+  isReadOnlyBoard,
   updateTask,
   columnTasks,
   visibleColumnTasks,
@@ -31,6 +32,9 @@ const {
   deleteColumn,
   restoreColumn
 } = useProjects()
+
+// A crew board is read-only for the staff who see it, so it offers no editing, as a customer contact's board does.
+const isCustomerView = computed(() => isCustomerContact.value || isReadOnlyBoard.value)
 
 const toast = useToast()
 

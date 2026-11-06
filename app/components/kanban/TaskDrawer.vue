@@ -28,6 +28,7 @@ const toast = useToast()
 const {
   activeProject,
   isCustomerView,
+  isReadOnlyBoard,
   boardColumns,
   boardTagCounts,
   people,
@@ -42,8 +43,8 @@ const {
 } = useProjects()
 
 // A customer contact reads the task and talks about it; the task itself is the
-// team's to edit, and the server refuses the rest.
-const readonly = isCustomerView
+// team's to edit, and the server refuses the rest. A crew board is read-only for its staff, the same way.
+const readonly = computed(() => isCustomerView.value || isReadOnlyBoard.value)
 
 function fullDate(ts: number) {
   return format(new Date(ts), 'PPp')
