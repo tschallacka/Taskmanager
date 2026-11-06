@@ -857,32 +857,124 @@ after(() => {
 })
 
 describe('crew mentions: the updates that ask Boss something', async () => {
-  const { MENTION, newMentions } = await import('./mentions.mjs')
+  const { MENTION, createWatcher, follow, mentionLines, rpcResult } = await import('./mentions.mjs')
   const task = { id: 't1', title: 'A card' }
-  const since = '2026-11-06T10:00:00.000Z'
 
-  test('finds @cato and @boss, in any case, and nothing else', () => {
+  // A fake board: get_board gives each card's update count, get_task the updates after `since`.
+  function fakeBoard() {
+    const cards = { t1: { id: 't1', title: 'A card', updatedAt: '2026-11-05T15:00:00.000Z', updates: [] } }
+    const calls = []
+    let failGetTask = 0
+    const call = async (name, args) => {
+      calls.push([name, args])
+      if (name === 'get_board') {
+        return { columns: [{ name: 'To do', tasks: Object.values(cards).map(c => ({ id: c.id, title: c.title, updatedAt: c.updatedAt, updates: c.updates.length })) }] }
+      }
+      if (failGetTask > 0) {
+        failGetTask--
+        throw new Error('get_task answered HTTP 502')
+      }
+      return { updates: cards[args.id].updates.filter(u => u.at > args.since) }
+    }
+    const post = (body, author = 'fork taskmanager-pia (agent)') => {
+      const card = cards.t1
+      card.updates.push({ id: `u${card.updates.length + 1}`, at: new Date(Date.now() + card.updates.length).toISOString(), author, body })
+    }
+    const failNext = (n) => {
+      failGetTask = n
+    }
+    return { call, calls, post, failNext }
+  }
+  const freshState = () => ({ since: new Date(Date.now() - 60000).toISOString(), counts: {}, seen: [] })
+
+  test('finds @cato and @boss as words of their own, and not inside an address or a longer name', () => {
     assert.ok(MENTION.test('QUESTION @cato: which one?'))
     assert.ok(MENTION.test('@Boss please merge'))
+    assert.ok(MENTION.test('ask @cato.'))
     assert.ok(!MENTION.test('Cato merged it'))
-    assert.ok(!MENTION.test('mail cato@example.com'))
+    assert.ok(!MENTION.test('mail x@cato.nl'))
     assert.ok(!MENTION.test('@catoni'))
   })
 
-  test('prints a new mention once, and skips older updates and updates without one', () => {
-    const seen = new Set()
-    const updates = [
-      { id: 'u1', at: '2026-11-06T10:05:00.000Z', author: 'Pia', body: 'QUESTION @cato:\nwhich   one?' },
-      { id: 'u2', at: '2026-11-06T09:59:00.000Z', author: 'Pia', body: '@cato an old one' },
-      { id: 'u3', at: '2026-11-06T10:06:00.000Z', author: 'Wren', body: 'no mention here' }
-    ]
-    assert.deepEqual(newMentions(task, updates, since, seen), ['@cato on t1 "A card" by Pia: QUESTION @cato: which one?'])
-    assert.deepEqual(newMentions(task, updates, since, seen), [], 'the same update is not printed twice')
+  test('skips Boss\'s own updates and cuts a long one to 240 characters', () => {
+    assert.deepEqual(mentionLines(task, [{ id: 'u1', author: 'Cato (agent)', body: '@pia quoting @cato' }], new Set()), [])
+    const [found] = mentionLines(task, [{ id: 'u2', author: 'Pia', body: `@cato ${'x'.repeat(400)}` }], new Set())
+    assert.ok(found.line.endsWith('…'))
+    assert.ok(found.line.length < 320)
   })
 
-  test('cuts a long update to 240 characters', () => {
-    const [line] = newMentions(task, [{ id: 'u4', at: since, author: 'Pia', body: `@cato ${'x'.repeat(400)}` }], since, new Set())
-    assert.ok(line.endsWith('…'))
-    assert.ok(line.length < 320)
+  test('a comment-only update is found, although the card\'s updatedAt does not change', async () => {
+    const board = fakeBoard()
+    const watcher = createWatcher({ call: board.call, boards: ['b1'], state: freshState() })
+    assert.deepEqual(await watcher.pass(), [])
+    board.post('QUESTION @cato:\nwhich   one?')
+    assert.deepEqual(await watcher.pass(), ['@cato on t1 "A card" by fork taskmanager-pia (agent): QUESTION @cato: which one?'])
+    assert.deepEqual(await watcher.pass(), [], 'printed once')
+  })
+
+  test('a card whose update count did not change is not read again', async () => {
+    const board = fakeBoard()
+    board.post('no mention')
+    const watcher = createWatcher({ call: board.call, boards: ['b1'], state: freshState() })
+    await watcher.pass()
+    const reads = board.calls.filter(([name]) => name === 'get_task').length
+    await watcher.pass()
+    assert.equal(board.calls.filter(([name]) => name === 'get_task').length, reads)
+  })
+
+  test('a burst of updates loses no mention: get_task is asked for everything since the last check', async () => {
+    const board = fakeBoard()
+    const watcher = createWatcher({ call: board.call, boards: ['b1'], state: freshState() })
+    await watcher.pass()
+    board.post('@cato first')
+    for (let n = 0; n < 7; n++) board.post(`update ${n}`)
+    const lines = await watcher.pass()
+    assert.equal(lines.length, 1)
+    assert.ok(board.calls.some(([name, args]) => name === 'get_task' && args.since && args.limit === undefined))
+  })
+
+  test('a pass that fails loses nothing: the mention comes on the next pass', async () => {
+    const board = fakeBoard()
+    const watcher = createWatcher({ call: board.call, boards: ['b1'], state: freshState() })
+    await watcher.pass()
+    board.post('@cato are you there?')
+    board.failNext(1)
+    await assert.rejects(watcher.pass(), /502/)
+    assert.equal((await watcher.pass()).length, 1)
+  })
+
+  test('a JSON-RPC error or a tool error is an error, never an empty board', () => {
+    assert.throws(() => rpcResult('get_board', { error: { code: -32603, message: 'boom' } }), /boom/)
+    assert.throws(() => rpcResult('get_board', { result: { isError: true, content: [{ type: 'text', text: 'No board "x"' }] } }), /No board/)
+    assert.throws(() => rpcResult('get_board', { result: {} }), /no content/)
+    assert.deepEqual(rpcResult('get_board', { result: { content: [{ type: 'text', text: '{"columns":[]}' }] } }), { columns: [] })
+  })
+
+  test('a board the key cannot open is dropped with one line, and the other boards are still read', async () => {
+    const board = fakeBoard()
+    const notes = []
+    const call = (name, args) => (args.board === 'gone' ? Promise.reject(new Error('get_board: No board "gone"')) : board.call(name, args))
+    const watcher = createWatcher({ call, boards: ['gone', 'b1'], state: freshState(), note: line => notes.push(line) })
+    await watcher.pass()
+    board.post('@cato hi')
+    assert.equal((await watcher.pass()).length, 1)
+    assert.equal(notes.length, 1)
+  })
+
+  test('follow prints one line when checks start failing and one when they work again', async () => {
+    const printed = []
+    const answers = [['@cato one'], new Error('down'), new Error('down'), new Error('down'), [], ['@cato two']]
+    const pass = async () => {
+      const next = answers.shift()
+      if (next instanceof Error) throw next
+      return next
+    }
+    await follow({ pass, print: text => printed.push(text), wait: async () => {}, rounds: 6 })
+    assert.deepEqual(printed, [
+      '@cato one',
+      'crew mentions: check failed (down); trying again every 60 s',
+      'crew mentions: the board answers again',
+      '@cato two'
+    ])
   })
 })
