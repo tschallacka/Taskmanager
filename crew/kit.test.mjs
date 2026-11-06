@@ -21,6 +21,14 @@ import { fileURLToPath } from 'node:url'
 import { findChromium, request, serve } from './browser-driver.mjs'
 import { boardOrigin, signIn } from './browser.mjs'
 import { crewHome } from './home.mjs'
+import { CAST, EXTRA_CAST, forkRole } from './config.mjs'
+
+test('an extra worker plays its role from its fork, and Pia starts none of the extra workers', () => {
+  assert.equal(forkRole('internal-tools-wes'), 'wes')
+  assert.equal(forkRole('internal-tools-walt'), 'walt')
+  assert.equal(forkRole('internal-tools-zed'), null)
+  assert.deepEqual(CAST.filter(key => EXTRA_CAST.includes(key)), [])
+})
 
 const KIT = dirname(fileURLToPath(import.meta.url))
 const CREW = join(KIT, 'crew.mjs')

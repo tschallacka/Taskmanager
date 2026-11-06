@@ -66,22 +66,31 @@ export interface ForkResult {
   members: ForkedMember[]
 }
 
-export function forkTeamCrew(teamId: string, linkId: string, rotate: boolean): Promise<ForkResult> {
-  return $fetch<ForkResult>(`/api/teams/${teamId}/crews/${linkId}/fork`, { method: 'POST', body: { rotate } })
+// The extra workers a board can add later, as the server names them (EXTRA_PEOPLE in crewForks.ts). Not
+// forked with the standard members; a board adds them on request, and the others keep their keys.
+export const EXTRA_WORKERS: { key: string, name: string }[] = [
+  { key: 'wes', name: 'Wes Worker' },
+  { key: 'wilma', name: 'Wilma Worker' },
+  { key: 'walt', name: 'Walt Worker' }
+]
+
+/** `add` names extra workers to fork on a board that is already forked; without a rotate the others stay as they are. */
+export function forkTeamCrew(teamId: string, linkId: string, rotate: boolean, add: string[] = []): Promise<ForkResult> {
+  return $fetch<ForkResult>(`/api/teams/${teamId}/crews/${linkId}/fork`, { method: 'POST', body: { rotate, add } })
 }
 
 /** `forks-<crew>-<board>.json`: the file Boss hands to `init.mjs --forks`. */
-export function forkFileName(result: ForkResult): string {
+export function forkFileName(result: ForkResult, suffix = ''): string {
   const board = result.board.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'board'
-  return `forks-${result.crew.slug}-${board}.json`
+  return `forks-${result.crew.slug}-${board}${suffix}.json`
 }
 
 /** Saves the whole answer, passwords included, as the file the crew kit reads. */
-export function downloadForkFile(result: ForkResult): void {
+export function downloadForkFile(result: ForkResult, suffix = ''): void {
   const url = URL.createObjectURL(new Blob([`${JSON.stringify(result, null, 2)}\n`], { type: 'application/json' }))
   const anchor = document.createElement('a')
   anchor.href = url
-  anchor.download = forkFileName(result)
+  anchor.download = forkFileName(result, suffix)
   anchor.click()
   URL.revokeObjectURL(url)
 }

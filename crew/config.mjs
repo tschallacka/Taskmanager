@@ -82,7 +82,7 @@ export function loadForks() {
 /** The cast role a fork plays, from its agent type: `taskmanager-wren` plays `wren`. Null when it names none. */
 export function forkRole(agentType) {
   const last = String(agentType).split('-').pop()
-  return CAST.includes(last) ? last : null
+  return [...CAST, ...EXTRA_CAST].includes(last) ? last : null
 }
 
 export function loadCreds() {
@@ -115,6 +115,10 @@ const slugify = text => String(text).toLowerCase().normalize('NFKD').replace(/[^
 
 // The members Pia starts as agents (Pia herself runs in her own session), the optional log watcher included.
 export const CAST = ['pia', 'wren', 'wick', 'wynn', 'wade', 'usher', 'nina', 'quincy', 'watcher']
+
+// Extra workers on a board (EXTRA_PEOPLE in the app): forked later, run on a local model through opencode,
+// and not part of CAST, so Pia starts none of them. Their forks still play their role (forkRole).
+export const EXTRA_CAST = ['wes', 'wilma', 'walt']
 
 // The model each person runs on is the Owner's choice, set per person in crew.json under "models" (README, "Models").
 // The kit fixes no model name: a person with no entry gets "haiku", which is Claude Code's name for the cheap tier of

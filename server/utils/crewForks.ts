@@ -22,6 +22,26 @@ import { genId } from './projects'
 const FORKED_KEYS = ['pia', 'wren', 'wick', 'wynn', 'wade', 'usher', 'nina', 'quincy']
 export const FORK_PEOPLE = CREW_PEOPLE.filter(person => FORKED_KEYS.includes(person.key))
 
+/**
+ * Extra workers: not forked with the standard members. A board gets them when they are asked for, and
+ * adding them leaves every fork that is already there alone. Probation workers run on a local model.
+ */
+export const EXTRA_PEOPLE = [
+  { key: 'wes', name: 'Wes Worker' },
+  { key: 'wilma', name: 'Wilma Worker' },
+  { key: 'walt', name: 'Walt Worker' }
+] as const
+
+/** The extra workers a request names, checked: an unknown key is refused with the keys that exist. */
+export function extraKeysOf(raw: unknown): string[] {
+  if (raw === undefined || raw === null) return []
+  const allowed: string[] = EXTRA_PEOPLE.map(person => person.key)
+  if (!Array.isArray(raw) || raw.some(key => typeof key !== 'string' || !allowed.includes(key))) {
+    throw createError({ statusCode: 400, message: `add must name extra workers from: ${allowed.join(', ')}.` })
+  }
+  return [...new Set(raw as string[])]
+}
+
 export interface ForkedMember {
   key: string
   name: string
@@ -70,25 +90,35 @@ async function mintForkKey(userId: string, teamId: string, shadowProjectId: stri
  * Forks the crew's working members for the board of `link`, or, with `rotate`, gives the existing forks new
  * passwords and keys and ends their sessions. A failed first fork leaves nothing of itself behind.
  */
-export async function forkCrew(input: { crew: Crew, link: CrewBoard, boardName: string, rotate: boolean }): Promise<ForkedMember[]> {
+export async function forkCrew(input: { crew: Crew, link: CrewBoard, boardName: string, rotate: boolean, add?: string[] }): Promise<ForkedMember[]> {
   const { crew, link, boardName } = input
+  const add = input.add ?? []
   const existing = await db.select().from(crewBoardMembers).where(eq(crewBoardMembers.linkId, link.id))
-  if (existing.length && !input.rotate) {
+  if (existing.length && !input.rotate && !add.length) {
     throw createError({ statusCode: 409, message: 'This crew is already forked for the board. Rotate to get new keys.' })
   }
+  const known = new Set(existing.map(row => row.personKey))
+  // A first fork makes the standard members and the asked-for extras. A rotate gives every fork new keys,
+  // extras included, and makes the asked-for extras that are not there yet. Without a rotate, a board that
+  // is forked gets only the extras that are asked for and not there yet: every fork already there stays.
+  const people: { key: string, name: string }[] = !existing.length
+    ? [...FORK_PEOPLE, ...EXTRA_PEOPLE.filter(person => add.includes(person.key))]
+    : input.rotate
+      ? [...FORK_PEOPLE, ...EXTRA_PEOPLE.filter(person => known.has(person.key) || add.includes(person.key))]
+      : EXTRA_PEOPLE.filter(person => add.includes(person.key) && !known.has(person.key))
 
   const made: string[] = []
   const result: ForkedMember[] = []
   try {
-    for (const person of FORK_PEOPLE) {
+    for (const person of people) {
       const password = secret()
       const agentType = forkAgentType(boardName, person.name)
-      const known = existing.find(row => row.personKey === person.key)
+      const existingRow = existing.find(row => row.personKey === person.key)
       let userId: string
       let email: string
 
-      if (known) {
-        userId = known.userId
+      if (existingRow) {
+        userId = existingRow.userId
         const [row] = await db.select({ email: user.email }).from(user).where(eq(user.id, userId))
         email = row?.email ?? ''
         await db.delete(apiKeys).where(eq(apiKeys.userId, userId))
@@ -109,10 +139,10 @@ export async function forkCrew(input: { crew: Crew, link: CrewBoard, boardName: 
       result.push({
         key: person.key,
         name: person.name,
-        agentType: known?.agentType ?? agentType,
+        agentType: existingRow?.agentType ?? agentType,
         email,
         password,
-        apiKey: await mintForkKey(userId, crew.teamId, link.shadowProjectId, known?.agentType ?? agentType)
+        apiKey: await mintForkKey(userId, crew.teamId, link.shadowProjectId, existingRow?.agentType ?? agentType)
       })
     }
     return result
@@ -133,7 +163,7 @@ export async function forksOfLink(linkId: string): Promise<ForkView[]> {
     .where(eq(crewBoardMembers.linkId, linkId))
   if (!rows.length) return []
   const keys = await db.select({ userId: apiKeys.userId, lastUsedAt: apiKeys.lastUsedAt }).from(apiKeys).where(inArray(apiKeys.userId, rows.map(row => row.userId)))
-  const order: string[] = FORK_PEOPLE.map(person => person.key)
+  const order: string[] = [...FORK_PEOPLE, ...EXTRA_PEOPLE].map(person => person.key)
   return rows
     .map((row) => {
       const used = keys.filter(k => k.userId === row.userId && k.lastUsedAt !== null).map(k => k.lastUsedAt as number)

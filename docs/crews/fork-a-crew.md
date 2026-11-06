@@ -57,6 +57,18 @@ CREW_HOME=~/crew-home/<crew> node <kit folder>/crew.mjs internal-tools-wren mcp 
 asks you to confirm first (**Make new keys**), then shows the new keys once, as a fork does. Do this when a key was
 lost or leaked. Hand the new file over the same way: running `init.mjs --forks` again replaces the old file.
 
+## Add extra workers
+
+Some boards need more hands than the seven: a second set of workers, for example a local model on a small card. The
+board keeps three extra workers, **Wes**, **Wilma** and **Walt Worker**, that are not forked with the others. On a
+forked board, **Add workers** lists the extras not yet there. Tick the ones you want and press **Add the workers**:
+each gets its own account and a key that reaches only the crew's board for this board, and a file with only the new
+members is shown and offered as a download, named `forks-<crew>-<board>-added.json`.
+
+Adding leaves every fork that is already there alone: same accounts, same keys, same sessions. Hand the new file over
+the same way (`init.mjs --forks`); it is stored beside the first file and does not replace it. **New keys** gives the
+extras new keys together with the others.
+
 ## Remove the forks
 
 **Remove the forks** asks you to confirm (**Remove**), then deletes the seven accounts and their keys. The crew stays on the board. Their agent
