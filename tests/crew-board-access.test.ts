@@ -162,8 +162,8 @@ test('nobody else reaches a shadow board: not another team, not a person with no
   await assert.rejects(requireProject(eventOf(stranger, realTeam), shadowBoard), notFound)
   // The crew's own team is not the real board's team: its members use the normal path, full access.
   assert.equal((await requireProject(eventOf(crewMember, crewTeam, 'POST'), shadowBoard)).readOnly, false)
-  assert.equal(await shadowBoardForStaff(realTeam, otherBoard), undefined)
-  assert.equal(await shadowBoardForStaff(null, shadowBoard), undefined)
+  assert.equal(await shadowBoardForStaff(boss, realTeam, otherBoard), undefined)
+  assert.equal(await shadowBoardForStaff(boss, null, shadowBoard), undefined)
 })
 
 test('files of a shadow board are served to the staff of the real board, and to nobody outside', async () => {

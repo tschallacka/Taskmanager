@@ -284,7 +284,7 @@ function menuItems(project: Project) {
             class="truncate text-xs text-muted"
             :title="countTitle(project)"
           >
-            {{ project.customerName ? `${project.customerName} · ` : '' }}{{ relativeTime(project.updatedAt) }} · {{ countLabel(project) }} {{ countsFor(project).total === 1 ? 'task' : 'tasks' }}
+            {{ project.crewBoardOf ? `Crew board of ${project.crewBoardOf} · ` : '' }}{{ project.customerName ? `${project.customerName} · ` : '' }}{{ relativeTime(project.updatedAt) }} · {{ countLabel(project) }} {{ countsFor(project).total === 1 ? 'task' : 'tasks' }}
           </p>
         </div>
         <!-- The menu keeps its slot even when invisible, so rows never jump on hover. -->

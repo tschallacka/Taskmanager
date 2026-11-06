@@ -28,6 +28,8 @@ export interface Project {
   audience?: Audience
   // Set by the server on a crew's shadow board opened by the staff of the real board.
   readOnly?: boolean
+  // Set on a crew board the viewer reads as the real board's staff: the real board's name.
+  crewBoardOf?: string | null
   // Colours pinned to this board's task labels, keyed by the label. A label
   // with no entry falls back to the colour derived from its own text.
   labelColors?: Record<string, string>
@@ -148,6 +150,14 @@ export interface TaskSearchRow {
   updatedAt: number
 }
 
+// A crew board of this board that the viewer may see: the crew's shadow board, with its open task count.
+export interface CrewBoardLink {
+  shadowProjectId: string
+  name: string
+  crewName: string
+  openTasks: number
+}
+
 interface BoardPayload {
   columns: ProjectColumn[]
   tasks: ProjectTask[]
@@ -157,6 +167,10 @@ interface BoardPayload {
   githubBadges?: Record<string, GithubBadge[]>
   // Whether a crew works on this board, so the Office view is offered. Never sent to a customer.
   crewBoard?: boolean
+  // The crew boards of this board the viewer may see, for the header's link. Never sent to a customer.
+  crewBoards?: CrewBoardLink[]
+  // The real board this one is a crew's board of, for the read-only banner. Never sent to a customer.
+  crewBoardOf?: string | null
   // The project's custom fields and each task's values. Staff only; a
   // contact's board carries empty ones.
   fields?: ProjectField[]
@@ -188,6 +202,10 @@ const _board = ref<{ columns: ProjectColumn[], tasks: ProjectTask[] } | null>(nu
 const _commentCounts = ref<Record<string, number>>({})
 // Whether the board is a crew's, so its Office view is offered. Set with the board it came with.
 const _crewBoard = ref(false)
+// The crew boards of the open board that the viewer may see, for the header's link.
+const _crewBoards = ref<CrewBoardLink[]>([])
+// The real board the open crew board works on, named in its read-only banner.
+const _crewBoardOf = ref<string | null>(null)
 // The open board's GitHub badges, from the board endpoint. Read by each card.
 const _githubBadges = ref<Record<string, GithubBadge[]>>({})
 // The open board's subtasks. Kept beside the cards rather than among them, so
@@ -652,6 +670,8 @@ export function useProjects() {
         _commentCounts.value = cached?.commentCounts ?? {}
         _githubBadges.value = cached?.githubBadges ?? {}
         _crewBoard.value = cached?.crewBoard ?? false
+        _crewBoards.value = []
+        _crewBoardOf.value = null
         _trashedCount.value = 0
       }
       _activeProjectId.value = id
@@ -669,6 +689,8 @@ export function useProjects() {
         _commentCounts.value = board.commentCounts ?? {}
         _githubBadges.value = board.githubBadges ?? {}
         _crewBoard.value = board.crewBoard ?? false
+        _crewBoards.value = board.crewBoards ?? []
+        _crewBoardOf.value = board.crewBoardOf ?? null
         _trashedCount.value = board.trashedCount ?? 0
         ingestBoardFields(id, board.fields ?? [], board.fieldValues ?? {})
       }
@@ -831,6 +853,8 @@ export function useProjects() {
         _commentCounts.value = board.commentCounts ?? {}
         _githubBadges.value = board.githubBadges ?? {}
         _crewBoard.value = board.crewBoard ?? false
+        _crewBoards.value = board.crewBoards ?? []
+        _crewBoardOf.value = board.crewBoardOf ?? null
         _trashedCount.value = board.trashedCount ?? 0
         ingestBoardFields(projectId, board.fields ?? [], board.fieldValues ?? {})
       }
@@ -1116,6 +1140,8 @@ export function useProjects() {
     showTrashed: _showTrashed,
     trashedCount: _trashedCount,
     crewBoard: _crewBoard,
+    crewBoardLinks: _crewBoards,
+    crewBoardOf: _crewBoardOf,
     toggleShowTrashed,
     isTrashed,
     addColumn,

@@ -47,7 +47,7 @@ export async function requireProject(event: H3Event, projectId: string) {
 
   if (project) return { ...project, audience: await audienceOf(event, project), readOnly: false }
 
-  const shadow = await shadowBoardForStaff(await getUserActiveTeamId(event), projectId)
+  const shadow = await shadowBoardForStaff(event.context.session.user.id, await getUserActiveTeamId(event), projectId)
   if (!shadow) throw createError({ statusCode: 404, message: 'Project not found' })
   if (!['GET', 'HEAD'].includes(event.method)) {
     throw createError({ statusCode: 403, message: 'This is a crew board. You can read it, not change it.' })

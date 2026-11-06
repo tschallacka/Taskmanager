@@ -8,6 +8,7 @@ import { githubBadgesForBoard } from '../../../utils/githubBadges'
 import { blockedStatesOn } from '../../../utils/taskDependencyService'
 import { blockedMark } from '../../../utils/mcpBlockerLinks'
 import { isCrewBoard } from '../../../utils/officeCast'
+import { crewBoardsOfRealBoard, realBoardOfCrewBoard } from '../../../utils/crewBoardAccess'
 
 // Full board in one payload: columns ordered, tasks grouped by column, and the
 // per-task update count the cards render as a badge.
@@ -126,6 +127,11 @@ export default defineEventHandler(async (event) => {
     fieldValues,
     githubBadges,
     crewBoard: !isCustomer && await isCrewBoard(id),
+    // The crew boards of this board a staff member may see (the owner, a manager of this board, or a
+    // member who set up the crew). Never sent to a customer: a crew board is the team's own.
+    crewBoards: isCustomer ? [] : await crewBoardsOfRealBoard(event.context.session.user.id, id),
+    // The real board this board is a crew's board of, named in the read-only banner.
+    crewBoardOf: isCustomer ? null : (await realBoardOfCrewBoard(id))?.name ?? null,
     commentCounts: Object.fromEntries(counts.map(c => [c.taskId, Number(c.total)])),
     trashedCount
   }

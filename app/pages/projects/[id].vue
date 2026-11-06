@@ -28,7 +28,9 @@ const {
   trashedCount,
   toggleShowTrashed,
   isTrashed,
-  crewBoard
+  crewBoard,
+  crewBoardLinks,
+  crewBoardOf
 } = useProjects()
 
 const projectId = computed(() => route.params.id as string)
@@ -278,7 +280,7 @@ useSeoMeta({
       class="shrink-0 border-b border-default bg-elevated px-4 py-1.5 text-xs text-muted lg:px-6"
       data-readonly-board
     >
-      This is a crew's board. You can read it here; only the crew's team changes it.
+      The crew's board for {{ crewBoardOf ?? 'the team' }}. Read-only: the crew plans here.
     </p>
     <!-- Board header -->
     <header class="flex shrink-0 items-center gap-2 border-b border-default px-4 py-3 lg:px-6">
@@ -407,6 +409,25 @@ useSeoMeta({
           @click="setView('settings')"
         >
           <span class="hidden sm:inline">Settings</span>
+        </UButton>
+
+        <!-- The crew boards of this board the viewer may see: the team's owner, a manager of this board,
+             or the member who set up the crew. The server sends none to anyone else. -->
+        <UButton
+          v-for="link in crewBoardLinks"
+          :key="link.shadowProjectId"
+          :to="`/projects/${link.shadowProjectId}`"
+          size="xs"
+          color="neutral"
+          variant="soft"
+          icon="i-lucide-users-round"
+          class="shrink-0"
+          :title="`The crew board of ${link.crewName}: ${link.openTasks} open tasks`"
+          data-crew-board-link
+        >
+          <span class="hidden sm:inline">Crew board:</span>
+          <span class="max-w-40 truncate">{{ link.name }}</span>
+          <span class="text-dimmed max-sm:hidden">{{ link.openTasks }} open</span>
         </UButton>
 
         <!-- Who may share decides what shows: a project admin or a manager guest gets the dialog,

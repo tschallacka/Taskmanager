@@ -1,12 +1,13 @@
 import { db } from '../db'
 import { customers, projects, projectColumns } from '../db/schema'
-import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNull, or } from 'drizzle-orm'
 import { getProjectAccessFilter, genId } from '../utils/projects'
 import { audienceFor, getUserActiveTeamId } from '../utils/auth-helpers'
 import { requireOrgCustomer } from '../utils/customers'
 import { publishFromEvent } from '../utils/realtime'
 import { terminalColumnIds } from '#shared/utils/board'
 import { columnsForNewBoard } from '../utils/teamSettings'
+import { realBoardOfCrewBoard, shadowBoardIdsSeenBy } from '../utils/crewBoardAccess'
 
 export default defineEventHandler(async (event) => {
   const userId = event.context.session.user.id
@@ -14,11 +15,15 @@ export default defineEventHandler(async (event) => {
   if (event.method === 'GET') {
     const filter = await getProjectAccessFilter(event)
     const teamId = await getUserActiveTeamId(event)
+    // The crew boards the person may read (the owner, a manager of the real board, or the member who set
+    // them up) are listed beside the team's own boards, marked as the crew's and read-only (Q92, Q93).
+    const crewIds = await shadowBoardIdsSeenBy(userId)
+    const reach = crewIds.length ? or(filter, inArray(projects.id, crewIds)) : filter
     const rows = await db
       .select({ project: projects, customerName: customers.name })
       .from(projects)
       .leftJoin(customers, eq(customers.id, projects.customerId))
-      .where(getQuery(event).archived === '1' ? filter : and(filter, isNull(projects.archivedAt)))
+      .where(getQuery(event).archived === '1' ? reach : and(reach, isNull(projects.archivedAt)))
       .orderBy(desc(projects.updatedAt))
     if (!rows.length) return []
 
@@ -46,12 +51,20 @@ export default defineEventHandler(async (event) => {
       else byProject.set(column.projectId, [column])
     }
 
+    // The name of the real board each crew board works on, for its "crew board of" mark.
+    const crewBoardOf = new Map(await Promise.all(rows
+      .filter(({ project }) => crewIds.includes(project.id))
+      .map(async ({ project }) => [project.id, (await realBoardOfCrewBoard(project.id))?.name ?? null] as const)))
     return rows.map(({ project, customerName }) => {
       const own = byProject.get(project.id) ?? []
+      // A crew board reached as the real board's staff is read-only here (the server refuses any write).
+      const readOnly = crewBoardOf.has(project.id) && project.teamId !== teamId
       return {
         ...project,
         customerName,
-        audience: audienceFor(userId, teamId, project),
+        audience: readOnly ? 'staff' as const : audienceFor(userId, teamId, project),
+        readOnly,
+        crewBoardOf: readOnly ? crewBoardOf.get(project.id) ?? null : null,
         terminalColumnIds: terminalColumnIds(own)
       }
     })
