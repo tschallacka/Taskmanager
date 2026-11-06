@@ -978,6 +978,10 @@ describe('crew mentions: the updates that ask Boss something', async () => {
     const watcher = createWatcher({ call: board.call, boards: ['b1'], state })
     assert.equal((await watcher.pass()).length, 1)
     assert.ok(!Number.isNaN(Date.parse(state.since)))
+    // It asked for 24 hours back (plus the 5-second overlap), measured from the start of the pass.
+    const [, args] = board.calls.find(([name]) => name === 'get_task')
+    const back = Date.parse(state.since) - Date.parse(args.since)
+    assert.ok(back >= 86400000 + 5000 && back < 86400000 + 5000 + 1000, `asked for ${back} ms back`)
   })
 
   test('follow prints one line when checks start failing and one when they work again', async () => {
