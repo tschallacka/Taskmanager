@@ -16,9 +16,11 @@ const password = `pw-${randomBytes(12).toString('hex')}`
 const mainEmail = `${tag}-main@hooks.test`
 const extraEmail = `${tag}-extra@hooks.test`
 const plainEmail = `${tag}-plain@hooks.test`
+const keysEmail = `${tag}-keys@hooks.test`
+const keysExtraEmail = `${tag}-keys-extra@hooks.test`
 
 const { db } = await import('../server/db')
-const { user, userEmail } = await import('../server/db/schema')
+const { passkey, user, userEmail } = await import('../server/db/schema')
 
 function post(path: string, body: unknown, cookie?: string) {
   return fetch(`${base}${path}`, {
@@ -44,7 +46,7 @@ before(async () => {
 after(async () => {
   if (SKIP) return
   await db.delete(userEmail).where(eq(userEmail.email, extraEmail))
-  await db.delete(user).where(inArray(user.email, [mainEmail, plainEmail]))
+  await db.delete(user).where(inArray(user.email, [mainEmail, plainEmail, keysEmail]))
   await db.$client.end()
 })
 
@@ -72,6 +74,24 @@ test('an extra address signs in with the main address password and names the mai
   const res = await post('/api/auth/sign-in/email', { email: extraEmail, password })
   assert.equal(res.status, 200)
   assert.equal((await res.json()).user.email, mainEmail)
+})
+
+test('sign-up refuses an address that another account holds as a verified extra one', { skip: SKIP }, async () => {
+  const res = await post('/api/auth/sign-up/email', { name: 'Hooks taken', email: extraEmail, password })
+  assert.equal(res.status, 400)
+  assert.match((await res.json()).message, /already in use/)
+})
+
+test('the last passkey cannot be removed while an extra address is on the account', { skip: SKIP }, async () => {
+  const userId = await signUp('Hooks keys', keysEmail)
+  await db.insert(passkey).values({ id: `hooks-${tag}-key`, name: 'Hooks key', publicKey: 'hooks-public-key', userId, credentialID: `hooks-${tag}-credential`, counter: 0, deviceType: 'singleDevice', backedUp: false, createdAt: new Date() })
+  await db.insert(userEmail).values({ id: `hooks-${tag}-keys-extra`, userId, email: keysExtraEmail, verifiedAt: new Date(), createdAt: new Date() })
+  const signIn = await post('/api/auth/sign-in/email', { email: keysEmail, password })
+  assert.equal(signIn.status, 200)
+  const cookie = signIn.headers.getSetCookie().map(part => part.split(';')[0]).join('; ')
+  const res = await post('/api/auth/passkey/delete-passkey', { id: `hooks-${tag}-key` }, cookie)
+  assert.equal(res.status, 403)
+  assert.match((await res.json()).message, /Remove your extra addresses before you remove your last passkey/)
 })
 
 test('two-factor cannot be turned off while an extra address is on the account', { skip: SKIP }, async () => {
