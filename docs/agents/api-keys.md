@@ -26,8 +26,9 @@ This is the most important rule. A key is the person acting through an agent:
 - It sees the same tasks and updates. Anything hidden from the person is hidden from the agent.
 - It may change only what the person may change. Anything the app would refuse them is refused to the key.
 - The permissions below can only take away from that, never add.
-- On a board it counts as **staff** only where its owner is an owner or admin of that board's workspace. In a workspace
-  where the owner is a plain member, the key sees the board as a customer does: only the tasks marked for customers.
+- It acts with its owner's own access: the same boards and the same audience. On a board of a workspace the owner is a
+  member of, the key is **staff**, as the owner is. On a board the owner reaches only as a customer or a guest, the key
+  sees what a customer sees: only the tasks marked for customers.
 
 So giving a key every permission does not turn it into an administrator. If its owner leaves a workspace, the key loses
 that workspace's boards at once.

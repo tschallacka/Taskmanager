@@ -122,7 +122,7 @@ export interface AgentEventRecord {
 
 export interface StreamKey extends AgentStreamGrant { keyId: string, userId: string, teamId: string | null }
 
-/** The teams and customers a user belongs to now, read when a stream opens. staffTeamIds are the teams the user is owner or admin of: a team missing there is not staff for any key. */
+/** The teams and customers a user belongs to now, read when a stream opens. staffTeamIds are the teams the user is a member of: a plain member is staff, as in the browser. */
 export interface Membership { teamIds: string[], staffTeamIds?: string[], customerIds: string[] }
 
 /** What the socket of one stream offers the hub. Writes never wait on a reader. */
@@ -672,7 +672,7 @@ function optionsFromEnv(): AgentEventHubOptions {
 export const agentEventHub = new AgentEventHub(optionsFromEnv())
 
 export interface AudienceLookups {
-  /** Owner or admin of the team: a plain member is not staff for a key's reach. */
+  /** A member of the team is staff for a key's reach, a plain member included. */
   isStaff(userId: string, teamId: string): Promise<boolean>
   customerIds(userId: string): Promise<string[]>
 }
@@ -682,7 +682,7 @@ export const databaseLookups: AudienceLookups = {
   customerIds: customerIdsOf
 }
 
-/** Whether a user is owner or admin of a team right now: the roles that make its boards staff for a key. */
+/** Whether a user is a member of a team right now: a plain member is staff for a key. */
 export async function isTeamStaff(userId: string, teamId: string): Promise<boolean> {
   const rows = await db.select({ teamId: member.organizationId, role: member.role }).from(member)
     .where(and(eq(member.userId, userId), eq(member.organizationId, teamId)))

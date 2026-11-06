@@ -67,7 +67,7 @@ export interface ApiKeyContext {
   reach: KeyReach
   /** The workspaces the owner is a member of right now. A grant from another workspace counts for nothing. */
   memberTeamIds: string[]
-  /** The workspaces the owner is staff of right now (owner or admin). Only these make a board staff for the key. */
+  /** The workspaces the owner is staff of right now: every one they are a member of, a plain member included. */
   staffTeamIds: string[]
 }
 
@@ -184,12 +184,12 @@ async function loadKeyReach(key: ApiKey): Promise<KeyReach> {
   }
 }
 
-// The roles that make a board of a workspace staff for a key (the same as the browser's admin roles).
-export const STAFF_ROLES = ['owner', 'admin']
-
-/** The teams a person is staff of, from their member rows: the owner and admin roles only. */
-export function staffTeamIdsOf(rows: { teamId: string, role: string }[]): string[] {
-  return rows.filter(row => STAFF_ROLES.includes(row.role)).map(row => row.teamId)
+/**
+ * The teams a person is staff of, from their member rows. A plain member is staff, as the browser shows
+ * a workspace's boards to them, so every workspace the person belongs to counts.
+ */
+export function staffTeamIdsOf(rows: { teamId: string }[]): string[] {
+  return rows.map(row => row.teamId)
 }
 
 async function teamIdsOf(userId: string): Promise<{ memberTeamIds: string[], staffTeamIds: string[] }> {

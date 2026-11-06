@@ -22,12 +22,6 @@ export function isNarrowedKey(context: Pick<ApiKeyContext, 'customerId' | 'reach
 }
 
 /**
- * The boards this key may reach. The owner's open boards (every workspace they are a member of, their
- * personal boards, and the boards of the customers and guests they are let onto) are the outer limit.
- * The key's own grants pick from them: Select all, whole workspaces, single boards. Because the outer
- * limit is checked on every call, a grant stops working as soon as its owner loses access to the board.
- */
-/**
  * The boards a person can open now: their own, those of the workspaces in memberTeamIds, those of their
  * customers, and the ones they are a guest on. The key's reach and the open-board list both start here.
  */
@@ -43,6 +37,12 @@ export async function openBoardScope(userId: string, memberTeamIds: string[]) {
   return { open, customerIds, guestIds }
 }
 
+/**
+ * The boards this key may reach. The owner's open boards (every workspace they are a member of, their
+ * personal boards, and the boards of the customers and guests they are let onto) are the outer limit.
+ * The key's own grants pick from them: Select all, whole workspaces, single boards. Because the outer
+ * limit is checked on every call, a grant stops working as soon as its owner loses access to the board.
+ */
 export async function boardFilter(context: ApiKeyContext) {
   const { userId, reach, memberTeamIds } = context
   const { open, customerIds, guestIds } = await openBoardScope(userId, memberTeamIds)
@@ -64,7 +64,7 @@ export async function boardFilter(context: ApiKeyContext) {
 }
 
 /**
- * How the person relates to a board: staff on a board of a workspace where they are owner or admin, and on their
+ * How the person relates to a board: staff on a board of a workspace they are a member of, and on their
  * own personal boards; a customer's contact everywhere else. A board a crew reads through its crew link
  * counts as the team's, so the crew sees every task on it; it can only be reached by a read call, so
  * nothing it may not do is ever asked of it.

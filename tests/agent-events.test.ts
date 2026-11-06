@@ -189,7 +189,6 @@ test('a resume replays nothing of a team or customer the user has left', () => {
   const own = { ...kept({ teamId: null }), id: 3, at: 0 }
   assert.equal(stillMember(teamA, { teamIds: ['team-b'], customerIds: [] }), false)
   assert.equal(stillMember(teamA, { teamIds: ['team-a'], staffTeamIds: ['team-a'], customerIds: [] }), true)
-  assert.equal(stillMember(teamA, { teamIds: ['team-a'], staffTeamIds: [], customerIds: [] }), false, 'a plain member is no longer replayed staff events')
   assert.equal(stillMember(acme, { teamIds: [], customerIds: [] }), false)
   assert.equal(stillMember(acme, { teamIds: [], customerIds: ['acme'] }), true)
   assert.equal(stillMember(own, { teamIds: [], customerIds: [] }), true)
@@ -208,18 +207,18 @@ test('a resume after a team was left replays only what the user still belongs to
   assert.deepEqual(ids(connection.text()), [BASE + 2], 'the personal event is still replayed')
 })
 
-test('a plain member of a workspace gets none of its staff events, so a key with a grant cannot see them', async () => {
+test('a plain member of a workspace gets its staff events, so a key with a grant sees them', async () => {
   const { hub } = makeHub()
   open(hub, key('k-plain-grant', 'u-plain'))
-  const plainMember: AudienceLookups = { isStaff: async () => false, customerIds: async () => [] }
-  assert.equal(await emitAgentEventWith(hub, plainMember, 'u-plain', eventFor({ board: teamBoard })), false)
-  const owner = lookups({ 'u-plain': ['team-a'] })
-  assert.equal(await emitAgentEventWith(hub, owner, 'u-plain', eventFor({ board: teamBoard })), true)
+  const plainMember = lookups({ 'u-plain': ['team-a'] })
+  assert.equal(await emitAgentEventWith(hub, plainMember, 'u-plain', eventFor({ board: teamBoard })), true)
+  const outsider = lookups({})
+  assert.equal(await emitAgentEventWith(hub, outsider, 'u-plain', eventFor({ board: teamBoard })), false)
 })
 
-test('a resume of a team staff event is replayed only while the user is still its owner or admin', () => {
+test('a resume of a team staff event is replayed while the user is still a member of the team', () => {
   const teamStaff = { ...kept({ teamId: 'team-a' }), id: 1, at: 0 }
-  assert.equal(stillMember(teamStaff, { teamIds: ['team-a'], staffTeamIds: [], customerIds: [] }), false)
+  assert.equal(stillMember(teamStaff, { teamIds: [], staffTeamIds: [], customerIds: [] }), false)
   assert.equal(stillMember(teamStaff, { teamIds: ['team-a'], staffTeamIds: ['team-a'], customerIds: [] }), true)
 })
 
