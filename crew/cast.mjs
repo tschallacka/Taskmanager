@@ -5,8 +5,10 @@
 // through opencode. The kit knows them so their forks can be read, but init writes no agent definition for them.
 export const EXTRA_CAST = ['wes', 'wilma', 'walt']
 
-// The members Pia starts as agents (Pia herself runs in her own session), the optional log watcher included,
-// and the extra workers, whose forks play their role.
+// CAST: every member the kit knows, in two groups. The standard members Pia starts as agents (Pia herself runs in
+// her own session; the optional log watcher included) get an agent definition. The extra workers (EXTRA_CAST) play
+// their role from their forks, but run on their own model and get no agent definition.
+
 export const CAST = ['pia', 'wren', 'wick', 'wynn', 'wade', 'usher', 'nina', 'quincy', 'watcher', ...EXTRA_CAST]
 
 /**
