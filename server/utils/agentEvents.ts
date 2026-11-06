@@ -27,7 +27,6 @@
 // delivery_failed goes to the crew's pm only (a team that is not a crew: its owners), with ids, the class, the attempts and a code; never a customer.
 import { and, asc, eq, sql } from 'drizzle-orm'
 import { db } from '../db'
-import { staffTeamIdsOf } from './api-keys'
 import { apiKeys, crews, member, projectGithubRepos, projects, user } from '../db/schema'
 import { customerIdsOf, isTeamMember } from './auth-helpers'
 import { crewAccountLive, isCrewAddress, normalizeAddress, personKeyOf } from './crewAccounts'
@@ -122,8 +121,8 @@ export interface AgentEventRecord {
 
 export interface StreamKey extends AgentStreamGrant { keyId: string, userId: string, teamId: string | null }
 
-/** The teams and customers a user belongs to now, read when a stream opens. staffTeamIds are the teams the user is a member of: a plain member is staff, as in the browser. */
-export interface Membership { teamIds: string[], staffTeamIds?: string[], customerIds: string[] }
+/** The teams and customers a user belongs to now, read when a stream opens. */
+export interface Membership { teamIds: string[], customerIds: string[] }
 
 /** What the socket of one stream offers the hub. Writes never wait on a reader. */
 export interface StreamConnection {
@@ -221,7 +220,7 @@ function deliverableByGrant(record: Pick<AgentEventRecord, 'audience' | 'teamId'
 /** Whether a user still belongs to the team or customer a kept event is about. Used on a resume. */
 export function stillMember(record: Pick<AgentEventRecord, 'audience' | 'teamId' | 'customerId'>, membership: Membership): boolean {
   if (record.audience === 'customer') return record.customerId !== null && membership.customerIds.includes(record.customerId)
-  return record.teamId === null || (membership.staffTeamIds ?? []).includes(record.teamId)
+  return record.teamId === null || membership.teamIds.includes(record.teamId)
 }
 
 /** The SSE frame for one event. Only ids, the kind, the names, the origin and the cut title. */
@@ -672,21 +671,14 @@ function optionsFromEnv(): AgentEventHubOptions {
 export const agentEventHub = new AgentEventHub(optionsFromEnv())
 
 export interface AudienceLookups {
-  /** A member of the team is staff for a key's reach, a plain member included. */
-  isStaff(userId: string, teamId: string): Promise<boolean>
+  /** Whether the user belongs to the team: a plain member is staff for a key's reach. */
+  isMember(userId: string, teamId: string): Promise<boolean>
   customerIds(userId: string): Promise<string[]>
 }
 
 export const databaseLookups: AudienceLookups = {
-  isStaff: isTeamStaff,
+  isMember: isTeamMember,
   customerIds: customerIdsOf
-}
-
-/** Whether a user is a member of a team right now: a plain member is staff for a key. */
-export async function isTeamStaff(userId: string, teamId: string): Promise<boolean> {
-  const rows = await db.select({ teamId: member.organizationId, role: member.role }).from(member)
-    .where(and(eq(member.userId, userId), eq(member.organizationId, teamId)))
-  return staffTeamIdsOf(rows).includes(teamId)
 }
 
 /**
@@ -701,7 +693,7 @@ export async function emitAgentEventWith(
 ): Promise<boolean> {
   if (!hub.watches(userId)) return false
   const staff = input.board.teamId
-    ? await lookups.isStaff(userId, input.board.teamId)
+    ? await lookups.isMember(userId, input.board.teamId)
     : input.board.userId === userId
   const contact = !staff && !!input.board.customerId
     && (await lookups.customerIds(userId)).includes(input.board.customerId)
@@ -833,7 +825,7 @@ export async function emitGithubEventWith(hub: AgentEventHub, lookups: GithubLoo
   let kept = 0
   for (const userId of candidates) {
     if (!hub.watches(userId)) continue
-    const staff = board.teamId ? await lookups.isStaff(userId, board.teamId) : board.userId === userId
+    const staff = board.teamId ? await lookups.isMember(userId, board.teamId) : board.userId === userId
     if (!staff) continue
     const key = keyOf.get(userId)
     const role = { owner: owners.includes(userId), pm: key === 'pia', boss: key === 'boss' }
@@ -914,7 +906,7 @@ export async function emitDeliveryFailedWith(hub: AgentEventHub, lookups: Delive
   let kept = 0
   for (const userId of new Set(recipients)) {
     if (!hub.watches(userId)) continue
-    const staff = board.teamId ? await lookups.isStaff(userId, board.teamId) : board.userId === userId
+    const staff = board.teamId ? await lookups.isMember(userId, board.teamId) : board.userId === userId
     if (!staff) continue
     hub.publish(userId, {
       kind: 'delivery_failed',
@@ -978,9 +970,8 @@ export async function actorNameOf(userId: string | null): Promise<string | null>
 
 /** The teams and customers a user belongs to right now. */
 export async function currentMembership(userId: string): Promise<Membership> {
-  const teams = await db.select({ teamId: member.organizationId, role: member.role }).from(member).where(eq(member.userId, userId))
-  const staffTeamIds = staffTeamIdsOf(teams)
-  return { teamIds: teams.map(team => team.teamId), staffTeamIds, customerIds: await customerIdsOf(userId) }
+  const teams = await db.select({ teamId: member.organizationId }).from(member).where(eq(member.userId, userId))
+  return { teamIds: teams.map(team => team.teamId), customerIds: await customerIdsOf(userId) }
 }
 
 /**

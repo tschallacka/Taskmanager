@@ -97,9 +97,9 @@ function eventFor(over: Partial<AgentEventInput> = {}): AgentEventInput {
   }
 }
 
-function lookups(staffTeams: Record<string, string[]> = {}, contacts: Record<string, string[]> = {}): AudienceLookups {
+function lookups(memberTeams: Record<string, string[]> = {}, contacts: Record<string, string[]> = {}): AudienceLookups {
   return {
-    isStaff: async (userId, teamId) => (staffTeams[userId] ?? []).includes(teamId),
+    isMember: async (userId, teamId) => (memberTeams[userId] ?? []).includes(teamId),
     customerIds: async userId => contacts[userId] ?? []
   }
 }
@@ -188,7 +188,7 @@ test('a resume replays nothing of a team or customer the user has left', () => {
   const acme = { ...kept({ audience: 'customer', teamId: null, customerId: 'acme' }), id: 2, at: 0 }
   const own = { ...kept({ teamId: null }), id: 3, at: 0 }
   assert.equal(stillMember(teamA, { teamIds: ['team-b'], customerIds: [] }), false)
-  assert.equal(stillMember(teamA, { teamIds: ['team-a'], staffTeamIds: ['team-a'], customerIds: [] }), true)
+  assert.equal(stillMember(teamA, { teamIds: ['team-a'], customerIds: [] }), true)
   assert.equal(stillMember(acme, { teamIds: [], customerIds: [] }), false)
   assert.equal(stillMember(acme, { teamIds: [], customerIds: ['acme'] }), true)
   assert.equal(stillMember(own, { teamIds: [], customerIds: [] }), true)
@@ -218,8 +218,8 @@ test('a plain member of a workspace gets its staff events, so a key with a grant
 
 test('a resume of a team staff event is replayed while the user is still a member of the team', () => {
   const teamStaff = { ...kept({ teamId: 'team-a' }), id: 1, at: 0 }
-  assert.equal(stillMember(teamStaff, { teamIds: [], staffTeamIds: [], customerIds: [] }), false)
-  assert.equal(stillMember(teamStaff, { teamIds: ['team-a'], staffTeamIds: ['team-a'], customerIds: [] }), true)
+  assert.equal(stillMember(teamStaff, { teamIds: [], customerIds: [] }), false)
+  assert.equal(stillMember(teamStaff, { teamIds: ['team-a'], customerIds: [] }), true)
 })
 
 // ── Frames and text ───────────────────────────────────────────────────
@@ -695,7 +695,7 @@ test('the last stream closed and the backlog aged out: no emit work, and no per-
 
   let lookupsRun = 0
   const counting: AudienceLookups = {
-    isStaff: async () => {
+    isMember: async () => {
       lookupsRun++
       return true
     },

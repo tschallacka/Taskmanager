@@ -28,7 +28,7 @@ const teamB = id('team-b')
 const created: string[] = []
 
 function contextFor(reach: KeyReach, memberTeamIds: string[]): ApiKeyContext {
-  return { keyId: id('key'), keyName: 'tools test', userId: owner, teamId: null, customerId: null, projectId: null, scopes: ['boards:write'], reach, memberTeamIds, staffTeamIds: memberTeamIds }
+  return { keyId: id('key'), keyName: 'tools test', userId: owner, teamId: null, customerId: null, projectId: null, scopes: ['boards:write'], reach, memberTeamIds }
 }
 
 async function createBoard(context: ApiKeyContext, args: Record<string, unknown>) {

@@ -194,9 +194,9 @@ async function linked(context: ApiKeyContext, only: RepoKey | null): Promise<Lin
     && (!only || (entry.owner.toLowerCase() === only.owner.toLowerCase() && entry.repo.toLowerCase() === only.repo.toLowerCase())))
 }
 
-const pmKey: ApiKeyContext = { keyId: 'k-pm', keyName: 'pm key', userId: 'pm-user', teamId: 'team-c', scopes: ['boards:read', 'boards:write'], reach: { allBoards: false, workspaceTeamIds: ['team-c'], boardIds: [] }, memberTeamIds: ['team-c'], staffTeamIds: ['team-c'] }
-const contactKey: ApiKeyContext = { keyId: 'k-contact', keyName: 'contact key', userId: 'contact-user', teamId: null, scopes: ['boards:read'], reach: { allBoards: false, workspaceTeamIds: [null], boardIds: [] }, memberTeamIds: [], staffTeamIds: [] }
-const otherKey: ApiKeyContext = { keyId: 'k-other', keyName: 'other key', userId: 'x-user', teamId: 'team-x', scopes: ['boards:read', 'boards:write'], reach: { allBoards: false, workspaceTeamIds: ['team-x'], boardIds: [] }, memberTeamIds: ['team-x'], staffTeamIds: ['team-x'] }
+const pmKey: ApiKeyContext = { keyId: 'k-pm', keyName: 'pm key', userId: 'pm-user', teamId: 'team-c', scopes: ['boards:read', 'boards:write'], reach: { allBoards: false, workspaceTeamIds: ['team-c'], boardIds: [] }, memberTeamIds: ['team-c'] }
+const contactKey: ApiKeyContext = { keyId: 'k-contact', keyName: 'contact key', userId: 'contact-user', teamId: null, scopes: ['boards:read'], reach: { allBoards: false, workspaceTeamIds: [null], boardIds: [] }, memberTeamIds: [] }
+const otherKey: ApiKeyContext = { keyId: 'k-other', keyName: 'other key', userId: 'x-user', teamId: 'team-x', scopes: ['boards:read', 'boards:write'], reach: { allBoards: false, workspaceTeamIds: ['team-x'], boardIds: [] }, memberTeamIds: ['team-x'] }
 
 const teamPayload = JSON.stringify({
   action: 'opened',
@@ -378,7 +378,7 @@ describe('retry and discard: once per row, the claim rules, the messages', () =>
     const store = fakeStore()
     const queue = fakeQueue()
     seed(store, { deliveryId: 'd-team' })
-    const worker: ApiKeyContext = { keyId: 'k-w1', keyName: 'w1 key', userId: 'w1-user', teamId: 'team-c', scopes: ['boards:read', 'boards:write'], reach: { allBoards: false, workspaceTeamIds: ['team-c'], boardIds: [] }, memberTeamIds: ['team-c'], staffTeamIds: ['team-c'] }
+    const worker: ApiKeyContext = { keyId: 'k-w1', keyName: 'w1 key', userId: 'w1-user', teamId: 'team-c', scopes: ['boards:read', 'boards:write'], reach: { allBoards: false, workspaceTeamIds: ['team-c'], boardIds: [] }, memberTeamIds: ['team-c'] }
     assert.equal((await pmGet(worker, 'd-team', deps(store, queue))).item.id, 'd-team')
     assert.equal((await pmList(worker, { limit: 50, state: 'failed' }, deps(store, queue))).items.length, 1)
     await refusedWith(() => pmRetry(worker, 'd-team', deps(store, queue)), PM_ONLY)
@@ -423,7 +423,7 @@ describe('a key from another crew is refused every delivery action', () => {
     const store = fakeStore()
     const queue = fakeQueue()
     seed(store, { deliveryId: 'd-team' })
-    const stranger: ApiKeyContext = { keyId: 'k-s', keyName: 'stranger', userId: 'x-user', teamId: 'team-x', scopes: ['boards:read', 'boards:write'], reach: { allBoards: false, workspaceTeamIds: ['team-x'], boardIds: [] }, memberTeamIds: ['team-x'], staffTeamIds: ['team-x'] }
+    const stranger: ApiKeyContext = { keyId: 'k-s', keyName: 'stranger', userId: 'x-user', teamId: 'team-x', scopes: ['boards:read', 'boards:write'], reach: { allBoards: false, workspaceTeamIds: ['team-x'], boardIds: [] }, memberTeamIds: ['team-x'] }
     await refusedWith(() => pmRetry(stranger, 'd-team', deps(store, queue)), NOT_LINKED)
     await refusedWith(() => pmDiscard(stranger, 'd-team', 'a stranger drops it', deps(store, queue)), NOT_LINKED)
     assert.equal(store.stored.get('d-team')!.state, 'failed')

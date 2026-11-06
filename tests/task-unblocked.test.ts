@@ -117,7 +117,7 @@ const crewBoard: AgentBoard = { id: 'board-1', userId: 'owner', teamId: 'crew-te
 
 function lookups(contacts: Record<string, string[]> = {}): AudienceLookups {
   return {
-    isStaff: async (userId, teamId) => teamId === 'crew-team' && (userId === 'pm-1' || userId === 'ann'),
+    isMember: async (userId, teamId) => teamId === 'crew-team' && (userId === 'pm-1' || userId === 'ann'),
     customerIds: async userId => contacts[userId] ?? []
   }
 }
@@ -137,7 +137,7 @@ test('an internal unblock reaches the assignee and the pm, not a customer contac
   const ann = open(hub, { keyId: 'k-ann', userId: 'ann', teamId: 'crew-team' })
   const pm = open(hub, { keyId: 'k-pm', userId: 'pm-1', teamId: 'crew-team' })
   const contact = open(hub, { keyId: 'k-contact', userId: 'contact-1', teamId: null })
-  const contactLookups: AudienceLookups = { isStaff: lookups().isStaff, customerIds: async userId => userId === 'contact-1' ? ['cust-1'] : [] }
+  const contactLookups: AudienceLookups = { isMember: lookups().isMember, customerIds: async userId => userId === 'contact-1' ? ['cust-1'] : [] }
 
   assert.equal(await emitAgentEventWith(hub, lookups(), 'ann', unblocked(false)), true)
   assert.equal(await emitAgentEventWith(hub, lookups(), 'pm-1', unblocked(false)), true)
@@ -151,7 +151,7 @@ test('an internal unblock reaches the assignee and the pm, not a customer contac
 test('a customer-visible unblock reaches the customer contact too', async () => {
   const hub = makeHub()
   const contact = open(hub, { keyId: 'k-contact', userId: 'contact-1', teamId: null })
-  const contactLookups: AudienceLookups = { isStaff: async () => false, customerIds: async userId => userId === 'contact-1' ? ['cust-1'] : [] }
+  const contactLookups: AudienceLookups = { isMember: async () => false, customerIds: async userId => userId === 'contact-1' ? ['cust-1'] : [] }
   assert.equal(await emitAgentEventWith(hub, contactLookups, 'contact-1', unblocked(true)), true)
   assert.match(contact.text(), /^event: unblocked$/m)
   assert.equal(deliverableTo({ audience: 'customer', teamId: null }, null), true)

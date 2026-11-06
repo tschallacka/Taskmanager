@@ -47,8 +47,7 @@ async function contextFor(keyId: string, reach: KeyReach): Promise<ApiKeyContext
     projectId: null,
     scopes: ['boards:read'],
     reach,
-    memberTeamIds: await memberTeams(owner),
-    staffTeamIds: await memberTeams(owner)
+    memberTeamIds: await memberTeams(owner)
   }
 }
 

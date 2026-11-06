@@ -71,7 +71,7 @@ export async function boardFilter(context: ApiKeyContext) {
  */
 export function audienceOf(context: ApiKeyContext, board: Pick<Project, 'userId' | 'teamId'> & { id?: string }): Audience {
   if (board.id && context.readGrantedBoardIds?.includes(board.id)) return 'staff'
-  if (board.teamId) return context.staffTeamIds.includes(board.teamId) ? 'staff' : 'customer'
+  if (board.teamId) return context.memberTeamIds.includes(board.teamId) ? 'staff' : 'customer'
   return board.userId === context.userId ? 'staff' : 'customer'
 }
 

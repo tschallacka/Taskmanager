@@ -67,8 +67,6 @@ export interface ApiKeyContext {
   reach: KeyReach
   /** The workspaces the owner is a member of right now. A grant from another workspace counts for nothing. */
   memberTeamIds: string[]
-  /** The workspaces the owner is staff of right now: every one they are a member of, a plain member included. */
-  staffTeamIds: string[]
 }
 
 function readBearerToken(event: H3Event): string | null {
@@ -161,7 +159,7 @@ export async function authenticateApiKey(event: H3Event): Promise<ApiKeyContext>
     projectId: key.projectId,
     scopes: key.scopes.filter(isApiKeyScope),
     reach: await loadKeyReach(key),
-    ...(await teamIdsOf(key.userId))
+    memberTeamIds: await teamIdsOf(key.userId)
   }
 }
 
@@ -184,17 +182,9 @@ async function loadKeyReach(key: ApiKey): Promise<KeyReach> {
   }
 }
 
-/**
- * The teams a person is staff of, from their member rows. A plain member is staff, as the browser shows
- * a workspace's boards to them, so every workspace the person belongs to counts.
- */
-export function staffTeamIdsOf(rows: { teamId: string }[]): string[] {
+async function teamIdsOf(userId: string): Promise<string[]> {
+  const rows = await db.select({ teamId: member.organizationId }).from(member).where(eq(member.userId, userId))
   return rows.map(row => row.teamId)
-}
-
-async function teamIdsOf(userId: string): Promise<{ memberTeamIds: string[], staffTeamIds: string[] }> {
-  const rows = await db.select({ teamId: member.organizationId, role: member.role }).from(member).where(eq(member.userId, userId))
-  return { memberTeamIds: rows.map(row => row.teamId), staffTeamIds: staffTeamIdsOf(rows) }
 }
 
 /** Whether a key is cut down to one customer's boards, or to single boards and not to a whole workspace. */
