@@ -23,7 +23,7 @@ import { kitDir } from './home.mjs'
 const NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
 // What a kit never ships: tests, dotfiles, logins, runs, and the archive itself.
 const NOT_KIT = /\.test\.mjs$|^\.|^(creds|crew|crew\.config|package-lock|crew-kit)\.json$|\.log$|^kit\.tar\.gz$/
-const SHAPE = /\.(mjs|md|tmpl|json|sh)$|^fonts\.conf/
+const SHAPE = /\.(mjs|md|tmpl|json|sh)$/
 // The list of kit files travels with a folder kit (not with the board's archive), so it is installed when present.
 const LIST = 'kit-files.txt'
 const MANIFEST = 'crew-kit.json'
@@ -72,6 +72,7 @@ async function fetchKit(from, board, stage) {
     if (existsSync(join(from, LIST)) && !names.includes(LIST)) names.push(LIST)
     for (const name of names) {
       if (!shipsName(name)) throw new Error(`${join(from, LIST)} lists "${name}", which a kit does not ship`)
+      if (!existsSync(join(from, name))) throw new Error(`${join(from, LIST)} lists "${name}", but ${from} has no file of that name`)
     }
     for (const name of names) copyFileSync(plainFile(join(from, name)), join(stage, name))
     checkStaged(stage, names)
