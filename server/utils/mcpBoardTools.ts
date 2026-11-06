@@ -8,7 +8,7 @@ import { db } from '../db'
 import { projects, projectColumns, projectTasks, taskComments, user, apiKeys } from '../db/schema'
 import type { Project, ProjectColumn, ProjectTask } from '../db/schema'
 import type { ApiKeyContext } from './api-keys'
-import { audienceOf, boardFilter, readableTasksIn, requireStaffAudience } from './mcpAccess'
+import { audienceOf, boardFilter, readableTasksIn, requireStaffAudience, workspacesReachedBy } from './mcpAccess'
 import { commentVisibilityFilter, taskVisibilityFilter, type Audience } from './auth-helpers'
 import { htmlToMarkdown, htmlToPlainText, markdownToHtml } from './markdown'
 import { columnTasksOrdered, positionBetween, projectColumnsOrdered, renumberColumnTasks, RESTORED, nextSubtaskPosition, subtasksOrdered } from './projects'
@@ -925,7 +925,8 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
         name: { type: 'string', description: 'Board name.' },
         columns: { type: 'array', items: { type: 'string' }, description: 'Column names, left to right. Defaults to Backlog, To do, Verify, Done.' },
         description: { type: 'string', description: 'What the project is for, shown on its Overview.' },
-        status: { type: 'string', description: `Project health: ${PROJECT_STATUSES.join(', ')}.` }
+        status: { type: 'string', description: `Project health: ${PROJECT_STATUSES.join(', ')}.` },
+        workspace: { type: 'string', description: 'The workspace the board goes in: a workspace id, or "personal". Required when the key reaches more than one workspace.' }
       },
       required: ['name']
     },
@@ -939,11 +940,28 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
       const status = optionalString(args, 'status')
       const now = Date.now()
       const id = newId()
+      // A board goes in one workspace. A key that reaches several must say which one.
+      const choices = await workspacesReachedBy(context)
+      const listed = choices.map(choice => (choice.teamId ? `${choice.name} (${choice.teamId})` : 'Personal (personal)')).join(', ')
+      const named = optionalString(args, 'workspace')
+      let teamId: string | null
+      if (named !== undefined) {
+        const wanted = named === 'personal' ? null : named
+        const match = choices.find(choice => choice.teamId === wanted)
+        if (!match) throw new McpToolError(`This key does not reach the workspace "${named}". Pass workspace as one of: ${listed}.`)
+        teamId = match.teamId
+      } else if (choices.length === 1) {
+        teamId = choices[0]!.teamId
+      } else if (!choices.length) {
+        throw new McpToolError('This key reaches no workspace to put a board in. Give it a board or a workspace first.')
+      } else {
+        throw new McpToolError(`This key reaches more than one workspace, so say which one the board goes in: pass workspace as one of: ${listed}.`)
+      }
 
       const [board] = await db.insert(projects).values({
         id,
         userId: context.userId,
-        teamId: context.teamId,
+        teamId,
         name,
         ...(description !== undefined ? { description: description.slice(0, MAX_PROJECT_DESCRIPTION) } : {}),
         ...(status !== undefined ? { status: asToolError(() => parseProjectStatus(status)) } : {}),

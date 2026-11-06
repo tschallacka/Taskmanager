@@ -12,6 +12,7 @@ import { McpToolError } from '../../utils/mcpToolKit'
 import { API_KEY_SCOPES } from '../../db/schema'
 import type { ApiKeyScope } from '../../db/schema'
 import { publish, workspaceTopic } from '../../utils/realtime'
+import { workspaceOfBoard, workspaceTopicOfWrite } from '../../utils/keyReach'
 import type { ProjectResource, RealtimeEvent, WorkspaceCollection } from '../../utils/realtime'
 
 const SERVER_NAME = 'taskmanager'
@@ -72,7 +73,7 @@ const ALL_SCOPES: ApiKeyScope[] = [...API_KEY_SCOPES]
  * board on screen refreshes instead of going stale. Board results carry the
  * board they touched; anything else falls back to the coarse signal.
  */
-function announceWrite(tool: { scope: ApiKeyScope, resource?: ProjectResource, collection?: WorkspaceCollection }, value: unknown, context: ApiKeyContext) {
+async function announceWrite(tool: { scope: ApiKeyScope, resource?: ProjectResource, collection?: WorkspaceCollection }, value: unknown, context: ApiKeyContext) {
   if (tool.scope !== 'boards:write') return
 
   const topic = workspaceTopic(context.userId, context.teamId)
@@ -93,8 +94,12 @@ function announceWrite(tool: { scope: ApiKeyScope, resource?: ProjectResource, c
     // reloads the open board along with it. The board-shaped results carry
     // their own id, which a renamed board's readers need.
     : { type: 'projects', ...(typeof record.id === 'string' && { projectId: record.id }) }
-  void publish(topic, event)
-  if (tool.resource && typeof projectId === 'string') void publish(topic, { type: 'resource', projectId, resource: tool.resource })
+  // A change to a board goes to the workspace the board is in, which need not be the key's own.
+  const writtenId = typeof projectId === 'string' ? projectId : typeof record.id === 'string' ? record.id : undefined
+  const boardTeam = writtenId ? await workspaceOfBoard(writtenId).catch(() => undefined) : undefined
+  const boardTopic = workspaceTopicOfWrite(context.userId, boardTeam, context.teamId)
+  void publish(boardTopic, event)
+  if (tool.resource && typeof projectId === 'string') void publish(boardTopic, { type: 'resource', projectId, resource: tool.resource })
 }
 
 /** Tool failures are reported inside the result so the model can read and retry them. */
@@ -165,7 +170,7 @@ async function handleMessage(message: JsonRpcMessage, context: ApiKeyContext) {
         const outOfScope = toolsForScopes(ALL_SCOPES).find(candidate => candidate.name === name)
         if (!outOfScope) return failure(id, ErrorCode.MethodNotFound, `Unknown tool "${name}".`)
         return toolFailure(id, hasScope(context, outOfScope.scope)
-          ? `This API key is limited to one ${context.projectId ? 'board' : 'customer'}, and "${name}" works across the whole workspace, so it is not open to it.`
+          ? `This API key is limited to ${context.customerId ? 'one customer' : 'some boards'}, and "${name}" works across the whole workspace, so it is not open to it.`
           : `This API key does not carry the "${outOfScope.scope}" permission that "${name}" requires.`)
       }
 
@@ -175,7 +180,7 @@ async function handleMessage(message: JsonRpcMessage, context: ApiKeyContext) {
           ? { ...context, readGrantedBoardIds: await readGrantedBoardIds(context) }
           : context
         const value = await tool.handler(asRecord(params.arguments), callContext)
-        if (!tool.readOnly) announceWrite(tool, value, context)
+        if (!tool.readOnly) void announceWrite(tool, value, context)
         // Only what succeeded is recorded; the recording never fails or slows the call.
         if (tool.audit ?? !tool.readOnly) void recordAgentAction(tool, asRecord(params.arguments), value, context)
         // Compact rather than indented: a model reads either the same, and the

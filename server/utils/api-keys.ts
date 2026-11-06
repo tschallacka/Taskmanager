@@ -2,8 +2,8 @@ import type { H3Event } from 'h3'
 import { createHash, randomBytes, timingSafeEqual } from 'crypto'
 import { eq } from 'drizzle-orm'
 import { db } from '../db'
-import { apiKeys, API_KEY_SCOPES } from '../db/schema'
-import type { ApiKeyScope } from '../db/schema'
+import { apiKeys, apiKeyBoards, apiKeyWorkspaces, API_KEY_SCOPES, member } from '../db/schema'
+import type { ApiKey, ApiKeyScope } from '../db/schema'
 import { isTeamMember } from './auth-helpers'
 
 // Keys are recognisable on sight so they can be spotted in configs and logs.
@@ -36,6 +36,16 @@ export function isApiKeyScope(value: unknown): value is ApiKeyScope {
   return typeof value === 'string' && (API_KEY_SCOPES as readonly string[]).includes(value)
 }
 
+/** What a key reaches. Each grant is intersected with what the owner can open at the time of the call. */
+export interface KeyReach {
+  /** Select all: every board the owner can open, now and later. */
+  allBoards: boolean
+  /** Whole workspaces, now and later. NULL is the owner's personal workspace. */
+  workspaceTeamIds: (string | null)[]
+  /** Single boards the owner ticked. */
+  boardIds: string[]
+}
+
 export interface ApiKeyContext {
   keyId: string
   /** The name the key was given, as the owner sees it in the agent audit. */
@@ -53,6 +63,10 @@ export interface ApiKeyContext {
    * (see crewBoardAccess.ts). Never set on a write call, so those boards do not resolve for it.
    */
   readGrantedBoardIds?: string[]
+  /** What the key reaches, as its owner chose it. Every grant is still cut down to what the owner can open. */
+  reach: KeyReach
+  /** The workspaces the owner is a member of right now. A grant from another workspace counts for nothing. */
+  memberTeamIds: string[]
 }
 
 function readBearerToken(event: H3Event): string | null {
@@ -143,8 +157,50 @@ export async function authenticateApiKey(event: H3Event): Promise<ApiKeyContext>
     teamId: key.teamId,
     customerId: key.customerId,
     projectId: key.projectId,
-    scopes: key.scopes.filter(isApiKeyScope)
+    scopes: key.scopes.filter(isApiKeyScope),
+    reach: await loadKeyReach(key),
+    memberTeamIds: await teamIdsOf(key.userId)
   }
+}
+
+// A key made before the reach tables reads the reach its columns always gave it; the startup
+// migration then moves it into the tables, and the tables are read from then on.
+/**
+ * The reach a key's rows give. A key made before the reach tables reads the reach its columns always gave
+ * it; the startup migration then moves it into the tables, and the tables are read from then on. Pure: the
+ * callers read the two tables, for one key or for a whole list, and pass the rows in.
+ */
+export function keyReachOf(key: ApiKey, workspaceRows: { teamId: string | null }[], boardRows: { projectId: string }[]): KeyReach {
+  if (!key.boardReachSet) {
+    return key.projectId
+      ? { allBoards: false, workspaceTeamIds: [], boardIds: [key.projectId] }
+      : { allBoards: false, workspaceTeamIds: [key.teamId], boardIds: [] }
+  }
+  return {
+    allBoards: key.allBoards,
+    workspaceTeamIds: workspaceRows.map(row => row.teamId),
+    boardIds: boardRows.map(row => row.projectId)
+  }
+}
+
+async function loadKeyReach(key: ApiKey): Promise<KeyReach> {
+  if (!key.boardReachSet) return keyReachOf(key, [], [])
+  const [workspaces, boards] = await Promise.all([
+    db.select({ teamId: apiKeyWorkspaces.teamId }).from(apiKeyWorkspaces).where(eq(apiKeyWorkspaces.keyId, key.id)),
+    db.select({ projectId: apiKeyBoards.projectId }).from(apiKeyBoards).where(eq(apiKeyBoards.keyId, key.id))
+  ])
+  return keyReachOf(key, workspaces, boards)
+}
+
+export async function teamIdsOf(userId: string): Promise<string[]> {
+  const rows = await db.select({ teamId: member.organizationId }).from(member).where(eq(member.userId, userId))
+  return rows.map(row => row.teamId)
+}
+
+/** Whether a key is cut down to one customer's boards, or to single boards and not to a whole workspace. */
+export function isNarrowedReach(customerId: string | null, reach: KeyReach): boolean {
+  if (customerId) return true
+  return !reach.allBoards && reach.workspaceTeamIds.length === 0 && reach.boardIds.length > 0
 }
 
 export function hasScope(context: ApiKeyContext, scope: ApiKeyScope): boolean {

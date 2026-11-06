@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { format } from 'date-fns'
+import { teamKeyFormOf, teamKeyFormValid, teamKeyPatchBody } from '../utils/teamKeyForm'
+import type { TeamKeyForm, TeamKeyReach } from '../utils/teamKeyForm'
 
 // The team's API keys, for owners and admins: every key that works in the team, and a form that
 // makes a key limited to the whole team, one customer or one board.
@@ -147,6 +149,65 @@ function scopeLabel(scope: string): string {
   return scope.replace(':', ' ')
 }
 
+// The key whose row is open, and the one key being edited in it (one at a time).
+const openId = ref<string | null>(null)
+const editing = ref<string | null>(null)
+const editName = ref('')
+const editWrite = ref(false)
+const editReach = ref<TeamKeyReach>('team')
+const editCustomerId = ref<string | undefined>(undefined)
+const editProjectId = ref<string | undefined>(undefined)
+const saving = ref(false)
+
+const editForm = computed<TeamKeyForm>(() => ({
+  name: editName.value,
+  write: editWrite.value,
+  reach: editReach.value,
+  customerId: editCustomerId.value,
+  projectId: editProjectId.value
+}))
+const editValid = computed(() => teamKeyFormValid(editForm.value))
+
+function toggleKey(key: TeamKey) {
+  if (openId.value === key.id) {
+    openId.value = null
+    editing.value = null
+    return
+  }
+  openId.value = key.id
+  editing.value = null
+}
+
+function startEdit(key: TeamKey) {
+  const form = teamKeyFormOf(key)
+  editing.value = key.id
+  editName.value = form.name
+  editWrite.value = form.write
+  editReach.value = form.reach
+  editCustomerId.value = form.customerId
+  editProjectId.value = form.projectId
+}
+
+function cancelEdit() {
+  editing.value = null
+}
+
+async function saveEdit(key: TeamKey) {
+  if (!editValid.value) return
+  saving.value = true
+  try {
+    const body = teamKeyPatchBody(editForm.value)
+    await $fetch(`/api/teams/${props.teamId}/keys/${key.id}`, { method: 'PATCH', body })
+    toast.add({ title: `Saved "${body.name}"`, icon: 'i-lucide-check', duration: 2000 })
+    editing.value = null
+    await load()
+  } catch (e) {
+    toast.add({ title: errMsg(e, 'Could not save the key'), icon: 'i-lucide-alert-triangle', color: 'error' })
+  } finally {
+    saving.value = false
+  }
+}
+
 const day = (ms: number) => format(new Date(ms), 'd MMM yyyy')
 </script>
 
@@ -281,48 +342,151 @@ const day = (ms: number) => format(new Date(ms), 'd MMM yyyy')
       <div
         v-for="key in keys"
         :key="key.id"
-        class="flex items-center gap-3 px-3 py-2.5"
         data-team-key
       >
-        <div class="min-w-0 flex-1 space-y-0.5">
-          <p class="flex flex-wrap items-center gap-1.5 font-medium text-default">
-            <span class="truncate">{{ key.name }}</span>
-            <UBadge
-              size="xs"
-              variant="subtle"
-              :color="key.limit.type === 'team' ? 'neutral' : 'primary'"
-            >
-              {{ limitLabel(key.limit) }}
-            </UBadge>
-            <UBadge
-              v-for="scope in key.scopes"
-              :key="scope"
-              size="xs"
-              variant="outline"
+        <button
+          type="button"
+          class="flex w-full items-center gap-3 px-3 py-2.5 text-left"
+          :aria-expanded="openId === key.id"
+          data-team-key-toggle
+          @click="toggleKey(key)"
+        >
+          <div class="min-w-0 flex-1 space-y-0.5">
+            <p class="flex flex-wrap items-center gap-1.5 font-medium text-default">
+              <span class="truncate">{{ key.name }}</span>
+              <UBadge
+                size="xs"
+                variant="subtle"
+                :color="key.limit.type === 'team' ? 'neutral' : 'primary'"
+              >
+                {{ limitLabel(key.limit) }}
+              </UBadge>
+              <UBadge
+                v-for="scope in key.scopes"
+                :key="scope"
+                size="xs"
+                variant="outline"
+                color="neutral"
+              >
+                {{ scopeLabel(scope) }}
+              </UBadge>
+            </p>
+            <p class="text-[11px] text-muted">
+              <span class="font-mono">{{ key.keyPrefix }}…</span>
+              · {{ key.owner.name || key.owner.email }}
+              · made {{ day(key.createdAt) }}
+              · {{ key.lastUsedAt ? `used ${day(key.lastUsedAt)}` : 'never used' }}
+              <template v-if="key.expiresAt">
+                · expires {{ day(key.expiresAt) }}
+              </template>
+            </p>
+          </div>
+          <UIcon
+            :name="openId === key.id ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
+            class="size-4 shrink-0 text-muted"
+          />
+        </button>
+
+        <div
+          v-if="openId === key.id"
+          class="space-y-3 border-t border-default px-3 py-3"
+          data-team-key-open
+        >
+          <div
+            v-if="editing === key.id"
+            class="space-y-3"
+            data-team-key-edit
+          >
+            <div class="grid gap-3 sm:grid-cols-2">
+              <UFormField label="Name">
+                <UInput
+                  v-model="editName"
+                  class="w-full"
+                  maxlength="60"
+                />
+              </UFormField>
+              <UFormField label="Reaches">
+                <USelect
+                  v-model="editReach"
+                  :items="REACH_OPTIONS"
+                  class="w-full"
+                  data-key-reach-edit
+                />
+              </UFormField>
+              <UFormField
+                v-if="editReach === 'customer'"
+                label="Customer"
+              >
+                <USelect
+                  v-model="editCustomerId"
+                  :items="customerItems"
+                  placeholder="Pick a customer"
+                  class="w-full"
+                />
+              </UFormField>
+              <UFormField
+                v-if="editReach === 'project'"
+                label="Board"
+              >
+                <USelect
+                  v-model="editProjectId"
+                  :items="boardItems"
+                  placeholder="Pick a board"
+                  class="w-full"
+                />
+              </UFormField>
+            </div>
+            <UCheckbox
+              v-model="editWrite"
+              label="May change things (create, edit and move tasks), not only read"
+            />
+            <div class="flex justify-end gap-2">
+              <UButton
+                size="sm"
+                color="neutral"
+                variant="ghost"
+                @click="cancelEdit"
+              >
+                Cancel
+              </UButton>
+              <UButton
+                size="sm"
+                icon="i-lucide-check"
+                :loading="saving"
+                :disabled="!editValid"
+                @click="saveEdit(key)"
+              >
+                Save
+              </UButton>
+            </div>
+          </div>
+          <div
+            v-else
+            class="flex justify-end"
+          >
+            <UButton
+              size="sm"
               color="neutral"
+              variant="soft"
+              icon="i-lucide-pencil"
+              @click="startEdit(key)"
             >
-              {{ scopeLabel(scope) }}
-            </UBadge>
-          </p>
-          <p class="text-[11px] text-muted">
-            <span class="font-mono">{{ key.keyPrefix }}…</span>
-            · {{ key.owner.name || key.owner.email }}
-            · made {{ day(key.createdAt) }}
-            · {{ key.lastUsedAt ? `used ${day(key.lastUsedAt)}` : 'never used' }}
-            <template v-if="key.expiresAt">
-              · expires {{ day(key.expiresAt) }}
-            </template>
-          </p>
+              Edit
+            </UButton>
+          </div>
+          <div class="flex justify-start border-t border-default pt-3">
+            <UButton
+              size="sm"
+              icon="i-lucide-trash-2"
+              color="error"
+              variant="ghost"
+              :loading="revoking === key.id"
+              @click="revoke(key)"
+            >
+              Revoke key
+            </UButton>
+          </div>
         </div>
-        <UButton
-          icon="i-lucide-trash-2"
-          size="xs"
-          color="error"
-          variant="ghost"
-          aria-label="Revoke key"
-          :loading="revoking === key.id"
-          @click="revoke(key)"
-        />
       </div>
     </div>
   </div>

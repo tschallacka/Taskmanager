@@ -6,6 +6,8 @@ import { db } from '../db'
 import { apiKeys, API_KEY_SCOPES, customers, projects } from '../db/schema'
 import type { ApiKeyScope } from '../db/schema'
 import { generateApiKey, isApiKeyScope } from './api-keys'
+import { storeReach, teamReachOf } from './keyReach'
+import type { ReachRequest } from './keyReach'
 import { requireInstanceAdmin } from './instanceAdmin'
 
 export const MAX_KEY_NAME_LENGTH = 60
@@ -77,21 +79,35 @@ export async function requireLimitInTeam(teamId: string, limit: KeyLimit): Promi
   }
 }
 
-/** Stores a new key for a person and returns it with the full token, which is shown once and never kept. */
-export async function issueKey(input: { userId: string, teamId: string | null, request: KeyRequest, limit?: KeyLimit }) {
+/**
+ * Stores a new key for a person and returns it with the full token, which is shown once and never kept.
+ * What it reaches is the pick given; without a pick, a team key reaches what its limit gives the team,
+ * and a personal key reaches its personal workspace.
+ */
+export async function issueKey(input: { userId: string, teamId: string | null, request: KeyRequest, limit?: KeyLimit, reach?: ReachRequest }) {
   const generated = generateApiKey()
-  const [created] = await db.insert(apiKeys).values({
-    id: Date.now().toString(36) + Math.random().toString(36).slice(2),
-    userId: input.userId,
-    teamId: input.teamId,
-    customerId: input.limit?.customerId ?? null,
-    projectId: input.limit?.projectId ?? null,
-    name: input.request.name,
-    keyHash: generated.hash,
-    keyPrefix: generated.displayPrefix,
-    scopes: input.request.scopes,
-    expiresAt: input.request.expiresAt,
-    createdAt: Date.now()
-  }).returning()
-  return { token: generated.token, key: created! }
+  const limit = input.limit ?? { customerId: null, projectId: null }
+  const reach = input.reach
+    ?? (input.teamId ? teamReachOf(input.teamId, limit) : { allBoards: false, workspaceTeamIds: [null], boardIds: [] })
+  const now = Date.now()
+  const created = await db.transaction(async (tx) => {
+    const [row] = await tx.insert(apiKeys).values({
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2),
+      userId: input.userId,
+      teamId: input.teamId,
+      customerId: limit.customerId,
+      projectId: limit.projectId,
+      name: input.request.name,
+      keyHash: generated.hash,
+      keyPrefix: generated.displayPrefix,
+      scopes: input.request.scopes,
+      expiresAt: input.request.expiresAt,
+      createdAt: now,
+      allBoards: reach.allBoards,
+      boardReachSet: true
+    }).returning()
+    await storeReach(tx, row!.id, reach, now)
+    return row!
+  })
+  return { token: generated.token, key: created }
 }

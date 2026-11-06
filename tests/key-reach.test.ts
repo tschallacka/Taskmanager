@@ -1,3 +1,4 @@
+import { reachOf } from './helpers/reach'
 // A key limited to one board or one customer: what boards it reaches, which tools it is given,
 // which events it receives and what a request for such a key may name. Needs the dev
 // database (DATABASE_URL) and the Nuxt aliases the tool modules import (`nuxt prepare` makes them). Run:
@@ -32,9 +33,16 @@ const foreignCustomer = id('customer-foreign')
 const board = { a1: id('a1'), a2: id('a2'), b1: id('b1'), loose: id('loose'), foreign: id('foreign') }
 
 const base = { keyId: 'k', keyName: 'k', userId: me, teamId: team, scopes: ['boards:read', 'boards:write'] as ('boards:read' | 'boards:write')[] }
-const teamKey = { ...base, customerId: null, projectId: null }
-const projectKey = { ...base, customerId: null, projectId: board.a1 }
-const customerKey = { ...base, customerId: customerA, projectId: null }
+// These keys carry their limit in the key row, as a key made before the reach tables does. The reach
+// the server derives for such a key is the team, or the one board, and the owner's memberships are read
+// per call; here the owner is a member of the team only.
+const legacyReach = (key: { teamId: string | null, projectId: string | null }) => (key.projectId
+  ? reachOf({ boards: [key.projectId] })
+  : reachOf({ workspaces: [key.teamId] }))
+const withReach = <T extends { teamId: string | null, projectId: string | null }>(key: T) => ({ ...key, reach: legacyReach(key), memberTeamIds: [team] })
+const teamKey = withReach({ ...base, customerId: null, projectId: null })
+const projectKey = withReach({ ...base, customerId: null, projectId: board.a1 })
+const customerKey = withReach({ ...base, customerId: customerA, projectId: null })
 
 async function boardIds(context: typeof teamKey) {
   const rows = await db.select({ id: projects.id }).from(projects).where(await boardFilter(context))

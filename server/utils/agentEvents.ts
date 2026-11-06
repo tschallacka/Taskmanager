@@ -27,6 +27,7 @@
 // delivery_failed goes to the crew's pm only (a team that is not a crew: its owners), with ids, the class, the attempts and a code; never a customer.
 import { and, asc, eq, sql } from 'drizzle-orm'
 import { db } from '../db'
+import { teamIdsOf } from './api-keys'
 import { apiKeys, crews, member, projectGithubRepos, projects, user } from '../db/schema'
 import { customerIdsOf, isTeamMember } from './auth-helpers'
 import { crewAccountLive, isCrewAddress, normalizeAddress, personKeyOf } from './crewAccounts'
@@ -119,7 +120,7 @@ export interface AgentEventRecord {
   customerId: string | null
 }
 
-export interface StreamKey extends KeyReach { keyId: string, userId: string, teamId: string | null }
+export interface StreamKey extends AgentStreamGrant { keyId: string, userId: string, teamId: string | null }
 
 /** The teams and customers a user belongs to now, read when a stream opens. */
 export interface Membership { teamIds: string[], customerIds: string[] }
@@ -179,7 +180,17 @@ export function audienceOfEvent(customerVisible: boolean, membership: { staff: b
 }
 
 /** The one board or customer a key is limited to. Both empty means the whole workspace. */
-export interface KeyReach { projectId?: string | null, customerId?: string | null }
+/**
+ * What a key reaches. A key with a grant (`allBoards`, `workspaceTeamIds` or `boardIds`) follows the grant;
+ * the columns are for a key the reach migration has not reached yet.
+ */
+export interface AgentStreamGrant {
+  projectId?: string | null
+  customerId?: string | null
+  allBoards?: boolean
+  workspaceTeamIds?: (string | null)[]
+  boardIds?: string[]
+}
 
 /**
  * Whether a key may receive a kept event. A team-pinned key sees only that team's
@@ -188,11 +199,23 @@ export interface KeyReach { projectId?: string | null, customerId?: string | nul
  * only, so it never gets another crew's events. A key limited to one board or one customer
  * gets nothing from any other.
  */
-export function deliverableTo(record: Pick<AgentEventRecord, 'audience' | 'teamId'> & Partial<Pick<AgentEventRecord, 'board' | 'customerId'>>, keyTeamId: string | null, reach: KeyReach = {}): boolean {
+export function deliverableTo(record: Pick<AgentEventRecord, 'audience' | 'teamId'> & Partial<Pick<AgentEventRecord, 'board' | 'customerId'>>, keyTeamId: string | null, reach: AgentStreamGrant = {}): boolean {
   if (reach.projectId && record.board !== reach.projectId) return false
   if (reach.customerId && record.customerId !== reach.customerId) return false
+  if (reach.allBoards || reach.boardIds || reach.workspaceTeamIds) return deliverableByGrant(record, reach)
   if (keyTeamId) return record.audience === 'staff' && record.teamId === keyTeamId
   return record.audience === 'customer' || (record.audience === 'staff' && record.teamId === null)
+}
+
+/**
+ * A key with a grant gets what the grant covers. A staff event follows the board or the workspace; a
+ * customer's event follows the board, or a personal key's customers, which the personal workspace shows.
+ */
+function deliverableByGrant(record: Pick<AgentEventRecord, 'audience' | 'teamId'> & Partial<Pick<AgentEventRecord, 'board'>>, reach: AgentStreamGrant): boolean {
+  const onBoard = reach.allBoards === true || (reach.boardIds ?? []).includes(record.board ?? '')
+  const workspaces = reach.workspaceTeamIds ?? []
+  if (record.audience === 'staff') return onBoard || workspaces.includes(record.teamId)
+  return onBoard || workspaces.includes(null)
 }
 
 /** Whether a user still belongs to the team or customer a kept event is about. Used on a resume. */
@@ -281,6 +304,10 @@ interface Stream {
   teamId: string | null
   /** The one board or customer this stream is limited to; null when it follows the whole workspace. */
   projectId: string | null
+  /** The grant the key was given (see AgentStreamGrant); a stream with none follows the columns above. */
+  allBoards?: boolean
+  boardIds?: string[]
+  workspaceTeamIds?: (string | null)[]
   customerId: string | null
   connection: StreamConnection | null
   membership: Membership | null
@@ -387,6 +414,9 @@ export class AgentEventHub {
       userId: key.userId,
       teamId: key.teamId,
       projectId: key.projectId ?? null,
+      allBoards: key.allBoards,
+      boardIds: key.boardIds,
+      workspaceTeamIds: key.workspaceTeamIds,
       customerId: key.customerId ?? null,
       connection: null,
       membership: null,
@@ -642,6 +672,7 @@ function optionsFromEnv(): AgentEventHubOptions {
 export const agentEventHub = new AgentEventHub(optionsFromEnv())
 
 export interface AudienceLookups {
+  /** Whether the user belongs to the team: a plain member is staff for a key's reach. */
   isMember(userId: string, teamId: string): Promise<boolean>
   customerIds(userId: string): Promise<string[]>
 }
@@ -940,8 +971,8 @@ export async function actorNameOf(userId: string | null): Promise<string | null>
 
 /** The teams and customers a user belongs to right now. */
 export async function currentMembership(userId: string): Promise<Membership> {
-  const teams = await db.select({ teamId: member.organizationId }).from(member).where(eq(member.userId, userId))
-  return { teamIds: teams.map(team => team.teamId), customerIds: await customerIdsOf(userId) }
+  const teamIds = await teamIdsOf(userId)
+  return { teamIds, customerIds: await customerIdsOf(userId) }
 }
 
 /**

@@ -1,6 +1,27 @@
 <script setup lang="ts">
 import { format } from 'date-fns'
+import { keyPanelMode } from '~/utils/apiKeyView'
 import type { Ref } from 'vue'
+
+interface ReachWorkspace {
+  teamId: string | null
+  name: string | null
+}
+
+interface ReachBoard {
+  id: string
+  name: string
+  teamId: string | null
+}
+
+/** A board a key reaches, by name and workspace; read-only when a crew reads it through its link. */
+interface ReachedBoardRow {
+  id: string
+  name: string
+  teamId: string | null
+  workspace: string
+  readOnly: boolean
+}
 
 interface ApiKeySummary {
   id: string
@@ -10,23 +31,38 @@ interface ApiKeySummary {
   createdAt: number
   lastUsedAt: number | null
   expiresAt: number | null
+  teamId: string | null
+  teamName: string | null
+  /** Only the owner changes a personal key here; a team key is changed on the team page. */
+  editable: boolean
+  allBoards: boolean
+  workspaces: ReachWorkspace[]
+  boards: ReachBoard[]
+  reachedBoards: ReachedBoardRow[]
 }
 
 interface ApiKeysResponse {
-  workspace: { id: string | null, name: string }
+  workspaces: { id: string | null, name: string }[]
+  boards: (ReachBoard & { workspace: string })[]
   keys: ApiKeySummary[]
 }
 
-const { activeTeamId } = useTeams()
+interface ReachPick {
+  all: boolean
+  workspaces: string[]
+  boards: string[]
+}
+
 const toast = useToast()
+const { switchWorkspace } = useWorkspace()
 
 const { data, status, refresh } = useFetch<ApiKeysResponse>('/api/settings/api-keys', { server: false, lazy: true })
 
-// Keys belong to one workspace, so switching teams shows a different set.
-watch(activeTeamId, () => refresh())
-
 const keys = computed(() => data.value?.keys ?? [])
-const workspaceName = computed(() => data.value?.workspace.name ?? 'this workspace')
+const workspaces = computed(() => data.value?.workspaces ?? [])
+const pickBoards = computed(() => data.value?.boards ?? [])
+
+const wsKeyOf = (teamId: string | null) => teamId ?? 'personal'
 
 const EXPIRY_OPTIONS = [
   { label: 'Never expires', value: 0 },
@@ -43,10 +79,23 @@ const PERMISSIONS = [
   { scope: 'secrets:write', label: 'Write project secrets', description: 'Add, change and delete a project\'s secrets by name, where this person is a project manager' }
 ] as const
 
+const emptyPick = (): ReachPick => ({ all: false, workspaces: [], boards: [] })
+const pickIsSet = (pick: ReachPick) => pick.all || pick.workspaces.length > 0 || pick.boards.length > 0
+
+// What the server stores: a null workspace is the personal one.
+function reachBody(pick: ReachPick) {
+  return {
+    allBoards: pick.all,
+    workspaceTeamIds: pick.workspaces.map(key => (key === 'personal' ? null : key)),
+    boardIds: pick.boards
+  }
+}
+
 const newName = ref('')
 const granted = ref<Record<string, boolean>>(
   Object.fromEntries(PERMISSIONS.map(permission => [permission.scope, permission.scope.startsWith('boards:')]))
 )
+const newPick = ref<ReachPick>(emptyPick())
 const expiresInDays = ref(0)
 const creating = ref(false)
 
@@ -56,7 +105,7 @@ const copied = ref(false)
 const commandCopied = ref(false)
 const scopes = computed(() => PERMISSIONS.filter(p => granted.value[p.scope]).map(p => p.scope))
 
-const canCreate = computed(() => newName.value.trim().length > 0 && scopes.value.length > 0)
+const canCreate = computed(() => newName.value.trim().length > 0 && scopes.value.length > 0 && pickIsSet(newPick.value))
 
 function errMsg(e: unknown): string | undefined {
   return (e as { data?: { message?: string } })?.data?.message
@@ -71,7 +120,8 @@ async function createKey() {
       body: {
         name: newName.value.trim(),
         scopes: scopes.value,
-        expiresInDays: expiresInDays.value === 0 ? null : expiresInDays.value
+        expiresInDays: expiresInDays.value === 0 ? null : expiresInDays.value,
+        reach: reachBody(newPick.value)
       }
     })
     issuedToken.value = response.token
@@ -136,6 +186,35 @@ async function copyWithFeedback(text: string, copiedFlag: Ref<boolean>, title: s
   }
 }
 
+// ─── Active keys: one row each, opened to see and change what it reaches ───
+
+const openId = ref<string | null>(null)
+const editing = ref<{ scopes: Record<string, boolean>, pick: ReachPick, saving: boolean } | null>(null)
+
+function toggleKey(key: ApiKeySummary) {
+  if (openId.value === key.id) {
+    openId.value = null
+    editing.value = null
+    return
+  }
+  // A row opens to its read-only view. The edit form opens only when the owner asks for it (startEdit).
+  openId.value = key.id
+  editing.value = null
+}
+
+function startEdit(key: ApiKeySummary) {
+  if (!key.editable) return
+  editing.value = {
+    scopes: Object.fromEntries(PERMISSIONS.map(permission => [permission.scope, key.scopes.includes(permission.scope)])),
+    pick: {
+      all: key.allBoards,
+      workspaces: key.workspaces.map(workspace => wsKeyOf(workspace.teamId)),
+      boards: key.boards.map(board => board.id)
+    },
+    saving: false
+  }
+}
+
 async function copyCommand() {
   if (!issuedToken.value) return
   await copyWithFeedback(claudeCommand.value, commandCopied, 'Command copied')
@@ -161,6 +240,41 @@ async function revokeKey(key: ApiKeySummary) {
   }
 }
 
+async function saveKey(key: ApiKeySummary) {
+  const state = editing.value
+  if (!state) return
+  const scopeList = PERMISSIONS.filter(p => state.scopes[p.scope]).map(p => p.scope)
+  if (!scopeList.length) {
+    toast.add({ title: 'Pick at least one permission', icon: 'i-lucide-alert-triangle', color: 'error' })
+    return
+  }
+  if (!pickIsSet(state.pick)) {
+    toast.add({ title: 'Pick at least one board or workspace, or Select all', icon: 'i-lucide-alert-triangle', color: 'error' })
+    return
+  }
+  state.saving = true
+  try {
+    await $fetch(`/api/settings/api-keys/${key.id}`, {
+      method: 'PATCH',
+      body: { name: key.name, scopes: scopeList, reach: reachBody(state.pick) }
+    })
+    toast.add({ title: 'Key saved', description: 'The secret is the same. The change applies to the key\'s next call.', icon: 'i-lucide-check', duration: 3000 })
+    openId.value = null
+    editing.value = null
+    await refresh()
+  } catch (e) {
+    toast.add({ title: 'Could not save the key', description: errMsg(e), icon: 'i-lucide-alert-triangle', color: 'error' })
+    if (editing.value) editing.value.saving = false
+  }
+}
+
+// A team key is changed on the team page, so the link switches to that team first.
+async function openTeamKeys(key: ApiKeySummary) {
+  if (!key.teamId) return
+  await switchWorkspace(key.teamId)
+  await navigateTo({ path: '/team', query: { section: 'keys' } })
+}
+
 // Badges read "boards: write", short enough to sit beside a key name.
 function scopeLabel(scope: string): string {
   // Shown on a key only the instance admin can hold; the picker never offers it.
@@ -173,6 +287,10 @@ function scopeColor(scope: string) {
   return scope.endsWith(':write') ? 'warning' as const : 'neutral' as const
 }
 
+function permissionLabel(scope: string): string {
+  return PERMISSIONS.find(permission => permission.scope === scope)?.label ?? scopeLabel(scope)
+}
+
 function formatDate(value: number): string {
   return format(new Date(value), 'PP')
 }
@@ -180,6 +298,14 @@ function formatDate(value: number): string {
 function expiryLabel(key: ApiKeySummary): string {
   if (!key.expiresAt) return 'never expires'
   return key.expiresAt <= Date.now() ? 'expired' : `expires ${formatDate(key.expiresAt)}`
+}
+
+function reachLabel(key: ApiKeySummary): string {
+  if (key.allBoards) return 'all your boards'
+  const parts = []
+  if (key.workspaces.length) parts.push(`${key.workspaces.length} workspace${key.workspaces.length === 1 ? '' : 's'}`)
+  if (key.boards.length) parts.push(`${key.boards.length} board${key.boards.length === 1 ? '' : 's'}`)
+  return parts.join(' and ') || 'no boards'
 }
 </script>
 
@@ -277,9 +403,7 @@ function expiryLabel(key: ApiKeySummary): string {
             Connect an AI agent
           </p>
           <p class="text-xs text-muted mt-0.5">
-            An API key lets Claude Code, Claude Desktop or any other MCP client read and write these boards.
-            Keys are issued for one workspace — these belong to
-            <span class="font-medium text-default">{{ workspaceName }}</span>.
+            An API key lets Claude Code, Claude Desktop or any other MCP client read and write the boards you pick, from any workspace you are in.
           </p>
         </div>
       </div>
@@ -415,6 +539,24 @@ function expiryLabel(key: ApiKeySummary): string {
             />
           </div>
 
+          <div class="space-y-2">
+            <p class="text-xs font-medium">
+              Boards this key reaches
+            </p>
+            <ApiKeyReachPicker
+              v-model="newPick"
+              :boards="pickBoards"
+              :workspaces="workspaces"
+              :disabled="creating"
+            />
+            <p
+              v-if="!pickIsSet(newPick)"
+              class="text-xs text-error"
+            >
+              Pick at least one board or workspace, or Select all.
+            </p>
+          </div>
+
           <p
             v-if="!scopes.length"
             class="text-xs text-error"
@@ -445,7 +587,7 @@ function expiryLabel(key: ApiKeySummary): string {
               Active keys
             </p>
             <p class="text-xs text-muted mt-0.5">
-              Revoking a key immediately disconnects anything using it
+              Open a key to see what it reaches, or to change its permissions and boards. The secret stays the same.
             </p>
           </div>
         </div>
@@ -475,38 +617,180 @@ function expiryLabel(key: ApiKeySummary): string {
             <div
               v-for="key in keys"
               :key="key.id"
-              class="px-3 py-2.5 flex items-center gap-3"
             >
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2 flex-wrap">
-                  <p class="text-sm font-medium truncate">
-                    {{ key.name }}
+              <button
+                type="button"
+                class="w-full px-3 py-2.5 flex items-center gap-3 text-left"
+                :aria-expanded="openId === key.id"
+                @click="toggleKey(key)"
+              >
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <p class="text-sm font-medium truncate">
+                      {{ key.name }}
+                    </p>
+                    <UBadge
+                      v-if="!key.editable"
+                      :label="`Team key · ${key.teamName ?? 'a team'}`"
+                      color="info"
+                      variant="subtle"
+                      size="sm"
+                    />
+                    <UBadge
+                      v-for="scope in key.scopes"
+                      :key="scope"
+                      :label="scopeLabel(scope)"
+                      :color="scopeColor(scope)"
+                      variant="subtle"
+                      size="sm"
+                    />
+                  </div>
+                  <p class="text-xs text-muted mt-0.5 truncate">
+                    <code class="font-mono">{{ key.keyPrefix }}…</code>
+                    · reaches {{ reachLabel(key) }}
+                    · {{ key.lastUsedAt ? `last used ${formatDate(key.lastUsedAt)}` : 'never used' }}
+                    · {{ expiryLabel(key) }}
                   </p>
-                  <UBadge
-                    v-for="scope in key.scopes"
-                    :key="scope"
-                    :label="scopeLabel(scope)"
-                    :color="scopeColor(scope)"
-                    variant="subtle"
-                    size="sm"
-                  />
                 </div>
-                <p class="text-xs text-muted mt-0.5 truncate">
-                  <code class="font-mono">{{ key.keyPrefix }}…</code>
-                  · created {{ formatDate(key.createdAt) }}
-                  · {{ key.lastUsedAt ? `last used ${formatDate(key.lastUsedAt)}` : 'never used' }}
-                  · {{ expiryLabel(key) }}
-                </p>
+                <UIcon
+                  :name="openId === key.id ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
+                  class="size-4 text-muted shrink-0"
+                />
+              </button>
+
+              <div
+                v-if="openId === key.id"
+                class="px-3 pb-3 space-y-4"
+              >
+                <!-- Editing a personal key -->
+                <template v-if="keyPanelMode(key, editing) === 'edit' && editing">
+                  <div class="space-y-2">
+                    <p class="text-xs font-medium">
+                      Permissions
+                    </p>
+                    <div class="flex flex-wrap gap-x-5 gap-y-2">
+                      <UCheckbox
+                        v-for="permission in PERMISSIONS"
+                        :key="permission.scope"
+                        v-model="editing.scopes[permission.scope]"
+                        :label="permission.label"
+                        :description="permission.description"
+                        :disabled="editing.saving"
+                      />
+                    </div>
+                  </div>
+
+                  <div class="space-y-2">
+                    <p class="text-xs font-medium">
+                      Boards it reaches
+                    </p>
+                    <ApiKeyReachPicker
+                      v-model="editing.pick"
+                      :boards="pickBoards"
+                      :workspaces="workspaces"
+                      :disabled="editing.saving"
+                    />
+                  </div>
+
+                  <div class="flex flex-wrap items-center gap-2">
+                    <UButton
+                      label="Save"
+                      icon="i-lucide-save"
+                      color="primary"
+                      size="sm"
+                      :loading="editing.saving"
+                      @click="saveKey(key)"
+                    />
+                    <UButton
+                      label="Cancel"
+                      color="neutral"
+                      variant="ghost"
+                      size="sm"
+                      @click="toggleKey(key)"
+                    />
+                    <UButton
+                      label="Revoke"
+                      icon="i-lucide-trash-2"
+                      color="error"
+                      variant="ghost"
+                      size="sm"
+                      class="ml-auto"
+                      :loading="revoking === key.id"
+                      @click="revokeKey(key)"
+                    />
+                  </div>
+                  <p class="text-xs text-muted">
+                    The secret stays the same, so no agent needs reconnecting. The change applies to the key's next call.
+                  </p>
+                </template>
+
+                <!-- Read only: a team key, or a personal key's reach as it stands -->
+                <template v-else>
+                  <div
+                    v-if="key.editable"
+                    class="flex flex-wrap items-center gap-2"
+                  >
+                    <UButton
+                      label="Change permissions and boards"
+                      icon="i-lucide-pencil"
+                      color="neutral"
+                      variant="soft"
+                      size="xs"
+                      data-key-edit
+                      @click="startEdit(key)"
+                    />
+                  </div>
+                  <div class="space-y-2 text-xs">
+                    <p class="font-medium text-default">
+                      Permissions
+                    </p>
+                    <p class="text-muted">
+                      {{ key.scopes.map(permissionLabel).join(' · ') || 'None' }}
+                    </p>
+                    <p class="font-medium text-default">
+                      Boards it reaches
+                    </p>
+                    <ul class="text-muted space-y-1">
+                      <li v-if="key.allBoards">
+                        All your boards, including ones you get later
+                      </li>
+                      <li
+                        v-for="workspace in key.workspaces"
+                        :key="workspace.teamId ?? 'personal'"
+                      >
+                        {{ workspace.teamId ? `All of ${workspace.name}` : 'Your personal boards' }}, including ones you get later
+                      </li>
+                      <li
+                        v-for="board in key.reachedBoards"
+                        :key="board.id"
+                      >
+                        <NuxtLink
+                          :to="`/projects/${board.id}`"
+                          class="text-primary underline"
+                        >{{ board.name }}</NuxtLink>
+                        · {{ board.workspace }}
+                        <span v-if="board.readOnly">· read-only</span>
+                      </li>
+                    </ul>
+                  </div>
+                  <div
+                    v-if="!key.editable"
+                    class="flex flex-wrap items-center gap-2"
+                  >
+                    <UButton
+                      :label="`Team key · ${key.teamName ?? 'a team'}`"
+                      trailing-icon="i-lucide-arrow-right"
+                      color="neutral"
+                      variant="soft"
+                      size="xs"
+                      @click="openTeamKeys(key)"
+                    />
+                    <p class="text-xs text-muted">
+                      A team owner or admin changes this key on the team's Keys page.
+                    </p>
+                  </div>
+                </template>
               </div>
-              <UButton
-                icon="i-lucide-trash-2"
-                color="error"
-                variant="ghost"
-                size="xs"
-                :aria-label="`Revoke ${key.name}`"
-                :loading="revoking === key.id"
-                @click="revokeKey(key)"
-              />
             </div>
           </div>
         </div>

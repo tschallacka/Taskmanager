@@ -35,8 +35,10 @@ const column = id('column')
 const task = id('task')
 
 const scopes = ['boards:read', 'boards:write'] as ('boards:read' | 'boards:write')[]
+// The owner's workspaces, as the key's server-side context carries them (memberships are per user).
+const memberOf: Record<string, string[]> = { [boss]: [realTeam, crewTeam], [crewMember]: [crewTeam], [stranger]: [] }
 const keyOf = (userId: string, teamId: string, projectId: string | null = null) =>
-  ({ keyId: 'k', keyName: 'k', userId, teamId, customerId: null, projectId, scopes })
+  ({ keyId: 'k', keyName: 'k', userId, teamId, customerId: null, projectId, scopes, reach: projectId ? { allBoards: false, workspaceTeamIds: [], boardIds: [projectId] } : { allBoards: false, workspaceTeamIds: [teamId], boardIds: [] }, memberTeamIds: memberOf[userId] ?? [] })
 const tool = (name: string) => MCP_TOOLS.find(t => t.name === name)!
 
 let shadowBoard = ''

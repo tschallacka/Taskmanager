@@ -12,14 +12,19 @@ import { mkdtempSync, writeFileSync, readFileSync, readdirSync, mkdirSync, exist
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { spawn, type ChildProcess } from 'node:child_process'
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
 
 const TM = join(process.cwd(), 'crew', 'tm.mjs')
 const FIXTURES = fileURLToPath(new URL('./fixtures/crew-tm/', import.meta.url))
 const KIT_READY = existsSync(join(process.cwd(), 'crew', 'node_modules'))
 const CHROMIUM = process.env.CHROMIUM && existsSync(process.env.CHROMIUM) ? process.env.CHROMIUM : ''
 const stand = KIT_READY ? test : test.skip
-const real = KIT_READY && CHROMIUM ? test : test.skip
+const realSkip = KIT_READY ? 'CHROMIUM does not name a Chromium binary (set CHROMIUM to its path)' : 'crew/node_modules is missing (run npm install in crew/)'
+const realGate = KIT_READY && CHROMIUM
+const real = (name: string, fn: () => Promise<void>) => {
+  if (realGate) test(name, fn)
+  else test(name, { skip: realSkip }, fn)
+}
 
 // The run scripts tm.mjs is asked to run. "hold" and "wait" keep the browser open until a signal arrives.
 const SCRIPTS: Record<string, string> = {
@@ -123,8 +128,18 @@ function alive(pid: number): boolean {
   }
 }
 
+// macOS has no /proc: ps lists the processes, and zombies are left out as /proc does.
+function processesWithPs(text: string): number[] {
+  const out = spawnSync('ps', ['-axo', 'pid=,stat=,command='], { encoding: 'utf8' }).stdout ?? ''
+  return out.split('\n').flatMap((line) => {
+    const m = line.trim().match(/^(\d+)\s+(\S+)\s+(.*)$/)
+    return m && !m[2].startsWith('Z') && m[3].includes(text) ? [Number(m[1])] : []
+  })
+}
+
 // The live processes whose command line contains the text (the real browser's profile directory).
 function processesWith(text: string): number[] {
+  if (process.platform === 'darwin') return processesWithPs(text)
   return readdirSync('/proc')
     .filter(name => /^\d+$/.test(name))
     .map(Number)

@@ -756,12 +756,45 @@ export const apiKeys = pgTable(
     scopes: json('scopes').$type<ApiKeyScope[]>().notNull().default([]),
     lastUsedAt: bigint('last_used_at', { mode: 'number' }),
     expiresAt: bigint('expires_at', { mode: 'number' }),
-    createdAt: bigint('created_at', { mode: 'number' }).notNull()
+    createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+    // Select all: every board the person can reach, now and later. A flag on the key, not a frozen list.
+    allBoards: boolean('all_boards').notNull().default(false),
+    // True once the reach is stored in api_key_workspaces and api_key_boards. Older keys get it at start.
+    boardReachSet: boolean('board_reach_set').notNull().default(false)
   },
   table => [index('api_keys_user_idx').on(table.userId)]
 )
 
 export type ApiKey = typeof apiKeys.$inferSelect
+
+// Whole workspaces a key reaches: every board of the team, now and later (Select all for that workspace).
+// teamId NULL is the owner's personal workspace. One row per key and workspace; the app checks for a
+// duplicate before it inserts, because a NULL teamId is not unique in the database.
+export const apiKeyWorkspaces = pgTable(
+  'api_key_workspaces',
+  {
+    id: text('id').primaryKey(),
+    keyId: text('key_id').notNull().references(() => apiKeys.id, { onDelete: 'cascade' }),
+    teamId: text('team_id').references(() => organization.id, { onDelete: 'cascade' }),
+    createdAt: bigint('created_at', { mode: 'number' }).notNull()
+  },
+  table => [index('api_key_workspaces_key_idx').on(table.keyId)]
+)
+
+// Single boards a key reaches, as its owner ticked them. One row per key and board.
+export const apiKeyBoards = pgTable(
+  'api_key_boards',
+  {
+    id: text('id').primaryKey(),
+    keyId: text('key_id').notNull().references(() => apiKeys.id, { onDelete: 'cascade' }),
+    projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+    createdAt: bigint('created_at', { mode: 'number' }).notNull()
+  },
+  table => [
+    uniqueIndex('api_key_boards_key_project_idx').on(table.keyId, table.projectId),
+    index('api_key_boards_project_idx').on(table.projectId)
+  ]
+)
 
 // ─── GitHub integration ───────────────────────────────────────────────────────
 

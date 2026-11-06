@@ -11,10 +11,9 @@ key can do what the key allows, as the person it belongs to. Treat it like a pas
 ## What a key is tied to
 
 - **One person.** The key belongs to whoever made it, and everything it does is done as that person.
-- **One workspace.** A key made while you are in a team reaches that team's boards. A key made in your personal
-  workspace reaches only your own. Switching teams in the app shows a different set of keys.
-- **A set of permissions**, chosen when it is made and fixed afterwards.
-- **An expiry**, or none.
+- **What it reaches.** The boards the key may open. You choose them when you make the key and change them later, without a new secret. See **Reach** below.
+- **A set of permissions.** You choose them when you make the key, and you can change them later.
+- **An expiry**, or none. You set it when you make the key.
 
 Taskmanager stores only a scrambled copy of the key. That is why it is shown once, when you make it, and cannot be shown
 again.
@@ -23,13 +22,16 @@ again.
 
 This is the most important rule. A key is the person acting through an agent:
 
-- It reaches the same boards the person reaches, by the same rule as in the browser.
+- It reaches only boards the person can open, by the same rule as in the browser.
 - It sees the same tasks and updates. Anything hidden from the person is hidden from the agent.
 - It may change only what the person may change. Anything the app would refuse them is refused to the key.
 - The permissions below can only take away from that, never add.
+- It acts with its owner's own access: the same boards and the same audience. On a board of a workspace the owner is a
+  member of, the key is **staff**, as the owner is. On a board the owner reaches only as a customer or a guest, the key
+  sees what a customer sees: only the tasks marked for customers.
 
-So giving a key every permission does not turn it into an administrator. If its owner leaves the team the key
-belongs to, the key stops working at once.
+So giving a key every permission does not turn it into an administrator. If its owner leaves a workspace, the key loses
+that workspace's boards at once.
 
 ## The permissions
 
@@ -67,23 +69,40 @@ revived: make a new one.
 
 Choose an expiry for any key you only need for a while.
 
-## Reach: limiting a key to one customer or one board
+## Reach: which boards a key can open
 
-By default a key reaches everything its person reaches in its workspace. A key can be limited to **one customer** or
-**one board**. A limited key can open only those boards, and it is also not offered the tools that work across the whole
-workspace: goals, portfolios, creating a board and the inbox.
+When you make a key, you choose what it reaches. You can change this later on the key, and the secret stays the same.
 
-You cannot choose this in your own keys under **Settings**. Limited keys are made by a team's owner or admin.
+- **Select all** reaches every board you can open, in every workspace you are in, and the boards you get later.
+- **A workspace** reaches every board of that workspace, now and later. Your own personal workspace is listed as **Personal**.
+- **Single boards** reach only the boards you tick.
+
+Whatever you pick, a key reaches a board only while its owner can open it. If you leave a workspace or lose access to a
+board, the key loses it at once. Select all and a whole workspace also cover boards added later, without any change to
+the key.
+
+A key that reaches more than one workspace needs a workspace named when an agent creates a board (`create_board`). A key
+that reaches one workspace puts a new board there without asking.
+
+**Team keys** are different. An owner or admin of a team makes them under **Team**, then **Keys**. A team key reaches the
+whole team, one customer's boards, or one board. A key limited to one customer or one board is not offered the tools that
+work across the whole workspace: goals, portfolios, creating a board and the inbox. Team keys show in your own key list
+too, read-only and labelled as team keys.
 
 <!-- requires: team-admin -->
 As an owner or admin you make them under **Team**, then **Keys**. See [Team keys for agents](/help/team/keys).
 <!-- /requires -->
 
-## Seeing and ending keys
+## Seeing and changing keys
 
-**Settings**, **API keys & MCP**, **Active keys** lists your keys for the workspace you are in: the name, its permissions
-as badges, the start of the key (such as `arn_a1b2c3...`), when it was made, when it was last used and when it expires. You can end
-one at any time. See [Create and revoke a key](/help/agents/create-and-revoke-a-key). To replace the key of a connection that Claude Code already has, see [Connect Claude Code](/help/agents/connect-claude-code), under **Replace a key that is already connected**.
+**Settings**, **API keys & MCP**, **Active keys** lists all your keys, across every workspace you are in. Each row shows the
+name, the permissions as badges, the start of the key (such as `arn_a1b2c3...`), where the key reaches, when it was made,
+when it was last used and when it expires.
+
+Choose a row to see its permissions and its reach. Change them there and press **Save**. The key itself does not change,
+so the agent keeps working without a new secret. You can end a key at any time with **Revoke key**. See
+[Create and revoke a key](/help/agents/create-and-revoke-a-key). To replace the key of a connection that Claude Code
+already has, see [Connect Claude Code](/help/agents/connect-claude-code), under **Replace a key that is already connected**.
 
 ## Next
 
