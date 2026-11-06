@@ -10,7 +10,8 @@ useHead({
   titleTemplate: title => title ? `${title} — ${instanceName.value}` : instanceName.value,
   link: computed(() => [
     { rel: 'icon', href: iconHref.value ?? '/favicon.ico', sizes: 'any' },
-    { rel: 'apple-touch-icon', href: iconHref.value ?? '/apple-touch-icon-180x180.png' }
+    { rel: 'apple-touch-icon', href: iconHref.value ?? '/apple-touch-icon-180x180.png' },
+    { rel: 'manifest', href: '/api/branding/manifest' }
   ])
 })
 useSeoMeta({

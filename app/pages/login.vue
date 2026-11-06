@@ -1,4 +1,7 @@
 <script setup lang="ts">
+// The instance's own name, as the instance admin set it (Branding). The built-in name until it loads.
+const { data: branding } = useFetch<{ name: string }>('/api/branding', { key: 'instance-branding', server: false })
+const instanceName = computed(() => branding.value?.name || 'Taskmanager')
 definePageMeta({ middleware: [] }) // skip auth middleware on this page
 
 useSeoMeta({ title: 'Sign in' })
@@ -145,7 +148,7 @@ onMounted(async () => {
             Sign in with an email code
           </template>
           <template v-else>
-            {{ mode === 'sign-in' ? 'Sign in to Taskmanager' : 'Create your account' }}
+            {{ mode === 'sign-in' ? `Sign in to ${instanceName}` : 'Create your account' }}
           </template>
         </h1>
         <p class="text-sm text-zinc-400">

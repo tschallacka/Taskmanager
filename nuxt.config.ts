@@ -105,40 +105,9 @@ export default defineNuxtConfig({
 
   pwa: {
     registerType: 'autoUpdate',
-    manifest: {
-      name: 'Taskmanager',
-      short_name: 'Taskmanager',
-      description: 'Self-hosted projects, tasks and notes',
-      theme_color: '#18181b',
-      background_color: '#18181b',
-      display: 'standalone',
-      orientation: 'portrait',
-      scope: '/',
-      start_url: '/',
-      icons: [
-        {
-          src: 'pwa-64x64.png',
-          sizes: '64x64',
-          type: 'image/png'
-        },
-        {
-          src: 'pwa-192x192.png',
-          sizes: '192x192',
-          type: 'image/png'
-        },
-        {
-          src: 'pwa-512x512.png',
-          sizes: '512x512',
-          type: 'image/png'
-        },
-        {
-          src: 'maskable-icon-512x512.png',
-          sizes: '512x512',
-          type: 'image/png',
-          purpose: 'maskable'
-        }
-      ]
-    },
+    // The manifest is served by server/api/branding/manifest.get.ts, so an installed app takes the instance's own
+    // name and icon, set by the instance admin, and not the ones written here at build time.
+    manifest: false,
     workbox: {
       globPatterns: ['**/*.{js,css,html,svg,ico}'],
       // Web Push: show what the server sends and open it on a click.

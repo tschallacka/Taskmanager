@@ -6,6 +6,7 @@ import { db } from '../db'
 import { organization, projectGuestInvitations, projects, teamInvitations, user } from '../db/schema'
 import { mailEnabled, sendMail } from '../lib/mailer'
 import { hashInvitationToken } from './customers'
+import { instanceNameOf } from './instanceBranding'
 
 export type InvitationLookup
   = | { kind: 'team', id: string, email: string, role: string, organizationId: string, organizationName: string, inviterName: string | null }
@@ -111,8 +112,9 @@ function escapeHtml(text: string): string {
 export async function mailInvitation(input: { to: string, inviterName: string | null, what: string, url: string }): Promise<boolean> {
   if (!mailEnabled) return false
   const who = input.inviterName || 'Someone'
-  const text = `${who} invited you to ${input.what} on Taskmanager.\n\nOpen the invitation: ${input.url}\n\nThe link works for ${input.to} only and expires in 14 days. If you were not expecting this, ignore this email.`
-  const html = `<p>${escapeHtml(who)} invited you to ${escapeHtml(input.what)} on Taskmanager.</p>`
+  const name = await instanceNameOf()
+  const text = `${who} invited you to ${input.what} on ${name}.\n\nOpen the invitation: ${input.url}\n\nThe link works for ${input.to} only and expires in 14 days. If you were not expecting this, ignore this email.`
+  const html = `<p>${escapeHtml(who)} invited you to ${escapeHtml(input.what)} on ${escapeHtml(name)}.</p>`
     + `<p><a href="${escapeHtml(input.url)}">Open the invitation</a></p>`
     + `<p style="color:#888;font-size:12px">The link works for ${escapeHtml(input.to)} only and expires in 14 days. If you were not expecting this, ignore this email.</p>`
   try {

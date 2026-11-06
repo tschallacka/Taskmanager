@@ -10,6 +10,7 @@ import { mailEnabled, sendMail } from '../lib/mailer'
 import { pushEnabled, sendPush } from '../lib/webpush'
 import { projectPeople } from './people'
 import { publishToUser } from './realtime'
+import { instanceNameOf } from './instanceBranding'
 
 const MAX_EXCERPT = 160
 
@@ -99,14 +100,15 @@ async function sendCopies(rows: { id: string, userId: string }[], input: NotifyI
       ))
 
     const link = appUrl(pathOf(input))
+    const name = await instanceNameOf()
     const body = input.body ?? ''
     for (const person of wanting) {
       const row = rows.find(candidate => candidate.userId === person.userId)!
       await sendMail({
         to: person.email,
         subject: input.title,
-        text: `${input.title}\n${body ? `\n${body}\n` : ''}\nOpen it: ${link}\n\nYou get this because email notifications are on in your Taskmanager inbox settings.`,
-        html: `<p><strong>${escapeHtml(input.title)}</strong></p>${body ? `<p>${escapeHtml(body)}</p>` : ''}<p><a href="${escapeHtml(link)}">Open it in Taskmanager</a></p><p style="color:#888;font-size:12px">You get this because email notifications are on in your Taskmanager inbox settings.</p>`
+        text: `${input.title}\n${body ? `\n${body}\n` : ''}\nOpen it: ${link}\n\nYou get this because email notifications are on in your ${name} inbox settings.`,
+        html: `<p><strong>${escapeHtml(input.title)}</strong></p>${body ? `<p>${escapeHtml(body)}</p>` : ''}<p><a href="${escapeHtml(link)}">Open it in ${escapeHtml(name)}</a></p><p style="color:#888;font-size:12px">You get this because email notifications are on in your ${escapeHtml(name)} inbox settings.</p>`
       })
       await db.update(notifications).set({ emailedAt: Date.now() }).where(eq(notifications.id, row.id))
     }

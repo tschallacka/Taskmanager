@@ -7,6 +7,7 @@ import { passkey, user, userEmail, verification } from '../db/schema'
 import { mailEnabled, sendMail } from '../lib/mailer'
 import { hashInvitationToken, newInvitationToken } from './customers'
 import { isInvalidDomain } from './crewAccounts'
+import { instanceNameOf } from './instanceBranding'
 import { genId } from './projects'
 
 /** How long a confirmation link stays usable. */
@@ -127,11 +128,12 @@ export async function startExtraEmail(
     updatedAt: now
   })
   const url = confirmUrl(token)
-  const text = `Confirm ${email} as an extra address on your Taskmanager account.\n\nOpen this link while you are signed in to that account: ${url}\n\nThe link expires in 24 hours. If you did not add this address, ignore this email.`
-  const html = `<p>Confirm ${email} as an extra address on your Taskmanager account.</p>`
+  const name = await instanceNameOf()
+  const text = `Confirm ${email} as an extra address on your ${name} account.\n\nOpen this link while you are signed in to that account: ${url}\n\nThe link expires in 24 hours. If you did not add this address, ignore this email.`
+  const html = `<p>Confirm ${email} as an extra address on your ${name} account.</p>`
     + `<p><a href="${url}">Confirm this address</a></p>`
     + '<p>Open the link while you are signed in to that account. It expires in 24 hours. If you did not add this address, ignore this email.</p>'
-  sendMail({ to: email, subject: 'Confirm your extra address on Taskmanager', text, html })
+  sendMail({ to: email, subject: `Confirm your extra address on ${name}`, text, html })
     .catch(error => console.error('[extraEmails] could not send the confirmation mail', error))
   return { id, email }
 }

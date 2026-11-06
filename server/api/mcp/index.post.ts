@@ -5,6 +5,7 @@
 import { authenticateApiKey, hasScope } from '../../utils/api-keys'
 import type { ApiKeyContext } from '../../utils/api-keys'
 import { toolsForKey, toolsForScopes } from '../../utils/mcpRegistry'
+import { instanceNameOf } from '../../utils/instanceBranding'
 import { mayUseReadGrant, readGrantedBoardIds } from '../../utils/crewBoardAccess'
 import { recordAgentAction } from '../../utils/agentAudit'
 import { bossInstructions } from '../../utils/crewBossSkill'
@@ -128,7 +129,7 @@ async function handleMessage(message: JsonRpcMessage, context: ApiKeyContext) {
       return result(id, {
         protocolVersion,
         capabilities: { tools: { listChanged: false } },
-        serverInfo: { name: SERVER_NAME, title: 'Taskmanager', version: SERVER_VERSION },
+        serverInfo: { name: SERVER_NAME, title: await instanceNameOf(), version: SERVER_VERSION },
         instructions: boss ? `${INSTRUCTIONS}\n\n${boss}` : INSTRUCTIONS
       })
     }
