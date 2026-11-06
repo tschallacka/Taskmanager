@@ -21,7 +21,7 @@ import { fileURLToPath } from 'node:url'
 import { findChromium, request, serve } from './browser-driver.mjs'
 import { boardOrigin, signIn } from './browser.mjs'
 import { crewHome } from './home.mjs'
-import { CAST, EXTRA_CAST, forkMemberPlan, forkRole } from './config.mjs'
+import { CAST, EXTRA_CAST, forkMemberPlan, forkRole } from './cast.mjs'
 
 test('the extra workers the kit names are the ones the app shares: one list, and this fails when they differ', () => {
   const shared = readFileSync(join(KIT, '..', 'shared', 'utils', 'extraWorkers.ts'), 'utf8')

@@ -7,6 +7,7 @@
 // URLs, people and chat settings; creds.json holds the accounts and keys the board made.
 import { readFileSync, existsSync, readdirSync } from 'node:fs'
 import { crewHome, kitDir } from './home.mjs'
+import { CAST, EXTRA_CAST, forkMemberPlan, forkRole } from './cast.mjs'
 import { migrateCrewHome, renameKeys } from './keys.mjs'
 
 export { kitDir }
@@ -79,12 +80,6 @@ export function loadForks() {
   })
 }
 
-/** The cast role a fork plays, from its agent type: `taskmanager-wren` plays `wren`. Null when it names none. */
-export function forkRole(agentType) {
-  const last = String(agentType).split('-').pop()
-  return [...CAST, ...EXTRA_CAST].includes(last) ? last : null
-}
-
 export function loadCreds() {
   const file = `${here}creds.json`
   if (!existsSync(file)) {
@@ -113,24 +108,7 @@ export function loadCreds() {
 
 const slugify = text => String(text).toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
 
-// Extra workers on a board (EXTRA_WORKERS in shared/utils/extraWorkers.ts): forked later, run on a local model
-// through opencode. They are known to the kit so their forks can be read, but init writes no agent definition for
-// them (forkMemberPlan), and Pia starts only the members Owner set up as agents.
-export const EXTRA_CAST = ['wes', 'wilma', 'walt']
-
-// The members Pia starts as agents (Pia herself runs in her own session), the optional log watcher included,
-// and the extra workers, whose forks play their role.
-export const CAST = ['pia', 'wren', 'wick', 'wynn', 'wade', 'usher', 'nina', 'quincy', 'watcher', ...EXTRA_CAST]
-
-/**
- * What init does with one member of a forks file: `write` an agent definition for a standard member, `skip` an
- * extra worker (it runs on its own model), or `unknown` for a key the kit does not know, which is an error.
- */
-export function forkMemberPlan(key) {
-  if (EXTRA_CAST.includes(key)) return 'skip'
-  if (CAST.includes(key)) return 'write'
-  return 'unknown'
-}
+export { CAST, EXTRA_CAST, forkMemberPlan, forkRole }
 
 // The model each person runs on is the Owner's choice, set per person in crew.json under "models" (README, "Models").
 // The kit fixes no model name: a person with no entry gets "haiku", which is Claude Code's name for the cheap tier of
