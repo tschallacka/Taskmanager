@@ -1,0 +1,19 @@
+{
+  "_about": "The models the crew runner starts a worker on, pinned here so every runner uses the same names. A model of null is not chosen yet, and the runner refuses to start a person on it. Change a name here, not in code.",
+  "opencode": {
+    "ollama": {
+      "model": "ollama/qwen3-coder-64k",
+      "note": "Qwen3 Coder 30B on a local Ollama, the model of the local-crew prototype"
+    },
+    "openrouter": {
+      "model": null,
+      "note": "not chosen: the Owner names the OpenRouter model"
+    }
+  },
+  "codex": {
+    "chatgpt": {
+      "model": null,
+      "note": "not chosen: the Owner names the Codex model"
+    }
+  }
+}

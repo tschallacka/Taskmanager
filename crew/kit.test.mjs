@@ -1015,3 +1015,29 @@ describe('crew mentions: the updates that ask Boss something', async () => {
     ])
   })
 })
+
+// ---------- crew runner models: the pinned names the runner starts a worker on ----------
+describe('crew runner models', () => {
+  const pinned = JSON.parse(readFileSync(join(KIT, 'runner-models.json'), 'utf8'))
+  const entries = Object.entries(pinned).filter(([key]) => !key.startsWith('_'))
+  const modelsOf = runner => Object.values(pinned[runner] ?? {})
+
+  test('the file names the two runner families the kit knows: opencode and codex', () => {
+    assert.deepEqual(entries.map(([runner]) => runner), ['opencode', 'codex'])
+  })
+
+  test('the Ollama model is pinned, and the others are not chosen yet', () => {
+    assert.equal(pinned.opencode.ollama.model, 'ollama/qwen3-coder-64k')
+    assert.equal(pinned.opencode.openrouter.model, null)
+    assert.equal(pinned.codex.chatgpt.model, null)
+  })
+
+  test('every entry has a model or null, and a note saying why', () => {
+    for (const [runner] of entries) {
+      for (const entry of modelsOf(runner)) {
+        assert.ok(entry.model === null || (typeof entry.model === 'string' && entry.model.includes('/')), `${runner}: ${JSON.stringify(entry)}`)
+        assert.ok(typeof entry.note === 'string' && entry.note.length > 0, `${runner} needs a note`)
+      }
+    }
+  })
+})
