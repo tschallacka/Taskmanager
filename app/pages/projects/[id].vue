@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import type { ProjectTask } from '~/composables/useProjects'
 import { taskCountLabel, terminalColumnIds } from '#shared/utils/board'
+import { parseTaskAddress, taskAddress } from '#shared/utils/taskAddress'
 import { queryForView } from '~/utils/projectViewQuery'
 
-definePageMeta({ layout: 'app' })
+definePageMeta({ layout: 'app', key: route => route.params.id as string })
 
 const route = useRoute()
 const { sidebarOpen } = useSidebar()
@@ -57,7 +58,7 @@ const tabViews = computed(() => visibleViews.value.filter(v => v.key !== 'settin
 const view = computed(() => visibleViews.value.filter(v => v.key !== 'office').find(v => v.key === route.query.view)?.key ?? 'board')
 
 function setView(key: string) {
-  navigateTo({ path: route.path, query: queryForView(route.query, key) }, { replace: true })
+  navigateTo({ path: window.location.pathname, query: queryForView(route.query, key) }, { replace: true })
 }
 
 // The office is a page of its own, not a view of the board: the tab leads there.
@@ -123,17 +124,54 @@ async function switchToHintTeam() {
 
 // ─── Task panel ────────────────────────────────────────────
 
-const drawerTaskId = ref<string | null>(null)
+const drawerTaskId = ref<string | null>(typeof route.params.task === 'string' ? route.params.task : null)
 
-// Deep link ?task=<id> (global search) opens the panel.
-watch(() => route.query.task, (taskId) => {
-  drawerTaskId.value = typeof taskId === 'string' && taskId ? taskId : null
-}, { immediate: true })
+// Opening a task writes its address with pushState: no navigation, no reload. The router does not see that
+// entry, so Back and Forward are followed by the popstate listener below. Closing goes back one step when
+// the panel opened that entry, and otherwise replaces the address with the board's own.
+function openTask(taskId: string) {
+  if (drawerTaskId.value === taskId) return
+  drawerTaskId.value = taskId
+  history.pushState({ taskPanel: true }, '', taskAddress(projectId.value, taskId))
+}
 
 function closeDrawer() {
   drawerTaskId.value = null
-  if (route.query.task) navigateTo({ path: route.path, replace: true })
+  if (history.state?.taskPanel) history.back()
+  else if (route.params.task) navigateTo({ path: `/projects/${projectId.value}`, query: route.query }, { replace: true })
 }
+
+function onPopState() {
+  const address = parseTaskAddress(window.location.pathname)
+  drawerTaskId.value = address?.boardId === projectId.value ? address.taskId : null
+}
+onMounted(() => window.addEventListener('popstate', onPopState))
+onBeforeUnmount(() => window.removeEventListener('popstate', onPopState))
+
+// A direct visit to the task's address opens the panel, and so does the router following a change.
+watch(() => route.params.task, (taskId) => {
+  drawerTaskId.value = typeof taskId === 'string' && taskId ? taskId : null
+})
+
+// An older ?task= link opens its task too, and its address is rewritten to the task's own.
+function rewriteTaskQuery(taskId: string) {
+  const query = { ...route.query }
+  delete query.task
+  navigateTo({ path: taskAddress(projectId.value, taskId), query }, { replace: true })
+}
+onMounted(() => {
+  if (typeof route.query.task === 'string' && route.query.task) rewriteTaskQuery(route.query.task)
+})
+watch(() => route.query.task, (taskId) => {
+  if (typeof taskId === 'string' && taskId) rewriteTaskQuery(taskId)
+})
+
+// A task the person cannot see, or that is gone, leaves the board open with a short note.
+watch([drawerTaskId, board], ([taskId, loaded]) => {
+  if (!taskId || !loaded || loaded.tasks.some(t => t.id === taskId)) return
+  toast.add({ title: 'That task is not on this board, or you cannot see it.', icon: 'i-lucide-info', duration: 5000 })
+  closeDrawer()
+})
 
 const drawerTask = computed<ProjectTask | null>(() =>
   drawerTaskId.value ? board.value?.tasks.find(t => t.id === drawerTaskId.value) ?? null : null
@@ -598,19 +636,19 @@ useSeoMeta({
         <KanbanBoard
           v-else-if="view === 'board'"
           :project-id="projectId"
-          @open-task="drawerTaskId = $event"
+          @open-task="openTask($event)"
         />
         <KanbanProjectListView
           v-else-if="view === 'list'"
-          @open-task="drawerTaskId = $event"
+          @open-task="openTask($event)"
         />
         <KanbanProjectTimelineView
           v-else-if="view === 'timeline'"
-          @open-task="drawerTaskId = $event"
+          @open-task="openTask($event)"
         />
         <KanbanProjectCalendarView
           v-else-if="view === 'calendar'"
-          @open-task="drawerTaskId = $event"
+          @open-task="openTask($event)"
         />
         <KanbanProjectDashboardView v-else-if="view === 'dashboard'" />
         <KanbanProjectMessagesView
@@ -629,7 +667,7 @@ useSeoMeta({
         />
         <KanbanProjectFilesView
           v-else
-          @open-task="drawerTaskId = $event"
+          @open-task="openTask($event)"
         />
       </template>
     </div>

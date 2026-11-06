@@ -18,6 +18,7 @@ const {
 } = useProjects()
 
 const toast = useToast()
+const { copyLink } = useTaskLink()
 
 const subtasks = computed(() => subtasksOf(props.parentTaskId))
 
@@ -253,6 +254,17 @@ onBeforeUnmount(destroySortable)
             :src="personById(sub.assigneeId)?.image ?? undefined"
             :alt="personById(sub.assigneeId)?.name"
             size="3xs"
+          />
+          <UButton
+            v-if="!readonly"
+            icon="i-lucide-link"
+            size="xs"
+            color="neutral"
+            variant="ghost"
+            aria-label="Copy link to this subtask"
+            title="Copy link"
+            class="opacity-0 transition-opacity focus-visible:opacity-100 group-hover/sub:opacity-100"
+            @click="copyLink(activeProject?.id ?? '', sub.id)"
           />
           <UButton
             v-if="!readonly"

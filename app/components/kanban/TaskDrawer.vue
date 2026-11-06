@@ -25,6 +25,7 @@ const props = defineProps<{ task: Task | null }>()
 const emit = defineEmits<{ close: [] }>()
 
 const toast = useToast()
+const { copyLink } = useTaskLink()
 const {
   activeProject,
   isCustomerView,
@@ -602,6 +603,16 @@ const menuItems = computed(() => [[
               aria-label="Task options"
             />
           </UDropdownMenu>
+          <UButton
+            icon="i-lucide-link"
+            size="xs"
+            color="neutral"
+            variant="ghost"
+            aria-label="Copy link to this task"
+            title="Copy link"
+            data-drawer-copy-link
+            @click="copyLink(activeProject?.id ?? '', task?.id ?? '')"
+          />
           <UButton
             icon="i-lucide-x"
             size="xs"

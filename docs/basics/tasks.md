@@ -30,6 +30,12 @@ Click a card (or press Enter on it). The task opens in a panel on the right. Dra
 width is remembered. Close it with the **X**, with Escape or by clicking outside it. Title and description save by
 themselves a moment after you stop typing, so there is no Save button.
 
+An open task has its own address, `/projects/<board>/<task>`, so you can bookmark it or send it. Opening a task
+changes the address without reloading the page, and Back and Forward close and reopen the panel. **Copy link**, the
+link icon in the panel's top bar, copies that address; a card and a subtask have a copy link button too. Someone who
+can see the board and opens the address gets the task; someone who cannot sees a note that the task is not on the
+board. An older `?task=` link still opens the task, and its address is changed to the new form.
+
 From top to bottom the panel has:
 
 - **Mark done** and the **column button** (the task's current column) at the top, then the visibility button, the

@@ -78,6 +78,8 @@ const internal = computed(() => props.task.visibility === 'internal')
 
 const assignee = computed(() => boardPerson(props.task.assigneeId))
 
+const { copyLink } = useTaskLink()
+
 // The quick-assign menu on the card's foot, the same choices as the task panel's.
 const assignItems = computed(() => [
   [{ label: 'Unassigned', icon: 'i-lucide-user-x', onSelect: () => emit('assign', props.task.id, null) }],
@@ -355,6 +357,22 @@ const hasMeta = computed(() =>
           />
         </button>
       </UDropdownMenu>
+      <button
+        v-if="task.projectId"
+        type="button"
+        class="ml-auto flex size-6 items-center justify-center rounded-md text-dimmed opacity-0 transition-opacity hover:bg-elevated hover:text-default focus:opacity-100 group-hover:opacity-100"
+        aria-label="Copy link to this task"
+        title="Copy link"
+        data-card-copy-link
+        @click.stop="copyLink(task.projectId, task.id)"
+        @keydown.enter.stop
+        @keydown.space.stop
+      >
+        <UIcon
+          name="i-lucide-link"
+          class="size-3.5"
+        />
+      </button>
       <button
         type="button"
         class="flex size-6 items-center justify-center rounded-md text-dimmed opacity-0 transition-opacity hover:bg-elevated hover:text-default focus:opacity-100 group-hover:opacity-100"

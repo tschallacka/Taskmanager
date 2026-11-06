@@ -2,6 +2,7 @@
 import type { ApiKeyScope } from '../db/schema'
 import type { ApiKeyContext } from './api-keys'
 import type { ProjectResource, WorkspaceCollection } from './realtime'
+import { parseTaskAddress } from '../../shared/utils/taskAddress'
 
 export interface McpToolDefinition {
   name: string
@@ -138,7 +139,10 @@ export function idFromReference(ref: string, prefer: 'task' | 'page' = 'page'): 
     return trimmed
   }
 
-  if (prefer === 'task' && taskId) return taskId
+  const inPath = parseTaskAddress(path)
+  const task = inPath?.taskId ?? taskId
+  if (prefer === 'task' && task) return task
+  if (inPath) return inPath.boardId
   return decodeURIComponent(path.split('/').filter(Boolean).at(-1) ?? '') || trimmed
 }
 
