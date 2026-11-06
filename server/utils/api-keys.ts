@@ -165,7 +165,7 @@ export async function authenticateApiKey(event: H3Event): Promise<ApiKeyContext>
 
 // A key made before the reach tables reads the reach its columns always gave it; the startup
 // migration then moves it into the tables, and the tables are read from then on.
-export async function loadKeyReach(key: ApiKey): Promise<KeyReach> {
+async function loadKeyReach(key: ApiKey): Promise<KeyReach> {
   if (!key.boardReachSet) {
     return key.projectId
       ? { allBoards: false, workspaceTeamIds: [], boardIds: [key.projectId] }

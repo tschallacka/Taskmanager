@@ -2,15 +2,17 @@
 // The owner picks from the boards they can open now, across every workspace they are in. A pick is
 // stored in the reach tables, and the check on each call (mcpAccess.ts) still cuts it down to what the
 // owner can open at that moment.
-import { eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray, isNull, or } from 'drizzle-orm'
 import { db } from '../db'
-import { agentAudit, apiKeyBoards, apiKeyWorkspaces, apiKeys, member, organization, projects } from '../db/schema'
+import { agentAudit, apiKeyBoards, apiKeyWorkspaces, apiKeys, member, organization, projects, user } from '../db/schema'
 import type { ApiKey } from '../db/schema'
+import type { KeyReach } from './api-keys'
+import { customerIdsOf } from './auth-helpers'
+import { crewLinksOf, grantedBoardIdsOf, shadowBoardsOfTeams, shadowTeamOf } from './crewBoardAccess'
+import type { GrantContext } from './crewBoardAccess'
+import { guestProjectIdsOf } from './guests'
+import { openBoardScope } from './mcpAccess'
 import { workspaceTopic } from './realtime'
-import { boardFilter, openBoardScope } from './mcpAccess'
-import { readGrantedBoardIds } from './crewBoardAccess'
-import { loadKeyReach } from './api-keys'
-import type { ApiKeyContext } from './api-keys'
 import { genId } from './projects'
 
 /** What the owner picked. A null workspace is the personal workspace. */
@@ -190,49 +192,110 @@ export interface ReachedBoard {
   readOnly: boolean
 }
 
+type OwnerScope = { userId: string, memberTeamIds: string[], customerIds: string[], guestIds: string[] }
+type BoardRow = { id: string, userId: string, teamId: string | null, customerId: string | null }
+
+/** The reach a key's own rows give, as the MCP check reads it (a key made before the reach tables reads its columns). */
+function reachOfKey(key: ApiKey, workspaceRows: { keyId: string, teamId: string | null }[], boardRows: { keyId: string, projectId: string }[]): KeyReach {
+  if (!key.boardReachSet) {
+    return key.projectId
+      ? { allBoards: false, workspaceTeamIds: [], boardIds: [key.projectId] }
+      : { allBoards: false, workspaceTeamIds: [key.teamId], boardIds: [] }
+  }
+  return {
+    allBoards: key.allBoards,
+    workspaceTeamIds: workspaceRows.filter(row => row.keyId === key.id).map(row => row.teamId),
+    boardIds: boardRows.filter(row => row.keyId === key.id).map(row => row.projectId)
+  }
+}
+
+/**
+ * The rule of boardFilter (mcpAccess.ts), read in memory: a board the owner can open, that the key's reach
+ * grants, and that is inside the key's customer when the key is limited to one.
+ */
+function reachesBoard(board: BoardRow, reach: KeyReach, customerId: string | null, owner: OwnerScope): boolean {
+  const ownPersonal = board.teamId === null && board.userId === owner.userId
+  const ofCustomer = board.customerId !== null && owner.customerIds.includes(board.customerId)
+  const asGuest = owner.guestIds.includes(board.id)
+  const open = (board.teamId !== null && owner.memberTeamIds.includes(board.teamId)) || ownPersonal || ofCustomer || asGuest
+  const granted = (reach.allBoards && open)
+    || reach.workspaceTeamIds.some(teamId => (teamId ? board.teamId === teamId : ownPersonal || ofCustomer || asGuest))
+    || reach.boardIds.includes(board.id)
+  return open && (customerId ? granted && board.customerId === customerId : granted)
+}
+
 /**
  * The boards each key reaches now, by name and workspace: what its reach covers and the owner can open,
- * plus the real boards a crew reads through its link, marked read-only. Read per call, so a board added
- * later shows up, and a board the owner has lost does not.
+ * plus the real boards a crew reads through its link, marked read-only. The owner's lists and the keys'
+ * reach rows are read once for the whole list, and one query reads the boards; each key is then cut from
+ * them in memory, by the rule of boardFilter (mcpAccess.ts) and readGrantedBoardIds (crewBoardAccess.ts).
  */
 export async function reachedBoardsOf(userId: string, keys: ApiKey[]): Promise<Map<string, ReachedBoard[]>> {
   const result = new Map<string, ReachedBoard[]>()
   if (!keys.length) return result
-  const workspaces = await workspacesOf(userId)
-  const memberTeamIds = workspaces.map(workspace => workspace.id)
+  const keyIds = keys.map(key => key.id)
+  const [workspaces, customerIds, guestIds, [account], keyWorkspaceRows, keyBoardRows] = await Promise.all([
+    workspacesOf(userId),
+    customerIdsOf(userId),
+    guestProjectIdsOf(userId),
+    db.select({ crewId: user.crewId }).from(user).where(eq(user.id, userId)),
+    db.select({ keyId: apiKeyWorkspaces.keyId, teamId: apiKeyWorkspaces.teamId }).from(apiKeyWorkspaces).where(inArray(apiKeyWorkspaces.keyId, keyIds)),
+    db.select({ keyId: apiKeyBoards.keyId, projectId: apiKeyBoards.projectId }).from(apiKeyBoards).where(inArray(apiKeyBoards.keyId, keyIds))
+  ])
+  const owner: OwnerScope = { userId, memberTeamIds: workspaces.map(workspace => workspace.id), customerIds, guestIds }
   const workspaceName = new Map(workspaces.map(workspace => [workspace.id, workspace.name]))
   const workspaceOf = (teamId: string | null) => (teamId ? workspaceName.get(teamId) ?? 'a team' : 'Personal')
 
-  for (const key of keys) {
-    const context: ApiKeyContext = {
-      keyId: key.id,
-      keyName: key.name,
-      userId,
-      teamId: key.teamId,
-      customerId: key.customerId,
-      projectId: key.projectId,
-      scopes: [],
-      reach: await loadKeyReach(key),
-      memberTeamIds
-    }
-    const reachable = await db.select({ id: projects.id, name: projects.name, teamId: projects.teamId, archivedAt: projects.archivedAt })
-      .from(projects)
-      .where(await boardFilter(context))
-    const reachableIds = new Set(reachable.map(row => row.id))
-    const crewIds = (await readGrantedBoardIds(context)).filter(id => !reachableIds.has(id))
-    const crewRows = crewIds.length
-      ? await db.select({ id: projects.id, name: projects.name, teamId: projects.teamId, archivedAt: projects.archivedAt })
-          .from(projects)
-          .where(inArray(projects.id, crewIds))
-      : []
+  const grantOf = (key: ApiKey): GrantContext => ({
+    userId,
+    teamId: key.teamId,
+    projectId: key.projectId,
+    customerId: key.customerId,
+    memberTeamIds: owner.memberTeamIds
+  })
+  const crewLinks = account?.crewId ? await crewLinksOf(account.crewId) : []
+  const shadowTeams = keys.map(key => shadowTeamOf(grantOf(key))).filter((teamId): teamId is string => teamId !== null)
+  const shadowsByTeam = await shadowBoardsOfTeams(shadowTeams)
+  const crewGranted = new Map<string, string[]>(keys.map((key) => {
+    const shadowTeam = shadowTeamOf(grantOf(key))
+    return [key.id, grantedBoardIdsOf(grantOf(key), crewLinks, shadowTeam ? shadowsByTeam.get(shadowTeam) ?? [] : [])]
+  }))
 
-    const boards: ReachedBoard[] = [
-      ...reachable.map(row => ({ row, readOnly: false })),
-      ...crewRows.map(row => ({ row, readOnly: true }))
-    ]
-      .filter(({ row }) => !row.archivedAt)
-      .map(({ row, readOnly }) => ({ id: row.id, name: row.name, teamId: row.teamId, workspace: workspaceOf(row.teamId), readOnly }))
-      .sort((a, b) => a.workspace.localeCompare(b.workspace) || a.name.localeCompare(b.name))
+  const openScope = or(
+    owner.memberTeamIds.length ? inArray(projects.teamId, owner.memberTeamIds) : undefined,
+    and(eq(projects.userId, userId), isNull(projects.teamId)),
+    customerIds.length ? inArray(projects.customerId, customerIds) : undefined,
+    guestIds.length ? inArray(projects.id, guestIds) : undefined
+  )!
+  const crewIds = [...new Set([...crewGranted.values()].flat())]
+  const candidates = await db.select({
+    id: projects.id,
+    name: projects.name,
+    teamId: projects.teamId,
+    userId: projects.userId,
+    customerId: projects.customerId,
+    archivedAt: projects.archivedAt
+  })
+    .from(projects)
+    .where(crewIds.length ? or(openScope, inArray(projects.id, crewIds)) : openScope)
+
+  // A crew's read-only board can sit in a team the owner is not in: its name comes from one more read.
+  const unnamed = [...new Set(candidates.map(row => row.teamId).filter((teamId): teamId is string => teamId !== null && !workspaceName.has(teamId)))]
+  if (unnamed.length) {
+    const names = await db.select({ id: organization.id, name: organization.name }).from(organization).where(inArray(organization.id, unnamed))
+    for (const team of names) workspaceName.set(team.id, team.name)
+  }
+  for (const key of keys) {
+    const reach = reachOfKey(key, keyWorkspaceRows, keyBoardRows)
+    const crew = new Set(crewGranted.get(key.id))
+    const boards: ReachedBoard[] = []
+    for (const row of candidates) {
+      if (row.archivedAt) continue
+      const reachable = reachesBoard(row, reach, key.customerId, owner)
+      if (!reachable && !crew.has(row.id)) continue
+      boards.push({ id: row.id, name: row.name, teamId: row.teamId, workspace: workspaceOf(row.teamId), readOnly: !reachable })
+    }
+    boards.sort((a, b) => a.workspace.localeCompare(b.workspace) || a.name.localeCompare(b.name))
     result.set(key.id, boards)
   }
   return result
