@@ -248,7 +248,7 @@ async function copySkill() {
                 <NuxtLink
                   to="/settings"
                   class="text-primary underline"
-                >Settings → API keys</NuxtLink>.
+                >Settings → API keys &amp; MCP</NuxtLink>.
               </p>
               <p
                 v-else-if="agent"
@@ -325,7 +325,7 @@ async function copySkill() {
               <p class="text-xs text-muted">
                 For an agent of your own, not Sprocket: each Sprocket run gets a short-lived key of its own.
                 Start Claude Code on the agent's machine from a terminal where you ran
-                <code class="font-mono">export TASKMANAGER_API_KEY=arn_…</code>, then paste this. It connects
+                <code class="font-mono">export TASKMANAGER_API_KEY=arn_…</code>, then paste this. Put the export line in your shell profile too, as under MCP server, so a new terminal has the key. It connects
                 the MCP server and installs the crew kit and its skill, using the key only as that variable.
               </p>
               <pre class="text-xs font-mono bg-elevated/50 border border-default rounded-md p-3 overflow-x-auto max-h-64">{{ instructions }}</pre>
@@ -348,13 +348,20 @@ async function copySkill() {
               </div>
               <pre class="text-xs font-mono bg-elevated/50 border border-default rounded-md p-3 overflow-x-auto">{{ mcpCommand }}</pre>
               <p class="text-xs text-muted">
+                {{ KEY_VARIABLE_HOME }}
                 It saves the variable's name, not the key: Claude Code fills
                 <code class="font-mono">$TASKMANAGER_API_KEY</code> in from the environment each time it starts.
-                A new key under Settings → API keys shows it with the export line filled in. More clients on
+                A new key under Settings → API keys &amp; MCP shows it with the export line filled in. More clients on
                 <NuxtLink
                   to="/mcp"
                   class="text-primary underline"
                 >Connect an AI agent</NuxtLink>.
+              </p>
+              <p class="text-xs text-muted">
+                Already connected? Make a new key under Settings → API keys &amp; MCP. Its panel shows the update command with that key filled in.
+              </p>
+              <p class="text-xs text-muted">
+                {{ RESTART_STEP }}
               </p>
             </div>
 

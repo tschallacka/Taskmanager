@@ -465,12 +465,14 @@ Anything addressable in the app is also addressable by its link. Paste the URL o
 The endpoint is `https://taskmanager.example.com/api/mcp`, spoken over streamable HTTP and authenticated with an `Authorization: Bearer` header.
 
 ```bash
-export TASKMANAGER_API_KEY=arn_your_key_here
+export TASKMANAGER_API_KEY=arn_...
 claude mcp add --scope user --transport http taskmanager https://taskmanager.example.com/api/mcp \
   --header 'Authorization: Bearer ${TASKMANAGER_API_KEY}'
 ```
 
 The single quotes keep the shell from expanding the variable, so Claude Code saves `${TASKMANAGER_API_KEY}` and fills it in from the environment every time it starts: the key itself is never written to its config. Keep the `export` in your shell profile, or run it before `claude`. An agent following the setup instructions from Settings → Sprocket uses the key only as that variable and never types or prints it. Sprocket's own runs work the same way: the server passes each `claude -p` run its short-lived key in that variable.
+
+To replace a key that is already connected, create a new key on the Settings page (Settings → API keys & MCP), then press **Copy update command** instead of the add command. One paste swaps the key and the server. If `claude mcp add` answers `MCP server taskmanager already exists in user config`, a connection is already there: see [Replace a key that is already connected](docs/agents/connect-claude-code.md#replace-a-key-that-is-already-connected).
 
 For clients configured with JSON (Claude Code's `.mcp.json` also accepts `"Bearer ${TASKMANAGER_API_KEY}"` here):
 
@@ -480,7 +482,7 @@ For clients configured with JSON (Claude Code's `.mcp.json` also accepts `"Beare
     "taskmanager": {
       "type": "http",
       "url": "https://taskmanager.example.com/api/mcp",
-      "headers": { "Authorization": "Bearer arn_your_key_here" }
+      "headers": { "Authorization": "Bearer arn_..." }
     }
   }
 }

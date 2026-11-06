@@ -24,14 +24,14 @@ function scopeLabel(scope: string): string {
 const origin = computed(() => (import.meta.client ? window.location.origin : ''))
 const endpoint = computed(() => `${origin.value}/api/mcp`)
 
-const claudeCodeCommand = computed(() => `${exportKeyCommand()}\n${mcpAddCommand(origin.value)}`)
+const claudeCodeCommand = computed(() => mcpAddCommand(origin.value))
 
 const jsonConfig = computed(() => JSON.stringify({
   mcpServers: {
     taskmanager: {
       type: 'http',
       url: endpoint.value,
-      headers: { Authorization: 'Bearer arn_your_key_here' }
+      headers: { Authorization: 'Bearer <your key>' }
     }
   }
 }, null, 2))
@@ -183,9 +183,21 @@ async function copy(text: string, id: string) {
                   @click="copy(claudeCodeCommand, 'cli')"
                 />
               </div>
-              <pre class="text-xs font-mono bg-elevated/50 border border-default rounded-md p-3 overflow-x-auto">{{ claudeCodeCommand }}</pre>
+              <pre class="text-xs font-mono bg-elevated/50 border border-default rounded-md p-3 whitespace-pre-wrap break-words">{{ claudeCodeCommand }}</pre>
               <p class="text-xs text-muted">
                 Then run <code class="font-mono">/mcp</code> inside Claude Code to confirm it connected.
+              </p>
+              <p class="text-xs text-muted">
+                Create a key in Settings first: its panel shows the export line with that key filled in.
+                {{ KEY_VARIABLE_HOME }}
+              </p>
+              <div class="pt-2 space-y-2">
+                <p class="text-xs text-muted">
+                  Already connected? Make a new key in Settings. Its panel shows the update command with that key filled in.
+                </p>
+              </div>
+              <p class="text-xs text-muted">
+                {{ RESTART_STEP }}
               </p>
             </div>
 
@@ -208,7 +220,7 @@ async function copy(text: string, id: string) {
                   @click="copy(jsonConfig, 'json')"
                 />
               </div>
-              <pre class="text-xs font-mono bg-elevated/50 border border-default rounded-md p-3 overflow-x-auto">{{ jsonConfig }}</pre>
+              <pre class="text-xs font-mono bg-elevated/50 border border-default rounded-md p-3 whitespace-pre-wrap break-words">{{ jsonConfig }}</pre>
             </div>
 
             <div class="px-5 py-4 space-y-2">
@@ -230,7 +242,7 @@ async function copy(text: string, id: string) {
                   @click="copy(curlCheck, 'curl')"
                 />
               </div>
-              <pre class="text-xs font-mono bg-elevated/50 border border-default rounded-md p-3 overflow-x-auto">{{ curlCheck }}</pre>
+              <pre class="text-xs font-mono bg-elevated/50 border border-default rounded-md p-3 whitespace-pre-wrap break-words">{{ curlCheck }}</pre>
               <p class="text-xs text-muted">
                 A list of tools means the key works. A <code class="font-mono">401</code> means it does not.
               </p>

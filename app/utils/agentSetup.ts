@@ -34,13 +34,41 @@ claude --dangerously-load-development-channels server:taskmanager-crew`
 // (single quotes stop the shell expanding it) and Claude Code fills it in on every start.
 export const KEY_VARIABLE = 'TASKMANAGER_API_KEY'
 
-/** Run in each terminal Claude Code is started from, or put in the shell profile. */
-export function exportKeyCommand(token = 'arn_your_key_here'): string {
+/**
+ * The profile step, as shell comments at the top of a copied command, so it travels with the copy:
+ * a new terminal then starts with the new key, and the comment does nothing when pasted.
+ */
+export const PROFILE_STEP = '# Also put the export line below in your shell profile, in place of any older TASKMANAGER_API_KEY line:\n# ~/.zshrc on a Mac, ~/.bashrc on Linux. Then open a new terminal before you start claude.'
+
+/** Where the variable has to live, so a new terminal or a restarted agent still finds the key. */
+export const KEY_VARIABLE_HOME = 'Put the export line in the shell profile of the terminal that starts Claude Code: ~/.zshrc on a Mac, ~/.bashrc on Linux. An app that starts Claude Code with environment settings of its own needs TASKMANAGER_API_KEY in those settings instead; a shell profile is not read there.'
+
+/** Said wherever a key has just been swapped: a running session keeps the key it started with. */
+export const RESTART_STEP = 'Restart Claude Code from a terminal that has the new key. A running session keeps the key it started with.'
+
+/** Said wherever a connection may already exist. The update command itself only appears next to a key. */
+export const ALREADY_CONNECTED_STEP = 'Already connected? One paste replaces the key: it sets the new key, removes the old server and adds it again.'
+
+/** Run in each terminal Claude Code is started from, or put in the shell profile. Needs the real key. */
+export function exportKeyCommand(token: string): string {
   return `export ${KEY_VARIABLE}=${token}`
 }
 
 export function mcpAddCommand(origin: string): string {
   return `claude mcp add --scope user --transport http taskmanager ${origin}/api/mcp \\\n  --header 'Authorization: Bearer \${${KEY_VARIABLE}}'`
+}
+
+/**
+ * Replaces an existing connection in one paste: the new key, the old server removed, the server added
+ * again. The remove fails when there is nothing to remove yet; its message is hidden and the add still
+ * runs, because each line is a command of its own.
+ *
+ * The copied command runs as it is, so it must carry the real key. A placeholder would overwrite a
+ * working key in the environment, which is why there is no default and only the key panel offers it.
+ */
+export function mcpReplaceCommand(origin: string, token: string): string {
+  if (!token.startsWith('arn_')) throw new Error('mcpReplaceCommand needs the real key, which starts with arn_')
+  return `${PROFILE_STEP}\n${exportKeyCommand(token)}\nclaude mcp remove --scope user taskmanager 2>/dev/null\n${mcpAddCommand(origin)}`
 }
 
 /** Every step at once, as instructions to paste into a Claude Code session. */
