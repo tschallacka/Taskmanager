@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { describe, test } from 'node:test'
 import { BrowserError, findChromium, request, serve } from './browser-driver.mjs'
-import { boardOrigin, parseSetCookie, signIn } from './browser.mjs'
+import { boardOrigin, parseSetCookie, productIsBoard, signIn } from './browser.mjs'
 
 const CHROMIUM = findChromium()
 const SKIP = CHROMIUM ? false : 'no Chromium found (set CREW_BROWSER_CHROMIUM or CHROMIUM, or chromium in crew.json)'
@@ -129,6 +129,20 @@ async function withDriver(prepare, job) {
 }
 
 // ---------- unit tests: no Chromium needed ----------
+
+describe('productIsBoard: the board sign-in only where the app under test is the board', () => {
+  test('is true for the same origin, path and trailing slash aside', () => {
+    assert.equal(productIsBoard('http://localhost:3000/projects', 'http://localhost:3000'), true)
+  })
+  test('is false for a dev copy on another port or host', () => {
+    assert.equal(productIsBoard('http://localhost:3041', 'http://taskmanager.localhost'), false)
+    assert.equal(productIsBoard('http://localhost:3041', 'http://localhost:3040'), false)
+  })
+  test('is false, not a throw, for a missing or broken URL', () => {
+    assert.equal(productIsBoard(undefined, 'http://localhost:3000'), false)
+    assert.equal(productIsBoard('http://localhost:3000', 'not a url'), false)
+  })
+})
 
 describe('the board origin', () => {
   test('https is accepted, and so is plain http to this machine only', () => {

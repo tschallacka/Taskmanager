@@ -79,6 +79,12 @@ export function loadForks() {
   })
 }
 
+/** The cast role a fork plays, from its agent type: `taskmanager-wren` plays `wren`. Null when it names none. */
+export function forkRole(agentType) {
+  const last = String(agentType).split('-').pop()
+  return CAST.includes(last) ? last : null
+}
+
 export function loadCreds() {
   const file = `${here}creds.json`
   if (!existsSync(file)) {
@@ -90,7 +96,16 @@ export function loadCreds() {
   creds.people ??= {}
   for (const { data } of loadForks()) {
     for (const person of data.members) {
-      if (!creds.people[person.agentType]) creds.people[person.agentType] = { name: person.name, email: person.email, password: person.password, apiKey: person.apiKey, fork: data.board?.name ?? true }
+      if (creds.people[person.agentType]) continue
+      creds.people[person.agentType] = {
+        name: person.name,
+        email: person.email,
+        password: person.password,
+        apiKey: person.apiKey,
+        fork: data.board?.name ?? true,
+        role: forkRole(person.agentType),
+        boardId: data.shadowBoard?.id ?? null,
+      }
     }
   }
   return creds
@@ -153,6 +168,14 @@ export const agentNames = Object.fromEntries(CAST.map(key => [key, `${slugify(co
 
 // A path as one shell word, quoted only when it has to be.
 const shellWord = text => (/^[\w@%+=:,./-]+$/.test(text) ? text : `'${text.replace(/'/g, `'\\''`)}'`)
+
+// The documents the owner edits by hand. init writes each once and keeps it; update merges the new template into it.
+export const OWNER_FILES = ['PROJECT-RULES.md', 'BRIEF.md']
+
+/** Fills {{key}} from the template values; a key with no value stays as it is. */
+export function renderTemplate(text, values = templateValues()) {
+  return text.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (all, key) => (key in values ? values[key] : all))
+}
 
 /**
  * Flat view of the config for templates: {{product.name}}, {{chat.channel}}, {{crew_dir}} ...

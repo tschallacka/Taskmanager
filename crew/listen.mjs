@@ -18,17 +18,19 @@ import { config, here, loadCreds } from './config.mjs'
 const creds = loadCreds()
 const [who, secs] = process.argv.slice(2)
 const me = creds.people[who]
-const nick = config.nicks[who]
+// A fork (`taskmanager-wren`) plays a cast role on its own crew board; its own key is its chat nick.
+const role = me?.role ?? who
+const nick = me?.role ? who : config.nicks[who]
 if (!me || !nick) {
-  console.error('usage: node listen.mjs <pia|wren|wick|wynn|wade|usher> [seconds]')
+  console.error('usage: node listen.mjs <pia|wren|wick|wynn|wade|usher|nina|quincy, or a fork such as taskmanager-wren> [seconds]')
   process.exit(64)
 }
 
 const WAIT = Number(secs ?? process.env.WAIT ?? 60) * 1000
 const CHAT = config.chat.client
 const { channel, workChannel } = config.chat
-const CHANNELS = who === 'pia' ? [workChannel, channel] : who === 'usher' ? [channel] : [workChannel]
-const boardId = creds.board.id
+const CHANNELS = role === 'pia' ? [workChannel, channel] : role === 'usher' ? [channel] : [workChannel]
+const boardId = me.boardId ?? creds.board.id
 
 mkdirSync(`${here}.listen`, { recursive: true })
 const statePath = `${here}.listen/${who}.json`
@@ -108,7 +110,8 @@ async function readBoard() {
   for (const n of inbox?.notifications ?? []) {
     if (n.read || state.notes.includes(n.id)) continue
     state.notes.push(n.id)
-    if (n.board !== creds.board.name) continue
+    // A fork is a member of its own crew board only, so everything in its inbox is about that board.
+    if (!me.role && n.board !== creds.board.name) continue
     out.push(`BOARD ${n.type} on task ${n.taskId ?? '?'}: ${n.title} - ${String(n.body ?? '').slice(0, 160)}`)
   }
   state.notes = state.notes.slice(-300)

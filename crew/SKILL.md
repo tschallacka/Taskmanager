@@ -31,7 +31,7 @@ If it is, run `crew watch` to see where the run stands.
 
 ## The board and who moves what
 
-Columns: Backlog, To do, In progress, **Verify**, **Ready for live**, **Done**, Bugs.
+Columns: Backlog, To do, In progress, **Verify PM**, **Verify UX**, **Verify CQ**, **Verify QA**, **Verify**, **Ready for live**, **Done**, **Blocked**, Bugs.
 
 1. The PM puts ready tasks in To do, the rest in Backlog. A worker moves a task to In progress,
    builds it, tests it in the browser, attaches a screenshot, runs the tests (none may fail), posts an
@@ -48,10 +48,11 @@ Columns: Backlog, To do, In progress, **Verify**, **Ready for live**, **Done**, 
    move to **Ready for live**, which hands the work to the user. Not approved: post written feedback as subtasks tagged `Feedback Cato`,
    assign the task to the PM and move it to **Backlog**. Be critical: send work back when it is not up to standard.
 4. **Only you publish**, and only tasks in Ready for live, following the release steps in
-   `PROJECT-RULES.md` (backup, schema change, typecheck and lint, commit, push). Move a task to **Done**
+   `PROJECT-RULES.md` (backup, schema change, typecheck and lint, merge the task's pull request). Move a task to **Done**
    when everything is wrapped up and the crew does not need to act on it anymore: it is published or
    accepted by the user, and no subtask, question or follow-up is open.
-5. Workers and the PM never commit, push, or touch the database.
+5. Workers commit and push only their own branch, one pull request per main task (`WORKFLOW.md`, Phase 3).
+   Only you merge. The PM and the reviewers never commit or push, and nobody but you touches the database.
 6. Bugs: anyone files a `[BUG]` task in the Bugs column; the PM assigns it, a worker fixes it and
    moves it through Verify like anything else.
 7. UX review: the tester files `[UX]` tasks to the PM; unclear ones become a chat meeting with you.
