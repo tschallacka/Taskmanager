@@ -2,7 +2,7 @@
 import type { OfficeSnapshot } from '#shared/office/model'
 import { DemoBoard } from '#shared/office/demo'
 import type { HoverInfo, OfficeScene } from '~/office/office'
-import { pollFailureOf, unseenAfter } from '~/office/pollFailure'
+import { pollFailureOf, strikesOnRestart, unseenAfter } from '~/office/pollFailure'
 
 definePageMeta({ layout: 'app' })
 
@@ -99,6 +99,7 @@ function start() {
   scene?.reset()
   ticker.value = []
   error.value = ''
+  unseenStrikes.value = strikesOnRestart()
   if (mode.value === 'demo') {
     demo = new DemoBoard()
     show(demo.snapshot())

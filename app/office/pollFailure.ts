@@ -11,11 +11,16 @@ export function pollFailureOf(error: unknown): PollFailure {
 }
 
 // How many unseen 404s in a row take a board's room away. One can come from a deploy or a route gap.
-export const UNSEEN_AFTER = 2
+const UNSEEN_AFTER = 2
 
 /** The count of unseen 404s in a row after one more failed poll. Any other answer starts the count again. */
 export function unseenAfter(strikes: number, failure: PollFailure): { strikes: number, unseen: boolean } {
   if (failure.kind !== 'unseen') return { strikes: 0, unseen: false }
   const next = strikes + 1
   return { strikes: next, unseen: next >= UNSEEN_AFTER }
+}
+
+/** The count when polling starts over on a switch between live and demo: no 404 from before counts any more. */
+export function strikesOnRestart(): number {
+  return 0
 }

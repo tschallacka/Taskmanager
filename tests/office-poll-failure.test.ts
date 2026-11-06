@@ -3,7 +3,7 @@
 //   node --import tsx --test tests/office-poll-failure.test.ts
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { pollFailureOf, unseenAfter } from '../app/office/pollFailure'
+import { pollFailureOf, strikesOnRestart, unseenAfter } from '../app/office/pollFailure'
 
 test('a 404 without a reason is a board the viewer cannot see, so no room is shown', () => {
   assert.deepEqual(pollFailureOf({ statusCode: 404, statusMessage: 'Not Found' }), { kind: 'unseen' })
@@ -36,4 +36,12 @@ test('a retry or a no-crew answer between two unseen 404s starts the count again
   assert.deepEqual(after, { strikes: 0, unseen: false })
   assert.deepEqual(unseenAfter(after.strikes, { kind: 'unseen' }), { strikes: 1, unseen: false })
   assert.deepEqual(unseenAfter(0, { kind: 'no-crew' }), { strikes: 0, unseen: false })
+})
+
+test('a mode switch starts the unseen count over, so one 404 after it is still only a retry', () => {
+  const before = unseenAfter(0, { kind: 'unseen' })
+  assert.deepEqual(before, { strikes: 1, unseen: false })
+  const restarted = strikesOnRestart()
+  assert.equal(restarted, 0)
+  assert.deepEqual(unseenAfter(restarted, { kind: 'unseen' }), { strikes: 1, unseen: false })
 })
