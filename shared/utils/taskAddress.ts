@@ -13,3 +13,6 @@ export function parseTaskAddress(pathname: string): { boardId: string, taskId: s
   if (parts.length !== 3 || parts[0] !== 'projects') return null
   return { boardId: decodeURIComponent(parts[1]!), taskId: decodeURIComponent(parts[2]!) }
 }
+
+/** What the board says when an address names a task the person cannot see, or that is gone. */
+export const MISSING_TASK_NOTE = 'This task is not on this board, or you cannot see it.'

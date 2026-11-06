@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ProjectTask } from '~/composables/useProjects'
 import { taskCountLabel, terminalColumnIds } from '#shared/utils/board'
-import { parseTaskAddress, taskAddress } from '#shared/utils/taskAddress'
+import { MISSING_TASK_NOTE, parseTaskAddress, taskAddress } from '#shared/utils/taskAddress'
 import { queryForView } from '~/utils/projectViewQuery'
 
 definePageMeta({ layout: 'app', key: route => route.params.id as string })
@@ -195,7 +195,7 @@ const drawerTask = computed<ProjectTask | null>(() => {
 // This runs on a background refresh too, so it replaces the address rather than stepping back.
 watch([drawerTaskId, board], ([taskId, loaded]) => {
   if (!taskId || !loaded || drawerTask.value) return
-  toast.add({ title: 'That task is not on this board, or you cannot see it.', icon: 'i-lucide-info', duration: 5000 })
+  toast.add({ title: MISSING_TASK_NOTE, icon: 'i-lucide-info', duration: 5000 })
   setOpenTask(null)
   leaveTask()
 })

@@ -3,7 +3,7 @@
 //   node --import tsx --test tests/task-address.test.ts
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { parseTaskAddress, taskAddress } from '../shared/utils/taskAddress'
+import { MISSING_TASK_NOTE, parseTaskAddress, taskAddress } from '../shared/utils/taskAddress'
 import { idFromReference } from '../server/utils/mcpToolKit'
 
 const origin = 'https://tasks.example.test'
@@ -43,4 +43,8 @@ test('a link to a board without a task names the board', () => {
 
 test('text that is not a link is used as it is', () => {
   assert.equal(idFromReference('Q1/Q2 roadmap', 'page'), 'Q1/Q2 roadmap')
+})
+
+test('the missing-task note reads as the spec says', () => {
+  assert.equal(MISSING_TASK_NOTE, 'This task is not on this board, or you cannot see it.')
 })
