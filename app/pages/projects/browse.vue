@@ -91,31 +91,36 @@ const rows = computed(() => {
           <span class="text-right">Total</span>
           <span class="hidden text-right sm:block">Updated</span>
         </div>
-        <NuxtLink
+        <BoardMenu
           v-for="{ project, open, total } in rows"
           :key="project.id"
-          :to="`/projects/${project.id}`"
-          data-browse-row
-          class="grid grid-cols-[1fr_4rem_4rem] items-center gap-3 border-b border-default px-4 py-3 text-sm transition-colors last:border-b-0 hover:bg-elevated/60 sm:grid-cols-[1fr_5rem_5rem_8rem]"
+          mode="context"
+          :board="project"
         >
-          <span class="flex min-w-0 items-center gap-2.5">
-            <span class="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary">
-              <UIcon
-                name="i-lucide-kanban"
-                class="size-4"
+          <NuxtLink
+            :to="`/projects/${project.id}`"
+            data-browse-row
+            class="grid grid-cols-[1fr_4rem_4rem] items-center gap-3 border-b border-default px-4 py-3 text-sm transition-colors last:border-b-0 hover:bg-elevated/60 sm:grid-cols-[1fr_5rem_5rem_8rem]"
+          >
+            <span class="flex min-w-0 items-center gap-2.5">
+              <span class="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary">
+                <UIcon
+                  name="i-lucide-kanban"
+                  class="size-4"
+                />
+              </span>
+              <span class="truncate font-medium text-default">{{ project.name }}</span>
+              <span
+                v-if="project.status"
+                class="size-2 shrink-0 rounded-full"
+                :class="STATUS_DOT[project.status]"
               />
             </span>
-            <span class="truncate font-medium text-default">{{ project.name }}</span>
-            <span
-              v-if="project.status"
-              class="size-2 shrink-0 rounded-full"
-              :class="STATUS_DOT[project.status]"
-            />
-          </span>
-          <span class="text-right tabular-nums text-muted">{{ open }}</span>
-          <span class="text-right tabular-nums text-muted">{{ total }}</span>
-          <span class="hidden text-right text-xs text-dimmed sm:block">{{ formatDistanceToNow(project.updatedAt, { addSuffix: true }) }}</span>
-        </NuxtLink>
+            <span class="text-right tabular-nums text-muted">{{ open }}</span>
+            <span class="text-right tabular-nums text-muted">{{ total }}</span>
+            <span class="hidden text-right text-xs text-dimmed sm:block">{{ formatDistanceToNow(project.updatedAt, { addSuffix: true }) }}</span>
+          </NuxtLink>
+        </BoardMenu>
         <p
           v-if="!rows.length"
           class="px-4 py-6 text-center text-sm text-muted"
@@ -140,12 +145,17 @@ const rows = computed(() => {
             data-browse-archived
             class="flex items-center gap-3 border-b border-default px-4 py-3 text-sm last:border-b-0"
           >
-            <NuxtLink
-              :to="`/projects/${project.id}`"
-              class="min-w-0 flex-1 truncate font-medium text-default hover:underline"
+            <BoardMenu
+              mode="context"
+              :board="project"
             >
-              {{ project.name }}
-            </NuxtLink>
+              <NuxtLink
+                :to="`/projects/${project.id}`"
+                class="min-w-0 flex-1 truncate font-medium text-default hover:underline"
+              >
+                {{ project.name }}
+              </NuxtLink>
+            </BoardMenu>
             <span
               v-if="project.archivedAt"
               class="hidden shrink-0 text-xs text-dimmed sm:block"
