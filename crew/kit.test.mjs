@@ -902,14 +902,17 @@ describe('crew mentions: the updates that ask Boss something', async () => {
       { id: 'q', author: 'Quincy Average (agent)', body: '@cato QA question' },
       { id: 'c', author: 'Cato (agent)', body: '@pia quoting @cato' },
       { id: 'p1', author: 'fork taskmanager-pia (agent)', body: '@cato from the fork' },
-      { id: 'p2', author: 'Pia Planner (agent)', body: '@cato from the crew' }
+      { id: 'p2', author: 'Pia Planner (agent)', body: '@cato from the crew' },
+      { id: 'm', author: 'Maria Pia', body: '@cato a person named Pia' },
+      { id: 'n', author: 'Pia Planner', body: '@cato not an agent' },
+      { id: 'o', author: 'fork taskmanager-pianist (agent)', body: '@cato another role' }
     ]
     assert.deepEqual(mentionLines(task, updates, new Set()).map(f => f.id), ['p1', 'p2'])
   })
 
   test('skips Boss\'s own updates and cuts a long one to 240 characters', () => {
     assert.deepEqual(mentionLines(task, [{ id: 'u1', author: 'Cato (agent)', body: '@pia quoting @cato' }], new Set()), [])
-    const [found] = mentionLines(task, [{ id: 'u2', author: 'Pia', body: `@cato ${'x'.repeat(400)}` }], new Set())
+    const [found] = mentionLines(task, [{ id: 'u2', author: 'Pia Planner (agent)', body: `@cato ${'x'.repeat(400)}` }], new Set())
     assert.ok(found.line.endsWith('…'))
     assert.ok(found.line.length < 320)
   })
