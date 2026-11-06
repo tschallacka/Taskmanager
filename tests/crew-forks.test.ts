@@ -112,7 +112,7 @@ test('a fork reads its own shadow board and the one real board behind it, nothin
   // This run's own fork, found through its board link: other crews in the dev database have a Wren of the same name.
   const [wren] = await db.select({ id: crewBoardMembers.userId }).from(crewBoardMembers)
     .where(and(eq(crewBoardMembers.linkId, linkA.id), eq(crewBoardMembers.personKey, 'wren')))
-  const context = { keyId: 'k', keyName: 'k', userId: wren!.id, teamId: crewTeam, customerId: null, projectId: linkA.shadowProjectId, scopes: ['boards:read', 'boards:write'] as ('boards:read' | 'boards:write')[], reach: { allBoards: false, workspaceTeamIds: [], boardIds: [linkA.shadowProjectId] }, memberTeamIds: [crewTeam] }
+  const context = { keyId: 'k', keyName: 'k', userId: wren!.id, teamId: crewTeam, customerId: null, projectId: linkA.shadowProjectId, scopes: ['boards:read', 'boards:write'] as ('boards:read' | 'boards:write')[], reach: { allBoards: false, workspaceTeamIds: [], boardIds: [linkA.shadowProjectId] }, memberTeamIds: [crewTeam], staffTeamIds: [crewTeam] }
   assert.deepEqual(await readGrantedBoardIds(context), [boardA])
   const reach = async (grant: string[]) =>
     (await db.select({ id: projects.id }).from(projects).where(await boardFilter({ ...context, readGrantedBoardIds: grant }))).map(r => r.id).sort()

@@ -40,7 +40,9 @@ export async function openBoardsOf(userId: string) {
     projectId: null,
     scopes: [] as ApiKeyScope[],
     reach: { allBoards: true, workspaceTeamIds: [], boardIds: [] },
-    memberTeamIds: memberships.map(workspace => workspace.id)
+    memberTeamIds: memberships.map(workspace => workspace.id),
+    // The list of boards only needs what the owner can open, not which of it is staff: nothing here reads it.
+    staffTeamIds: []
   }
   const rows = await db.select({ id: projects.id, name: projects.name, teamId: projects.teamId, archivedAt: projects.archivedAt })
     .from(projects)

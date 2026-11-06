@@ -119,7 +119,7 @@ export interface AgentEventRecord {
   customerId: string | null
 }
 
-export interface StreamKey extends KeyReach { keyId: string, userId: string, teamId: string | null }
+export interface StreamKey extends AgentStreamGrant { keyId: string, userId: string, teamId: string | null }
 
 /** The teams and customers a user belongs to now, read when a stream opens. */
 export interface Membership { teamIds: string[], customerIds: string[] }
@@ -183,7 +183,7 @@ export function audienceOfEvent(customerVisible: boolean, membership: { staff: b
  * What a key reaches. A key with a grant (`allBoards`, `workspaceTeamIds` or `boardIds`) follows the grant;
  * the columns are for a key the reach migration has not reached yet.
  */
-export interface KeyReach {
+export interface AgentStreamGrant {
   projectId?: string | null
   customerId?: string | null
   allBoards?: boolean
@@ -198,7 +198,7 @@ export interface KeyReach {
  * only, so it never gets another crew's events. A key limited to one board or one customer
  * gets nothing from any other.
  */
-export function deliverableTo(record: Pick<AgentEventRecord, 'audience' | 'teamId'> & Partial<Pick<AgentEventRecord, 'board' | 'customerId'>>, keyTeamId: string | null, reach: KeyReach = {}): boolean {
+export function deliverableTo(record: Pick<AgentEventRecord, 'audience' | 'teamId'> & Partial<Pick<AgentEventRecord, 'board' | 'customerId'>>, keyTeamId: string | null, reach: AgentStreamGrant = {}): boolean {
   if (reach.projectId && record.board !== reach.projectId) return false
   if (reach.customerId && record.customerId !== reach.customerId) return false
   if (reach.allBoards || reach.boardIds || reach.workspaceTeamIds) return deliverableByGrant(record, reach)
@@ -210,7 +210,7 @@ export function deliverableTo(record: Pick<AgentEventRecord, 'audience' | 'teamI
  * A key with a grant gets what the grant covers. A staff event follows the board or the workspace; a
  * customer's event follows the board, or a personal key's customers, which the personal workspace shows.
  */
-function deliverableByGrant(record: Pick<AgentEventRecord, 'audience' | 'teamId'> & Partial<Pick<AgentEventRecord, 'board'>>, reach: KeyReach): boolean {
+function deliverableByGrant(record: Pick<AgentEventRecord, 'audience' | 'teamId'> & Partial<Pick<AgentEventRecord, 'board'>>, reach: AgentStreamGrant): boolean {
   const onBoard = reach.allBoards === true || (reach.boardIds ?? []).includes(record.board ?? '')
   const workspaces = reach.workspaceTeamIds ?? []
   if (record.audience === 'staff') return onBoard || workspaces.includes(record.teamId)
@@ -303,7 +303,7 @@ interface Stream {
   teamId: string | null
   /** The one board or customer this stream is limited to; null when it follows the whole workspace. */
   projectId: string | null
-  /** The grant the key was given (see KeyReach); a stream with none follows the columns above. */
+  /** The grant the key was given (see AgentStreamGrant); a stream with none follows the columns above. */
   allBoards?: boolean
   boardIds?: string[]
   workspaceTeamIds?: (string | null)[]

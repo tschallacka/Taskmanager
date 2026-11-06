@@ -36,6 +36,11 @@ async function memberTeams(userId: string): Promise<string[]> {
   return rows.map(row => row.teamId)
 }
 
+async function staffTeams(userId: string): Promise<string[]> {
+  const rows = await db.select({ teamId: member.organizationId, role: member.role }).from(member).where(eq(member.userId, userId))
+  return rows.filter(row => row.role === 'owner' || row.role === 'admin').map(row => row.teamId)
+}
+
 async function contextFor(keyId: string, reach: KeyReach): Promise<ApiKeyContext> {
   return {
     keyId,
@@ -46,7 +51,8 @@ async function contextFor(keyId: string, reach: KeyReach): Promise<ApiKeyContext
     projectId: null,
     scopes: ['boards:read'],
     reach,
-    memberTeamIds: await memberTeams(owner)
+    memberTeamIds: await memberTeams(owner),
+    staffTeamIds: await staffTeams(owner)
   }
 }
 
@@ -136,6 +142,17 @@ test('a board in another workspace is a customer board to the key, a board in th
   assert.equal(audienceOf(context, { id: boards.a1, userId: owner, teamId: teamA }), 'staff')
   assert.equal(audienceOf(context, { id: boards.personal, userId: owner, teamId: null }), 'staff')
   assert.equal(audienceOf(context, { id: boards.b1, userId: owner, teamId: teamB }), 'customer')
+})
+
+test('a workspace where the owner is only a member is a customer audience, even under Select all', async () => {
+  await db.insert(member).values({ id: id('member-b'), organizationId: teamB, userId: owner, role: 'member', createdAt: at })
+  try {
+    const context = await contextFor(keys.all, { allBoards: true, workspaceTeamIds: [], boardIds: [] })
+    assert.equal(audienceOf(context, { id: boards.b1, userId: owner, teamId: teamB }), 'customer')
+    assert.equal(audienceOf(context, { id: boards.a1, userId: owner, teamId: teamA }), 'staff')
+  } finally {
+    await db.delete(member).where(eq(member.id, id('member-b')))
+  }
 })
 
 test('a workspace where the owner is only a guest is a customer audience, and its board is reached as a guest board', async () => {

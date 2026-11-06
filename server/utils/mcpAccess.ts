@@ -55,14 +55,14 @@ export async function boardFilter(context: ApiKeyContext) {
 }
 
 /**
- * How the person relates to a board: staff on a board of a workspace they are a member of, and on their
+ * How the person relates to a board: staff on a board of a workspace where they are owner or admin, and on their
  * own personal boards; a customer's contact everywhere else. A board a crew reads through its crew link
  * counts as the team's, so the crew sees every task on it; it can only be reached by a read call, so
  * nothing it may not do is ever asked of it.
  */
 export function audienceOf(context: ApiKeyContext, board: Pick<Project, 'userId' | 'teamId'> & { id?: string }): Audience {
   if (board.id && context.readGrantedBoardIds?.includes(board.id)) return 'staff'
-  if (board.teamId) return context.memberTeamIds.includes(board.teamId) ? 'staff' : 'customer'
+  if (board.teamId) return context.staffTeamIds.includes(board.teamId) ? 'staff' : 'customer'
   return board.userId === context.userId ? 'staff' : 'customer'
 }
 

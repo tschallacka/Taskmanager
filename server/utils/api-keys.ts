@@ -67,6 +67,8 @@ export interface ApiKeyContext {
   reach: KeyReach
   /** The workspaces the owner is a member of right now. A grant from another workspace counts for nothing. */
   memberTeamIds: string[]
+  /** The workspaces the owner is staff of right now (owner or admin). Only these make a board staff for the key. */
+  staffTeamIds: string[]
 }
 
 function readBearerToken(event: H3Event): string | null {
@@ -159,7 +161,7 @@ export async function authenticateApiKey(event: H3Event): Promise<ApiKeyContext>
     projectId: key.projectId,
     scopes: key.scopes.filter(isApiKeyScope),
     reach: await loadKeyReach(key),
-    memberTeamIds: await teamIdsOf(key.userId)
+    ...(await teamIdsOf(key.userId))
   }
 }
 
@@ -182,9 +184,13 @@ async function loadKeyReach(key: ApiKey): Promise<KeyReach> {
   }
 }
 
-async function teamIdsOf(userId: string): Promise<string[]> {
-  const rows = await db.select({ teamId: member.organizationId }).from(member).where(eq(member.userId, userId))
-  return rows.map(row => row.teamId)
+// The roles that make a board of a workspace staff for a key (the same as the browser's admin roles).
+const STAFF_ROLES = ['owner', 'admin']
+
+async function teamIdsOf(userId: string): Promise<{ memberTeamIds: string[], staffTeamIds: string[] }> {
+  const rows = await db.select({ teamId: member.organizationId, role: member.role }).from(member).where(eq(member.userId, userId))
+  const staffTeamIds = rows.filter(row => STAFF_ROLES.includes(row.role)).map(row => row.teamId)
+  return { memberTeamIds: rows.map(row => row.teamId), staffTeamIds }
 }
 
 /** Whether a key is cut down to one customer's boards, or to single boards and not to a whole workspace. */

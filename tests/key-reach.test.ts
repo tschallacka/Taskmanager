@@ -38,7 +38,7 @@ const base = { keyId: 'k', keyName: 'k', userId: me, teamId: team, scopes: ['boa
 const legacyReach = (key: { teamId: string | null, projectId: string | null }) => (key.projectId
   ? { allBoards: false, workspaceTeamIds: [], boardIds: [key.projectId] }
   : { allBoards: false, workspaceTeamIds: [key.teamId], boardIds: [] })
-const withReach = <T extends { teamId: string | null, projectId: string | null }>(key: T) => ({ ...key, reach: legacyReach(key), memberTeamIds: [team] })
+const withReach = <T extends { teamId: string | null, projectId: string | null }>(key: T) => ({ ...key, reach: legacyReach(key), memberTeamIds: [team], staffTeamIds: [team] })
 const teamKey = withReach({ ...base, customerId: null, projectId: null })
 const projectKey = withReach({ ...base, customerId: null, projectId: board.a1 })
 const customerKey = withReach({ ...base, customerId: customerA, projectId: null })

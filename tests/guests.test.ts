@@ -109,7 +109,7 @@ test('a guest reaches the board from the personal workspace, as an outside reade
   assert.deepEqual(visible.map(row => row.id), [sharedTask])
 
   // An API key holds the same reach as its person.
-  const key = { keyId: 'k', keyName: 'k', userId: manager, teamId: null, customerId: null, projectId: null, scopes: ['boards:read'] as ('boards:read')[], reach: { allBoards: false, workspaceTeamIds: [null], boardIds: [] }, memberTeamIds: [] }
+  const key = { keyId: 'k', keyName: 'k', userId: manager, teamId: null, customerId: null, projectId: null, scopes: ['boards:read'] as ('boards:read')[], reach: { allBoards: false, workspaceTeamIds: [null], boardIds: [] }, memberTeamIds: [], staffTeamIds: [] }
   assert.equal((await db.select({ id: projects.id }).from(projects).where(and(eq(projects.id, board), await boardFilter(key)))).length, 1)
 })
 
