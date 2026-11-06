@@ -330,7 +330,7 @@ function expiryLabel(key: ApiKeySummary): string {
               that it prints <code class="font-mono">arn_</code>, then start <code class="font-mono">claude</code>.
             </p>
             <div class="flex flex-col sm:flex-row gap-2">
-              <pre class="flex-1 min-w-0 text-xs font-mono bg-default border border-default rounded-md px-3 py-2 whitespace-pre overflow-x-auto sm:whitespace-pre-wrap sm:break-all">{{ claudeCommand }}</pre>
+              <pre class="flex-1 min-w-0 text-xs font-mono bg-default border border-default rounded-md px-3 py-2 whitespace-pre-wrap break-words">{{ claudeCommand }}</pre>
               <UButton
                 :icon="commandCopied ? 'i-lucide-check' : 'i-lucide-copy'"
                 :label="commandCopied ? 'Copied' : 'Copy command'"
@@ -345,7 +345,7 @@ function expiryLabel(key: ApiKeySummary): string {
               {{ RESTART_STEP }}
             </p>
             <div class="flex flex-col sm:flex-row gap-2">
-              <pre class="flex-1 min-w-0 text-xs font-mono bg-default border border-default rounded-md px-3 py-2 whitespace-pre overflow-x-auto sm:whitespace-pre-wrap sm:break-all">{{ replaceCommand }}</pre>
+              <pre class="flex-1 min-w-0 text-xs font-mono bg-default border border-default rounded-md px-3 py-2 whitespace-pre-wrap break-words">{{ replaceCommand }}</pre>
               <UButton
                 :icon="replaceCopied ? 'i-lucide-check' : 'i-lucide-copy'"
                 :label="replaceCopied ? 'Copied' : 'Copy update command'"
