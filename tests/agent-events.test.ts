@@ -97,9 +97,9 @@ function eventFor(over: Partial<AgentEventInput> = {}): AgentEventInput {
   }
 }
 
-function lookups(members: Record<string, string[]> = {}, contacts: Record<string, string[]> = {}): AudienceLookups {
+function lookups(staffTeams: Record<string, string[]> = {}, contacts: Record<string, string[]> = {}): AudienceLookups {
   return {
-    isStaff: async (userId, teamId) => (members[userId] ?? []).includes(teamId),
+    isStaff: async (userId, teamId) => (staffTeams[userId] ?? []).includes(teamId),
     customerIds: async userId => contacts[userId] ?? []
   }
 }

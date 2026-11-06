@@ -1,3 +1,4 @@
+import { reachOf } from './helpers/reach'
 // A key limited to one board or one customer: what boards it reaches, which tools it is given,
 // which events it receives and what a request for such a key may name. Needs the dev
 // database (DATABASE_URL) and the Nuxt aliases the tool modules import (`nuxt prepare` makes them). Run:
@@ -36,8 +37,8 @@ const base = { keyId: 'k', keyName: 'k', userId: me, teamId: team, scopes: ['boa
 // the server derives for such a key is the team, or the one board, and the owner's memberships are read
 // per call; here the owner is a member of the team only.
 const legacyReach = (key: { teamId: string | null, projectId: string | null }) => (key.projectId
-  ? { allBoards: false, workspaceTeamIds: [], boardIds: [key.projectId] }
-  : { allBoards: false, workspaceTeamIds: [key.teamId], boardIds: [] })
+  ? reachOf({ boards: [key.projectId] })
+  : reachOf({ workspaces: [key.teamId] }))
 const withReach = <T extends { teamId: string | null, projectId: string | null }>(key: T) => ({ ...key, reach: legacyReach(key), memberTeamIds: [team], staffTeamIds: [team] })
 const teamKey = withReach({ ...base, customerId: null, projectId: null })
 const projectKey = withReach({ ...base, customerId: null, projectId: board.a1 })

@@ -1,3 +1,4 @@
+import { reachOf } from './helpers/reach'
 // Where a key's tools put a board, and which live-refresh topic a write goes to. A key that reaches
 // several workspaces must say which one create_board is for. Needs the dev database. Run:
 //   TSX_TSCONFIG_PATH=.nuxt/tsconfig.server.json DATABASE_URL=postgresql://arnotes:arnotes@localhost:5433/arnotes node --import tsx --test tests/api-key-reach-tools.test.ts
@@ -58,7 +59,7 @@ after(async () => {
 })
 
 test('a key that reaches two workspaces must say which one a new board is for', async () => {
-  const context = contextFor({ allBoards: false, workspaceTeamIds: [teamA, teamB], boardIds: [] }, [teamA, teamB])
+  const context = contextFor(reachOf({ workspaces: [teamA, teamB] }), [teamA, teamB])
   await assert.rejects(createBoard(context, { name: 'No workspace' }), (error: unknown) => {
     assert.ok(error instanceof McpToolError)
     assert.match((error as Error).message, /more than one workspace/)
@@ -67,14 +68,14 @@ test('a key that reaches two workspaces must say which one a new board is for', 
 })
 
 test('a new board goes in the workspace the key names', async () => {
-  const context = contextFor({ allBoards: false, workspaceTeamIds: [teamA, teamB], boardIds: [] }, [teamA, teamB])
+  const context = contextFor(reachOf({ workspaces: [teamA, teamB] }), [teamA, teamB])
   const board = await createBoard(context, { name: 'In B', workspace: teamB })
   const [row] = await db.select({ teamId: projects.teamId }).from(projects).where(eq(projects.id, board.id))
   assert.equal(row?.teamId, teamB)
 })
 
 test('a key cannot put a board in a workspace it does not reach', async () => {
-  const context = contextFor({ allBoards: false, workspaceTeamIds: [teamA], boardIds: [] }, [teamA, teamB])
+  const context = contextFor(reachOf({ workspaces: [teamA] }), [teamA, teamB])
   await assert.rejects(createBoard(context, { name: 'Not reached', workspace: teamB }), (error: unknown) => {
     assert.ok(error instanceof McpToolError)
     assert.match((error as Error).message, /does not reach the workspace/)
@@ -83,14 +84,14 @@ test('a key cannot put a board in a workspace it does not reach', async () => {
 })
 
 test('a key that reaches one workspace creates there without a name', async () => {
-  const context = contextFor({ allBoards: false, workspaceTeamIds: [teamA], boardIds: [] }, [teamA, teamB])
+  const context = contextFor(reachOf({ workspaces: [teamA] }), [teamA, teamB])
   const board = await createBoard(context, { name: 'Only A' })
   const [row] = await db.select({ teamId: projects.teamId }).from(projects).where(eq(projects.id, board.id))
   assert.equal(row?.teamId, teamA)
 })
 
 test('a Select all key names the personal workspace for a personal board', async () => {
-  const context = contextFor({ allBoards: true, workspaceTeamIds: [], boardIds: [] }, [teamA, teamB])
+  const context = contextFor(reachOf({ all: true }), [teamA, teamB])
   const board = await createBoard(context, { name: 'Personal', workspace: 'personal' })
   const [row] = await db.select({ teamId: projects.teamId }).from(projects).where(eq(projects.id, board.id))
   assert.equal(row?.teamId, null)

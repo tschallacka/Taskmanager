@@ -187,10 +187,14 @@ async function loadKeyReach(key: ApiKey): Promise<KeyReach> {
 // The roles that make a board of a workspace staff for a key (the same as the browser's admin roles).
 export const STAFF_ROLES = ['owner', 'admin']
 
+/** The teams a person is staff of, from their member rows: the owner and admin roles only. */
+export function staffTeamIdsOf(rows: { teamId: string, role: string }[]): string[] {
+  return rows.filter(row => STAFF_ROLES.includes(row.role)).map(row => row.teamId)
+}
+
 async function teamIdsOf(userId: string): Promise<{ memberTeamIds: string[], staffTeamIds: string[] }> {
   const rows = await db.select({ teamId: member.organizationId, role: member.role }).from(member).where(eq(member.userId, userId))
-  const staffTeamIds = rows.filter(row => STAFF_ROLES.includes(row.role)).map(row => row.teamId)
-  return { memberTeamIds: rows.map(row => row.teamId), staffTeamIds }
+  return { memberTeamIds: rows.map(row => row.teamId), staffTeamIds: staffTeamIdsOf(rows) }
 }
 
 /** Whether a key is cut down to one customer's boards, or to single boards and not to a whole workspace. */

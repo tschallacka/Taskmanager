@@ -5,10 +5,9 @@
 import { eq, inArray } from 'drizzle-orm'
 import { db } from '../db'
 import { agentAudit, apiKeyBoards, apiKeyWorkspaces, apiKeys, member, organization, projects } from '../db/schema'
-import type { ApiKey, ApiKeyScope } from '../db/schema'
-import type { ApiKeyContext } from './api-keys'
+import type { ApiKey } from '../db/schema'
 import { workspaceTopic } from './realtime'
-import { boardFilter } from './mcpAccess'
+import { openBoardScope } from './mcpAccess'
 import { genId } from './projects'
 
 /** What the owner picked. A null workspace is the personal workspace. */
@@ -31,22 +30,10 @@ export async function workspacesOf(userId: string): Promise<{ id: string, name: 
 /** The boards a person can open now, across every workspace they are in, not archived. */
 export async function openBoardsOf(userId: string) {
   const memberships = await workspacesOf(userId)
-  const context: ApiKeyContext = {
-    keyId: '',
-    keyName: '',
-    userId,
-    teamId: null,
-    customerId: null,
-    projectId: null,
-    scopes: [] as ApiKeyScope[],
-    reach: { allBoards: true, workspaceTeamIds: [], boardIds: [] },
-    memberTeamIds: memberships.map(workspace => workspace.id),
-    // The list of boards only needs what the owner can open, not which of it is staff: nothing here reads it.
-    staffTeamIds: []
-  }
+  const { open } = await openBoardScope(userId, memberships.map(workspace => workspace.id))
   const rows = await db.select({ id: projects.id, name: projects.name, teamId: projects.teamId, archivedAt: projects.archivedAt })
     .from(projects)
-    .where(await boardFilter(context))
+    .where(open)
   return rows.filter(row => !row.archivedAt)
 }
 

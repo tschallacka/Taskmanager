@@ -27,8 +27,11 @@ export function isNarrowedKey(context: Pick<ApiKeyContext, 'customerId' | 'reach
  * The key's own grants pick from them: Select all, whole workspaces, single boards. Because the outer
  * limit is checked on every call, a grant stops working as soon as its owner loses access to the board.
  */
-export async function boardFilter(context: ApiKeyContext) {
-  const { userId, reach, memberTeamIds } = context
+/**
+ * The boards a person can open now: their own, those of the workspaces in memberTeamIds, those of their
+ * customers, and the ones they are a guest on. The key's reach and the open-board list both start here.
+ */
+export async function openBoardScope(userId: string, memberTeamIds: string[]) {
   const customerIds = await customerIdsOf(userId)
   const guestIds = await guestProjectIdsOf(userId)
   const open = or(
@@ -37,6 +40,12 @@ export async function boardFilter(context: ApiKeyContext) {
     customerIds.length ? inArray(projects.customerId, customerIds) : undefined,
     guestIds.length ? inArray(projects.id, guestIds) : undefined
   )!
+  return { open, customerIds, guestIds }
+}
+
+export async function boardFilter(context: ApiKeyContext) {
+  const { userId, reach, memberTeamIds } = context
+  const { open, customerIds, guestIds } = await openBoardScope(userId, memberTeamIds)
 
   const grants = [
     reach.allBoards ? open : undefined,

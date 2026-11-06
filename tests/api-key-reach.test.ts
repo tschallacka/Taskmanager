@@ -1,3 +1,4 @@
+import { reachOf } from './helpers/reach'
 // What an API key reaches: the grant its owner chose (Select all, one workspace, or single boards), cut
 // down to what the owner can open when the call is made. Needs the dev database with the reach tables
 // pushed. Run:
@@ -102,7 +103,7 @@ after(async () => {
 })
 
 test('Select all reaches the boards of every workspace the owner is in, and a board added later', async () => {
-  const context = await contextFor(keys.all, { allBoards: true, workspaceTeamIds: [], boardIds: [] })
+  const context = await contextFor(keys.all, reachOf({ all: true }))
   const all = [boards.a1, boards.personal, boards.b1]
   assert.deepEqual(await reachableIds(context, all), [boards.a1, boards.personal].sort())
   const later = id('board-a2')
@@ -111,19 +112,19 @@ test('Select all reaches the boards of every workspace the owner is in, and a bo
 })
 
 test('a workspace grant reaches that workspace, including a board made later, and nothing else', async () => {
-  const context = await contextFor(keys.workspace, { allBoards: false, workspaceTeamIds: [teamA], boardIds: [] })
+  const context = await contextFor(keys.workspace, reachOf({ workspaces: [teamA] }))
   const later = id('board-a3')
   await addBoard(later, teamA)
   assert.deepEqual(await reachableIds(context, [boards.a1, boards.personal, boards.b1, later]), [boards.a1, later].sort())
 })
 
 test('a fixed list reaches only the ticked boards, not a board made later', async () => {
-  const context = await contextFor(keys.fixed, { allBoards: false, workspaceTeamIds: [], boardIds: [boards.a1] })
+  const context = await contextFor(keys.fixed, reachOf({ boards: [boards.a1] }))
   assert.deepEqual(await reachableIds(context, [boards.a1, boards.personal, boards.b1]), [boards.a1])
 })
 
 test('a grant on a board the owner has no access to reaches nothing', async () => {
-  const context = await contextFor(keys.fixed, { allBoards: false, workspaceTeamIds: [], boardIds: [boards.b1] })
+  const context = await contextFor(keys.fixed, reachOf({ boards: [boards.b1] }))
   assert.deepEqual(await reachableIds(context, [boards.b1]), [])
 })
 
@@ -131,14 +132,14 @@ test('a board is lost to a key as soon as its owner leaves the workspace', async
   await db.delete(member).where(eq(member.userId, owner))
   try {
     // Memberships are read per call, so the owner's context is built again after the change.
-    assert.deepEqual(await reachableIds(await contextFor(keys.fixed, { allBoards: false, workspaceTeamIds: [], boardIds: [boards.a1] }), [boards.a1]), [])
+    assert.deepEqual(await reachableIds(await contextFor(keys.fixed, reachOf({ boards: [boards.a1] })), [boards.a1]), [])
   } finally {
     await db.insert(member).values({ id: id('member-a-again'), organizationId: teamA, userId: owner, role: 'owner', createdAt: at })
   }
 })
 
 test('a board in another workspace is a customer board to the key, a board in the owner\'s own is staff', async () => {
-  const context = await contextFor(keys.all, { allBoards: true, workspaceTeamIds: [], boardIds: [] })
+  const context = await contextFor(keys.all, reachOf({ all: true }))
   assert.equal(audienceOf(context, { id: boards.a1, userId: owner, teamId: teamA }), 'staff')
   assert.equal(audienceOf(context, { id: boards.personal, userId: owner, teamId: null }), 'staff')
   assert.equal(audienceOf(context, { id: boards.b1, userId: owner, teamId: teamB }), 'customer')
@@ -147,7 +148,7 @@ test('a board in another workspace is a customer board to the key, a board in th
 test('a workspace where the owner is only a member is a customer audience, even under Select all', async () => {
   await db.insert(member).values({ id: id('member-b'), organizationId: teamB, userId: owner, role: 'member', createdAt: at })
   try {
-    const context = await contextFor(keys.all, { allBoards: true, workspaceTeamIds: [], boardIds: [] })
+    const context = await contextFor(keys.all, reachOf({ all: true }))
     assert.equal(audienceOf(context, { id: boards.b1, userId: owner, teamId: teamB }), 'customer')
     assert.equal(audienceOf(context, { id: boards.a1, userId: owner, teamId: teamA }), 'staff')
   } finally {
@@ -159,14 +160,14 @@ test('a workspace where the owner is only a guest is a customer audience, and it
   const guestBoard = id('board-guest')
   await addBoard(guestBoard, teamB)
   await db.insert(projectGuests).values({ id: id('guest-row'), projectId: guestBoard, userId: owner, role: 'editor', addedBy: owner, createdAt: now })
-  const context = await contextFor(keys.all, { allBoards: true, workspaceTeamIds: [], boardIds: [] })
+  const context = await contextFor(keys.all, reachOf({ all: true }))
   assert.ok((await reachableIds(context, [guestBoard])).includes(guestBoard))
   assert.equal(audienceOf(context, { id: guestBoard, userId: owner, teamId: teamB }), 'customer')
 })
 
 test('a key is narrowed when it has single boards and no whole workspace, or a customer', () => {
-  assert.equal(isNarrowedReach(null, { allBoards: false, workspaceTeamIds: [], boardIds: [boards.a1] }), true)
-  assert.equal(isNarrowedReach(null, { allBoards: false, workspaceTeamIds: [teamA], boardIds: [] }), false)
-  assert.equal(isNarrowedReach(null, { allBoards: true, workspaceTeamIds: [], boardIds: [] }), false)
-  assert.equal(isNarrowedReach('some-customer', { allBoards: true, workspaceTeamIds: [], boardIds: [] }), true)
+  assert.equal(isNarrowedReach(null, reachOf({ boards: [boards.a1] })), true)
+  assert.equal(isNarrowedReach(null, reachOf({ workspaces: [teamA] })), false)
+  assert.equal(isNarrowedReach(null, reachOf({ all: true })), false)
+  assert.equal(isNarrowedReach('some-customer', reachOf({ all: true })), true)
 })

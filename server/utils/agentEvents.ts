@@ -27,7 +27,7 @@
 // delivery_failed goes to the crew's pm only (a team that is not a crew: its owners), with ids, the class, the attempts and a code; never a customer.
 import { and, asc, eq, sql } from 'drizzle-orm'
 import { db } from '../db'
-import { STAFF_ROLES } from './api-keys'
+import { staffTeamIdsOf } from './api-keys'
 import { apiKeys, crews, member, projectGithubRepos, projects, user } from '../db/schema'
 import { customerIdsOf, isTeamMember } from './auth-helpers'
 import { crewAccountLive, isCrewAddress, normalizeAddress, personKeyOf } from './crewAccounts'
@@ -684,9 +684,9 @@ export const databaseLookups: AudienceLookups = {
 
 /** Whether a user is owner or admin of a team right now: the roles that make its boards staff for a key. */
 export async function isTeamStaff(userId: string, teamId: string): Promise<boolean> {
-  const [row] = await db.select({ role: member.role }).from(member)
+  const rows = await db.select({ teamId: member.organizationId, role: member.role }).from(member)
     .where(and(eq(member.userId, userId), eq(member.organizationId, teamId)))
-  return !!row && STAFF_ROLES.includes(row.role)
+  return staffTeamIdsOf(rows).includes(teamId)
 }
 
 /**
@@ -979,7 +979,7 @@ export async function actorNameOf(userId: string | null): Promise<string | null>
 /** The teams and customers a user belongs to right now. */
 export async function currentMembership(userId: string): Promise<Membership> {
   const teams = await db.select({ teamId: member.organizationId, role: member.role }).from(member).where(eq(member.userId, userId))
-  const staffTeamIds = teams.filter(team => STAFF_ROLES.includes(team.role)).map(team => team.teamId)
+  const staffTeamIds = staffTeamIdsOf(teams)
   return { teamIds: teams.map(team => team.teamId), staffTeamIds, customerIds: await customerIdsOf(userId) }
 }
 
