@@ -187,7 +187,6 @@ async function addWorkers() {
     forkResultAdded.value = true
   } catch (e) {
     fail(e, 'Could not add the workers')
-    fail(e, 'Could not add the workers')
   } finally {
     addBusy.value = false
   }

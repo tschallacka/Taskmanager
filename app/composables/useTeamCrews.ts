@@ -67,7 +67,7 @@ export interface ForkResult {
 }
 
 // The extra workers a board can add later: one list, shared with the server and the crew kit.
-export { EXTRA_WORKERS } from '../../shared/utils/extraWorkers'
+export { EXTRA_WORKERS } from '#shared/utils/extraWorkers'
 
 /** `add` names extra workers to fork on a board that is already forked; without a rotate the others stay as they are. */
 export function forkTeamCrew(teamId: string, linkId: string, rotate: boolean, add: string[] = []): Promise<ForkResult> {
