@@ -63,4 +63,5 @@ It cannot be undone, but you can give the board a crew again; that makes a new c
   crews. If someone else made it, ask them to give the board the crew.
 - **The crew is already on this board.** Each crew can be linked to a board once. Use **Continue** to carry on with
   it.
+- **Not every board can take the crew.** A crew's own work board, and the crew board it keeps, cannot be given that crew: it would work on itself. Every other board of your team can, including one in the crew's own team.
 - **No Step by step button.** It needs at least one crew you made, and the owner or admin role.
