@@ -329,8 +329,8 @@ function expiryLabel(key: ApiKeySummary): string {
               Then open a new terminal, check with <code class="font-mono">echo ${TASKMANAGER_API_KEY:0:4}</code>
               that it prints <code class="font-mono">arn_</code>, then start <code class="font-mono">claude</code>.
             </p>
-            <div class="flex gap-2">
-              <pre class="flex-1 min-w-0 text-xs font-mono bg-default border border-default rounded-md px-3 py-2 whitespace-pre-wrap break-all">{{ claudeCommand }}</pre>
+            <div class="flex flex-col sm:flex-row gap-2">
+              <pre class="flex-1 min-w-0 text-xs font-mono bg-default border border-default rounded-md px-3 py-2 whitespace-pre overflow-x-auto sm:whitespace-pre-wrap sm:break-all">{{ claudeCommand }}</pre>
               <UButton
                 :icon="commandCopied ? 'i-lucide-check' : 'i-lucide-copy'"
                 :label="commandCopied ? 'Copied' : 'Copy command'"
@@ -341,11 +341,11 @@ function expiryLabel(key: ApiKeySummary): string {
               />
             </div>
             <p class="text-xs text-muted pt-1">
-              Already connected? One paste replaces the key: it sets the new key, removes the old server and adds it
+              Already connected? Paste the update command below. It sets the new key, removes the old server and adds it
               again. Restart Claude Code from a terminal that has the new key, since a running session keeps the old one.
             </p>
             <div class="flex flex-col sm:flex-row gap-2">
-              <pre class="flex-1 min-w-0 text-xs font-mono bg-default border border-default rounded-md px-3 py-2 whitespace-pre-wrap break-all">{{ replaceCommand }}</pre>
+              <pre class="flex-1 min-w-0 text-xs font-mono bg-default border border-default rounded-md px-3 py-2 whitespace-pre overflow-x-auto sm:whitespace-pre-wrap sm:break-all">{{ replaceCommand }}</pre>
               <UButton
                 :icon="replaceCopied ? 'i-lucide-check' : 'i-lucide-copy'"
                 :label="replaceCopied ? 'Copied' : 'Copy update command'"
