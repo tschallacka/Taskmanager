@@ -896,6 +896,17 @@ describe('crew mentions: the updates that ask Boss something', async () => {
     assert.ok(!MENTION.test('@catoni'))
   })
 
+  test('only Pia reaches Boss: @cato from a worker, a reviewer or Boss itself is ignored', () => {
+    const updates = [
+      { id: 'w', author: 'fork taskmanager-wren (agent)', body: '@cato can I push?' },
+      { id: 'q', author: 'Quincy Average (agent)', body: '@cato QA question' },
+      { id: 'c', author: 'Cato (agent)', body: '@pia quoting @cato' },
+      { id: 'p1', author: 'fork taskmanager-pia (agent)', body: '@cato from the fork' },
+      { id: 'p2', author: 'Pia Planner (agent)', body: '@cato from the crew' }
+    ]
+    assert.deepEqual(mentionLines(task, updates, new Set()).map(f => f.id), ['p1', 'p2'])
+  })
+
   test('skips Boss\'s own updates and cuts a long one to 240 characters', () => {
     assert.deepEqual(mentionLines(task, [{ id: 'u1', author: 'Cato (agent)', body: '@pia quoting @cato' }], new Set()), [])
     const [found] = mentionLines(task, [{ id: 'u2', author: 'Pia', body: `@cato ${'x'.repeat(400)}` }], new Set())

@@ -9,15 +9,17 @@
 // in CREW_HOME/.listen/boss-mentions.json, so a one-shot check after --follow (or after a restart) prints only
 // what is new. Boards: the crew's board and, for a fork, its main board and its crew board. Key:
 // TASKMANAGER_API_KEY (the Owner's key, which Boss's session already has), else the crew's boss account.
-// Limits: only top-level cards are read, so a question for Boss goes in an update on the main card, not on a
-// subtask; and a column past 200 cards is read only up to 200, which the watch says once.
+// Only Pia talks to Boss: the workers and reviewers ask Pia, and Pia decides what goes to Boss. So only an update
+// written by the PM counts; "@cato" from anyone else (a worker, a reviewer, Boss itself) is ignored.
+// Limits: only top-level cards are read, so Pia asks Boss in an update on the main card, not on a subtask; and a
+// column past 200 cards is read only up to 200, which the watch says once.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 
 // "@cato" or "@boss" as a word of its own: not inside an address (x@cato.nl) or a longer name (@catoni).
 export const MENTION = /(?<![\w.+-])@(cato|boss)(?![\w-]|\.\w)/i
-// Boss's own updates name Pia or the Owner, never itself, but a quote of "@cato" in one must not wake Boss.
-export const BOSS_AUTHOR = /^cato\b/i
+// The PM's author name on the board: "fork taskmanager-pia (agent)" for a fork, "Pia Planner (agent)" for the crew's own.
+export const PM_AUTHOR = /(^|[\s-])pia\b/i
 const SEEN_KEEP = 500
 
 /** The text of a tools/call answer, or an error: a JSON-RPC error and a tool error are never an empty board. */
@@ -29,11 +31,11 @@ export function rpcResult(name, body) {
   return JSON.parse(text)
 }
 
-/** One line per update that mentions Boss, is not Boss's own and is not in `seen`. Does not change `seen`. */
+/** One line per update by the PM that mentions Boss and is not in `seen`. Does not change `seen`. */
 export function mentionLines(task, updates, seen) {
   const found = []
   for (const update of updates ?? []) {
-    if (!update?.id || seen.has(update.id) || BOSS_AUTHOR.test(String(update.author)) || !MENTION.test(String(update.body))) continue
+    if (!update?.id || seen.has(update.id) || !PM_AUTHOR.test(String(update.author)) || !MENTION.test(String(update.body))) continue
     const text = String(update.body).replace(/\s+/g, ' ').trim()
     found.push({ id: update.id, line: `@cato on ${task.id} "${task.title}" by ${update.author}: ${text.length > 240 ? `${text.slice(0, 240)}…` : text}` })
   }

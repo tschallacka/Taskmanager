@@ -69,7 +69,8 @@ Columns: Backlog, To do, In progress, **Verify PM**, **Verify UX**, **Verify CQ*
 - **Check on Pia.** At the start of every turn read the board (`crew watch`), not the transcripts. When Pia is
   unavailable (her session ended, or a task assigned to her had no update, move or tag from her for two of your
   wake-ups), start her again the same way. Pia does the same for a worker or reviewer who is unavailable.
-- **Watch for `@cato`, every minute.** Pia and the crew ask Boss things by writing `@cato` in a task update. Boss
+- **Watch for `@cato`, every minute.** Pia asks Boss things by writing `@cato` in a task update. Only Pia does: the
+  workers and reviewers ask Pia, and Pia decides what goes to Boss, so a `@cato` from anyone else is ignored. Boss
   is not a board member, so no notification reaches this session. At the start of a crew session, start
   `crew mentions --follow` as a `Monitor` (timeout 30 minutes, the most it allows). It checks the boards every 60
   seconds and prints one line per new mention, and each line wakes you. Re-arm it every time it expires, for as long
