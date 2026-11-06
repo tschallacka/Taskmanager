@@ -148,7 +148,14 @@ useSeoMeta({ title: computed(() => (boardName.value ? `Office · ${boardName.val
       />
       <div class="min-w-0 flex-1">
         <p class="truncate text-sm font-semibold text-default">
-          {{ mode === 'demo' ? 'Demo office' : (boardName || 'Office') }}
+          <NuxtLink
+            v-if="mode === 'live' && boardName"
+            :to="`/projects/${boardId}`"
+            class="hover:underline"
+          >{{ boardName }}</NuxtLink>
+          <template v-else>
+            {{ mode === 'demo' ? 'Demo office' : (boardName || 'Office') }}
+          </template>
         </p>
         <p class="truncate text-xs text-muted">
           {{ mode === 'demo' ? 'A made-up board playing every scene' : (crewName ? `${crewName} at work` : 'Who carries what, live from the board') }}

@@ -7,6 +7,7 @@ import { listFields, loadFieldValues } from '../../../utils/customFields'
 import { githubBadgesForBoard } from '../../../utils/githubBadges'
 import { blockedStatesOn } from '../../../utils/taskDependencyService'
 import { blockedMark } from '../../../utils/mcpBlockerLinks'
+import { isCrewBoard } from '../../../utils/officeCast'
 
 // Full board in one payload: columns ordered, tasks grouped by column, and the
 // per-task update count the cards render as a badge.
@@ -124,6 +125,7 @@ export default defineEventHandler(async (event) => {
     fields,
     fieldValues,
     githubBadges,
+    crewBoard: !isCustomer && await isCrewBoard(id),
     commentCounts: Object.fromEntries(counts.map(c => [c.taskId, Number(c.total)])),
     trashedCount
   }

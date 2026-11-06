@@ -11,6 +11,14 @@ import type { OfficePerson } from '../../shared/office/model'
 const OUTSIDE_KEYS = new Set(['customer', 'contact'])
 const ROLE_ORDER = ['pm', 'worker', 'ux', 'cq', 'qa', 'boss']
 
+/** Whether a crew works on `projectId`: its shadow board, or the board the crew was made on. The office route answers from the same test. */
+export async function isCrewBoard(projectId: string): Promise<boolean> {
+  const [link] = await db.select({ id: crewBoards.id }).from(crewBoards).where(eq(crewBoards.shadowProjectId, projectId))
+  if (link) return true
+  const [own] = await db.select({ id: crews.id }).from(crews).where(eq(crews.boardId, projectId))
+  return Boolean(own)
+}
+
 /** The office's people for `projectId`, names only (never an address), Pia first and the Boss last. */
 export async function officeCastOf(projectId: string, assigneeIds: string[]): Promise<{ crewName: string | null, cast: OfficePerson[] }> {
   const cast: OfficePerson[] = []
@@ -52,6 +60,7 @@ export async function officeCastOf(projectId: string, assigneeIds: string[]): Pr
     for (const row of rows) cast.push({ userId: row.id, key: `u-${row.id}`, name: row.name, role: 'worker' })
   }
 
-  cast.sort((a, b) => ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role))
+  // Role first, then key: the forks come back in no fixed order, so the seats must not depend on it.
+  cast.sort((a, b) => ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role) || a.key.localeCompare(b.key))
   return { crewName: crew?.name ?? null, cast }
 }

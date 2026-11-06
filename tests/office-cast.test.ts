@@ -75,7 +75,7 @@ after(async () => {
 test('a shadow board seats the members forked for it, the crew\'s Boss, and a guest; never the customer', async () => {
   const { crewName, cast } = await officeCastOf(shadowId, [stranger])
   assert.equal(crewName, 'Office crew')
-  assert.deepEqual(cast.map(p => p.key), ['pia', 'wren', 'wick', 'wynn', 'wade', `u-${stranger}`, 'usher', 'nina', 'quincy', 'boss'])
+  assert.deepEqual(cast.map(p => p.key), ['pia', `u-${stranger}`, 'wade', 'wick', 'wren', 'wynn', 'usher', 'nina', 'quincy', 'boss'])
   assert.deepEqual(cast.map(p => p.role), ['pm', 'worker', 'worker', 'worker', 'worker', 'worker', 'ux', 'cq', 'qa', 'boss'])
   // Wren is the fork for this board, not the crew's own Wren account.
   const [fork] = await db.select({ userId: crewBoardMembers.userId }).from(crewBoardMembers)

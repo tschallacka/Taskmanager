@@ -27,7 +27,8 @@ const {
   showTrashed,
   trashedCount,
   toggleShowTrashed,
-  isTrashed
+  isTrashed,
+  crewBoard
 } = useProjects()
 
 const projectId = computed(() => route.params.id as string)
@@ -35,6 +36,7 @@ const projectId = computed(() => route.params.id as string)
 const VIEWS = [
   { key: 'overview', label: 'Overview', icon: 'i-lucide-layout-dashboard' },
   { key: 'board', label: 'Board', icon: 'i-lucide-kanban' },
+  { key: 'office', label: 'Office', icon: 'i-lucide-building-2' },
   { key: 'list', label: 'List', icon: 'i-lucide-list' },
   { key: 'timeline', label: 'Timeline', icon: 'i-lucide-gantt-chart' },
   { key: 'calendar', label: 'Calendar', icon: 'i-lucide-calendar-days' },
@@ -46,14 +48,20 @@ const VIEWS = [
 ] as const
 
 // Time, messages and settings are the team's own: a customer's contact has no tab for them.
-const STAFF_ONLY_VIEWS: string[] = ['messages', 'time', 'settings']
-const visibleViews = computed(() => VIEWS.filter(v => !STAFF_ONLY_VIEWS.includes(v.key) || !isCustomerView.value))
+const STAFF_ONLY_VIEWS: string[] = ['messages', 'time', 'settings', 'office']
+// The office is a crew board's: it shows only on one, and only to the team's staff.
+const visibleViews = computed(() => VIEWS.filter(v => (v.key !== 'office' || crewBoard.value) && (!STAFF_ONLY_VIEWS.includes(v.key) || !isCustomerView.value)))
 
 const tabViews = computed(() => visibleViews.value.filter(v => v.key !== 'settings'))
 const view = computed(() => visibleViews.value.find(v => v.key === route.query.view)?.key ?? 'board')
 
 function setView(key: string) {
   navigateTo({ path: route.path, query: queryForView(route.query, key) }, { replace: true })
+}
+
+// The office is a page of its own, not a view of the board: the tab leads there.
+function openOffice() {
+  navigateTo(`/office/${projectId.value}`)
 }
 
 // The tab row scrolls sideways on a phone. Its edges fade where tabs are cut off,
@@ -474,24 +482,34 @@ useSeoMeta({
       :style="tabsMaskStyle"
       @scroll="updateTabCues"
     >
-      <button
+      <template
         v-for="v in tabViews"
         :key="v.key"
-        class="relative flex shrink-0 items-center gap-1.5 px-2.5 py-2 text-sm transition-colors"
-        :class="view === v.key ? 'font-medium text-default' : 'text-muted hover:text-default'"
-        :aria-current="view === v.key ? 'page' : undefined"
-        @click="setView(v.key)"
       >
-        <UIcon
-          :name="v.icon"
-          class="size-4"
-        />
-        {{ v.label }}
-        <span
-          class="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-primary transition-opacity duration-200"
-          :class="view === v.key ? 'opacity-100' : 'opacity-0'"
-        />
-      </button>
+        <button
+          class="relative flex shrink-0 items-center gap-1.5 px-2.5 py-2 text-sm transition-colors"
+          :class="view === v.key ? 'font-medium text-default' : 'text-muted hover:text-default'"
+          :aria-current="view === v.key ? 'page' : undefined"
+          @click="v.key === 'office' ? openOffice() : setView(v.key)"
+        >
+          <UIcon
+            :name="v.icon"
+            class="size-4"
+          />
+          {{ v.label }}
+          <span
+            class="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-primary transition-opacity duration-200"
+            :class="view === v.key ? 'opacity-100' : 'opacity-0'"
+          />
+        </button>
+        <HelpHint
+          v-if="v.key === 'office'"
+          page="agents/office-view"
+          label="About the Office view"
+        >
+          The office shows this board's crew at work: every task is a folder that moves between the desks as the board changes.
+        </HelpHint>
+      </template>
     </nav>
 
     <!-- Trash summary. The board itself draws the deleted columns and cards in
