@@ -48,7 +48,7 @@ describe('the kit file list', () => {
   })
 
   test('every shipped-shape file in the kit folder is listed', () => {
-    const shape = /\.(mjs|md|tmpl|json|sh)$|^fonts\.conf/
+    const shape = /\.(mjs|md|tmpl|json|sh)$/
     const present = readdirSync(KIT).filter((name) => {
       const path = join(KIT, name)
       return statSync(path).isFile() && shape.test(name) && !NOT_SHIPPED.test(name) && !SECRET_OR_RUN.test(name)
@@ -647,6 +647,34 @@ describe('crew update: the kit folder and the owner files', () => {
     assert.equal(out.code, 3)
     assert.match(out.stderr, /lists "\.\.\/escape\.mjs", which a kit does not ship/)
     assert.deepEqual(snapshot(dirA), before, 'nothing is installed')
+    assert.deepEqual(backupsOf(crew), [])
+  })
+
+  test('a bare fonts.conf listed in a --from folder is refused, and nothing is installed', async () => {
+    const crew = newCrew()
+    const dirA = await installedKit(crew)
+    const dirB = newerKit(dirA, crew)
+    writeFileSync(join(dirB, 'fonts.conf'), '<fontconfig/>\n')
+    editFile(join(dirB, 'kit-files.txt'), text => `${text}fonts.conf\n`)
+    const before = snapshot(dirA)
+    const out = await updateKit(dirA, crew, ['--from', dirB, '--kit', dirA])
+    assert.equal(out.code, 3, out.stderr)
+    assert.match(out.stderr, /lists "fonts\.conf", which a kit does not ship/)
+    assert.deepEqual(snapshot(dirA), before, 'nothing is installed')
+    assert.deepEqual(backupsOf(crew), [])
+  })
+
+  test('a --from folder whose kit-files.txt names a missing file is refused: the name is given, --kit is unchanged, no stage folder is left', async () => {
+    const crew = newCrew()
+    const dirA = await installedKit(crew)
+    const dirB = newerKit(dirA, crew)
+    editFile(join(dirB, 'kit-files.txt'), text => `${text}missing.mjs\n`)
+    const before = snapshot(dirA)
+    const out = await updateKit(dirA, crew, ['--from', dirB, '--kit', dirA])
+    assert.equal(out.code, 3, out.stderr)
+    assert.match(out.stderr, /lists "missing\.mjs", but .+ has no file of that name/)
+    assert.deepEqual(snapshot(dirA), before, '--kit is unchanged')
+    assert.deepEqual(readdirSync(crew.home).filter(name => name.startsWith('.update-')), [], 'no stage folder is left')
     assert.deepEqual(backupsOf(crew), [])
   })
 
