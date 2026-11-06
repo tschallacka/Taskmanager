@@ -81,7 +81,7 @@ function workspaceTicked(workspace: PickWorkspace): boolean {
       :model-value="modelValue.all"
       :disabled="disabled"
       label="Select all"
-      description="Every board you can open, in every workspace, now and later"
+      description="All your boards, including ones you get later"
       @update:model-value="(on: boolean | 'indeterminate') => setAll(on === true)"
     />
 
