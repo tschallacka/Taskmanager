@@ -33,26 +33,39 @@ export async function addressesOfUser(userId: string): Promise<string[]> {
     .map(email => email.toLowerCase())
 }
 
+/** The user id of the account that holds a verified extra address. Null when no account has it. */
+async function extraOwnerOf(address: string): Promise<string | null> {
+  const [extra] = await db.select({ userId: userEmail.userId }).from(userEmail)
+    .where(and(sql`lower(${userEmail.email}) = ${address}`, isNotNull(userEmail.verifiedAt)))
+  return extra?.userId ?? null
+}
+
+/** A confirmation link carries the same kind of random token as an invitation link; these names say what it is for here. */
+function newConfirmToken() {
+  return newInvitationToken()
+}
+
+function hashConfirmToken(token: string) {
+  return hashInvitationToken(token)
+}
+
 /** The account an address belongs to, as its main address or a verified extra one. Null when none has it. */
 export async function accountOfAddress(email: string): Promise<{ userId: string, mainEmail: string } | null> {
   const address = email.trim().toLowerCase()
   const [main] = await db.select({ id: user.id, email: user.email }).from(user)
     .where(sql`lower(${user.email}) = ${address}`)
   if (main) return { userId: main.id, mainEmail: main.email }
-  const [extra] = await db.select({ userId: userEmail.userId }).from(userEmail)
-    .where(and(sql`lower(${userEmail.email}) = ${address}`, isNotNull(userEmail.verifiedAt)))
-  if (!extra) return null
-  const [owner] = await db.select({ email: user.email }).from(user).where(eq(user.id, extra.userId))
-  return owner ? { userId: extra.userId, mainEmail: owner.email } : null
+  const userId = await extraOwnerOf(address)
+  if (!userId) return null
+  const [owner] = await db.select({ email: user.email }).from(user).where(eq(user.id, userId))
+  return owner ? { userId, mainEmail: owner.email } : null
 }
 
 /** The main address of the account a verified extra address belongs to. Null for a main address or an unknown one. */
 export async function mainAddressForExtra(email: string): Promise<string | null> {
-  const address = email.trim().toLowerCase()
-  const [extra] = await db.select({ userId: userEmail.userId }).from(userEmail)
-    .where(and(sql`lower(${userEmail.email}) = ${address}`, isNotNull(userEmail.verifiedAt)))
-  if (!extra) return null
-  const [owner] = await db.select({ email: user.email }).from(user).where(eq(user.id, extra.userId))
+  const userId = await extraOwnerOf(email.trim().toLowerCase())
+  if (!userId) return null
+  const [owner] = await db.select({ email: user.email }).from(user).where(eq(user.id, userId))
   return owner?.email ?? null
 }
 
@@ -103,7 +116,7 @@ export async function startExtraEmail(
   const now = new Date()
   await db.insert(userEmail).values({ id, userId, email, verifiedAt: null, createdAt: now })
 
-  const { token, tokenHash } = newInvitationToken()
+  const { token, tokenHash } = newConfirmToken()
   const expiresAt = new Date(Date.now() + CONFIRM_TTL_MS)
   await db.insert(verification).values({
     id: genId(),
@@ -125,7 +138,7 @@ export async function startExtraEmail(
 
 /** Confirms an extra address for the signed-in account that added it. */
 export async function confirmExtraEmail(token: string, userId: string): Promise<{ email: string }> {
-  const identifier = `${CONFIRM_PREFIX}${hashInvitationToken(token)}`
+  const identifier = `${CONFIRM_PREFIX}${hashConfirmToken(token)}`
   const [row] = await db.select().from(verification).where(eq(verification.identifier, identifier))
   if (!row || row.expiresAt.getTime() <= Date.now()) {
     throw createError({ statusCode: 410, message: 'This link is no longer valid. Add the address again.' })

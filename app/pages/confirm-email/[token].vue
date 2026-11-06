@@ -79,7 +79,7 @@ onMounted(async () => {
         </NuxtLink>
         <NuxtLink
           v-if="state === 'failed'"
-          to="/settings#extra-emails"
+          :to="EXTRA_EMAILS_LINK"
           class="text-sm text-primary underline"
         >
           Go to Settings, Extra email addresses
