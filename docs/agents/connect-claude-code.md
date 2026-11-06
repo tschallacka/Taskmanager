@@ -23,7 +23,8 @@ a scrambled copy and cannot show it again. If you lose it, you make a new one.
 
 ## 2. Connect Claude Code
 
-In the same box, press **Copy command**. It copies two lines, which look like this (with your own address and key):
+In the same box, press **Copy command**. It copies the export line and the add command, plus comment lines that do nothing
+when pasted, which look like this (with your own address and key):
 
 ```
 export TASKMANAGER_API_KEY=arn_...
@@ -62,7 +63,7 @@ cannot sign in.
 
 If `claude mcp add` answers `MCP server taskmanager already exists in user config`, a connection is already there, and
 adding it again changes nothing. Replace it instead. In the box where you copied the first command, press **Copy update
-command**. **Settings**, **Sprocket** shows the same command under **MCP server**. It has three lines:
+command**. It has three lines:
 
 ```
 export TASKMANAGER_API_KEY=arn_...

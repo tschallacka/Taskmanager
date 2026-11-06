@@ -60,7 +60,6 @@ const effortValue = computed(() => settings.value?.effort ?? DEFAULT_EFFORT)
 const origin = computed(() => (import.meta.client ? window.location.origin : ''))
 
 const mcpCommand = computed(() => mcpAddCommand(origin.value))
-const replaceCommand = computed(() => mcpReplaceCommand(origin.value))
 const kitCommands = computed(() => crewKitCommands(origin.value))
 const channelCommand = crewChannelCommand()
 const instructions = computed(() => agentInstructions(origin.value))
@@ -326,7 +325,7 @@ async function copySkill() {
               <p class="text-xs text-muted">
                 For an agent of your own, not Sprocket: each Sprocket run gets a short-lived key of its own.
                 Start Claude Code on the agent's machine from a terminal where you ran
-                <code class="font-mono">export TASKMANAGER_API_KEY=arn_…</code>, then paste this. Put the export line in your shell profile too (~/.zshrc on a Mac, ~/.bashrc on Linux), so a new terminal has the key. It connects
+                <code class="font-mono">export TASKMANAGER_API_KEY=arn_…</code>, then paste this. Put the export line in your shell profile too, as under MCP server, so a new terminal has the key. It connects
                 the MCP server and installs the crew kit and its skill, using the key only as that variable.
               </p>
               <pre class="text-xs font-mono bg-elevated/50 border border-default rounded-md p-3 overflow-x-auto max-h-64">{{ instructions }}</pre>
@@ -359,11 +358,10 @@ async function copySkill() {
                 >Connect an AI agent</NuxtLink>.
               </p>
               <p class="text-xs text-muted">
-                Already connected? One paste replaces the key: it removes the old server and adds it again.
+                Already connected? Make a new key under Settings → API keys. Its panel shows the update command with that key filled in.
               </p>
-              <pre class="text-xs font-mono bg-elevated/50 border border-default rounded-md p-3 overflow-x-auto">{{ replaceCommand }}</pre>
               <p class="text-xs text-muted">
-                Restart Claude Code from a terminal that has the new key. A running session keeps the key it started with.
+                {{ RESTART_STEP }}
               </p>
             </div>
 

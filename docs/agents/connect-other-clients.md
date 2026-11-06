@@ -32,7 +32,7 @@ Claude Desktop and many other clients take a block like this. The **Setup guide*
     "taskmanager": {
       "type": "http",
       "url": "https://your-taskmanager/api/mcp",
-      "headers": { "Authorization": "Bearer arn_your_key_here" }
+      "headers": { "Authorization": "Bearer <your key>" }
     }
   }
 }

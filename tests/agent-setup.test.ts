@@ -16,7 +16,7 @@ test('the replace command sets the key, removes the old server and adds it again
 })
 
 test('the remove and the add are separate commands, so a failed remove does not stop the add', () => {
-  const command = mcpReplaceCommand(ORIGIN)
+  const command = mcpReplaceCommand(ORIGIN, 'arn_test_key')
   assert.doesNotMatch(command, /&&|\|\|/)
   assert.doesNotMatch(command, /;\s*claude mcp add/)
 })
@@ -27,8 +27,14 @@ test('the replace command leaves the key out of the MCP entry and uses the varia
   assert.equal(command.split('arn_test_key').length - 1, 1, 'the key appears only in the export line')
 })
 
-test('without a key the replace command still shows the placeholder export', () => {
-  assert.ok(mcpReplaceCommand(ORIGIN).includes('\nexport TASKMANAGER_API_KEY=arn_your_key_here\n'))
+test('the replace command refuses to build without a real key, so no placeholder can be copied', () => {
+  assert.throws(() => mcpReplaceCommand(ORIGIN, ''), /real key/)
+  assert.throws(() => mcpReplaceCommand(ORIGIN, 'your key'), /real key/)
+})
+
+test('no copied command carries the old placeholder that would overwrite a working key', () => {
+  assert.doesNotMatch(mcpReplaceCommand(ORIGIN, 'arn_test_key'), /your_key_here/)
+  assert.doesNotMatch(exportKeyCommand('arn_test_key'), /your_key_here/)
 })
 
 test('the replace command starts with the profile step as comments, so the copy carries it', () => {
