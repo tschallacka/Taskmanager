@@ -27,6 +27,7 @@
 // delivery_failed goes to the crew's pm only (a team that is not a crew: its owners), with ids, the class, the attempts and a code; never a customer.
 import { and, asc, eq, sql } from 'drizzle-orm'
 import { db } from '../db'
+import { teamIdsOf } from './api-keys'
 import { apiKeys, crews, member, projectGithubRepos, projects, user } from '../db/schema'
 import { customerIdsOf, isTeamMember } from './auth-helpers'
 import { crewAccountLive, isCrewAddress, normalizeAddress, personKeyOf } from './crewAccounts'
@@ -970,8 +971,8 @@ export async function actorNameOf(userId: string | null): Promise<string | null>
 
 /** The teams and customers a user belongs to right now. */
 export async function currentMembership(userId: string): Promise<Membership> {
-  const teams = await db.select({ teamId: member.organizationId }).from(member).where(eq(member.userId, userId))
-  return { teamIds: teams.map(team => team.teamId), customerIds: await customerIdsOf(userId) }
+  const teamIds = await teamIdsOf(userId)
+  return { teamIds, customerIds: await customerIdsOf(userId) }
 }
 
 /**

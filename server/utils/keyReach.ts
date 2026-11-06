@@ -7,7 +7,10 @@ import { db } from '../db'
 import { agentAudit, apiKeyBoards, apiKeyWorkspaces, apiKeys, member, organization, projects } from '../db/schema'
 import type { ApiKey } from '../db/schema'
 import { workspaceTopic } from './realtime'
-import { openBoardScope } from './mcpAccess'
+import { boardFilter, openBoardScope } from './mcpAccess'
+import { readGrantedBoardIds } from './crewBoardAccess'
+import { loadKeyReach } from './api-keys'
+import type { ApiKeyContext } from './api-keys'
 import { genId } from './projects'
 
 /** What the owner picked. A null workspace is the personal workspace. */
@@ -175,6 +178,64 @@ export async function recordKeyChange(userId: string, key: { id: string, name: s
   } catch (error) {
     console.error('[api-keys] could not audit a key change', error)
   }
+}
+
+export interface ReachedBoard {
+  id: string
+  name: string
+  teamId: string | null
+  /** The workspace's name, or Personal. */
+  workspace: string
+  /** A real board a crew reads through its link: the key reads it, and never changes it. */
+  readOnly: boolean
+}
+
+/**
+ * The boards each key reaches now, by name and workspace: what its reach covers and the owner can open,
+ * plus the real boards a crew reads through its link, marked read-only. Read per call, so a board added
+ * later shows up, and a board the owner has lost does not.
+ */
+export async function reachedBoardsOf(userId: string, keys: ApiKey[]): Promise<Map<string, ReachedBoard[]>> {
+  const result = new Map<string, ReachedBoard[]>()
+  if (!keys.length) return result
+  const workspaces = await workspacesOf(userId)
+  const memberTeamIds = workspaces.map(workspace => workspace.id)
+  const workspaceName = new Map(workspaces.map(workspace => [workspace.id, workspace.name]))
+  const workspaceOf = (teamId: string | null) => (teamId ? workspaceName.get(teamId) ?? 'a team' : 'Personal')
+
+  for (const key of keys) {
+    const context: ApiKeyContext = {
+      keyId: key.id,
+      keyName: key.name,
+      userId,
+      teamId: key.teamId,
+      customerId: key.customerId,
+      projectId: key.projectId,
+      scopes: [],
+      reach: await loadKeyReach(key),
+      memberTeamIds
+    }
+    const reachable = await db.select({ id: projects.id, name: projects.name, teamId: projects.teamId, archivedAt: projects.archivedAt })
+      .from(projects)
+      .where(await boardFilter(context))
+    const reachableIds = new Set(reachable.map(row => row.id))
+    const crewIds = (await readGrantedBoardIds(context)).filter(id => !reachableIds.has(id))
+    const crewRows = crewIds.length
+      ? await db.select({ id: projects.id, name: projects.name, teamId: projects.teamId, archivedAt: projects.archivedAt })
+          .from(projects)
+          .where(inArray(projects.id, crewIds))
+      : []
+
+    const boards: ReachedBoard[] = [
+      ...reachable.map(row => ({ row, readOnly: false })),
+      ...crewRows.map(row => ({ row, readOnly: true }))
+    ]
+      .filter(({ row }) => !row.archivedAt)
+      .map(({ row, readOnly }) => ({ id: row.id, name: row.name, teamId: row.teamId, workspace: workspaceOf(row.teamId), readOnly }))
+      .sort((a, b) => a.workspace.localeCompare(b.workspace) || a.name.localeCompare(b.name))
+    result.set(key.id, boards)
+  }
+  return result
 }
 
 /** The reach as one line for the audit: what the key reaches now. */

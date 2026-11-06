@@ -13,6 +13,15 @@ interface ReachBoard {
   teamId: string | null
 }
 
+/** A board a key reaches, by name and workspace; read-only when a crew reads it through its link. */
+interface ReachedBoardRow {
+  id: string
+  name: string
+  teamId: string | null
+  workspace: string
+  readOnly: boolean
+}
+
 interface ApiKeySummary {
   id: string
   name: string
@@ -28,6 +37,7 @@ interface ApiKeySummary {
   allBoards: boolean
   workspaces: ReachWorkspace[]
   boards: ReachBoard[]
+  reachedBoards: ReachedBoardRow[]
 }
 
 interface ApiKeysResponse {
@@ -50,11 +60,6 @@ const { data, status, refresh } = useFetch<ApiKeysResponse>('/api/settings/api-k
 const keys = computed(() => data.value?.keys ?? [])
 const workspaces = computed(() => data.value?.workspaces ?? [])
 const pickBoards = computed(() => data.value?.boards ?? [])
-
-function workspaceNameOf(teamId: string | null): string {
-  if (teamId === null) return 'Personal'
-  return workspaces.value.find(workspace => workspace.id === teamId)?.name ?? 'a team'
-}
 
 const wsKeyOf = (teamId: string | null) => teamId ?? 'personal'
 
@@ -737,14 +742,15 @@ function reachLabel(key: ApiKeySummary): string {
                         {{ workspace.teamId ? `All of ${workspace.name}` : 'Your personal boards' }}, including ones you get later
                       </li>
                       <li
-                        v-for="board in key.boards"
+                        v-for="board in key.reachedBoards"
                         :key="board.id"
                       >
                         <NuxtLink
                           :to="`/projects/${board.id}`"
                           class="text-primary underline"
                         >{{ board.name }}</NuxtLink>
-                        · {{ workspaceNameOf(board.teamId) }}
+                        · {{ board.workspace }}
+                        <span v-if="board.readOnly">· read-only</span>
                       </li>
                     </ul>
                   </div>

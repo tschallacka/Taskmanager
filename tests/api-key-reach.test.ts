@@ -16,6 +16,7 @@ const { db } = await import('../server/db')
 const { apiKeys, apiKeyBoards, apiKeyWorkspaces, member, organization, projectGuests, projects, user } = await import('../server/db/schema')
 const { boardFilter, audienceOf } = await import('../server/utils/mcpAccess')
 const { isNarrowedReach } = await import('../server/utils/api-keys')
+const { reachedBoardsOf } = await import('../server/utils/keyReach')
 
 const tag = randomBytes(4).toString('hex')
 const id = (name: string) => `akreach-${tag}-${name}`
@@ -157,6 +158,33 @@ test('a workspace where the owner is only a guest is a customer audience, and it
   const context = await contextFor(keys.all, reachOf({ all: true }))
   assert.ok((await reachableIds(context, [guestBoard])).includes(guestBoard))
   assert.equal(audienceOf(context, { id: guestBoard, userId: owner, teamId: teamB }), 'customer')
+})
+
+test('the boards a key reaches are listed by name and workspace: Select all, a whole workspace, and single boards', async () => {
+  const rows = await db.select().from(apiKeys).where(inArray(apiKeys.id, [keys.all, keys.workspace, keys.fixed]))
+  const listed = await reachedBoardsOf(owner, rows)
+  const shown = (keyId: string) => (listed.get(keyId) ?? []).map(board => `${board.name} in ${board.workspace}`)
+  assert.ok(shown(keys.all).includes(`${boards.a1} in Reach A`))
+  assert.ok(shown(keys.all).includes(`${boards.personal} in Personal`))
+  assert.ok(!shown(keys.all).some(line => line.startsWith(boards.b1)), 'a board of a workspace the owner is not in is not listed')
+  assert.ok(shown(keys.workspace).includes(`${boards.a1} in Reach A`))
+  assert.deepEqual(shown(keys.fixed), [`${boards.a1} in Reach A`])
+  assert.ok([...listed.values()].flat().every(board => board.readOnly === false), 'no board is read-only without a crew link')
+})
+
+test('a key with a grant lists a board added later, and a board the owner has lost is not listed', async () => {
+  const later = id('board-a4')
+  await addBoard(later, teamA)
+  const rows = await db.select().from(apiKeys).where(inArray(apiKeys.id, [keys.workspace]))
+  const shownLater = (await reachedBoardsOf(owner, rows)).get(keys.workspace)!.map(board => board.id)
+  assert.ok(shownLater.includes(later))
+  await db.delete(member).where(eq(member.userId, owner))
+  try {
+    const none = (await reachedBoardsOf(owner, rows)).get(keys.workspace)!
+    assert.deepEqual(none, [])
+  } finally {
+    await db.insert(member).values({ id: id('member-a-back'), organizationId: teamA, userId: owner, role: 'owner', createdAt: at })
+  }
 })
 
 test('a key is narrowed when it has single boards and no whole workspace, or a customer', () => {

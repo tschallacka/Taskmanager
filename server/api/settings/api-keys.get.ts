@@ -1,7 +1,7 @@
 import { desc, eq } from 'drizzle-orm'
 import { db } from '../../db'
 import { apiKeys } from '../../db/schema'
-import { openBoardsOf, reachViewsOf, workspacesOf } from '../../utils/keyReach'
+import { openBoardsOf, reachViewsOf, reachedBoardsOf, workspacesOf } from '../../utils/keyReach'
 
 /**
  * The caller's API keys, whichever workspace they were made in, each with what it reaches. A key made
@@ -12,10 +12,11 @@ export default defineEventHandler(async (event) => {
   const userId = event.context.session.user.id
 
   const rows = await db.select().from(apiKeys).where(eq(apiKeys.userId, userId)).orderBy(desc(apiKeys.createdAt))
-  const [views, workspaces, boards] = await Promise.all([
+  const [views, workspaces, boards, reached] = await Promise.all([
     reachViewsOf(rows),
     workspacesOf(userId),
-    openBoardsOf(userId)
+    openBoardsOf(userId),
+    reachedBoardsOf(userId, rows)
   ])
   const workspaceName = new Map(workspaces.map(workspace => [workspace.id, workspace.name]))
 
@@ -42,7 +43,8 @@ export default defineEventHandler(async (event) => {
         editable: key.teamId === null,
         allBoards: view?.allBoards ?? false,
         workspaces: view?.workspaces ?? [],
-        boards: view?.boards ?? []
+        boards: view?.boards ?? [],
+        reachedBoards: reached.get(key.id) ?? []
       }
     })
   }
