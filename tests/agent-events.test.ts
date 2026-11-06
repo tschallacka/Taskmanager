@@ -99,7 +99,7 @@ function eventFor(over: Partial<AgentEventInput> = {}): AgentEventInput {
 
 function lookups(members: Record<string, string[]> = {}, contacts: Record<string, string[]> = {}): AudienceLookups {
   return {
-    isMember: async (userId, teamId) => (members[userId] ?? []).includes(teamId),
+    isStaff: async (userId, teamId) => (members[userId] ?? []).includes(teamId),
     customerIds: async userId => contacts[userId] ?? []
   }
 }
@@ -188,7 +188,8 @@ test('a resume replays nothing of a team or customer the user has left', () => {
   const acme = { ...kept({ audience: 'customer', teamId: null, customerId: 'acme' }), id: 2, at: 0 }
   const own = { ...kept({ teamId: null }), id: 3, at: 0 }
   assert.equal(stillMember(teamA, { teamIds: ['team-b'], customerIds: [] }), false)
-  assert.equal(stillMember(teamA, { teamIds: ['team-a'], customerIds: [] }), true)
+  assert.equal(stillMember(teamA, { teamIds: ['team-a'], staffTeamIds: ['team-a'], customerIds: [] }), true)
+  assert.equal(stillMember(teamA, { teamIds: ['team-a'], staffTeamIds: [], customerIds: [] }), false, 'a plain member is no longer replayed staff events')
   assert.equal(stillMember(acme, { teamIds: [], customerIds: [] }), false)
   assert.equal(stillMember(acme, { teamIds: [], customerIds: ['acme'] }), true)
   assert.equal(stillMember(own, { teamIds: [], customerIds: [] }), true)
@@ -205,6 +206,21 @@ test('a resume after a team was left replays only what the user still belongs to
   assert.deepEqual(ids(pinned.connection.text()), [], 'a team the user left is not replayed')
   const { connection } = open(hub, key('k-own', 'u-member'), BASE - 1, { teamIds: [], customerIds: [] })
   assert.deepEqual(ids(connection.text()), [BASE + 2], 'the personal event is still replayed')
+})
+
+test('a plain member of a workspace gets none of its staff events, so a key with a grant cannot see them', async () => {
+  const { hub } = makeHub()
+  open(hub, key('k-plain-grant', 'u-plain'))
+  const plainMember: AudienceLookups = { isStaff: async () => false, customerIds: async () => [] }
+  assert.equal(await emitAgentEventWith(hub, plainMember, 'u-plain', eventFor({ board: teamBoard })), false)
+  const owner = lookups({ 'u-plain': ['team-a'] })
+  assert.equal(await emitAgentEventWith(hub, owner, 'u-plain', eventFor({ board: teamBoard })), true)
+})
+
+test('a resume of a team staff event is replayed only while the user is still its owner or admin', () => {
+  const teamStaff = { ...kept({ teamId: 'team-a' }), id: 1, at: 0 }
+  assert.equal(stillMember(teamStaff, { teamIds: ['team-a'], staffTeamIds: [], customerIds: [] }), false)
+  assert.equal(stillMember(teamStaff, { teamIds: ['team-a'], staffTeamIds: ['team-a'], customerIds: [] }), true)
 })
 
 // ── Frames and text ───────────────────────────────────────────────────
@@ -680,7 +696,7 @@ test('the last stream closed and the backlog aged out: no emit work, and no per-
 
   let lookupsRun = 0
   const counting: AudienceLookups = {
-    isMember: async () => {
+    isStaff: async () => {
       lookupsRun++
       return true
     },

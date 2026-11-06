@@ -53,7 +53,7 @@ function open(hub: AgentEventHub, streamKey: StreamKey) {
 
 function lookups(members: Record<string, string[]> = {}, contacts: Record<string, string[]> = {}): AudienceLookups {
   return {
-    isMember: async (userId, teamId) => (members[userId] ?? []).includes(teamId),
+    isStaff: async (userId, teamId) => (members[userId] ?? []).includes(teamId),
     customerIds: async userId => contacts[userId] ?? []
   }
 }

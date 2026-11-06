@@ -185,7 +185,7 @@ async function loadKeyReach(key: ApiKey): Promise<KeyReach> {
 }
 
 // The roles that make a board of a workspace staff for a key (the same as the browser's admin roles).
-const STAFF_ROLES = ['owner', 'admin']
+export const STAFF_ROLES = ['owner', 'admin']
 
 async function teamIdsOf(userId: string): Promise<{ memberTeamIds: string[], staffTeamIds: string[] }> {
   const rows = await db.select({ teamId: member.organizationId, role: member.role }).from(member).where(eq(member.userId, userId))
