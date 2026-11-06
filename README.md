@@ -465,7 +465,7 @@ Anything addressable in the app is also addressable by its link. Paste the URL o
 The endpoint is `https://taskmanager.example.com/api/mcp`, spoken over streamable HTTP and authenticated with an `Authorization: Bearer` header.
 
 ```bash
-export TASKMANAGER_API_KEY=arn_your_key_here
+export TASKMANAGER_API_KEY=arn_...
 claude mcp add --scope user --transport http taskmanager https://taskmanager.example.com/api/mcp \
   --header 'Authorization: Bearer ${TASKMANAGER_API_KEY}'
 ```
@@ -480,7 +480,7 @@ For clients configured with JSON (Claude Code's `.mcp.json` also accepts `"Beare
     "taskmanager": {
       "type": "http",
       "url": "https://taskmanager.example.com/api/mcp",
-      "headers": { "Authorization": "Bearer arn_your_key_here" }
+      "headers": { "Authorization": "Bearer arn_..." }
     }
   }
 }

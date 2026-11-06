@@ -78,7 +78,7 @@ export function agentInstructions(origin: string): string {
 The API key is in your environment as $${KEY_VARIABLE}. Never echo it, print it or write its
 value anywhere. The command below stores the variable's name, not its value, and Claude Code
 fills it in every time it starts. If the variable is not set, stop and ask me to run
-\`export ${KEY_VARIABLE}=<my key>\` (or put it in my shell profile) and start you again.
+\`${exportKeyCommand('<my key>')}\` (or put it in my shell profile) and start you again.
 
 1. Connect its MCP server, exactly as written (the single quotes matter):
    claude mcp add --scope user --transport http taskmanager ${origin}/api/mcp --header 'Authorization: Bearer \${${KEY_VARIABLE}}'

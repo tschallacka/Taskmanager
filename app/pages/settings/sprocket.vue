@@ -248,7 +248,7 @@ async function copySkill() {
                 <NuxtLink
                   to="/settings"
                   class="text-primary underline"
-                >Settings → API keys</NuxtLink>.
+                >Settings → API keys &amp; MCP</NuxtLink>.
               </p>
               <p
                 v-else-if="agent"
@@ -351,14 +351,14 @@ async function copySkill() {
                 {{ KEY_VARIABLE_HOME }}
                 It saves the variable's name, not the key: Claude Code fills
                 <code class="font-mono">$TASKMANAGER_API_KEY</code> in from the environment each time it starts.
-                A new key under Settings → API keys shows it with the export line filled in. More clients on
+                A new key under Settings → API keys &amp; MCP shows it with the export line filled in. More clients on
                 <NuxtLink
                   to="/mcp"
                   class="text-primary underline"
                 >Connect an AI agent</NuxtLink>.
               </p>
               <p class="text-xs text-muted">
-                Already connected? Make a new key under Settings → API keys. Its panel shows the update command with that key filled in.
+                Already connected? Make a new key under Settings → API keys &amp; MCP. Its panel shows the update command with that key filled in.
               </p>
               <p class="text-xs text-muted">
                 {{ RESTART_STEP }}
