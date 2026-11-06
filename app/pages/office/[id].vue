@@ -2,6 +2,7 @@
 import type { OfficeSnapshot } from '#shared/office/model'
 import { DemoBoard } from '#shared/office/demo'
 import type { HoverInfo, OfficeScene } from '~/office/office'
+import { pollFailureOf } from '~/office/pollFailure'
 
 definePageMeta({ layout: 'app' })
 
@@ -23,6 +24,8 @@ const showLegend = ref(false)
 const lag = ref(0)
 const paused = ref(false)
 const noWebGL = ref(false)
+// A board the viewer cannot see: no room is drawn and polling stops. Set once, for this page visit.
+const unseen = ref(false)
 
 let scene: OfficeScene | null = null
 let timer: ReturnType<typeof setTimeout> | null = null
@@ -48,16 +51,24 @@ function stop() {
 
 async function pollLive() {
   stop()
-  if (mode.value !== 'live') return
+  if (mode.value !== 'live' || unseen.value) return
   if (!document.hidden) {
     try {
       show(await $fetch<OfficeSnapshot>(`/api/projects/${boardId.value}/office`))
       error.value = ''
     } catch (e) {
-      const status = (e as { statusCode?: number })?.statusCode
-      const reason = (e as { data?: { data?: { reason?: string } } })?.data?.data?.reason
-      if (reason === 'no-crew') error.value = 'No crew works on this board, so there is no office to show.'
-      else error.value = status === 404 ? 'This board is not one you can see.' : 'Could not reach the board; trying again.'
+      const failure = pollFailureOf(e)
+      if (failure.kind === 'unseen') {
+        // The server answers 404 for a board the viewer cannot see. Such a board gets no room: the scene is
+        // taken down and polling stops for this visit.
+        unseen.value = true
+        error.value = ''
+        scene?.dispose()
+        scene = null
+        return
+      }
+      if (failure.kind === 'no-crew') error.value = 'No crew works on this board, so there is no office to show.'
+      else error.value = 'Could not reach the board; trying again.'
     }
   }
   timer = setTimeout(pollLive, 3000)
@@ -234,13 +245,28 @@ useSeoMeta({ title: computed(() => (boardName.value ? `Office · ${boardName.val
 
     <div class="relative min-h-0 flex-1 overflow-hidden bg-[#1e2235]">
       <div
+        v-if="!unseen"
         ref="host"
         class="absolute inset-0"
         data-office-canvas
       />
 
       <div
-        v-if="noWebGL"
+        v-if="unseen"
+        class="absolute inset-0 flex items-center justify-center px-4"
+        data-office-unseen
+      >
+        <p class="text-center text-sm text-white">
+          This board is not one you can see.
+          <NuxtLink
+            to="/projects"
+            class="whitespace-nowrap underline"
+          >Back to your boards</NuxtLink>
+        </p>
+      </div>
+
+      <div
+        v-if="noWebGL && !unseen"
         class="absolute inset-0 flex items-center justify-center px-4"
       >
         <p class="text-center text-sm text-white">
@@ -254,7 +280,7 @@ useSeoMeta({ title: computed(() => (boardName.value ? `Office · ${boardName.val
       </div>
 
       <p
-        v-if="error"
+        v-if="error && !unseen"
         class="absolute left-1/2 top-3 -translate-x-1/2 rounded-md bg-error/90 px-3 py-1.5 text-xs text-white shadow"
       >
         {{ error }}
