@@ -155,6 +155,8 @@ interface BoardPayload {
   commentCounts: Record<string, number>
   // GitHub summaries per task, for the cards' badges. Only links the viewer may see.
   githubBadges?: Record<string, GithubBadge[]>
+  // Whether a crew works on this board, so the Office view is offered. Never sent to a customer.
+  crewBoard?: boolean
   // The project's custom fields and each task's values. Staff only; a
   // contact's board carries empty ones.
   fields?: ProjectField[]
@@ -184,6 +186,8 @@ const _board = ref<{ columns: ProjectColumn[], tasks: ProjectTask[] } | null>(nu
 // Update counts live beside the board: task PUT responses do not carry them, so
 // folding them into the task would wipe the badge on every edit.
 const _commentCounts = ref<Record<string, number>>({})
+// Whether the board is a crew's, so its Office view is offered. Set with the board it came with.
+const _crewBoard = ref(false)
 // The open board's GitHub badges, from the board endpoint. Read by each card.
 const _githubBadges = ref<Record<string, GithubBadge[]>>({})
 // The open board's subtasks. Kept beside the cards rather than among them, so
@@ -274,6 +278,7 @@ const _boardCache = new Map<string, {
   people: ProjectPerson[]
   commentCounts: Record<string, number>
   githubBadges: Record<string, GithubBadge[]>
+  crewBoard: boolean
 }>()
 
 function cacheBoard(projectId: string) {
@@ -285,7 +290,8 @@ function cacheBoard(projectId: string) {
     subtasks: _subtasks.value,
     people: _people.value,
     commentCounts: _commentCounts.value,
-    githubBadges: _githubBadges.value
+    githubBadges: _githubBadges.value,
+    crewBoard: _crewBoard.value
   })
   while (_boardCache.size > BOARD_CACHE_SIZE) _boardCache.delete(_boardCache.keys().next().value!)
 }
@@ -645,6 +651,7 @@ export function useProjects() {
         _people.value = cached?.people ?? []
         _commentCounts.value = cached?.commentCounts ?? {}
         _githubBadges.value = cached?.githubBadges ?? {}
+        _crewBoard.value = cached?.crewBoard ?? false
         _trashedCount.value = 0
       }
       _activeProjectId.value = id
@@ -661,6 +668,7 @@ export function useProjects() {
         _people.value = people
         _commentCounts.value = board.commentCounts ?? {}
         _githubBadges.value = board.githubBadges ?? {}
+        _crewBoard.value = board.crewBoard ?? false
         _trashedCount.value = board.trashedCount ?? 0
         ingestBoardFields(id, board.fields ?? [], board.fieldValues ?? {})
       }
@@ -822,6 +830,7 @@ export function useProjects() {
         _subtasks.value = board.subtasks ?? []
         _commentCounts.value = board.commentCounts ?? {}
         _githubBadges.value = board.githubBadges ?? {}
+        _crewBoard.value = board.crewBoard ?? false
         _trashedCount.value = board.trashedCount ?? 0
         ingestBoardFields(projectId, board.fields ?? [], board.fieldValues ?? {})
       }
@@ -1106,6 +1115,7 @@ export function useProjects() {
     setLabelColor,
     showTrashed: _showTrashed,
     trashedCount: _trashedCount,
+    crewBoard: _crewBoard,
     toggleShowTrashed,
     isTrashed,
     addColumn,

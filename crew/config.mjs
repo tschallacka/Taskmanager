@@ -104,7 +104,7 @@ export function loadCreds() {
         apiKey: person.apiKey,
         fork: data.board?.name ?? true,
         role: forkRole(person.agentType),
-        boardId: data.shadowBoard?.id ?? null,
+        boardId: data.shadowBoard?.id ?? null
       }
     }
   }

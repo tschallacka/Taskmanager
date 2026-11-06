@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { attachTeamCrew, downloadForkFile, forkFileName, forkTeamCrew } from '~/composables/useTeamCrews'
 import type { ForkResult, TeamCrewsList } from '~/composables/useTeamCrews'
+import { guessCrewHome } from '~/utils/crewHome'
 
 // "Give a board a crew", step by step: pick the board and crew, attach, fork the members (or not), hand the
 // keys to whoever runs the crew, and check it worked. The panel's form does the same in one go for people
@@ -109,9 +110,11 @@ async function copy(text: string) {
   }
 }
 
-const initCommand = computed(() => `CREW_HOME=~/crew-home/${crewSlug.value} node <kit folder>/init.mjs --forks ~/Downloads/${fileName.value || `forks-${crewSlug.value}-<board>.json`}`)
+const crewHome = ref('')
+const crewHomeNow = computed(() => crewHome.value || guessCrewHome(crewSlug.value))
+const initCommand = computed(() => `CREW_HOME=${crewHomeNow.value} node <kit folder>/init.mjs --forks ~/Downloads/${fileName.value || `forks-${crewSlug.value}-<board>.json`}`)
 const sampleAgent = computed(() => forkResult.value?.members[0]?.agentType ?? link.value?.forks[0]?.agentType ?? '<agent type>')
-const checkCommand = computed(() => `CREW_HOME=~/crew-home/${crewSlug.value} node <kit folder>/crew.mjs ${sampleAgent.value} mcp list_boards '{}'`)
+const checkCommand = computed(() => `CREW_HOME=${crewHomeNow.value} node <kit folder>/crew.mjs ${sampleAgent.value} mcp list_boards '{}'`)
 
 function next() {
   if (step.value === 2) {
@@ -337,6 +340,11 @@ async function openCrewBoard() {
           class="space-y-3"
           data-crew-wizard-step="3"
         >
+          <CrewHomeField
+            :key="crewSlug"
+            v-model="crewHome"
+            :slug="crewSlug"
+          />
           <p class="text-sm text-default">
             Whoever runs the crew (Boss) gives the file to the crew kit. On the machine that runs the crew:
           </p>

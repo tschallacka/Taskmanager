@@ -85,7 +85,7 @@ fills it in every time it starts. If the variable is not set, stop and ask me to
 2. Install the crew kit and its skill:
 ${crewKitCommands(origin).split('\n').map(line => `   ${line}`).join('\n')}
 3. Read ~/crew-kit/README.md and take me through "A provisioned crew" if I want to run a crew.
-   Each crew has a home folder of its own, ~/crew-home/<crew slug> (CREW_HOME); its creds.json goes
+   Each crew has a home folder of its own (CREW_HOME), the one the Owner gave it when the crew was set up; its creds.json goes
    there, never into a repository.
 4. For crew channels, put a .mcp.json in the folder a crew member's session starts from, as the
    README's "Channels" section shows, with the full paths of ~/crew-kit/channel.mjs and the crew's home folder.
