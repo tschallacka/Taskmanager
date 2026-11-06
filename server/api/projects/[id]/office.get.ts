@@ -64,7 +64,12 @@ export default defineEventHandler(async (event): Promise<OfficeSnapshot> => {
   })
 
   const assignees = [...new Set(tasks.map(t => t.assigneeId).filter((id): id is string => Boolean(id)))]
-  const { crewName, cast } = await officeCastOf(project.id, assignees)
+  const { crewName, cast, seats } = await officeCastOf(project.id, assignees)
+  // A task on a crew's own account reads at the desk of the fork that is that same person.
+  for (const task of tasks) {
+    const seat = task.assigneeId ? seats[task.assigneeId] : undefined
+    if (seat) task.assigneeId = seat
+  }
   // The office is a crew's. A board nobody works on has no room to show; the reason lets the page say so.
   if (!crewName) throw createError({ statusCode: 404, statusMessage: 'No crew works on this board', data: { reason: 'no-crew' } })
   return { boardId: project.id, boardName: project.name, crewName, cast, tasks }
