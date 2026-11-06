@@ -336,7 +336,7 @@ async function saveColumns(names: string[]) {
           class="flex flex-col gap-6 md:flex-row"
         >
           <nav
-            class="flex shrink-0 gap-1 md:w-48 md:flex-col"
+            class="flex w-full min-w-0 gap-1 overflow-x-auto md:w-48 md:flex-col md:overflow-visible"
             aria-label="Team sections"
           >
             <UButton
@@ -353,7 +353,7 @@ async function saveColumns(names: string[]) {
             />
           </nav>
 
-          <div class="min-w-0 flex-1 space-y-6 text-sm">
+          <div class="min-w-0 flex-1 space-y-6 text-sm max-sm:pr-14">
             <!-- General -->
             <template v-if="section === 'general'">
               <div class="rounded-xl border border-default p-4 space-y-2">
