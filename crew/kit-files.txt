@@ -18,6 +18,7 @@ USHER.md.tmpl
 WORKFLOW.md
 browser-driver.mjs
 browser.mjs
+cast.mjs
 channel.mjs
 config.mjs
 crew.config.example.json

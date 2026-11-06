@@ -21,6 +21,24 @@ import { fileURLToPath } from 'node:url'
 import { findChromium, request, serve } from './browser-driver.mjs'
 import { boardOrigin, signIn } from './browser.mjs'
 import { crewHome } from './home.mjs'
+import { CAST, EXTRA_CAST, forkMemberPlan, forkRole } from './cast.mjs'
+
+test('the extra workers the kit names are the ones the app shares: one list, and this fails when they differ', () => {
+  const shared = readFileSync(join(KIT, '..', 'shared', 'utils', 'extraWorkers.ts'), 'utf8')
+  const keys = [...shared.matchAll(/key: '(\w+)'/g)].map(match => match[1])
+  assert.ok(keys.length > 0, 'the shared list names the extra workers')
+  assert.deepEqual([...EXTRA_CAST].sort(), [...keys].sort())
+})
+
+test('an extra worker plays its role from its fork, and the plan of a forked member: an extra worker gets none, and an unknown key is refused', () => {
+  assert.equal(forkRole('internal-tools-wes'), 'wes')
+  assert.equal(forkRole('internal-tools-walt'), 'walt')
+  assert.equal(forkRole('internal-tools-zed'), null)
+  assert.ok(EXTRA_CAST.every(key => CAST.includes(key)), 'the kit knows the extra workers')
+  assert.equal(forkMemberPlan('wes'), 'skip', 'an extra worker gets no agent definition')
+  assert.equal(forkMemberPlan('wren'), 'write', 'a standard member gets one')
+  assert.equal(forkMemberPlan('zed'), 'unknown', 'a key the kit does not know is an error')
+})
 
 const KIT = dirname(fileURLToPath(import.meta.url))
 const CREW = join(KIT, 'crew.mjs')
