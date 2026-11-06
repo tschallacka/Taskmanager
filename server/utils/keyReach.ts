@@ -6,6 +6,7 @@ import { and, eq, inArray, isNull, or } from 'drizzle-orm'
 import { db } from '../db'
 import { agentAudit, apiKeyBoards, apiKeyWorkspaces, apiKeys, member, organization, projects, user } from '../db/schema'
 import type { ApiKey } from '../db/schema'
+import { keyReachOf } from './api-keys'
 import type { KeyReach } from './api-keys'
 import { customerIdsOf } from './auth-helpers'
 import { crewLinksOf, grantedBoardIdsOf, shadowBoardsOfTeams, shadowTeamOf } from './crewBoardAccess'
@@ -195,20 +196,6 @@ export interface ReachedBoard {
 type OwnerScope = { userId: string, memberTeamIds: string[], customerIds: string[], guestIds: string[] }
 type BoardRow = { id: string, userId: string, teamId: string | null, customerId: string | null }
 
-/** The reach a key's own rows give, as the MCP check reads it (a key made before the reach tables reads its columns). */
-function reachOfKey(key: ApiKey, workspaceRows: { keyId: string, teamId: string | null }[], boardRows: { keyId: string, projectId: string }[]): KeyReach {
-  if (!key.boardReachSet) {
-    return key.projectId
-      ? { allBoards: false, workspaceTeamIds: [], boardIds: [key.projectId] }
-      : { allBoards: false, workspaceTeamIds: [key.teamId], boardIds: [] }
-  }
-  return {
-    allBoards: key.allBoards,
-    workspaceTeamIds: workspaceRows.filter(row => row.keyId === key.id).map(row => row.teamId),
-    boardIds: boardRows.filter(row => row.keyId === key.id).map(row => row.projectId)
-  }
-}
-
 /**
  * The rule of boardFilter (mcpAccess.ts), read in memory: a board the owner can open, that the key's reach
  * grants, and that is inside the key's customer when the key is limited to one.
@@ -286,7 +273,7 @@ export async function reachedBoardsOf(userId: string, keys: ApiKey[]): Promise<M
     for (const team of names) workspaceName.set(team.id, team.name)
   }
   for (const key of keys) {
-    const reach = reachOfKey(key, keyWorkspaceRows, keyBoardRows)
+    const reach = keyReachOf(key, keyWorkspaceRows.filter(row => row.keyId === key.id), keyBoardRows.filter(row => row.keyId === key.id))
     const crew = new Set(crewGranted.get(key.id))
     const boards: ReachedBoard[] = []
     for (const row of candidates) {

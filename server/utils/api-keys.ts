@@ -165,21 +165,31 @@ export async function authenticateApiKey(event: H3Event): Promise<ApiKeyContext>
 
 // A key made before the reach tables reads the reach its columns always gave it; the startup
 // migration then moves it into the tables, and the tables are read from then on.
-async function loadKeyReach(key: ApiKey): Promise<KeyReach> {
+/**
+ * The reach a key's rows give. A key made before the reach tables reads the reach its columns always gave
+ * it; the startup migration then moves it into the tables, and the tables are read from then on. Pure: the
+ * callers read the two tables, for one key or for a whole list, and pass the rows in.
+ */
+export function keyReachOf(key: ApiKey, workspaceRows: { teamId: string | null }[], boardRows: { projectId: string }[]): KeyReach {
   if (!key.boardReachSet) {
     return key.projectId
       ? { allBoards: false, workspaceTeamIds: [], boardIds: [key.projectId] }
       : { allBoards: false, workspaceTeamIds: [key.teamId], boardIds: [] }
   }
+  return {
+    allBoards: key.allBoards,
+    workspaceTeamIds: workspaceRows.map(row => row.teamId),
+    boardIds: boardRows.map(row => row.projectId)
+  }
+}
+
+async function loadKeyReach(key: ApiKey): Promise<KeyReach> {
+  if (!key.boardReachSet) return keyReachOf(key, [], [])
   const [workspaces, boards] = await Promise.all([
     db.select({ teamId: apiKeyWorkspaces.teamId }).from(apiKeyWorkspaces).where(eq(apiKeyWorkspaces.keyId, key.id)),
     db.select({ projectId: apiKeyBoards.projectId }).from(apiKeyBoards).where(eq(apiKeyBoards.keyId, key.id))
   ])
-  return {
-    allBoards: key.allBoards,
-    workspaceTeamIds: workspaces.map(row => row.teamId),
-    boardIds: boards.map(row => row.projectId)
-  }
+  return keyReachOf(key, workspaces, boards)
 }
 
 export async function teamIdsOf(userId: string): Promise<string[]> {
