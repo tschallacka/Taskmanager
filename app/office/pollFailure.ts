@@ -19,8 +19,3 @@ export function unseenAfter(strikes: number, failure: PollFailure): { strikes: n
   const next = strikes + 1
   return { strikes: next, unseen: next >= UNSEEN_AFTER }
 }
-
-/** The count when polling starts over on a switch between live and demo: no 404 from before counts any more. */
-export function strikesOnRestart(): number {
-  return 0
-}
