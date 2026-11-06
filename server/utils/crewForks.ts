@@ -15,6 +15,7 @@ import { account, apiKeys, crewBoardMembers, member, session, user } from '../db
 import type { Crew, CrewBoard } from '../db/schema'
 import { createCrewAccount, crewAddress } from './crewAccounts'
 import { CREW_PEOPLE } from './crewProvisioning'
+import { EXTRA_WORKERS } from '../../shared/utils/extraWorkers'
 import { issueKey } from './keyIssue'
 import { genId } from './projects'
 
@@ -26,11 +27,7 @@ export const FORK_PEOPLE = CREW_PEOPLE.filter(person => FORKED_KEYS.includes(per
  * Extra workers: not forked with the standard members. A board gets them when they are asked for, and
  * adding them leaves every fork that is already there alone. Probation workers run on a local model.
  */
-export const EXTRA_PEOPLE = [
-  { key: 'wes', name: 'Wes Worker' },
-  { key: 'wilma', name: 'Wilma Worker' },
-  { key: 'walt', name: 'Walt Worker' }
-] as const
+export const EXTRA_PEOPLE = EXTRA_WORKERS
 
 /** The extra workers a request names, checked: an unknown key is refused with the keys that exist. */
 export function extraKeysOf(raw: unknown): string[] {

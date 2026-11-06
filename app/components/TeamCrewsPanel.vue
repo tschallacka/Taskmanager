@@ -170,11 +170,23 @@ async function addWorkers() {
   if (!link || !addPicked.value.length || addBusy.value) return
   addBusy.value = true
   try {
-    forkResult.value = await forkTeamCrew(props.teamId, link.id, false, addPicked.value)
-    forkResultAdded.value = true
+    const answer = await forkTeamCrew(props.teamId, link.id, false, addPicked.value)
     addFor.value = null
     await load()
+    // Every worker asked for already has a fork here: nothing was made, so there is no file to offer.
+    if (!answer.members.length) {
+      toast.add({
+        title: 'Those workers already have forks on this board',
+        description: 'Nothing was added, so there is no file to download.',
+        icon: 'i-lucide-info',
+        duration: 4000
+      })
+      return
+    }
+    forkResult.value = answer
+    forkResultAdded.value = true
   } catch (e) {
+    fail(e, 'Could not add the workers')
     fail(e, 'Could not add the workers')
   } finally {
     addBusy.value = false

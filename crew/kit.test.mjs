@@ -23,6 +23,13 @@ import { boardOrigin, signIn } from './browser.mjs'
 import { crewHome } from './home.mjs'
 import { CAST, EXTRA_CAST, forkRole } from './config.mjs'
 
+test('the extra workers the kit names are the ones the app shares: one list, and this fails when they differ', () => {
+  const shared = readFileSync(join(KIT, '..', 'shared', 'utils', 'extraWorkers.ts'), 'utf8')
+  const keys = [...shared.matchAll(/key: '(\w+)'/g)].map(match => match[1])
+  assert.ok(keys.length > 0, 'the shared list names the extra workers')
+  assert.deepEqual([...EXTRA_CAST].sort(), [...keys].sort())
+})
+
 test('an extra worker plays its role from its fork, and Pia starts none of the extra workers', () => {
   assert.equal(forkRole('internal-tools-wes'), 'wes')
   assert.equal(forkRole('internal-tools-walt'), 'walt')
