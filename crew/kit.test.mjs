@@ -21,6 +21,7 @@ import { fileURLToPath } from 'node:url'
 import { findChromium, request, serve } from './browser-driver.mjs'
 import { boardOrigin, signIn } from './browser.mjs'
 import { crewHome } from './home.mjs'
+import { formatIdle, parseActivity } from './idle.mjs'
 
 const KIT = dirname(fileURLToPath(import.meta.url))
 const CREW = join(KIT, 'crew.mjs')
@@ -1013,5 +1014,47 @@ describe('crew mentions: the updates that ask Boss something', async () => {
       'crew mentions: the board answers again',
       '@cato two'
     ])
+  })
+})
+
+// ---------- crew idle: who is free, and what they may start, from the crew_activity answer ----------
+describe('crew idle', () => {
+  const activity = {
+    boardId: 'b1',
+    boardName: 'Board',
+    crewName: 'Crew',
+    people: [
+      { key: 'pia', name: 'Pia Planner', role: 'pm', state: 'reviewing', cards: [{ id: 'v1', title: 'In verify' }], waitingOn: [], next: [] },
+      { key: 'wren', name: 'Wren Worker', role: 'worker', state: 'working', cards: [{ id: 'd1', title: 'On desk' }], waitingOn: [], next: [] },
+      { key: 'wick', name: 'Wick Worker', role: 'worker', state: 'idle', cards: [], waitingOn: ['UX'], next: [{ id: 'b2', title: 'Mine', assignedToMe: true }, { id: 'b3', title: 'Free', assignedToMe: false }] },
+      { key: 'wynn', name: 'Wynn Worker', role: 'worker', state: 'idle', cards: [], waitingOn: [], next: [{ id: 'b3', title: 'Free', assignedToMe: false }] },
+      { key: 'usher', name: 'Usher Xander', role: 'ux', state: 'idle', cards: [], waitingOn: [], next: [] }
+    ]
+  }
+
+  test('lists each free worker, and only workers, with the gate a card waits in and what they may start', () => {
+    const lines = formatIdle(activity)
+    assert.equal(lines[0], 'idle wick (Wick Worker), waiting on UX: Mine (yours); Free (unassigned)')
+    assert.equal(lines[1], 'idle wynn (Wynn Worker): Free (unassigned)')
+    assert.equal(lines.length, 3, 'two worker lines and the startable line; the working worker and the reviewers are not listed')
+  })
+
+  test('the startable line gives each card once, in order, and nobody else', () => {
+    const last = formatIdle(activity).at(-1)
+    assert.equal(last, 'startable: b2 Mine (yours) | b3 Free (unassigned)')
+  })
+
+  test('with no free worker it says so, and a worker with nothing startable says that', () => {
+    const none = { people: [{ key: 'wren', name: 'Wren Worker', role: 'worker', state: 'working', cards: [], waitingOn: [], next: [] }] }
+    assert.deepEqual(formatIdle(none), ['no idle worker'])
+    const bare = { people: [{ key: 'wade', name: 'Wade Worker', role: 'worker', state: 'idle', cards: [], waitingOn: [], next: [] }] }
+    assert.deepEqual(formatIdle(bare), ['idle wade (Wade Worker): nothing startable in Backlog'])
+  })
+
+  test('the tool answer is read from the JSON line after any warning, and a missing answer is not guessed', () => {
+    const text = 'Cannot detect the correct bin file\n{"boardId":"b1","people":[]}\n'
+    assert.deepEqual(parseActivity(text), { boardId: 'b1', people: [] })
+    assert.equal(parseActivity('no json here\n'), null)
+    assert.deepEqual(formatIdle(null), ['no crew activity to show'])
   })
 })

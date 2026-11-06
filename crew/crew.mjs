@@ -6,6 +6,7 @@
 //   crew <who> attach <taskId> <image>                              upload an image to a task
 //   crew listen <who> [sec]    wait for new messages (listen.mjs)
 //   crew watch                 the Boss's board watcher (watch.mjs)
+//   crew idle [who]            who is free on the crew board, and the Backlog cards they may start (idle.mjs)
 //   crew init                  check the machine and render the documents (init.mjs)
 //   crew setup                 make the crew by hand through the crew API (setup.mjs)
 //   crew channel <who>         the Claude Code channel server for one person (channel.mjs)
@@ -19,7 +20,7 @@ import { fileURLToPath } from 'node:url'
 
 const kit = dirname(fileURLToPath(import.meta.url))
 const [first, ...rest] = process.argv.slice(2)
-const scripts = { listen: 'listen.mjs', watch: 'watch.mjs', init: 'init.mjs', setup: 'setup.mjs', channel: 'channel.mjs', update: 'update.mjs', mentions: 'mentions.mjs' }
+const scripts = { listen: 'listen.mjs', watch: 'watch.mjs', init: 'init.mjs', setup: 'setup.mjs', channel: 'channel.mjs', update: 'update.mjs', mentions: 'mentions.mjs', idle: 'idle.mjs' }
 
 if (!first || first === '-h' || first === '--help') {
   console.log('usage: crew <who> <command ...> | crew <who> browser <command> | crew browser status|shutdown | crew listen <who> [sec] | crew watch | crew init | crew setup | crew channel <who> | crew mentions [minutes|--follow] | crew update [--check] [--from <kit folder|kit.tar.gz>] [--kit <folder>]')

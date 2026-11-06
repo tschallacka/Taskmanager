@@ -4,6 +4,7 @@
 // catalogue all read from here.
 import type { ApiKeyScope } from '../db/schema'
 import { MCP_BOARD_TOOLS } from './mcpBoardTools'
+import { MCP_CREW_TOOLS } from './mcpCrewTools'
 import { MCP_FIELD_TOOLS } from './mcpFieldTools'
 import { MCP_GITHUB_TOOLS } from './mcpGithubTools'
 import { MCP_GOAL_TOOLS } from './mcpGoalTools'
@@ -19,6 +20,7 @@ import type { McpToolDefinition } from './mcpToolKit'
 
 export const MCP_TOOLS: McpToolDefinition[] = [
   ...MCP_BOARD_TOOLS,
+  ...MCP_CREW_TOOLS,
   ...MCP_FIELD_TOOLS,
   ...MCP_GITHUB_TOOLS,
   ...MCP_GOAL_TOOLS,

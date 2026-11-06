@@ -317,3 +317,68 @@ export function describeErrand(errand: Errand, cast: OfficePerson[]): string {
 export function officePath(boardId: string): string {
   return `/office/${encodeURIComponent(boardId)}`
 }
+
+export type DeskState = 'working' | 'queued' | 'reviewing' | 'idle'
+
+export interface DeskCard {
+  id: string
+  title: string
+}
+
+export interface DeskStatus {
+  key: string
+  name: string
+  role: Role
+  state: DeskState
+  /** Cards on the person's desk (working), in their todo tray (queued), or in their gate (reviewing). */
+  cards: DeskCard[]
+  /** The gates a worker's own cards wait in, as UX, CQ, QA, PM or Boss. Why an idle worker is idle. */
+  waitingOn: string[]
+}
+
+const GATE_BY_STAGE: Partial<Record<Stage, string>> = {
+  'verify-pm': 'PM',
+  'verify-ux': 'UX',
+  'verify-cq': 'CQ',
+  'verify-qa': 'QA',
+  'verify-boss': 'Boss'
+}
+
+/**
+ * What each person of the cast is doing, from the same placement the office draws. The office scene
+ * and crew_activity both read this, so they cannot disagree about who is idle. A worker's own card in a
+ * review gate is not on their desk: the reviewer holds it, so the worker reads idle, with the gate named.
+ */
+export function deskStatesOf(snapshot: OfficeSnapshot): DeskStatus[] {
+  const cast = castWithStandIns(snapshot.cast)
+  const placed = snapshot.tasks.map(task => ({ task, place: placeOf(task, cast) }))
+  return cast.map((person) => {
+    const mine = placed.filter(({ place }) => ownerOf(place) === person.key)
+    const cardsIn = (slot: string) => mine
+      .filter(({ place }) => slotOf(place) === slot)
+      .map(({ task }) => ({ id: task.id, title: task.title }))
+    const gates = person.userId
+      ? snapshot.tasks
+          .filter(task => task.assigneeId === person.userId && GATE_BY_STAGE[task.stage])
+          .map(task => GATE_BY_STAGE[task.stage]!)
+      : []
+    const waitingOn = [...new Set(gates)]
+    if (person.role === 'worker') {
+      const desk = cardsIn('desk')
+      if (desk.length) return { key: person.key, name: person.name, role: person.role, state: 'working', cards: desk, waitingOn }
+      const todo = cardsIn('todo')
+      if (todo.length) return { key: person.key, name: person.name, role: person.role, state: 'queued', cards: todo, waitingOn }
+      return { key: person.key, name: person.name, role: person.role, state: 'idle', cards: [], waitingOn }
+    }
+    if (person.role === 'pm') {
+      // Pia's own Verify column is the review she does; a card waiting in Backlog is work queued for her.
+      const verify = cardsIn('verify')
+      if (verify.length) return { key: person.key, name: person.name, role: person.role, state: 'reviewing', cards: verify, waitingOn: [] }
+      const backlog = cardsIn('backlog')
+      if (backlog.length) return { key: person.key, name: person.name, role: person.role, state: 'queued', cards: backlog, waitingOn: [] }
+      return { key: person.key, name: person.name, role: person.role, state: 'idle', cards: [], waitingOn: [] }
+    }
+    const gate = [...cardsIn('review'), ...cardsIn('inbox')]
+    return { key: person.key, name: person.name, role: person.role, state: gate.length ? 'reviewing' : 'idle', cards: gate, waitingOn: [] }
+  })
+}

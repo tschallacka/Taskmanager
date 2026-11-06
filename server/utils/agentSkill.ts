@@ -15,6 +15,7 @@ const GROUPS: { title: string, match: (tool: McpToolDefinition) => boolean, note
     match: tool => /^(edit|delete)_task_update$/.test(tool.name),
     note: 'An update on a task can be changed or removed by its author: you may change what you posted, or what your key\'s owner posted through an agent. The board\'s owner, or a team owner or admin, may change or remove any update on that board. A customer contact may change only the customer-visible updates they wrote. An edit keeps the update\'s visibility and reply, marks it edited with the time, and does not tell anyone again; the old text is not kept. A delete removes the update for good, with no trash, and a reply to it stays and shows that its target was deleted. Both are recorded in the key owner\'s Inbox without the text. Read the thread with get_task to find the update id.'
   },
+  { title: 'Crew activity', match: tool => tool.name === 'crew_activity', note: 'Who of a crew board is busy, and what a free worker may start next. It answers for one board at a time, and only a board the key can open.' },
   { title: 'My tasks and my inbox', match: tool => /^(my_tasks|list_notifications|mark_notifications_read)$/.test(tool.name) },
   { title: 'Custom fields', match: tool => /_fields?$/.test(tool.name) },
   {

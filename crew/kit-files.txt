@@ -25,6 +25,7 @@ crew.mjs
 fonts.conf.tmpl
 guard.sh
 home.mjs
+idle.mjs
 init.mjs
 keys.mjs
 listen.mjs

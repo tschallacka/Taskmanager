@@ -93,7 +93,8 @@ Where the tools come from: the AI text editor, tailpipe, `interactive-shell`, `g
 - Pia wakes on any inbox item, and every 10 minutes while any task is open.
 - Cato checks his inbox (`list_notifications`), his tasks (`my_tasks`) and the `Verify` column at the start of every turn. When he can schedule a wake-up, he schedules one 10 minutes ahead while a task is assigned to him or waiting in `Verify`, and 30 minutes ahead otherwise. He handles a `split help` task or a question that names him first, then a task in `Verify`, then anything else. He also checks that Pia is available, and restarts her when she is not (section 1).
 - Idle ladder: with nothing to do, wake after 5, then 15, then 30 minutes, and stay at 30 until something arrives. This keeps cheap models cheap.
-- If the inbox is empty, Pia looks at Backlog, picks the highest priority task she may work on, and triages it.
+- Pia runs `node crew.mjs idle` on every wake-up, before her inbox. It prints each free worker (state `idle` on the board's crew activity) with the Backlog cards that worker may start next, own cards first, and the startable cards. She gives every free worker the next card they may start: the top priority first, skipping a card whose "start only after" or "depends on" is not met. Reviews, gates and questions run alongside; a free worker is never left without a card. Cards that edit the same files go to the same worker, one after the other.
+- A worker's own card in a review gate does not keep the worker busy: the reviewer holds it, so the worker shows idle, with the gate named (`waitingOn`).
 
 ## 6. The flow, phase by phase
 
