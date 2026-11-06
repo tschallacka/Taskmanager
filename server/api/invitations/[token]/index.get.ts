@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm'
 import { hashInvitationToken, INVITATION_COOKIE } from '../../../utils/customers'
 import { auth } from '../../../lib/auth'
 import { lookupAddressedInvitation } from '../../../utils/invitations'
+import { addressesOfUser } from '../../../utils/extraEmails'
 
 // What an invitation link is for, readable before signing in: the invite page
 // has to say whose portal, team or board it opens. Opening it also drops the token in a cookie,
@@ -29,7 +30,7 @@ export default defineEventHandler(async (event) => {
     // The address stays out of the answer: whoever holds the link has to know it, not read it here.
     // `forYou` only says whether the account signed in right now (if any) is the one invited.
     const session = await auth.api.getSession({ headers: event.headers }).catch(() => null)
-    const forYou = session ? session.user.email.trim().toLowerCase() === addressed.email : null
+    const forYou = session ? (await addressesOfUser(session.user.id)).includes(addressed.email) : null
     return addressed.kind === 'team'
       ? { kind: 'team' as const, organizationName: addressed.organizationName, inviterName: addressed.inviterName, role: addressed.role, forYou }
       : { kind: 'board' as const, projectName: addressed.projectName, inviterName: addressed.inviterName, role: addressed.role, forYou }

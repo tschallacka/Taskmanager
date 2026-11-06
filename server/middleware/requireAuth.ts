@@ -4,6 +4,7 @@ import { crewAccountLive, isCrewAddress } from '../utils/crewAccounts'
 // Everything under these needs a session. `/api/invitations` is deliberately not
 // here: an invite link has to be readable before its recipient has an account.
 const PROTECTED_PREFIXES = [
+  '/api/account',
   '/api/settings',
   '/api/ai',
   '/api/chat',
