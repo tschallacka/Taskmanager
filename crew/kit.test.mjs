@@ -686,6 +686,116 @@ describe('crew update: the kit folder and the owner files', () => {
     assert.deepEqual(readdirSync(crew.home).filter(name => name.startsWith('.update-')), [])
   })
 
+  test('a file the kit does not ship is refused from a folder and from an archive, and nothing is installed', async () => {
+    const crew = newCrew()
+    const dirA = await installedKit(crew)
+    const dirB = newerKit(dirA, crew)
+    writeFileSync(join(dirB, 'payload.bin'), 'not a kit file\n')
+    editFile(join(dirB, 'kit-files.txt'), text => `${text}payload.bin\n`)
+    const before = snapshot(dirA)
+    const folder = await updateKit(dirA, crew, ['--from', dirB, '--kit', dirA])
+    assert.equal(folder.code, 3, folder.stderr)
+    assert.match(folder.stderr, /lists "payload\.bin", which a kit does not ship/)
+    const archive = join(crew.root, 'payload.tar.gz')
+    assert.equal(spawnSync('tar', ['-czf', archive, '-C', dirB, ...kitFilesOf(dirB)], { encoding: 'utf8' }).status, 0)
+    const file = await updateKit(dirA, crew, ['--from', archive, '--kit', dirA])
+    assert.equal(file.code, 3, file.stderr)
+    assert.match(file.stderr, /the archive lists "payload\.bin", which a kit does not ship/)
+    assert.deepEqual(snapshot(dirA), before, 'nothing is installed')
+    assert.deepEqual(backupsOf(crew), [])
+  })
+
+  test('an owner file with no recorded template gets the next template change merged by the update after it', async () => {
+    const crew = newCrew()
+    const dirA = await installedKit(crew)
+    const dirB = newerKit(dirA, crew)
+    rmSync(join(crew.home, 'kit-base'), { recursive: true, force: true })
+    editFile(ownerFile(crew), text => `${text}\nOwner line kept.\n`)
+    const first = await updateKit(dirA, crew, ['--from', dirB, '--kit', dirA])
+    assert.match(first.stdout, /WARN PROJECT-RULES\.md: no template was recorded/)
+    const dirC = join(crew.root, 'kitC')
+    copyKit(dirC, dirB)
+    editFile(join(dirC, 'PROJECT-RULES.md.tmpl'), text => text.replace('## Editing files', '## Editing code'))
+    const second = await updateKit(dirA, crew, ['--from', dirC, '--kit', dirA])
+    assert.match(second.stdout, /PROJECT-RULES\.md: your edits and the new template merged cleanly/, second.stdout + second.stderr)
+    const owner = readFileSync(ownerFile(crew), 'utf8')
+    assert.match(owner, /Owner line kept\./, 'owner text is not lost')
+    assert.match(owner, /## Editing code/, 'the later template change is in')
+    assert.doesNotMatch(owner, /<<<<<<</)
+  })
+
+  test('a board update removes a file the new kit dropped, and the next board update removes what the record of the last install names', async () => {
+    const crew = newCrew()
+    const dirA = await installedKit(crew)
+    const dirB = newerKit(dirA, crew)
+    // The board's archive carries the listed files only, never kit-files.txt, as the server packs it.
+    const packBoardKit = (dir, name) => {
+      const archive = join(crew.root, name)
+      assert.equal(spawnSync('tar', ['-czf', archive, '-C', dir, ...kitFilesOf(dir)], { encoding: 'utf8' }).status, 0)
+      return readFileSync(archive)
+    }
+    const board = { body: packBoardKit(dirB, 'board-b.tar.gz') }
+    const server = http.createServer((req, res) => {
+      if (req.url !== '/crew/kit.tar.gz') {
+        res.statusCode = 404
+        return res.end('')
+      }
+      res.setHeader('x-crew-kit-version', 'board-test')
+      res.end(board.body)
+    })
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+    try {
+      writeConfig(crew, `http://127.0.0.1:${server.address().port}`)
+      await updateKit(dirA, crew)
+      assert.equal(existsSync(join(dirA, 'watch.mjs')), false, 'a board update removes what the new kit dropped')
+      const first = JSON.parse(readFileSync(join(crew.home, 'crew-kit.json'), 'utf8'))
+      assert.equal(first.files['watch.mjs'], undefined, 'the record of the install no longer names it')
+      const dirC = join(crew.root, 'kitC')
+      copyKit(dirC, dirB)
+      writeFileSync(join(dirC, 'extra.mjs'), 'export const extra = 1\n')
+      editFile(join(dirC, 'kit-files.txt'), text => `${text}extra.mjs\n`)
+      board.body = packBoardKit(dirC, 'board-c.tar.gz')
+      await updateKit(dirA, crew)
+      assert.ok(existsSync(join(dirA, 'extra.mjs')), 'the file the new kit adds is installed')
+      const dirD = join(crew.root, 'kitD')
+      copyKit(dirD, dirC)
+      rmSync(join(dirD, 'extra.mjs'))
+      editFile(join(dirD, 'kit-files.txt'), text => text.replace(/^extra\.mjs\n/m, ''))
+      board.body = packBoardKit(dirD, 'board-d.tar.gz')
+      await updateKit(dirA, crew)
+      assert.equal(existsSync(join(dirA, 'extra.mjs')), false, 'the next board update removes it, from the record of the last install')
+    } finally {
+      server.close()
+    }
+  })
+
+  test('a skill copy that still matches the old kit is refreshed', async () => {
+    const crew = newCrew()
+    const dirA = await installedKit(crew)
+    const dirB = newerKit(dirA, crew)
+    editFile(join(dirB, 'SKILL.md'), text => `${text}\nTest line for the skill.\n`)
+    const skillDir = join(crew.claude, 'skills', 'taskmanager-crew')
+    mkdirSync(skillDir, { recursive: true })
+    copyFileSync(join(dirA, 'SKILL.md'), join(skillDir, 'SKILL.md'))
+    const out = await updateKit(dirA, crew, ['--from', dirB, '--kit', dirA])
+    assert.match(out.stdout, /skill taskmanager-crew: copy refreshed from the kit/, out.stdout + out.stderr)
+    assert.equal(readFileSync(join(skillDir, 'SKILL.md'), 'utf8'), readFileSync(join(dirB, 'SKILL.md'), 'utf8'))
+  })
+
+  test('a skill copy with a local edit is left alone, and the update says so', async () => {
+    const crew = newCrew()
+    const dirA = await installedKit(crew)
+    const dirB = newerKit(dirA, crew)
+    editFile(join(dirB, 'SKILL.md'), text => `${text}\nTest line for the skill.\n`)
+    const skillDir = join(crew.claude, 'skills', 'taskmanager-crew')
+    mkdirSync(skillDir, { recursive: true })
+    const mine = `${readFileSync(join(dirA, 'SKILL.md'), 'utf8')}My own line.\n`
+    writeFileSync(join(skillDir, 'SKILL.md'), mine)
+    const out = await updateKit(dirA, crew, ['--from', dirB, '--kit', dirA])
+    assert.match(out.stdout, /WARN skill taskmanager-crew: the copy at .+ differs from the kit and was not touched/, out.stdout + out.stderr)
+    assert.equal(readFileSync(join(skillDir, 'SKILL.md'), 'utf8'), mine, 'the local edit is kept')
+  })
+
   test('without --from the kit comes from the board, and its version is reported', async () => {
     const crew = newCrew()
     const dirA = await installedKit(crew)

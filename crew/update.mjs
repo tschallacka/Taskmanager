@@ -29,7 +29,7 @@ const LIST = 'kit-files.txt'
 const MANIFEST = 'crew-kit.json'
 const ARGS = process.argv.slice(2)
 
-const shipsName = name => name === LIST || (NAME.test(name) && !NOT_KIT.test(name))
+const shipsName = name => name === LIST || (NAME.test(name) && SHAPE.test(name) && !NOT_KIT.test(name))
 const sha = path => createHash('sha256').update(readFileSync(path)).digest('hex')
 const readText = path => (existsSync(path) ? readFileSync(path, 'utf8') : null)
 const readJson = path => {
@@ -125,7 +125,8 @@ async function front() {
       return 3
     }
     const manifest = readJson(join(here, MANIFEST))
-    const owned = new Set([...Object.keys(manifest?.files ?? {}), ...(listedNames(target) ?? [])])
+    // The files this crew has installed: the manifest of the last install, or for a crew never updated, the list it came with.
+    const owned = new Set(manifest?.files ? Object.keys(manifest.files) : (listedNames(target) ?? []))
     const removed = [...owned].filter(name => name !== LIST && shipsName(name) && !kit.names.includes(name) && existsSync(join(target, name))).sort()
     const changed = kit.names.filter(name => !existsSync(join(target, name)) || sha(join(target, name)) !== sha(join(stage, name))).sort()
     if (!changed.length && !removed.length) {
