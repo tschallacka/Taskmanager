@@ -29,7 +29,8 @@ const {
   trashedCount,
   toggleShowTrashed,
   isTrashed,
-  crewBoard
+  crewBoard,
+  subtasks
 } = useProjects()
 
 const projectId = computed(() => route.params.id as string)
@@ -124,33 +125,49 @@ async function switchToHintTeam() {
 
 // ─── Task panel ────────────────────────────────────────────
 
-const drawerTaskId = ref<string | null>(typeof route.params.task === 'string' ? route.params.task : null)
+// The open task is named by the address, /projects/<board>/<task>. Opening one writes that address with
+// pushState, so the router does not see it; Back and Forward are followed by the popstate listener below.
+// Only the person's own close steps back in history. A refresh of the board, or a task that has gone,
+// replaces the address with the board's instead.
+const drawerTaskId = ref<string | null>(null)
 
-// Opening a task writes its address with pushState: no navigation, no reload. The router does not see that
-// entry, so Back and Forward are followed by the popstate listener below. Closing goes back one step when
-// the panel opened that entry, and otherwise replaces the address with the board's own.
+// The one place the open task is set: a click, a direct visit, Back and Forward and the router all go through it.
+function setOpenTask(taskId: string | null) {
+  drawerTaskId.value = taskId || null
+}
+setOpenTask(typeof route.params.task === 'string' ? route.params.task : null)
+
 function openTask(taskId: string) {
   if (drawerTaskId.value === taskId) return
-  drawerTaskId.value = taskId
+  setOpenTask(taskId)
   history.pushState({ taskPanel: true }, '', taskAddress(projectId.value, taskId))
 }
 
+// Replaces an address that still names a task with the board's own, without a history step.
+function leaveTask() {
+  if (parseTaskAddress(window.location.pathname)) {
+    navigateTo({ path: `/projects/${projectId.value}`, query: route.query }, { replace: true })
+  }
+}
+
+// The person closed the panel: step back when the panel opened that entry, otherwise replace the address.
 function closeDrawer() {
-  drawerTaskId.value = null
-  if (history.state?.taskPanel) history.back()
-  else if (route.params.task) navigateTo({ path: `/projects/${projectId.value}`, query: route.query }, { replace: true })
+  const opened = history.state?.taskPanel === true
+  setOpenTask(null)
+  if (opened) history.back()
+  else leaveTask()
 }
 
 function onPopState() {
   const address = parseTaskAddress(window.location.pathname)
-  drawerTaskId.value = address?.boardId === projectId.value ? address.taskId : null
+  setOpenTask(address?.boardId === projectId.value ? address.taskId : null)
 }
 onMounted(() => window.addEventListener('popstate', onPopState))
 onBeforeUnmount(() => window.removeEventListener('popstate', onPopState))
 
 // A direct visit to the task's address opens the panel, and so does the router following a change.
 watch(() => route.params.task, (taskId) => {
-  drawerTaskId.value = typeof taskId === 'string' && taskId ? taskId : null
+  setOpenTask(typeof taskId === 'string' ? taskId : null)
 })
 
 // An older ?task= link opens its task too, and its address is rewritten to the task's own.
@@ -166,16 +183,22 @@ watch(() => route.query.task, (taskId) => {
   if (typeof taskId === 'string' && taskId) rewriteTaskQuery(taskId)
 })
 
-// A task the person cannot see, or that is gone, leaves the board open with a short note.
-watch([drawerTaskId, board], ([taskId, loaded]) => {
-  if (!taskId || !loaded || loaded.tasks.some(t => t.id === taskId)) return
-  toast.add({ title: 'That task is not on this board, or you cannot see it.', icon: 'i-lucide-info', duration: 5000 })
-  closeDrawer()
+// The open task, whether it is a top-level card or a subtask (subtasks are kept apart from the board's tasks).
+const drawerTask = computed<ProjectTask | null>(() => {
+  if (!drawerTaskId.value) return null
+  return board.value?.tasks.find(t => t.id === drawerTaskId.value)
+    ?? subtasks.value.find(t => t.id === drawerTaskId.value)
+    ?? null
 })
 
-const drawerTask = computed<ProjectTask | null>(() =>
-  drawerTaskId.value ? board.value?.tasks.find(t => t.id === drawerTaskId.value) ?? null : null
-)
+// A task the person cannot see, or that is gone after a refresh, leaves the board open with a short note.
+// This runs on a background refresh too, so it replaces the address rather than stepping back.
+watch([drawerTaskId, board], ([taskId, loaded]) => {
+  if (!taskId || !loaded || drawerTask.value) return
+  toast.add({ title: 'That task is not on this board, or you cannot see it.', icon: 'i-lucide-info', duration: 5000 })
+  setOpenTask(null)
+  leaveTask()
+})
 
 // ─── Project name (inline rename) ──────────────────────────
 

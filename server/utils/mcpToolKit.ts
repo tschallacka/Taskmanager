@@ -2,7 +2,7 @@
 import type { ApiKeyScope } from '../db/schema'
 import type { ApiKeyContext } from './api-keys'
 import type { ProjectResource, WorkspaceCollection } from './realtime'
-import { parseTaskAddress } from '../../shared/utils/taskAddress'
+import { parseTaskAddress } from '#shared/utils/taskAddress'
 
 export interface McpToolDefinition {
   name: string
