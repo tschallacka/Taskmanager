@@ -329,6 +329,11 @@ onMounted(() => {
         </div>
       </div>
 
+      <!-- Extra addresses: they need two-factor or a passkey, which the sections around them manage -->
+      <div class="px-5 py-4">
+        <ExtraEmailsPanel />
+      </div>
+
       <!-- Two-factor -->
       <div class="px-5 py-4 space-y-3">
         <div class="flex items-center gap-4">

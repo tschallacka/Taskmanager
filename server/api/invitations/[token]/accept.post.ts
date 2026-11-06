@@ -7,6 +7,7 @@ import { isCrewUser } from '../../../utils/crewAccounts'
 import { hashInvitationToken, INVITATION_COOKIE } from '../../../utils/customers'
 import { lookupAddressedInvitation } from '../../../utils/invitations'
 import { publish, workspaceTopic } from '../../../utils/realtime'
+import { addressesOfUser } from '../../../utils/extraEmails'
 
 // Turns the signed-in account into a member of the invitation's team, a guest of its board, or a
 // contact of its customer. A link is spent by the first account that accepts it; a team or board
@@ -30,7 +31,8 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 410, message: 'This invitation is no longer valid' })
   }
   if (addressed !== 'missing') {
-    if (session.user.email.trim().toLowerCase() !== addressed.email) {
+    // Any verified address of the account counts: its main one or an extra one that was confirmed.
+    if (!(await addressesOfUser(session.user.id)).includes(addressed.email)) {
       // The address is not repeated here: the person who was invited knows it.
       throw createError({
         statusCode: 403,
