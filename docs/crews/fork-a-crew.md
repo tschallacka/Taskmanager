@@ -39,6 +39,8 @@ The link then lists the forked agents by name.
 
 On the computer that runs the crew, give the file to the crew kit:
 
+`CREW_HOME` in the command is the crew home folder you typed in **Give a board a crew**, on the step **Hand over the keys**. It is the folder that holds the crew's `crew.json` and `creds.json`. It starts as `~/crew-home/<crew>`, and this browser remembers it for that crew, so every command the page copies for the crew uses it. Press **Change** next to it if the crew lives somewhere else. If the browser does not keep it, the command shows the same guess each time.
+
 ```
 CREW_HOME=~/crew-home/<crew> node <kit folder>/init.mjs --forks ~/Downloads/forks-<crew>-<board>.json
 ```

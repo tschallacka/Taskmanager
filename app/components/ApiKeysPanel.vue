@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { format } from 'date-fns'
+import { keyPanelMode } from '~/utils/apiKeyView'
 import type { Ref } from 'vue'
 
 interface ReachWorkspace {
@@ -196,18 +197,22 @@ function toggleKey(key: ApiKeySummary) {
     editing.value = null
     return
   }
+  // A row opens to its read-only view. The edit form opens only when the owner asks for it (startEdit).
   openId.value = key.id
-  editing.value = key.editable
-    ? {
-        scopes: Object.fromEntries(PERMISSIONS.map(permission => [permission.scope, key.scopes.includes(permission.scope)])),
-        pick: {
-          all: key.allBoards,
-          workspaces: key.workspaces.map(workspace => wsKeyOf(workspace.teamId)),
-          boards: key.boards.map(board => board.id)
-        },
-        saving: false
-      }
-    : null
+  editing.value = null
+}
+
+function startEdit(key: ApiKeySummary) {
+  if (!key.editable) return
+  editing.value = {
+    scopes: Object.fromEntries(PERMISSIONS.map(permission => [permission.scope, key.scopes.includes(permission.scope)])),
+    pick: {
+      all: key.allBoards,
+      workspaces: key.workspaces.map(workspace => wsKeyOf(workspace.teamId)),
+      boards: key.boards.map(board => board.id)
+    },
+    saving: false
+  }
 }
 
 async function copyCommand() {
@@ -658,7 +663,7 @@ function reachLabel(key: ApiKeySummary): string {
                 class="px-3 pb-3 space-y-4"
               >
                 <!-- Editing a personal key -->
-                <template v-if="key.editable && editing">
+                <template v-if="keyPanelMode(key, editing) === 'edit' && editing">
                   <div class="space-y-2">
                     <p class="text-xs font-medium">
                       Permissions
@@ -721,6 +726,20 @@ function reachLabel(key: ApiKeySummary): string {
 
                 <!-- Read only: a team key, or a personal key's reach as it stands -->
                 <template v-else>
+                  <div
+                    v-if="key.editable"
+                    class="flex flex-wrap items-center gap-2"
+                  >
+                    <UButton
+                      label="Change permissions and boards"
+                      icon="i-lucide-pencil"
+                      color="neutral"
+                      variant="soft"
+                      size="xs"
+                      data-key-edit
+                      @click="startEdit(key)"
+                    />
+                  </div>
                   <div class="space-y-2 text-xs">
                     <p class="font-medium text-default">
                       Permissions

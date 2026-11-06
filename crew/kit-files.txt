@@ -28,6 +28,7 @@ home.mjs
 init.mjs
 keys.mjs
 listen.mjs
+mentions.mjs
 package.json
 postbrief.mjs
 setup.mjs

@@ -873,3 +873,163 @@ describe('crew update: the kit folder and the owner files', () => {
 after(() => {
   for (const dir of made) rmSync(dir, { recursive: true, force: true })
 })
+
+describe('crew mentions: the updates that ask Boss something', async () => {
+  const { MENTION, createWatcher, follow, mentionLines, rpcResult } = await import('./mentions.mjs')
+  const task = { id: 't1', title: 'A card' }
+
+  // A fake board: get_board gives each card's update count, get_task the updates after `since`.
+  function fakeBoard() {
+    const cards = { t1: { id: 't1', title: 'A card', updatedAt: '2026-11-05T15:00:00.000Z', updates: [] } }
+    const calls = []
+    let failGetTask = 0
+    const call = async (name, args) => {
+      calls.push([name, args])
+      if (name === 'get_board') {
+        return { columns: [{ name: 'To do', tasks: Object.values(cards).map(c => ({ id: c.id, title: c.title, updatedAt: c.updatedAt, updates: c.updates.length })) }] }
+      }
+      if (failGetTask > 0) {
+        failGetTask--
+        throw new Error('get_task answered HTTP 502')
+      }
+      return { updates: cards[args.id].updates.filter(u => u.at > args.since) }
+    }
+    const post = (body, author = 'fork taskmanager-pia (agent)') => {
+      const card = cards.t1
+      card.updates.push({ id: `u${card.updates.length + 1}`, at: new Date(Date.now() + card.updates.length).toISOString(), author, body })
+    }
+    const failNext = (n) => {
+      failGetTask = n
+    }
+    return { call, calls, post, failNext }
+  }
+  const freshState = () => ({ since: new Date(Date.now() - 60000).toISOString(), counts: {}, seen: [] })
+
+  test('finds @cato and @boss as words of their own, and not inside an address or a longer name', () => {
+    assert.ok(MENTION.test('QUESTION @cato: which one?'))
+    assert.ok(MENTION.test('@Boss please merge'))
+    assert.ok(MENTION.test('ask @cato.'))
+    assert.ok(!MENTION.test('Cato merged it'))
+    assert.ok(!MENTION.test('mail x@cato.nl'))
+    assert.ok(!MENTION.test('@catoni'))
+  })
+
+  test('only Pia reaches Boss: @cato from a worker, a reviewer or Boss itself is ignored', () => {
+    const updates = [
+      { id: 'w', author: 'fork taskmanager-wren (agent)', body: '@cato can I push?' },
+      { id: 'q', author: 'Quincy Average (agent)', body: '@cato QA question' },
+      { id: 'c', author: 'Cato (agent)', body: '@pia quoting @cato' },
+      { id: 'p1', author: 'fork taskmanager-pia (agent)', body: '@cato from the fork' },
+      { id: 'p2', author: 'Pia Planner (agent)', body: '@cato from the crew' },
+      { id: 'm', author: 'Maria Pia', body: '@cato a person named Pia' },
+      { id: 'n', author: 'Pia Planner', body: '@cato not an agent' },
+      { id: 'o', author: 'fork taskmanager-pianist (agent)', body: '@cato another role' }
+    ]
+    assert.deepEqual(mentionLines(task, updates, new Set()).map(f => f.id), ['p1', 'p2'])
+  })
+
+  test('skips Boss\'s own updates and cuts a long one to 240 characters', () => {
+    assert.deepEqual(mentionLines(task, [{ id: 'u1', author: 'Cato (agent)', body: '@pia quoting @cato' }], new Set()), [])
+    const [found] = mentionLines(task, [{ id: 'u2', author: 'Pia Planner (agent)', body: `@cato ${'x'.repeat(400)}` }], new Set())
+    assert.ok(found.line.endsWith('…'))
+    assert.ok(found.line.length < 320)
+  })
+
+  test('a comment-only update is found, although the card\'s updatedAt does not change', async () => {
+    const board = fakeBoard()
+    const watcher = createWatcher({ call: board.call, boards: ['b1'], state: freshState() })
+    assert.deepEqual(await watcher.pass(), [])
+    board.post('QUESTION @cato:\nwhich   one?')
+    assert.deepEqual(await watcher.pass(), ['@cato on t1 "A card" by fork taskmanager-pia (agent): QUESTION @cato: which one?'])
+    assert.deepEqual(await watcher.pass(), [], 'printed once')
+  })
+
+  test('a card whose update count did not change is not read again', async () => {
+    const board = fakeBoard()
+    board.post('no mention')
+    const watcher = createWatcher({ call: board.call, boards: ['b1'], state: freshState() })
+    await watcher.pass()
+    const reads = board.calls.filter(([name]) => name === 'get_task').length
+    await watcher.pass()
+    assert.equal(board.calls.filter(([name]) => name === 'get_task').length, reads)
+  })
+
+  test('a burst of updates loses no mention: get_task is asked for everything since the last check', async () => {
+    const board = fakeBoard()
+    const watcher = createWatcher({ call: board.call, boards: ['b1'], state: freshState() })
+    await watcher.pass()
+    board.post('@cato first')
+    for (let n = 0; n < 7; n++) board.post(`update ${n}`)
+    const lines = await watcher.pass()
+    assert.equal(lines.length, 1)
+    assert.ok(board.calls.some(([name, args]) => name === 'get_task' && args.since && args.limit === undefined))
+  })
+
+  test('a pass that fails loses nothing: the mention comes on the next pass', async () => {
+    const board = fakeBoard()
+    const watcher = createWatcher({ call: board.call, boards: ['b1'], state: freshState() })
+    await watcher.pass()
+    board.post('@cato are you there?')
+    board.failNext(1)
+    await assert.rejects(watcher.pass(), /502/)
+    assert.equal((await watcher.pass()).length, 1)
+  })
+
+  test('a JSON-RPC error or a tool error is an error, never an empty board', () => {
+    assert.throws(() => rpcResult('get_board', { error: { code: -32603, message: 'boom' } }), /boom/)
+    assert.throws(() => rpcResult('get_board', { result: { isError: true, content: [{ type: 'text', text: 'No board "x"' }] } }), /No board/)
+    assert.throws(() => rpcResult('get_board', { result: {} }), /no content/)
+    assert.deepEqual(rpcResult('get_board', { result: { content: [{ type: 'text', text: '{"columns":[]}' }] } }), { columns: [] })
+  })
+
+  test('a board the key cannot open is dropped with one line, and the other boards are still read', async () => {
+    const board = fakeBoard()
+    const notes = []
+    const call = (name, args) => (args.board === 'gone' ? Promise.reject(new Error('get_board: No board "gone"')) : board.call(name, args))
+    const watcher = createWatcher({ call, boards: ['gone', 'b1'], state: freshState(), note: line => notes.push(line) })
+    await watcher.pass()
+    board.post('@cato hi')
+    assert.equal((await watcher.pass()).length, 1)
+    assert.equal(notes.length, 1)
+  })
+
+  test('a column clipped at 200 cards is said once, not skipped without a word', async () => {
+    const notes = []
+    const call = async () => ({ columns: [{ name: 'Done', omitted: 12, tasks: [] }] })
+    const watcher = createWatcher({ call, boards: ['b1'], state: freshState(), note: line => notes.push(line) })
+    await watcher.pass()
+    await watcher.pass()
+    assert.equal(notes.length, 1)
+    assert.match(notes[0], /"Done".*12 more cards/)
+  })
+
+  test('a saved since that is not a time reads the last 24 hours instead of failing every pass', async () => {
+    const board = fakeBoard()
+    board.post('@cato still there?')
+    const state = { since: 'not a time', counts: {}, seen: [] }
+    const watcher = createWatcher({ call: board.call, boards: ['b1'], state })
+    assert.equal((await watcher.pass()).length, 1)
+    assert.ok(!Number.isNaN(Date.parse(state.since)))
+    // It asked for 24 hours back (plus the 5-second overlap), measured from the start of the pass.
+    const [, args] = board.calls.find(([name]) => name === 'get_task')
+    const back = Date.parse(state.since) - Date.parse(args.since)
+    assert.ok(back >= 86400000 + 5000 && back < 86400000 + 5000 + 1000, `asked for ${back} ms back`)
+  })
+
+  test('follow prints one line when checks start failing and one when they work again', async () => {
+    const printed = []
+    const answers = [['@cato one'], new Error('down'), new Error('down'), new Error('down'), [], ['@cato two']]
+    const pass = async () => {
+      const next = answers.shift()
+      if (next instanceof Error) throw next
+      return next
+    }
+    await follow({ pass, print: text => printed.push(text), wait: async () => {}, rounds: 6 })
+    assert.deepEqual(printed, [
+      '@cato one',
+      'crew mentions: check failed (down); trying again every 60 s',
+      'crew mentions: the board answers again',
+      '@cato two'
+    ])
+  })
+})

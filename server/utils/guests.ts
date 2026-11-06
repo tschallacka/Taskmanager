@@ -4,6 +4,7 @@ import { db } from '../db'
 import { projectGuests, user } from '../db/schema'
 import type { GuestRole } from '../db/schema'
 import { isPublicMailDomain } from '#shared/utils/mailDomains'
+import { accountOfAddress } from './extraEmails'
 
 /** The boards a person is a guest of. */
 export async function guestProjectIdsOf(userId: string): Promise<string[]> {
@@ -71,6 +72,10 @@ export function parseGuestRole(role: unknown): GuestRole {
 }
 
 export async function accountByEmail(email: string) {
-  const [row] = await db.select({ id: user.id, name: user.name, email: user.email }).from(user).where(eq(user.email, email))
+  // An address that is an account's verified extra address counts as that account, so "already on the team"
+  // holds whichever of its addresses the invitation names.
+  const owner = await accountOfAddress(email)
+  if (!owner) return null
+  const [row] = await db.select({ id: user.id, name: user.name, email: user.email }).from(user).where(eq(user.id, owner.userId))
   return row ?? null
 }

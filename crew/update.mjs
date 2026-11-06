@@ -32,7 +32,7 @@ const ARGS = process.argv.slice(2)
 const shipsName = name => name === LIST || (NAME.test(name) && SHAPE.test(name) && !NOT_KIT.test(name))
 const sha = path => createHash('sha256').update(readFileSync(path)).digest('hex')
 const readText = path => (existsSync(path) ? readFileSync(path, 'utf8') : null)
-const readJson = path => {
+const readJson = (path) => {
   try {
     return JSON.parse(readFileSync(path, 'utf8'))
   } catch {
@@ -40,7 +40,7 @@ const readJson = path => {
   }
 }
 const stamp = () => new Date().toISOString().replace(/[:.]/g, '-')
-const valueOf = name => {
+const valueOf = (name) => {
   const at = ARGS.indexOf(name)
   return at >= 0 ? ARGS[at + 1] : undefined
 }
