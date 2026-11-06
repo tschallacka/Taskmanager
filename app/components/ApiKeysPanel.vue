@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { format } from 'date-fns'
+import type { Ref } from 'vue'
 
 interface ReachWorkspace {
   teamId: string | null
@@ -142,9 +143,13 @@ async function copyToken() {
 
 // The key goes into the shell's environment and `claude mcp add` reads it from there, so the
 // setup instructions copied later find it as $TASKMANAGER_API_KEY too.
-const claudeCommand = computed(() =>
-  `${exportKeyCommand(issuedToken.value ?? '')}\n${mcpAddCommand(window.location.origin)}`
-)
+const claudeCommand = computed(() => {
+  if (!issuedToken.value) return ''
+  return `${PROFILE_STEP}\n${exportKeyCommand(issuedToken.value)}\n${mcpAddCommand(window.location.origin)}`
+})
+
+// Already connected: one paste swaps the key in and the server out for a fresh one.
+const replaceCommand = computed(() => (issuedToken.value ? mcpReplaceCommand(window.location.origin, issuedToken.value) : ''))
 
 const origin = import.meta.client ? window.location.origin : ''
 const kitCommands = crewKitCommands(origin)
@@ -163,12 +168,13 @@ async function copyKit(text: string, id: string) {
   }
 }
 
-async function copyCommand() {
-  if (!issuedToken.value) return
+const replaceCopied = ref(false)
+
+async function copyWithFeedback(text: string, copiedFlag: Ref<boolean>, title: string) {
   try {
-    await navigator.clipboard.writeText(claudeCommand.value)
-    commandCopied.value = true
-    toast.add({ title: 'Command copied', icon: 'i-lucide-check', duration: 2000 })
+    await navigator.clipboard.writeText(text)
+    copiedFlag.value = true
+    toast.add({ title, icon: 'i-lucide-check', duration: 2000 })
   } catch {
     toast.add({ title: 'Could not copy — select the command and copy it manually', icon: 'i-lucide-alert-triangle', color: 'error' })
   }
@@ -197,6 +203,16 @@ function toggleKey(key: ApiKeySummary) {
         saving: false
       }
     : null
+}
+
+async function copyCommand() {
+  if (!issuedToken.value) return
+  await copyWithFeedback(claudeCommand.value, commandCopied, 'Command copied')
+}
+
+async function copyReplaceCommand() {
+  if (!issuedToken.value) return
+  await copyWithFeedback(replaceCommand.value, replaceCopied, 'Update command copied')
 }
 
 const revoking = ref<string | null>(null)
@@ -420,13 +436,15 @@ function reachLabel(key: ApiKeySummary): string {
               />
             </div>
             <p class="text-xs text-muted pt-1">
-              Or connect Claude Code in one go: these lines put the key in
+              Or connect Claude Code in one go. These lines put the key in
               <code class="font-mono">$TASKMANAGER_API_KEY</code> and add the MCP server by that name only, so
-              the key is never saved. Claude Code reads it on every start: keep the export in your shell
-              profile, or run it before <code class="font-mono">claude</code>.
+              the key is not saved in Claude Code settings; only the variable name is. Claude Code reads the variable every time it starts.
+              {{ KEY_VARIABLE_HOME }}
+              Then open a new terminal, check with <code class="font-mono">echo ${TASKMANAGER_API_KEY:0:4}</code>
+              that it prints <code class="font-mono">arn_</code>, then start <code class="font-mono">claude</code>.
             </p>
-            <div class="flex gap-2">
-              <pre class="flex-1 min-w-0 text-xs font-mono bg-default border border-default rounded-md px-3 py-2 whitespace-pre-wrap break-all">{{ claudeCommand }}</pre>
+            <div class="flex flex-col sm:flex-row gap-2">
+              <pre class="flex-1 min-w-0 text-xs font-mono bg-default border border-default rounded-md px-3 py-2 whitespace-pre-wrap break-words">{{ claudeCommand }}</pre>
               <UButton
                 :icon="commandCopied ? 'i-lucide-check' : 'i-lucide-copy'"
                 :label="commandCopied ? 'Copied' : 'Copy command'"
@@ -434,6 +452,21 @@ function reachLabel(key: ApiKeySummary): string {
                 variant="soft"
                 size="sm"
                 @click="copyCommand"
+              />
+            </div>
+            <p class="text-xs text-muted pt-1">
+              {{ ALREADY_CONNECTED_STEP }} Paste the update command below.
+              {{ RESTART_STEP }}
+            </p>
+            <div class="flex flex-col sm:flex-row gap-2">
+              <pre class="flex-1 min-w-0 text-xs font-mono bg-default border border-default rounded-md px-3 py-2 whitespace-pre-wrap break-words">{{ replaceCommand }}</pre>
+              <UButton
+                :icon="replaceCopied ? 'i-lucide-check' : 'i-lucide-copy'"
+                :label="replaceCopied ? 'Copied' : 'Copy update command'"
+                color="neutral"
+                variant="soft"
+                size="sm"
+                @click="copyReplaceCommand"
               />
             </div>
           </div>

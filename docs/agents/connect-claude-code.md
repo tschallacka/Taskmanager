@@ -23,7 +23,8 @@ a scrambled copy and cannot show it again. If you lose it, you make a new one.
 
 ## 2. Connect Claude Code
 
-In the same box, press **Copy command**. It copies two lines, which look like this (with your own address and key):
+In the same box, press **Copy command**. It copies the export line and the add command, plus comment lines that do nothing
+when pasted, which look like this (with your own address and key):
 
 ```
 export TASKMANAGER_API_KEY=arn_...
@@ -39,8 +40,47 @@ Paste both lines into a terminal and run them. This is what they do:
 - The key itself is **not** saved in Claude Code's settings. Only the name of the variable is. Claude Code reads the
   variable every time it starts.
 
-Because of that last point, put the `export` line in your shell profile (for example `~/.zshrc`), or run it in each
-terminal before you start `claude`. If the variable is missing, Claude Code cannot sign in.
+Because of that last point, the variable has to be set wherever Claude Code starts. Set it once, in the shell profile:
+
+1. Open the profile in an editor, not in the terminal, so the key does not end up in your shell history. On a Mac with
+   zsh that is `~/.zshrc`; on Linux with bash it is `~/.bashrc`.
+2. Add the `export` line from the box, with your key in it, and save the file.
+3. Open a new terminal and check that the variable holds the key. Print only its first four characters:
+
+   ```
+   echo ${TASKMANAGER_API_KEY:0:4}
+   ```
+
+   It prints `arn_`. If it prints nothing, the profile was not read: check the file name and save it again.
+
+4. Only then start `claude` from that terminal.
+
+If you start Claude Code from an app rather than a terminal, and that app sets its own environment, the profile is not
+read there. Add `TASKMANAGER_API_KEY` to that app's environment settings instead. Without the variable, Claude Code
+cannot sign in.
+
+### Replace a key that is already connected
+
+If `claude mcp add` answers `MCP server taskmanager already exists in user config`, a connection is already there, and
+adding it again changes nothing. Replace it instead. In the box where you copied the first command, press **Copy update
+command**. It has three lines:
+
+```
+export TASKMANAGER_API_KEY=arn_...
+claude mcp remove --scope user taskmanager 2>/dev/null
+claude mcp add --scope user --transport http taskmanager https://your-taskmanager/api/mcp \
+  --header 'Authorization: Bearer ${TASKMANAGER_API_KEY}'
+```
+
+The second line removes the old connection. If there is none yet, the remove fails quietly and the third line still adds
+the server, so the same command also works for a first connection.
+
+After you paste it:
+
+- Put the new key in the shell profile in place of the old one, as above, so the variable holds the new key wherever
+  Claude Code starts.
+- Restart Claude Code from a terminal that has the new key. A Claude Code session that is already running keeps the key
+  it started with.
 
 ## 3. Check that it connected
 
@@ -90,9 +130,14 @@ Claude Code is disconnected immediately. See [Create and revoke a key](/help/age
 
 ## When it does not work
 
-- **`/mcp` shows taskmanager as failed, or it reports that it cannot sign in (Taskmanager answers 401).** The variable is probably not set in the terminal where you
-  started `claude`. Run the `export` line again, then start `claude` again. A 401 can also mean the key expired or was
-  revoked.
+- **`/mcp` shows taskmanager as failed, and the answer is 401 "Invalid or missing API key".** Taskmanager received no key,
+  or a key it does not know. Usually the variable is not set where Claude Code started. Open a new terminal, run
+  `echo ${TASKMANAGER_API_KEY:0:4}` and check that it prints `arn_`. If it prints nothing, add the `export` line to the
+  shell profile as described above and start `claude` again. A 401 can also mean the key expired or was revoked. Make a
+  new key and replace the old one, as described above.
+- **`claude mcp add` answers `MCP server taskmanager already exists in user config`.** A connection is already there, so
+  nothing changes. Use the update command under **Replace a key that is already connected**, which removes the old one
+  first.
 - **You are tempted to paste the key straight into the second line.** Use the version with `${TASKMANAGER_API_KEY}`
   instead: it keeps the key out of Claude Code's saved settings.
 - **Claude Code says it cannot create or change anything.** The key is read-only. Make a new key with **Write boards**.

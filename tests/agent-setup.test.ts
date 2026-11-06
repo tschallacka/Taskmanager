@@ -1,0 +1,53 @@
+// The commands a person pastes to connect Claude Code, or to replace a key that is already connected.
+// Needs nothing but the module. Run:
+//   node --import tsx --test tests/agent-setup.test.ts
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import { exportKeyCommand, KEY_VARIABLE_HOME, mcpAddCommand, mcpReplaceCommand, PROFILE_STEP } from '../app/utils/agentSetup'
+
+const ORIGIN = 'https://tasks.example.com'
+
+test('the replace command sets the key, removes the old server and adds it again', () => {
+  const command = mcpReplaceCommand(ORIGIN, 'arn_test_key')
+  const lines = command.split('\n').filter(line => !line.startsWith('#'))
+  assert.equal(lines[0], exportKeyCommand('arn_test_key'))
+  assert.equal(lines[1], 'claude mcp remove --scope user taskmanager 2>/dev/null')
+  assert.ok(command.endsWith(mcpAddCommand(ORIGIN)), 'the add command comes last, unchanged')
+})
+
+test('the remove and the add are separate commands, so a failed remove does not stop the add', () => {
+  const command = mcpReplaceCommand(ORIGIN, 'arn_test_key')
+  assert.doesNotMatch(command, /&&|\|\|/)
+  assert.doesNotMatch(command, /;\s*claude mcp add/)
+})
+
+test('the replace command leaves the key out of the MCP entry and uses the variable instead', () => {
+  const command = mcpReplaceCommand(ORIGIN, 'arn_test_key')
+  assert.ok(command.includes('Authorization: Bearer ${TASKMANAGER_API_KEY}'))
+  assert.equal(command.split('arn_test_key').length - 1, 1, 'the key appears only in the export line')
+})
+
+test('the replace command refuses to build without a real key, so no placeholder can be copied', () => {
+  assert.throws(() => mcpReplaceCommand(ORIGIN, ''), /real key/)
+  assert.throws(() => mcpReplaceCommand(ORIGIN, 'your key'), /real key/)
+})
+
+test('no copied command carries the old placeholder that would overwrite a working key', () => {
+  assert.doesNotMatch(mcpReplaceCommand(ORIGIN, 'arn_test_key'), /your_key_here/)
+  assert.doesNotMatch(exportKeyCommand('arn_test_key'), /your_key_here/)
+})
+
+test('the replace command starts with the profile step as comments, so the copy carries it', () => {
+  const command = mcpReplaceCommand(ORIGIN, 'arn_test_key')
+  assert.ok(command.startsWith(PROFILE_STEP + '\n'))
+  assert.match(PROFILE_STEP, /shell profile/)
+  assert.match(PROFILE_STEP, /~\/\.zshrc/)
+  assert.match(PROFILE_STEP, /~\/\.bashrc/)
+  for (const line of PROFILE_STEP.split('\n')) assert.ok(line.startsWith('#'), 'every profile line is a shell comment')
+})
+
+test('the profile note names the files for macOS and Linux and the app environment case', () => {
+  assert.match(KEY_VARIABLE_HOME, /~\/\.zshrc/)
+  assert.match(KEY_VARIABLE_HOME, /~\/\.bashrc/)
+  assert.match(KEY_VARIABLE_HOME, /environment settings/)
+})

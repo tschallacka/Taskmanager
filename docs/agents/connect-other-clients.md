@@ -32,7 +32,7 @@ Claude Desktop and many other clients take a block like this. The **Setup guide*
     "taskmanager": {
       "type": "http",
       "url": "https://your-taskmanager/api/mcp",
-      "headers": { "Authorization": "Bearer arn_your_key_here" }
+      "headers": { "Authorization": "Bearer <your key>" }
     }
   }
 }
@@ -61,7 +61,7 @@ change things.
 
 | You see | It means |
 |---|---|
-| 401 "Invalid or missing API key" | The header is missing or wrong, or the key was revoked. |
+| 401 "Invalid or missing API key" | The header is missing or wrong, or the key was revoked. If the client takes the key from `$TASKMANAGER_API_KEY`, the variable must be set in the environment the client starts from. [Connect Claude Code](/help/agents/connect-claude-code) explains where that is. |
 | 401 "API key has expired" | The key's expiry date has passed. Make a new key. |
 | 403 "API key owner is no longer a member of this team" | The key belongs to a team and its owner has left it. The key stops working with the membership. |
 | 403 "This API key carries no permissions" | The key was made with no usable permissions. Make a new one. |

@@ -12,7 +12,7 @@
 // This module has no side effects on import: config.mjs is loaded only when a command runs.
 // The team step is part of the login on purpose: a crew person who is not on the crew team is a setup
 // error, so a failed set-active fails the sign-in and the person gets no browser session.
-import { readFileSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { BrowserError, parseCli, request } from './browser-driver.mjs'
@@ -31,13 +31,13 @@ async function stateDir() {
   return process.env.CREW_BROWSER_DIR || join(here, 'work', 'browser')
 }
 
+// The logins of the crew and of its forks (a fork such as taskmanager-usher signs in as itself).
 async function readCreds() {
-  const { here } = await import('./config.mjs')
-  try {
-    return JSON.parse(readFileSync(join(here, 'creds.json'), 'utf8'))
-  } catch {
+  const { here, loadCreds } = await import('./config.mjs')
+  if (!existsSync(join(here, 'creds.json'))) {
     throw new BrowserError('no creds.json in the crew folder: the crew has not been provisioned here')
   }
+  return loadCreds()
 }
 
 const LOCAL_HOSTS = ['localhost', '127.0.0.1', '[::1]']
@@ -145,9 +145,25 @@ export async function signIn(who, session, creds) {
   await session.setCookies([...jar.values()])
 }
 
+/**
+ * Whether the app the crew tests is the board's own instance. Only then does a person's context sign in
+ * to the board first: on a separate dev copy the board's accounts do not exist, and the person signs in
+ * there in the page, with an account of that copy (PROJECT-RULES.md).
+ */
+export function productIsBoard(appUrl, base) {
+  try {
+    return new URL(String(appUrl)).origin === new URL(String(base)).origin
+  } catch {
+    return false
+  }
+}
+
 /** The driver runs this once per new context, before the person's first command. */
 export async function prepare(who, _call, session) {
-  return signIn(who, session, await readCreds())
+  const { config } = await import('./config.mjs')
+  const creds = await readCreds()
+  if (!productIsBoard(config.product?.appUrl, creds.base)) return
+  return signIn(who, session, creds)
 }
 /** Runs one browser command from the arguments after `browser`. Prints the result, or the note. */
 export async function main(argv) {
