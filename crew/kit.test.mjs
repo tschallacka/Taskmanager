@@ -21,6 +21,8 @@ import { fileURLToPath } from 'node:url'
 import { findChromium, request, serve } from './browser-driver.mjs'
 import { boardOrigin, signIn } from './browser.mjs'
 import { crewHome } from './home.mjs'
+import { DEFAULTS, eligibleCards, formatPlan, nextAction, planPass } from './runner-core.mjs'
+import * as opencode from './runner-opencode.mjs'
 
 const KIT = dirname(fileURLToPath(import.meta.url))
 const CREW = join(KIT, 'crew.mjs')
@@ -1038,6 +1040,91 @@ describe('crew runner models', () => {
         assert.ok(entry.model === null || (typeof entry.model === 'string' && entry.model.includes('/')), `${runner}: ${JSON.stringify(entry)}`)
         assert.ok(typeof entry.note === 'string' && entry.note.length > 0, `${runner} needs a note`)
       }
+    }
+  })
+})
+
+// ---------- crew runner process: eligibility, retry and maxRuns, the plan, the adapter, and a dry run ----------
+describe('crew runner process', () => {
+  const MINUTE = 60_000
+  const card = (over = {}) => ({ id: 'c1', title: 'A card', column: 'To do', labels: ['runner'], completed: false, updatedAt: 100, ...over })
+  const pinnedOllama = 'ollama/qwen3-coder-64k'
+
+  test('only To do and In progress cards labelled runner, not finished, are eligible', () => {
+    const cards = [
+      card({ id: 'ok1' }),
+      card({ id: 'ok2', column: 'In progress' }),
+      card({ id: 'no-label', labels: [] }),
+      card({ id: 'backlog', column: 'Backlog' }),
+      card({ id: 'verify', column: 'Verify PM' }),
+      card({ id: 'done', completed: true })
+    ]
+    assert.deepEqual(eligibleCards(cards).map(c => c.id), ['ok1', 'ok2'])
+  })
+
+  test('a card is started first, left alone while it is recent, and started again after retryMinutes', () => {
+    const now = 10_000_000
+    const state = { runs: 1, lastRunAt: now - MINUTE, lastSeenUpdate: 100 }
+    assert.equal(nextAction(null, card(), now), 'start')
+    assert.equal(nextAction(state, card(), now), 'wait')
+    assert.equal(nextAction({ ...state, lastRunAt: now - (DEFAULTS.retryMinutes + 1) * MINUTE }, card(), now), 'start')
+  })
+
+  test('a new update on the card starts it again at once, whatever the clock says', () => {
+    const now = 10_000_000
+    const state = { runs: 1, lastRunAt: now - MINUTE, lastSeenUpdate: 100 }
+    assert.equal(nextAction(state, card({ updatedAt: 200 }), now), 'start')
+  })
+
+  test('after maxRuns the runner asks Pia once, then stops, and no run is started', () => {
+    const now = 10_000_000
+    const used = { runs: DEFAULTS.maxRuns, lastRunAt: 0, lastSeenUpdate: 100 }
+    assert.equal(nextAction(used, card({ updatedAt: 999 }), now), 'ask')
+    assert.equal(nextAction({ ...used, asked: true }, card({ updatedAt: 999 }), now), 'stop')
+  })
+
+  test('the plan starts a pinned worker on its eligible cards and refuses a worker with no pinned model', () => {
+    const plan = planPass({
+      workers: [
+        { key: 'wes', runner: 'opencode', provider: 'ollama', model: pinnedOllama },
+        { key: 'wick', runner: 'opencode', provider: 'openrouter', model: null }
+      ],
+      cards: { wes: [card({ id: 'a' }), card({ id: 'b', column: 'Backlog' })], wick: [card({ id: 'c' })] },
+      now: 10_000_000
+    })
+    assert.deepEqual(formatPlan(plan), [
+      `start wes on a "A card" (${pinnedOllama})`,
+      'refuse wick: no model is pinned for opencode/openrouter'
+    ])
+  })
+
+  test('the opencode command names the model and the message, and gives the worker only its own config', () => {
+    const argv = opencode.args({ model: pinnedOllama, message: 'Work on the card c1.' })
+    assert.deepEqual(argv.slice(0, 4), ['run', '--model', pinnedOllama, '--format'])
+    assert.equal(argv.at(-1), 'Work on the card c1.')
+    assert.throws(() => opencode.args({ model: 'no-slash', message: 'x' }), /provider\/model/)
+    assert.deepEqual(opencode.env({ configFile: '/x/opencode.json' }), { OPENCODE_CONFIG: '/x/opencode.json' })
+    assert.deepEqual(opencode.env({}), {})
+  })
+
+  test('the session id is read from the JSON lines opencode prints, and none is invented', () => {
+    assert.equal(opencode.parseSession('not json\n{"type":"step"}\n{"sessionID":"ses_42"}\n'), 'ses_42')
+    assert.equal(opencode.parseSession('{"type":"step"}\n'), null)
+  })
+
+  test('the dry run prints the plan from a cards file and starts nothing', () => {
+    const home = mkdtempSync(join(tmpdir(), 'crew-runner-'))
+    try {
+      writeFileSync(join(home, 'crew.json'), JSON.stringify({ runners: { wes: 'opencode/ollama', wick: 'opencode/openrouter' } }))
+      const cards = join(home, 'cards.json')
+      writeFileSync(cards, JSON.stringify({ wes: [card({ id: 't1', title: 'Ship it' })], wick: [] }))
+      const run = spawnSync(process.execPath, [join(KIT, 'runner.mjs'), 'once', '--dry-run', '--cards', cards], { encoding: 'utf8', env: { ...process.env, CREW_HOME: home } })
+      assert.equal(run.status, 0, run.stderr)
+      assert.match(run.stdout, /start wes on t1 "Ship it" \(ollama\/qwen3-coder-64k\)/)
+      assert.match(run.stdout, /refuse wick: no model is pinned for opencode\/openrouter/)
+      assert.equal(existsSync(join(home, 'runners')), false, 'a dry run writes no state')
+    } finally {
+      rmSync(home, { recursive: true, force: true })
     }
   })
 })

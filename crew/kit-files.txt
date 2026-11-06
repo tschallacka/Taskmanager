@@ -31,7 +31,10 @@ listen.mjs
 mentions.mjs
 package.json
 postbrief.mjs
+runner-core.mjs
 runner-models.json
+runner-opencode.mjs
+runner.mjs
 setup.mjs
 tm.mjs
 unslop.SKILL.md
