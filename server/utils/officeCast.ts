@@ -95,3 +95,15 @@ export async function officeCastOf(projectId: string, assigneeIds: string[]): Pr
   cast.sort((a, b) => ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role) || a.key.localeCompare(b.key))
   return { crewName: crew?.name ?? null, cast, seats }
 }
+
+/**
+ * The tasks with each assignee moved to the seat that person holds: a card on a crew's own account reads at the
+ * desk of the fork that is that same person (`seats` maps the own account to the fork). Returns new objects; the
+ * tasks it was given are left as they were.
+ */
+export function seatTasks<T extends { assigneeId: string | null }>(tasks: readonly T[], seats: Record<string, string>): T[] {
+  return tasks.map((task) => {
+    const seat = task.assigneeId ? seats[task.assigneeId] : undefined
+    return seat ? { ...task, assigneeId: seat } : { ...task }
+  })
+}

@@ -3,7 +3,7 @@
 //   TSX_TSCONFIG_PATH=.nuxt/tsconfig.server.json DATABASE_URL=postgresql://arnotes:arnotes@localhost:5433/arnotes node --import tsx --test tests/office-duplicate-desk.test.ts
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { seatOwnAccounts } from '../server/utils/officeCast'
+import { seatOwnAccounts, seatTasks } from '../server/utils/officeCast'
 import type { OfficePerson } from '../shared/office/model'
 
 const keyOf = (email: string) => email.split('@')[0]!
@@ -46,4 +46,31 @@ test('an account with no address is never seated', () => {
   const { added, aliases } = seatOwnAccounts(seated, [{ id: 'own-x', email: '', name: 'Nobody' }], forkIds, keyOf)
   assert.deepEqual(added, [])
   assert.deepEqual(aliases, {})
+})
+
+test('a card on a crew\'s own account moves to its fork\'s desk', () => {
+  const tasks = [{ id: 't1', assigneeId: 'own-wade' as string | null }]
+  const seatsOfOwn = { 'own-wade': 'fork-wade' }
+  const seated = seatTasks(tasks, seatsOfOwn)
+  assert.equal(seated[0]!.assigneeId, 'fork-wade')
+})
+
+test('a card on a fork stays at that fork\'s desk', () => {
+  const seated = seatTasks([{ id: 't2', assigneeId: 'fork-usher' as string | null }], { 'own-wade': 'fork-wade' })
+  assert.equal(seated[0]!.assigneeId, 'fork-usher')
+})
+
+test('a card with no assignee stays unassigned', () => {
+  const seated = seatTasks([{ id: 't3', assigneeId: null as string | null }], { 'own-wade': 'fork-wade' })
+  assert.equal(seated[0]!.assigneeId, null)
+})
+
+test('seating returns new task objects and leaves the input unchanged', () => {
+  const input = [{ id: 't1', assigneeId: 'own-wade' as string | null, title: 'Card' }]
+  const before = JSON.stringify(input)
+  const seated = seatTasks(input, { 'own-wade': 'fork-wade' })
+  assert.notEqual(seated[0], input[0])
+  assert.equal(seated[0]!.title, 'Card')
+  assert.equal(input[0]!.assigneeId, 'own-wade')
+  assert.equal(JSON.stringify(input), before)
 })
