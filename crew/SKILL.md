@@ -75,7 +75,8 @@ Columns: Backlog, To do, In progress, **Verify PM**, **Verify UX**, **Verify CQ*
   seconds and prints one line per new mention, and each line wakes you. Re-arm it every time it expires, for as long
   as the crew runs. Without a `Monitor`, schedule `crew mentions` every minute instead: it prints only what came in
   since its last check, so nothing is printed twice. Answer a mention before anything else except the Owner. After a
-  restart, run `crew mentions` once: it catches up from its last check (the first time, the last 24 hours).
+  restart, run `crew mentions` once: it catches up from its last check (the first time, the last 24 hours). The
+  watch reads updates on main cards only, so tell Pia to put a question for you on the main card, not on a subtask.
 - **Chat line.** Start the chat server, join the customer channel as the customer nick, keep a
   presence tail running and arm `guard.sh` as a tracked background task; its exit is the wake for
   an `@<customer nick>` mention. Re-arm it every time. The chat line is optional (off unless `chat.client` is set): without it, meetings and steering go through the board. See `README.md`.

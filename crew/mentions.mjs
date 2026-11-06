@@ -9,6 +9,8 @@
 // in CREW_HOME/.listen/boss-mentions.json, so a one-shot check after --follow (or after a restart) prints only
 // what is new. Boards: the crew's board and, for a fork, its main board and its crew board. Key:
 // TASKMANAGER_API_KEY (the Owner's key, which Boss's session already has), else the crew's boss account.
+// Limits: only top-level cards are read, so a question for Boss goes in an update on the main card, not on a
+// subtask; and a column past 200 cards is read only up to 200, which the watch says once.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 
@@ -45,10 +47,15 @@ export function mentionLines(task, updates, seen) {
  */
 export function createWatcher({ call, boards, state, now = () => new Date().toISOString(), note = () => {} }) {
   const open = new Set(boards)
+  const warned = new Set()
   async function pass() {
     const started = now()
     const counts = {}
     const found = []
+    // A saved `since` that is not a time (a hand-edited state file, say) starts from 24 hours back instead of failing every pass.
+    const base = Date.parse(state.since)
+    // Five seconds of overlap cover a clock that runs a little behind the board's; `seen` drops the repeats.
+    const since = new Date((Number.isNaN(base) ? Date.parse(started) - 86400000 : base) - 5000).toISOString()
     for (const board of [...open]) {
       let data
       try {
@@ -60,16 +67,22 @@ export function createWatcher({ call, boards, state, now = () => new Date().toIS
         note(`crew mentions: board ${board} is not open to this key; no longer checked`)
         continue
       }
-      for (const task of (data?.columns ?? []).flatMap(column => column.tasks ?? [])) {
-        const total = Number(task.updates ?? 0)
-        counts[task.id] = total
-        if (!total || state.counts[task.id] === total) continue
-        // `since` returns every update after it, not only the newest five, so a burst of updates loses none.
-        // Five seconds of overlap cover a clock that runs a little behind the board's; `seen` drops the repeats.
-        const since = new Date(Date.parse(state.since) - 5000).toISOString()
-        const full = await call('get_task', { id: task.id, since })
-        const seen = new Set([...state.seen, ...found.map(f => f.id)])
-        found.push(...mentionLines(task, full?.updates, seen))
+      for (const column of data?.columns ?? []) {
+        // get_board reads at most 200 cards a column. Say so once, instead of skipping the rest without a word.
+        const key = `${board}/${column.name}`
+        if (Number(column.omitted) > 0 && !warned.has(key)) {
+          warned.add(key)
+          note(`crew mentions: column "${column.name}" on board ${board} has ${column.omitted} more cards than one read returns; @cato on those is not seen`)
+        }
+        for (const task of column.tasks ?? []) {
+          const total = Number(task.updates ?? 0)
+          counts[task.id] = total
+          if (!total || state.counts[task.id] === total) continue
+          // `since` returns every update after it, not only the newest five, so a burst of updates loses none.
+          const full = await call('get_task', { id: task.id, since })
+          const seen = new Set([...state.seen, ...found.map(f => f.id)])
+          found.push(...mentionLines(task, full?.updates, seen))
+        }
       }
     }
     state.since = started

@@ -961,6 +961,25 @@ describe('crew mentions: the updates that ask Boss something', async () => {
     assert.equal(notes.length, 1)
   })
 
+  test('a column clipped at 200 cards is said once, not skipped without a word', async () => {
+    const notes = []
+    const call = async () => ({ columns: [{ name: 'Done', omitted: 12, tasks: [] }] })
+    const watcher = createWatcher({ call, boards: ['b1'], state: freshState(), note: line => notes.push(line) })
+    await watcher.pass()
+    await watcher.pass()
+    assert.equal(notes.length, 1)
+    assert.match(notes[0], /"Done".*12 more cards/)
+  })
+
+  test('a saved since that is not a time reads the last 24 hours instead of failing every pass', async () => {
+    const board = fakeBoard()
+    board.post('@cato still there?')
+    const state = { since: 'not a time', counts: {}, seen: [] }
+    const watcher = createWatcher({ call: board.call, boards: ['b1'], state })
+    assert.equal((await watcher.pass()).length, 1)
+    assert.ok(!Number.isNaN(Date.parse(state.since)))
+  })
+
   test('follow prints one line when checks start failing and one when they work again', async () => {
     const printed = []
     const answers = [['@cato one'], new Error('down'), new Error('down'), new Error('down'), [], ['@cato two']]
