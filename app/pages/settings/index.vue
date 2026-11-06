@@ -167,6 +167,15 @@ function swatchStyle(color: string, selected: boolean) {
         </h1>
         <UButton
           v-if="isInstanceAdmin"
+          to="/admin/branding"
+          label="Branding"
+          icon="i-lucide-palette"
+          size="xs"
+          color="neutral"
+          variant="ghost"
+        />
+        <UButton
+          v-if="isInstanceAdmin"
           to="/admin/crews"
           label="Crews"
           icon="i-lucide-boxes"

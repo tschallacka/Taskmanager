@@ -123,6 +123,16 @@ export const organization = pgTable('organization', {
   joinCode: text('join_code').unique()
 })
 
+// The instance's own name and icon, set by the instance admin. One row, with the id 'instance'. The icon is
+// kept in the row: its type and its data (base64); a missing icon means the built-in one.
+export const instanceSettings = pgTable('instance_settings', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  iconMime: text('icon_mime'),
+  iconData: text('icon_data'),
+  updatedAt: timestamp('updated_at').notNull()
+})
+
 // Settings a team keeps for itself. One row per team, made when something is first set.
 export const teamSettings = pgTable('team_settings', {
   teamId: text('team_id').primaryKey().references(() => organization.id, { onDelete: 'cascade' }),
