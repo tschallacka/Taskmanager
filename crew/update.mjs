@@ -243,7 +243,7 @@ async function finish(planFile) {
       const newFile = join(plan.backupDir, `${out}.new`)
       writeFileSync(newFile, theirs)
       saveBase(out, theirs)
-      lines.push(`WARN ${out}: no template was recorded for this file, so the new template cannot be merged into it now. Kept as it is. The new template is in ${newFile} and is now recorded as the base, so the next update merges from here. Template changes made before this one are not brought in: compare with that file by hand.`)
+      lines.push(`WARN ${out}: no template was recorded for this file, so the new template cannot be merged into it now. Kept as it is. The new template is in ${newFile} and is now recorded as the base, so a later update merges any template change from there on. Template changes made before this one are not brought in: compare with that file by hand.`)
     } else if (base === theirs) {
       lines.push(`${out}: the template did not change; kept`)
     } else if (ours === base) {

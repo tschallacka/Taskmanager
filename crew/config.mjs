@@ -96,7 +96,16 @@ export function loadCreds() {
   creds.people ??= {}
   for (const { data } of loadForks()) {
     for (const person of data.members) {
-      if (!creds.people[person.agentType]) creds.people[person.agentType] = { name: person.name, email: person.email, password: person.password, apiKey: person.apiKey, fork: data.board?.name ?? true, role: forkRole(person.agentType), boardId: data.shadowBoard?.id ?? null }
+      if (creds.people[person.agentType]) continue
+      creds.people[person.agentType] = {
+        name: person.name,
+        email: person.email,
+        password: person.password,
+        apiKey: person.apiKey,
+        fork: data.board?.name ?? true,
+        role: forkRole(person.agentType),
+        boardId: data.shadowBoard?.id ?? null,
+      }
     }
   }
   return creds
