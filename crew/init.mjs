@@ -9,7 +9,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, chmodS
 import { execSync } from 'node:child_process'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { CAST, OWNER_FILES, agentNames, config, here, kitDir, loadForks, modelProblems, renderTemplate, templateValues } from './config.mjs'
+import { CAST, OWNER_FILES, agentNames, config, forkMemberPlan, here, kitDir, loadForks, modelProblems, renderTemplate, templateValues } from './config.mjs'
 
 const ok = m => console.log(`  ok   ${m}`)
 const warn = m => console.log(`  WARN ${m}`)
@@ -146,7 +146,7 @@ const DUTIES = {
   quincy: 'QA. Uses the finished task like a customer, or like an agent with no prior knowledge, and files QA violations for the PM.',
   watcher: 'log watcher (optional). Reads the dev logs and reports what matters; changes nothing.'
 }
-for (const key of CAST) {
+for (const key of CAST.filter(member => forkMemberPlan(member) === 'write')) {
   const name = agentNames[key]
   const file = join(agentsDir, `${name}.md`)
   const marker = `<!-- ${name}: written by the crew kit's init.mjs, which rewrites this file -->`
@@ -198,6 +198,17 @@ if (!forks.length) console.log('  none (hand a fork over with: init.mjs --forks 
 for (const { file, data } of forks) {
   const boardName = data.board?.name ?? file
   for (const member of data.members) {
+    // An extra worker runs on its own model: no agent definition. A key the kit does not know is an error, not a
+    // Claude agent with some other member's model.
+    const plan = forkMemberPlan(member.key)
+    if (plan === 'unknown') {
+      fail(`${file}: "${member.key}" is not a crew member this kit knows; no agent definition is written for it`)
+      continue
+    }
+    if (plan === 'skip') {
+      ok(`${member.agentType}  (extra worker: no agent definition, it runs on its own model)`)
+      continue
+    }
     const name = member.agentType
     const agentFile = join(agentsDir, `${name}.md`)
     const marker = `<!-- ${name}: written by the crew kit's init.mjs, which rewrites this file -->`
@@ -206,7 +217,7 @@ for (const { file, data } of forks) {
       continue
     }
     const base = config.people[member.key] ?? member.name
-    const chosen = config.models[member.key] ?? config.models.wren
+    const chosen = config.models[member.key]
     if (skipsProvider(name, chosen)) continue
     const description = `${member.name}, ${DUTIES[member.key] ?? DUTIES.wren} Forked from crew "${config.team}" for the board "${boardName}". Launch prompt in ${here}PROMPTS.md.`
     writeFileSync(agentFile, `---

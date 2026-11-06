@@ -104,7 +104,7 @@ export function loadCreds() {
         apiKey: person.apiKey,
         fork: data.board?.name ?? true,
         role: forkRole(person.agentType),
-        boardId: data.shadowBoard?.id ?? null,
+        boardId: data.shadowBoard?.id ?? null
       }
     }
   }
@@ -113,12 +113,24 @@ export function loadCreds() {
 
 const slugify = text => String(text).toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
 
-// The members Pia starts as agents (Pia herself runs in her own session), the optional log watcher included.
-export const CAST = ['pia', 'wren', 'wick', 'wynn', 'wade', 'usher', 'nina', 'quincy', 'watcher']
-
-// Extra workers on a board (EXTRA_PEOPLE in the app): forked later, run on a local model through opencode,
-// and not part of CAST, so Pia starts none of them. Their forks still play their role (forkRole).
+// Extra workers on a board (EXTRA_WORKERS in shared/utils/extraWorkers.ts): forked later, run on a local model
+// through opencode. They are known to the kit so their forks can be read, but init writes no agent definition for
+// them (forkMemberPlan), and Pia starts only the members Owner set up as agents.
 export const EXTRA_CAST = ['wes', 'wilma', 'walt']
+
+// The members Pia starts as agents (Pia herself runs in her own session), the optional log watcher included,
+// and the extra workers, whose forks play their role.
+export const CAST = ['pia', 'wren', 'wick', 'wynn', 'wade', 'usher', 'nina', 'quincy', 'watcher', ...EXTRA_CAST]
+
+/**
+ * What init does with one member of a forks file: `write` an agent definition for a standard member, `skip` an
+ * extra worker (it runs on its own model), or `unknown` for a key the kit does not know, which is an error.
+ */
+export function forkMemberPlan(key) {
+  if (EXTRA_CAST.includes(key)) return 'skip'
+  if (CAST.includes(key)) return 'write'
+  return 'unknown'
+}
 
 // The model each person runs on is the Owner's choice, set per person in crew.json under "models" (README, "Models").
 // The kit fixes no model name: a person with no entry gets "haiku", which is Claude Code's name for the cheap tier of
@@ -168,7 +180,7 @@ export const modelProblems = resolvedModels.problems
  * Each member's Claude Code agent type, such as acme-pia-planner: the crew slug first, so two crews
  * on one machine never share one. init.mjs writes the definitions; PROMPTS.md names them.
  */
-export const agentNames = Object.fromEntries(CAST.map(key => [key, `${slugify(config.crew.slug || config.team)}-${slugify(config.people[key])}`]))
+export const agentNames = Object.fromEntries(CAST.filter(key => !EXTRA_CAST.includes(key)).map(key => [key, `${slugify(config.crew.slug || config.team)}-${slugify(config.people[key])}`]))
 
 // A path as one shell word, quoted only when it has to be.
 const shellWord = text => (/^[\w@%+=:,./-]+$/.test(text) ? text : `'${text.replace(/'/g, `'\\''`)}'`)

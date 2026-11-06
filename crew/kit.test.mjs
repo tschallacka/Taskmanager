@@ -21,7 +21,7 @@ import { fileURLToPath } from 'node:url'
 import { findChromium, request, serve } from './browser-driver.mjs'
 import { boardOrigin, signIn } from './browser.mjs'
 import { crewHome } from './home.mjs'
-import { CAST, EXTRA_CAST, forkRole } from './config.mjs'
+import { CAST, EXTRA_CAST, forkMemberPlan, forkRole } from './config.mjs'
 
 test('the extra workers the kit names are the ones the app shares: one list, and this fails when they differ', () => {
   const shared = readFileSync(join(KIT, '..', 'shared', 'utils', 'extraWorkers.ts'), 'utf8')
@@ -30,11 +30,14 @@ test('the extra workers the kit names are the ones the app shares: one list, and
   assert.deepEqual([...EXTRA_CAST].sort(), [...keys].sort())
 })
 
-test('an extra worker plays its role from its fork, and Pia starts none of the extra workers', () => {
+test('an extra worker plays its role from its fork, and the plan of a forked member: an extra worker gets none, and an unknown key is refused', () => {
   assert.equal(forkRole('internal-tools-wes'), 'wes')
   assert.equal(forkRole('internal-tools-walt'), 'walt')
   assert.equal(forkRole('internal-tools-zed'), null)
-  assert.deepEqual(CAST.filter(key => EXTRA_CAST.includes(key)), [])
+  assert.ok(EXTRA_CAST.every(key => CAST.includes(key)), 'the kit knows the extra workers')
+  assert.equal(forkMemberPlan('wes'), 'skip', 'an extra worker gets no agent definition')
+  assert.equal(forkMemberPlan('wren'), 'write', 'a standard member gets one')
+  assert.equal(forkMemberPlan('zed'), 'unknown', 'a key the kit does not know is an error')
 })
 
 const KIT = dirname(fileURLToPath(import.meta.url))
