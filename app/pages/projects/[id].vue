@@ -48,12 +48,13 @@ const VIEWS = [
 ] as const
 
 // Time, messages and settings are the team's own: a customer's contact has no tab for them.
-const STAFF_ONLY_VIEWS: string[] = ['messages', 'time', 'settings', 'office']
+const STAFF_ONLY_VIEWS: string[] = ['messages', 'time', 'settings']
 // The office is a crew board's: it shows only on one, and only to the team's staff.
 const visibleViews = computed(() => VIEWS.filter(v => (v.key !== 'office' || crewBoard.value) && (!STAFF_ONLY_VIEWS.includes(v.key) || !isCustomerView.value)))
 
 const tabViews = computed(() => visibleViews.value.filter(v => v.key !== 'settings'))
-const view = computed(() => visibleViews.value.find(v => v.key === route.query.view)?.key ?? 'board')
+// The office is no panel of this page, so ?view=office falls back to the board instead of showing files.
+const view = computed(() => visibleViews.value.filter(v => v.key !== 'office').find(v => v.key === route.query.view)?.key ?? 'board')
 
 function setView(key: string) {
   navigateTo({ path: route.path, query: queryForView(route.query, key) }, { replace: true })

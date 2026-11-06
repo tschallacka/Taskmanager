@@ -186,9 +186,9 @@ const _board = ref<{ columns: ProjectColumn[], tasks: ProjectTask[] } | null>(nu
 // Update counts live beside the board: task PUT responses do not carry them, so
 // folding them into the task would wipe the badge on every edit.
 const _commentCounts = ref<Record<string, number>>({})
-// The open board's GitHub badges, from the board endpoint. Read by each card.
 // Whether the board is a crew's, so its Office view is offered. Set with the board it came with.
 const _crewBoard = ref(false)
+// The open board's GitHub badges, from the board endpoint. Read by each card.
 const _githubBadges = ref<Record<string, GithubBadge[]>>({})
 // The open board's subtasks. Kept beside the cards rather than among them, so
 // nothing that walks the board's tasks has to know they exist.

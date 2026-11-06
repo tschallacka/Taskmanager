@@ -2,7 +2,7 @@
 import type { OfficeSnapshot } from '#shared/office/model'
 import { DemoBoard } from '#shared/office/demo'
 import type { HoverInfo, OfficeScene } from '~/office/office'
-import { pollFailureOf } from '~/office/pollFailure'
+import { pollFailureOf, unseenAfter } from '~/office/pollFailure'
 
 definePageMeta({ layout: 'app' })
 
@@ -26,6 +26,8 @@ const paused = ref(false)
 const noWebGL = ref(false)
 // A board the viewer cannot see: no room is drawn and polling stops. Set once, for this page visit.
 const unseen = ref(false)
+// Unseen 404s in a row for this visit; see unseenAfter.
+const unseenStrikes = ref(0)
 
 let scene: OfficeScene | null = null
 let timer: ReturnType<typeof setTimeout> | null = null
@@ -56,9 +58,13 @@ async function pollLive() {
     try {
       show(await $fetch<OfficeSnapshot>(`/api/projects/${boardId.value}/office`))
       error.value = ''
+      unseenStrikes.value = 0
     } catch (e) {
       const failure = pollFailureOf(e)
-      if (failure.kind === 'unseen') {
+      // One 404 without a reason can come from a deploy or a route gap, so the room goes only after two in a row.
+      const next = unseenAfter(unseenStrikes.value, failure)
+      unseenStrikes.value = next.strikes
+      if (next.unseen) {
         // The server answers 404 for a board the viewer cannot see. Such a board gets no room: the scene is
         // taken down and polling stops for this visit.
         unseen.value = true
