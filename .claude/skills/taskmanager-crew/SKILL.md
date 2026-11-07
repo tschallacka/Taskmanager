@@ -34,9 +34,14 @@ Columns: Backlog, To do, In progress, **Verify**, **Ready for live**, **Done**, 
 3. **You review the code in Verify** (read the diff of the owned files, run lint and the typecheck,
    look at the screenshot, try it). Approved: move to **Ready for live**. Not approved: post written
    feedback on the task and move it to **To do**.
-4. **Only you publish**, and only tasks in Ready for live: backup the database, apply any schema change
-   (`SCHEMA CHANGED:` updates), run typecheck and lint, commit, `git push origin taskmanager-views:master`.
-   Then move the tasks to **Done**.
+4. **Only you publish**, and only tasks in Ready for live. **Before merging ANY branch, merge the main
+   branch into it and rerun everything on the result** (install, migrate on a scratch database, typecheck, lint,
+   the full tests): a branch that was green on its own base goes stale in unexpected ways, and a clean textual
+   merge can still break at compile time or at run time. That is the merger's job (yours), not the workers', and it is
+   one command you run very often (`crew publish`, or your own script): squash onto a fresh main in a worktree on
+   disk (never `/tmp`, a ramdisk), run the checks, stop on a conflict or a failure, then push and open the pull
+   request. Then back up the database and apply any schema change (`SCHEMA CHANGED:` updates), merge, and move the
+   tasks to **Done**.
 5. Workers and the PM never commit, push, run `db:push`/`psql`/`drizzle-kit`, or touch the dev server.
 6. Bugs: anyone files a `[BUG]` task in the Bugs column; the PM assigns it, a worker fixes it and moves it
    through Verify like anything else.
