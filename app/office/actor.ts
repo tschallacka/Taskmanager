@@ -143,6 +143,37 @@ export async function followPlan(
   if (plan.then === 'sweep') await actor.play('sweep')
 }
 
+/**
+ * Turns a sharp corner of a path into two gentler ones. Where the path turns back on itself by more than about 110
+ * degrees at a point, the body would snap round in a single stride; instead the corner is cut on both legs by up to
+ * `radius` metres, so each of the two turns is about half the angle and the body turns over a stride or two. Only the
+ * sharp corners change: the first point stays, and nothing is added at the end.
+ */
+export function roundSharpCorners(points: P[], radius = 0.6, sharp = -0.4): P[] {
+  if (points.length < 3) return points.slice()
+  const out: P[] = [points[0]!]
+  for (let i = 1; i < points.length - 1; i++) {
+    const prev = points[i - 1]!
+    const cur = points[i]!
+    const next = points[i + 1]!
+    const ax = cur.x - prev.x
+    const az = cur.z - prev.z
+    const bx = next.x - cur.x
+    const bz = next.z - cur.z
+    const la = Math.hypot(ax, az)
+    const lb = Math.hypot(bx, bz)
+    const cos = la && lb ? (ax * bx + az * bz) / (la * lb) : 1
+    if (cos >= sharp) {
+      out.push(cur)
+      continue
+    }
+    const r = Math.min(radius, la / 2, lb / 2)
+    out.push({ x: cur.x - (ax / la) * r, z: cur.z - (az / la) * r }, { x: cur.x + (bx / lb) * r, z: cur.z + (bz / lb) * r })
+  }
+  out.push(points[points.length - 1]!)
+  return out
+}
+
 /** What each role has printed on the back of the shirt; the name tag above the head stays the first name. */
 const BACK_PRINT: Record<Role, string> = { pm: 'PM', worker: 'WORKER', ux: 'UX', cq: 'CQ', qa: 'QA', boss: 'BOSS' }
 
