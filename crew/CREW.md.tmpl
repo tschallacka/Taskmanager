@@ -37,7 +37,9 @@ Your key (`pia`, `wren`, ...) is the first argument to every command below.
 {{node_kit}}/crew.mjs <you> api GET /api/...               # the board app's own API with your session; prints "<status> <body>"
 {{node_kit}}/crew.mjs <you> apij GET /api/...              # the same, but prints the body ONLY (use this when you JSON.parse)
 {{node_kit}}/crew.mjs <you> run script.mjs                 # your own Playwright script; default-export async ({ page, ctx, BASE, APP }) => {}
+{{node_kit}}/crew.mjs totp <file>          # the current two-factor code of a test account, from a secret file in your work folder (see below)
 ```
+**Two-factor codes for a test account.** Switch two-factor on in the dev copy, copy the secret shown under the QR code (or the whole `otpauth://` link) into a file in your work folder, and run `crew.mjs totp <that file>`. It prints the six-digit code and the seconds it stays valid. Keep the file in the work folder and delete it when the pass is done. The secret never goes in a card, an update, a commit or chat. Dev copies and scratch accounts only.
 
 **Posting an update: write the Markdown to a file, then post the file.** This is the default for anything longer than one line. It needs no escaping, so quotes, backticks, code fences and newlines go in exactly as written:
 

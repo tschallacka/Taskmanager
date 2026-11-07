@@ -21,6 +21,8 @@ import { fileURLToPath } from 'node:url'
 import { findChromium, request, serve } from './browser-driver.mjs'
 import { boardOrigin, signIn } from './browser.mjs'
 import { crewHome } from './home.mjs'
+import { codeAt, keyOf } from './totp.mjs'
+import { createOTP } from '@better-auth/utils/otp'
 import { CAST, EXTRA_CAST, forkMemberPlan, forkRole } from './cast.mjs'
 
 test('the extra workers the kit names are the ones the app shares: one list, and this fails when they differ', () => {
@@ -1031,5 +1033,55 @@ describe('crew mentions: the updates that ask Boss something', async () => {
       'crew mentions: the board answers again',
       '@cato two'
     ])
+  })
+})
+
+// ---------- crew totp: the authenticator code, against the RFC 6238 vectors and the Better Auth library ----------
+describe('crew totp', () => {
+  const ASCII = '12345678901234567890'
+  const KEY = Buffer.from(ASCII)
+  const BASE32 = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ'
+  const TOTP = join(KIT, 'totp.mjs')
+  const scratch = mkdtempSync(join(tmpdir(), 'crew-totp-'))
+  after(() => rmSync(scratch, { recursive: true, force: true }))
+  const fileWith = (name, text) => {
+    const path = join(scratch, name)
+    writeFileSync(path, text)
+    return path
+  }
+
+  test('the RFC 6238 SHA-1 vectors give the RFC codes, the last six digits', () => {
+    assert.equal(codeAt(KEY, 59), '287082')
+    assert.equal(codeAt(KEY, 1111111109), '081804')
+    assert.equal(codeAt(KEY, 1234567890), '005924')
+  })
+
+  test('an otpauth link and the bare base32 secret, with or without spaces, are the same key', () => {
+    assert.deepEqual(keyOf(`otpauth://totp/Taskmanager:tester@dev.test?secret=${BASE32}&issuer=Taskmanager`), KEY)
+    assert.deepEqual(keyOf(`${BASE32}\n`), KEY)
+    assert.deepEqual(keyOf(BASE32.match(/.{4}/g).join(' ')), KEY)
+    assert.equal(keyOf('SECRET1NOTBASE32'), null)
+  })
+
+  test('the command prints six digits and the seconds left, read from a link file', () => {
+    const run = spawnSync(process.execPath, [TOTP, fileWith('link.txt', `otpauth://totp/x?secret=${BASE32}`)], { encoding: 'utf8' })
+    assert.equal(run.status, 0)
+    assert.match(run.stdout, /^\d{6} \(valid \d+ more seconds\)\n$/)
+  })
+
+  test('a secret that is not base32 exits 65, prints nothing to stdout and never echoes the secret', () => {
+    const bad = 'SECRET1NOTBASE32'
+    const run = spawnSync(process.execPath, [TOTP, fileWith('bad.txt', bad)], { encoding: 'utf8' })
+    assert.equal(run.status, 65)
+    assert.equal(run.stdout, '')
+    assert.ok(!run.stderr.includes(bad), 'the secret is not echoed')
+    assert.ok(!run.stderr.includes('SECRET1'), 'no part of the secret is echoed')
+  })
+
+  test('the same secret gives the same codes as the Better Auth library, counter for counter', async () => {
+    const otp = createOTP(ASCII)
+    for (const counter of [1, 2, 37037036]) {
+      assert.equal(await otp.hotp(counter), codeAt(KEY, counter * 30))
+    }
   })
 })
