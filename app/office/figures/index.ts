@@ -3,9 +3,11 @@
 // card adds its figure as app/office/figures/<key>.ts and lists it below.
 import type { Look } from '../meshes'
 import { PAT } from './pat'
+import { RITA_LOOK } from './rita'
 import { TESS } from './tess'
 
 export const FIGURES: Record<string, Look> = {
   pat: PAT,
+  rita: RITA_LOOK,
   tess: TESS
 }
