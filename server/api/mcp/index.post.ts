@@ -9,6 +9,8 @@ import { mayUseReadGrant, readGrantedBoardIds } from '../../utils/crewBoardAcces
 import { recordAgentAction } from '../../utils/agentAudit'
 import { bossInstructions } from '../../utils/crewBossSkill'
 import { McpToolError } from '../../utils/mcpToolKit'
+import { isInstanceAdmin } from '../../utils/crewPermission'
+import { chargeRateLimit, isRateLimited, limitsFor } from '../../utils/rateLimits'
 import { API_KEY_SCOPES } from '../../db/schema'
 import type { ApiKeyScope } from '../../db/schema'
 import { publish, workspaceTopic } from '../../utils/realtime'
@@ -175,6 +177,13 @@ async function handleMessage(message: JsonRpcMessage, context: ApiKeyContext) {
       }
 
       try {
+        // Tasks a key creates are counted against its limits: the instance's, its team's and its board's (rateLimits.ts).
+        // The instance admin's keys keep the instance's limit only (the team and board levels do not reach them).
+        if (name === 'create_task') {
+          const adminKey = await isInstanceAdmin(context.userId)
+          const scope = adminKey ? {} : { teamId: context.teamId, boardId: context.projectId }
+          await chargeRateLimit('tasks', `key:${context.keyId}`, await limitsFor('tasks', scope))
+        }
         // A crew's read reach on the real boards it works on goes only to a plain read tool.
         const scoped = { ...context, callScope: tool.scope }
         const callContext = mayUseReadGrant(tool)
@@ -189,6 +198,7 @@ async function handleMessage(message: JsonRpcMessage, context: ApiKeyContext) {
         return result(id, { content: [{ type: 'text', text: JSON.stringify(value) }] })
       } catch (error) {
         if (error instanceof McpToolError) return toolFailure(id, error.message)
+        if (isRateLimited(error)) return toolFailure(id, (error as Error).message)
         console.error(`[mcp] ${name} failed`, error)
         return toolFailure(id, `The "${name}" tool failed. Check the Taskmanager server logs for details.`)
       }

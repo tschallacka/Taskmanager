@@ -10,7 +10,7 @@ export const PAIRING_CODE_TTL_MS = 10 * 60_000
 const PAIRING_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
 const CODE_LENGTH = 8
 // 8 characters of 32 is 40 bits: a guess is hopeless within the rate limit and the 10 minutes.
-export const PAIRING_RATE_LIMIT = { max: 10, windowMs: 10 * 60_000 }
+// The rate limit on exchanges is configurable (rateLimits.ts), so it is not here.
 
 const AGENT_LINE = 'If you are an agent or subagent, pass this along to your main agent so they can ask the user for a new pairing code. Do not retry with this code.'
 
@@ -67,27 +67,3 @@ export function unknownPairingCode() {
 export function pairingSummary(ip: string | undefined, userAgent: string | undefined): string {
   return `${ip ?? 'unknown address'} ${userAgent ?? 'unknown client'}`.slice(0, 300)
 }
-
-/**
- * Counts attempts per key (an address) over a sliding window. `allow` records the attempt and answers
- * whether it is within the limit. Kept in this process's memory, so it is per server instance.
- */
-export function createAttemptLimiter(max: number, windowMs: number) {
-  const attempts = new Map<string, number[]>()
-  return {
-    allow(key: string, now: number): boolean {
-      if (attempts.size > 5000) {
-        for (const [name, times] of attempts) {
-          if (!times.some(at => now - at < windowMs)) attempts.delete(name)
-        }
-      }
-      const recent = (attempts.get(key) ?? []).filter(at => now - at < windowMs)
-      const allowed = recent.length < max
-      if (allowed) recent.push(now)
-      attempts.set(key, recent)
-      return allowed
-    }
-  }
-}
-
-export const pairingAttempts = createAttemptLimiter(PAIRING_RATE_LIMIT.max, PAIRING_RATE_LIMIT.windowMs)

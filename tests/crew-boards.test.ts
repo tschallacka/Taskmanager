@@ -12,6 +12,7 @@ Object.assign(globalThis, { createError })
 
 const { db } = await import('../server/db')
 const schema = await import('../server/db/schema')
+const { allowCrews } = await import('./helpers/crewLevels')
 const { crewBoards, crews, customers, member, organization, projectColumns, projects, user } = schema
 const { attachCrew, crewLinksOfTeam, crewsToAttach, detachCrew, findCrewLink, requireOwnCrew, shadowBoardName } = await import('../server/utils/crewBoards')
 
@@ -79,6 +80,7 @@ test('a person attaches only a live crew they made themselves', async () => {
 })
 
 test('attaching makes a shadow board in the crew team, with the crew board columns and customer', async () => {
+  await allowCrews(owner, realTeam, [board.real])
   const link = await attachCrew({ crew: await requireOwnCrew(crew.mine, owner), projectId: board.real, teamId: realTeam, userId: owner })
   assert.equal(link.projectId, board.real)
 

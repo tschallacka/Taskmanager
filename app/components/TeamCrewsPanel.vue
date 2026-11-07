@@ -28,8 +28,38 @@ function fail(e: unknown, fallback: string) {
   toast.add({ title: errMsg(e, fallback), icon: 'i-lucide-alert-triangle', color: 'error' })
 }
 
+// The team level of the crew permission. Only owners and admins get it; a member gets none and sees no switch.
+const teamPermission = ref<{ crewsAllowed: boolean, instanceAllowed: boolean } | null>(null)
+const savingPermission = ref(false)
+
+async function loadTeamPermission() {
+  try {
+    teamPermission.value = await $fetch<{ crewsAllowed: boolean, instanceAllowed: boolean }>(`/api/teams/${props.teamId}/crews-allowed`)
+  } catch {
+    teamPermission.value = null
+  }
+}
+
+async function setTeamCrews(allowed: boolean) {
+  savingPermission.value = true
+  try {
+    await $fetch(`/api/teams/${props.teamId}/crews-allowed`, { method: 'PUT', body: { crewsAllowed: allowed } })
+    await loadTeamPermission()
+    toast.add({
+      title: allowed ? 'Crews may be made for this team\'s boards' : 'Crews are off for this team',
+      description: allowed ? undefined : 'The crews on its boards are disabled. A rotate turns one back on.',
+      icon: 'i-lucide-check'
+    })
+  } catch (e) {
+    fail(e, 'Could not save the setting')
+  } finally {
+    savingPermission.value = false
+  }
+}
+
 async function load() {
   loading.value = true
+  loadTeamPermission()
   try {
     data.value = await listTeamCrews(props.teamId)
     // "Give it a crew" in a board's menu arrives with the board in the address.
@@ -224,6 +254,40 @@ const SELECT_CLASS = 'min-w-0 flex-1 rounded-md border border-default bg-default
     class="space-y-4"
     data-team-crews
   >
+    <!-- The team level: off until an owner or admin allows crews for this team's boards. -->
+    <div
+      v-if="teamPermission"
+      class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-default p-3"
+      data-team-crews-allowed
+    >
+      <div>
+        <p class="text-sm font-medium text-default">
+          Crews may be made for this team's boards
+        </p>
+        <p class="text-xs text-muted">
+          <template v-if="!teamPermission.instanceAllowed">
+            Your admin has not allowed crews on this instance, so this cannot be turned on yet.
+          </template>
+          <template v-else>
+            Off until you turn it on. Each board needs its own switch as well, in the board's settings.
+          </template>
+        </p>
+      </div>
+      <USwitch
+        :model-value="teamPermission.crewsAllowed"
+        :disabled="savingPermission || (!teamPermission.instanceAllowed && !teamPermission.crewsAllowed)"
+        aria-label="Crews may be made for this team's boards"
+        @update:model-value="setTeamCrews"
+      />
+    </div>
+
+    <RateLimitFields
+      v-if="teamPermission"
+      :url="`/api/teams/${teamId}/rate-limits`"
+      title="Rate limits for this team's boards"
+      hint="At most this many of each in the window, on top of the instance's limit."
+    />
+
     <p class="text-xs text-muted">
       A crew that works on a board keeps a board of its own for it, in its own team. It reads this board and never changes it; the results are carried over by whoever runs the crew.
     </p>

@@ -5,7 +5,6 @@ import { describe, test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   PAIRING_REFUSAL_MESSAGES,
-  createAttemptLimiter,
   generatePairingCode,
   isPairingCodeExpired,
   pairingCodeDigest,
@@ -84,30 +83,6 @@ describe('the refusals', () => {
     assert.equal(refusal.statusCode, 401)
     assert.equal(refusal.message, 'Invalid pairing code')
     assert.equal(refusal.data, undefined)
-  })
-})
-
-describe('the exchange rate limit', () => {
-  test('attempts within the limit pass, the one after it does not', () => {
-    const limiter = createAttemptLimiter(3, 1_000)
-    assert.equal(limiter.allow('a', 0), true)
-    assert.equal(limiter.allow('a', 1), true)
-    assert.equal(limiter.allow('a', 2), true)
-    assert.equal(limiter.allow('a', 3), false)
-  })
-
-  test('the limit is per address', () => {
-    const limiter = createAttemptLimiter(1, 1_000)
-    assert.equal(limiter.allow('a', 0), true)
-    assert.equal(limiter.allow('b', 0), true)
-    assert.equal(limiter.allow('a', 0), false)
-  })
-
-  test('the window slides: an attempt counts for its window only', () => {
-    const limiter = createAttemptLimiter(1, 1_000)
-    assert.equal(limiter.allow('a', 0), true)
-    assert.equal(limiter.allow('a', 999), false)
-    assert.equal(limiter.allow('a', 1_000), true)
   })
 })
 

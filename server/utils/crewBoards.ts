@@ -8,9 +8,10 @@ import { and, asc, desc, eq, inArray, isNotNull, isNull, notInArray, sql } from 
 import { alias } from 'drizzle-orm/pg-core'
 import { createError } from 'h3'
 import { db } from '../db'
-import { crewBoards, crews, member, organization, projectColumns, projects } from '../db/schema'
+import { crewBoards, crews, member, organization, projectColumns, projects, user } from '../db/schema'
 import type { Crew, CrewBoard } from '../db/schema'
 import { genId } from './projects'
+import { crewPermissionRefusal } from './crewPermission'
 import { BOARD_COLUMNS, CREW_PEOPLE, accountsOf, baseUrl, createOrRotateCrew } from './crewProvisioning'
 import type { CrewCaller, CrewInput } from './crewProvisioning'
 import { personKeyOf } from './crewAccounts'
@@ -75,6 +76,16 @@ export async function attachCrew(input: { crew: Crew, projectId: unknown, teamId
   const [already] = await db.select({ id: crewBoards.id }).from(crewBoards)
     .where(and(eq(crewBoards.crewId, crew.id), eq(crewBoards.projectId, real.id)))
   if (already) throw createError({ statusCode: 409, message: `${crew.name} already works on this board.` })
+  // The crew permission: the three levels for this board (crewPermission.ts). Refused before anything is made.
+  const refusal = await crewPermissionRefusal(userId, real.id)
+  if (refusal) throw createError({ statusCode: 403, message: refusal })
+  // A crew a person made works on one board only. A link is only ever added to such a crew that has none; the crews
+  // the instance admin made keep the boards they have (the admin's own crews are not limited here).
+  const [creator] = crew.createdBy
+    ? await db.select({ isInstanceAdmin: user.isInstanceAdmin }).from(user).where(eq(user.id, crew.createdBy))
+    : []
+  const [other] = await db.select({ id: crewBoards.id }).from(crewBoards).where(eq(crewBoards.crewId, crew.id))
+  if (other && !creator?.isInstanceAdmin) throw createError({ statusCode: 400, message: 'A crew works on one board only. Make another crew for this board.' })
 
   const now = Date.now()
   const shadowId = genId()
@@ -270,6 +281,9 @@ export async function makeBoundCrew(input: CrewInput, caller: CrewCaller, bind: 
     throw createError({ statusCode: 404, message: 'No crew of yours with that slug.' })
   }
   const real = await boardToBind({ projectId: bind.projectId, teamId: bind.teamId, userId: caller.userId, crew: existing ?? null })
+  // Making or rotating a crew for a board needs the crew permission on that board (the three levels, see crewPermission.ts).
+  const refusal = await crewPermissionRefusal(caller.userId, real.id)
+  if (refusal) throw createError({ statusCode: 403, message: refusal })
   const made = await createOrRotateCrew(input, caller)
   const [crew] = await db.select().from(crews).where(eq(crews.slug, input.slug))
   const [linked] = await db.select().from(crewBoards)

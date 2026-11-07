@@ -11,6 +11,7 @@ Object.assign(globalThis, { createError })
 
 const { db } = await import('../server/db')
 const { crews, member, organization, projects, user } = await import('../server/db/schema')
+const { allowCrews } = await import('./helpers/crewLevels')
 const { attachCrew } = await import('../server/utils/crewBoards')
 const { isCrewBoard } = await import('../server/utils/officeCast')
 
@@ -53,6 +54,7 @@ before(async () => {
     crewId
   })))
   const [crew] = await db.select().from(crews).where(eq(crews.id, crewId))
+  await allowCrews(owner, realTeam, [realBoard])
   const link = await attachCrew({ crew: crew!, projectId: realBoard, teamId: realTeam, userId: owner })
   shadowId = link.shadowProjectId
 })

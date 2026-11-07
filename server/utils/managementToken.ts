@@ -6,11 +6,13 @@
 import { and, eq } from 'drizzle-orm'
 import { createError } from 'h3'
 import { db } from '../db'
-import { agentAudit, apiKeys, crewBoards, crews, user } from '../db/schema'
+import { agentAudit, apiKeys, crewBoards, crews } from '../db/schema'
 import type { Crew } from '../db/schema'
 import { generateApiKey } from './api-keys'
 import { storeBoardScopes } from './connectTokens'
 import { boardToBind } from './crewBoards'
+import { crewPermissionRefusal, isInstanceAdmin } from './crewPermission'
+import { chargeRateLimit, limitsFor, scopeOfBoard } from './rateLimits'
 import type { CrewCaller } from './crewProvisioning'
 import { storeReach } from './keyReach'
 import { genId } from './projects'
@@ -19,23 +21,18 @@ export const MANAGEMENT_TOKEN_MS = 10 * 60_000
 export const MANAGEMENT_SCOPE = 'crews:manage'
 
 /**
- * Whether a person may hold a crew token: the crew permission. Today only the instance admin may make crews,
- * so the admin's permission is the one that counts. Read from the database, not the session.
- */
-export async function hasCrewPermission(userId: string): Promise<boolean> {
-  const [row] = await db.select({ isInstanceAdmin: user.isInstanceAdmin }).from(user).where(eq(user.id, userId))
-  return Boolean(row?.isInstanceAdmin)
-}
-
-/**
  * Makes the management token for one board. The board must be one the person may bind a crew to (an owner or
- * admin of its team, not archived, not a crew's own or shadow board). The secret is returned once.
+ * admin of its team, not archived, not a crew's own or shadow board), and the crew permission must reach it
+ * (the instance, team and board levels, see crewPermission.ts). The secret is returned once.
  */
 export async function issueManagementToken(userId: string, projectId: unknown, now = Date.now()) {
-  if (!(await hasCrewPermission(userId))) {
-    throw createError({ statusCode: 403, message: 'You do not have permission to manage crews.' })
-  }
   const real = await boardToBind({ projectId, teamId: undefined, userId, crew: null })
+  const refusal = await crewPermissionRefusal(userId, real.id)
+  if (refusal) throw createError({ statusCode: 403, message: refusal })
+  // The instance admin's crew calls are not counted against the crew limit: they get no new refusals.
+  if (!(await isInstanceAdmin(userId))) {
+    await chargeRateLimit('crews', `user:${userId}`, await limitsFor('crews', await scopeOfBoard(real.id)))
+  }
   const [ownCrew] = await db.select({ id: crews.id }).from(crews).where(eq(crews.boardId, real.id))
   if (ownCrew) throw createError({ statusCode: 400, message: 'A crew\'s own board cannot be given a token.' })
 

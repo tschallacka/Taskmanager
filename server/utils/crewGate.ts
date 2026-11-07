@@ -4,6 +4,7 @@ import { db } from '../db'
 import { apiKeys, crewApiAudit, crewApiGate, user } from '../db/schema'
 import { authenticateApiKey, generateApiKey, hasScope } from './api-keys'
 import { closingWriter, recordAudit, type AuditRoute } from './auditRouting'
+import { boardOfCrewKey, crewPermissionRefusal } from './crewPermission'
 import { throttledTask } from './periodicTask'
 import { BoundedQueue } from './boundedQueue'
 import { CREW_KEY_SCOPE, type KeyVerdict } from './crewGatePolicy'
@@ -136,7 +137,11 @@ export async function checkCrewKey(event: H3Event): Promise<KeyVerdict> {
   }
   if (!hasScope(context, CREW_KEY_SCOPE)) return { ok: false, reason: 'wrong scope' }
   const [row] = await db.select({ isInstanceAdmin: user.isInstanceAdmin }).from(user).where(eq(user.id, context.userId))
-  if (!row?.isInstanceAdmin) return { ok: false, reason: 'not admin' }
+  const ownerIsAdmin = Boolean(row?.isInstanceAdmin)
+  // A key of anyone but the instance admin passes only when it is bound to one board that the crew permission reaches.
+  if (!ownerIsAdmin && !context.projectId) return { ok: false, reason: 'not admin' }
+  const refusal = await crewPermissionRefusal(context.userId, boardOfCrewKey(context, ownerIsAdmin))
+  if (refusal) return { ok: false, reason: 'not admin', message: refusal }
   return { ok: true, keyId: context.keyId }
 }
 

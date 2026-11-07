@@ -2,6 +2,8 @@ import { createError } from 'h3'
 import { audited, createOrRotateCrew, parseCrewInput, requireCrewManager } from '../../utils/crewProvisioning'
 import { makeBoundCrew } from '../../utils/crewBoards'
 import { requireCreateOnOwnBoard } from '../../utils/managementToken'
+import { isInstanceAdmin } from '../../utils/crewPermission'
+import { chargeRateLimit, limitsFor, scopeOfBoard } from '../../utils/rateLimits'
 
 /**
  * Makes a crew: its team, accounts, customer, board and one key per account. A slug
@@ -24,6 +26,12 @@ export default defineEventHandler(async (event) => {
 
   const outcome = await audited(caller, 'create', input.slug, async () => {
     await requireCreateOnOwnBoard(caller, input.slug, body.projectId)
+    // Crews made or rotated by one person are counted against the crew limits (rateLimits.ts).
+    const boardId = caller.boardId ?? (typeof body.projectId === 'string' ? body.projectId : null)
+    // The instance admin's crew calls are not counted: the existing crew API gets no new refusals.
+    if (!(await isInstanceAdmin(caller.userId))) {
+      await chargeRateLimit('crews', `user:${caller.userId}`, await limitsFor('crews', await scopeOfBoard(boardId)), event)
+    }
     const made = body.projectId === undefined
       ? await createOrRotateCrew(input, caller)
       : await makeBoundCrew(input, caller, { projectId: body.projectId, teamId: body.teamId })

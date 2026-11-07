@@ -46,6 +46,7 @@ watch([sessionPending, isInstanceAdmin], ([pending, admin]) => {
   }
   refreshCrews()
   refreshWindow()
+  refreshPermission()
 }, { immediate: true })
 
 const crews = computed(() => crewData.value?.crews ?? [])
@@ -119,6 +120,27 @@ async function copy(value: string) {
     toast.add({ title: 'Copied', icon: 'i-lucide-check', duration: 1500 })
   } catch {
     toast.add({ title: 'Could not copy. Select the text and copy it.', color: 'warning' })
+  }
+}
+
+// The instance level of the crew permission: switching it off disables every crew.
+const { data: permissionData, refresh: refreshPermission } = useFetch<{ crewsAllowed: boolean }>('/api/settings/crew-permission', { server: false, immediate: false })
+
+async function setCrewsAllowed(allowed: boolean) {
+  busy.value = 'permission'
+  try {
+    await $fetch('/api/settings/crew-permission', { method: 'PUT', body: { crewsAllowed: allowed } })
+    await refreshPermission()
+    await refreshCrews()
+    toast.add({
+      title: allowed ? 'Users may create crews now' : 'Crews are off',
+      description: allowed ? undefined : 'Every crew is disabled. A rotate turns one back on.',
+      icon: 'i-lucide-check'
+    })
+  } catch (e) {
+    toast.add({ title: 'Could not save the setting', description: errMsg(e), color: 'error' })
+  } finally {
+    busy.value = null
   }
 }
 
@@ -255,6 +277,33 @@ function cancelPurge() {
       </div>
 
       <template v-else>
+        <!-- The instance level: whether crews may be made at all. Off disables every crew. -->
+        <section class="rounded-lg border border-default p-4 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 class="text-sm font-semibold text-default">
+                Users may create crews
+              </h2>
+              <p class="text-xs text-muted">
+                Off (the default): nobody can make a crew, and the Connect window explains it. On: a user may make a crew for one board they run, if their team and that board allow it too.
+                Switching it off disables every crew until it is rotated.
+              </p>
+            </div>
+            <USwitch
+              :model-value="Boolean(permissionData?.crewsAllowed)"
+              :disabled="busy === 'permission'"
+              aria-label="Users may create crews"
+              @update:model-value="setCrewsAllowed"
+            />
+          </div>
+        </section>
+
+        <RateLimitFields
+          url="/api/settings/rate-limits"
+          title="Rate limits for the whole instance"
+          hint="At most this many of each in the window. A team or a board can add a stricter limit of its own."
+        />
+
         <!-- The window: remote callers may use the crew API for 10 minutes -->
         <section class="rounded-lg border border-default p-4 space-y-3">
           <div class="flex flex-wrap items-center justify-between gap-3">

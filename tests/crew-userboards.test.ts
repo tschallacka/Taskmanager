@@ -13,8 +13,9 @@ import { eq, inArray } from 'drizzle-orm'
 Object.assign(globalThis, { createError })
 
 const { db } = await import('../server/db')
-const { crews, member, organization, projects, user } = await import('../server/db/schema')
+const { crews, instanceSettings, member, organization, projects, user } = await import('../server/db/schema')
 const { crewTargets, detachCrewLinks, makeBoundCrew } = await import('../server/utils/crewBoards')
+const { setBoardCrews, setInstanceCrews, setTeamCrews } = await import('../server/utils/crewPermission')
 const { purgeCrew } = await import('../server/utils/crewProvisioning')
 
 const tag = randomBytes(4).toString('hex')
@@ -57,7 +58,15 @@ before(async () => {
   ])
 })
 
+// The three levels of the crew permission on for the board these tests bind crews to. The first test that binds calls it.
+async function enableLevels() {
+  await setInstanceCrews(true, null)
+  await setTeamCrews(realTeam, true)
+  await setBoardCrews(board.real, true)
+}
+
 after(async () => {
+  await db.delete(instanceSettings).where(eq(instanceSettings.id, 'instance'))
   const made = await db.select().from(crews).where(eq(crews.slug, slug))
   for (const crew of made) await purgeCrew(crew)
   await db.delete(projects).where(inArray(projects.id, [board.real, board.archived, board.foreign]))
@@ -79,6 +88,7 @@ test('targets list the boards of the teams the owner or admin runs, and nothing 
 })
 
 test('making a crew bound to a board gives the userboard, the shadow board and the crew people', async () => {
+  await enableLevels()
   bound = await makeBoundCrew({ slug, name: 'Bound crew', product: { name: 'Bound product' }, rotate: false }, caller(boss), { projectId: board.real, teamId: realTeam })
   assert.equal(bound.status, 201)
   const body = bound.body

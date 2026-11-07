@@ -2,8 +2,9 @@ import type { H3Event } from 'h3'
 import { createHash, randomBytes, timingSafeEqual } from 'crypto'
 import { eq } from 'drizzle-orm'
 import { db } from '../db'
-import { apiKeys, apiKeyBoards, apiKeyBoardScopes, apiKeySecrets, apiKeyWorkspaces, API_KEY_SCOPES, member } from '../db/schema'
+import { apiKeys, apiKeyBoards, apiKeyBoardScopes, apiKeySecrets, apiKeyWorkspaces, API_KEY_SCOPES, crews, member, user } from '../db/schema'
 import { boardScopesOf, isTokenExpired, tokenRefusal } from './connectTokenRules'
+import { crewRefusal } from './crewPermission'
 import type { ApiKey, ApiKeyScope } from '../db/schema'
 import { isTeamMember } from './auth-helpers'
 
@@ -132,6 +133,15 @@ async function findKey(token: string) {
   return key
 }
 
+/** Refuses a key of a crew account whose crew the permission no longer reaches. A key of any other person passes. */
+async function refuseIfCrewOff(userId: string): Promise<void> {
+  const [owner] = await db.select({ crewId: user.crewId }).from(user).where(eq(user.id, userId))
+  if (!owner?.crewId) return
+  const [crew] = await db.select().from(crews).where(eq(crews.id, owner.crewId))
+  const refusal = crew ? await crewRefusal(crew) : null
+  if (refusal) throw createError({ statusCode: 401, statusMessage: 'Unauthorized', message: refusal, data: { code: 'crew_permission' } })
+}
+
 /**
  * Resolves the `Authorization: Bearer` key on a request into the workspace and
  * permissions it carries. Throws 401 when the key is missing, unknown, expired,
@@ -154,6 +164,9 @@ export async function authenticateApiKey(event: H3Event): Promise<ApiKeyContext>
   if (key.teamId && !(await isTeamMember(key.userId, key.teamId))) {
     throw createError({ statusCode: 403, message: 'API key owner is no longer a member of this team' })
   }
+
+  // A crew's own keys work only while the crew permission still reaches the crew: the three levels, checked on every call.
+  await refuseIfCrewOff(key.userId)
 
   touchLastUsed(key.id, key.lastUsedAt, now)
 

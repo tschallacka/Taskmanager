@@ -128,8 +128,40 @@ export const teamSettings = pgTable('team_settings', {
   teamId: text('team_id').primaryKey().references(() => organization.id, { onDelete: 'cascade' }),
   // The columns a new board starts with, in order. NULL = the built-in set.
   defaultColumns: json('default_columns').$type<string[] | null>(),
+  // The team admin's switch for crews: off until the team's owner or admin turns it on.
+  crewsAllowed: boolean('crews_allowed').notNull().default(false),
+  // The team's stricter rate limits for agent calls; NULL = the instance's limits only.
+  rateLimits: json('rate_limits').$type<RateLimitSettings | null>(),
   updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
 })
+
+// The one row of instance-wide settings, id "instance". The first level of the crew permission
+// (crewsAllowed) and the instance's rate limits, which a team or board may only tighten.
+export const instanceSettings = pgTable('instance_settings', {
+  id: text('id').primaryKey(),
+  crewsAllowed: boolean('crews_allowed').notNull().default(false),
+  rateLimits: json('rate_limits').$type<RateLimitSettings | null>(),
+  updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
+  updatedBy: text('updated_by').references(() => user.id, { onDelete: 'set null' })
+})
+
+// A limit on agent calls: at most `max` of them in each window of `windowSeconds`.
+export const RATE_LIMIT_KINDS = ['tasks', 'pairing', 'crews'] as const
+export type RateLimitKind = typeof RATE_LIMIT_KINDS[number]
+export type RateLimitSettings = Partial<Record<RateLimitKind, { max: number, windowSeconds: number }>>
+
+// The calls counted against a rate limit, one row per scope and window. `scope` names what is counted
+// (a token, an address or a user, with the kind); `windowStart` is the first millisecond of the window.
+export const rateLimitHits = pgTable(
+  'rate_limit_hits',
+  {
+    id: text('id').primaryKey(),
+    scope: text('scope').notNull(),
+    windowStart: bigint('window_start', { mode: 'number' }).notNull(),
+    hits: integer('hits').notNull().default(0)
+  },
+  table => [uniqueIndex('rate_limit_hits_scope_window_idx').on(table.scope, table.windowStart)]
+)
 
 export const member = pgTable(
   'member',
@@ -263,6 +295,10 @@ export const projects = pgTable(
     // The built-in crew rules (promotion, gate routing, time-log check, failing-test clock) run on a
     // crew board while this is on. Off turns them off for this board only.
     crewRulesOn: boolean('crew_rules_on').notNull().default(true),
+    // The board admin's switch for crews on this board: off until a team owner or admin, or a board manager, turns it on.
+    crewsAllowed: boolean('crews_allowed').notNull().default(false),
+    // The board's stricter rate limits for agent calls; NULL = the team's and the instance's limits only.
+    rateLimits: json('rate_limits').$type<RateLimitSettings | null>(),
     createdAt: bigint('created_at', { mode: 'number' }).notNull(),
     updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
   },

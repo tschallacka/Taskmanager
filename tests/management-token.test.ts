@@ -18,8 +18,9 @@ const asToken = (token: string) => {
 }
 
 const { db } = await import('../server/db')
-const { agentAudit, apiKeys, crewBoards, crews, member, organization, projects, user } = await import('../server/db/schema')
+const { agentAudit, apiKeys, crewBoards, crews, instanceSettings, member, organization, projects, teamSettings, user } = await import('../server/db/schema')
 const { authenticateApiKey } = await import('../server/utils/api-keys')
+const { setBoardCrews, setInstanceCrews, setTeamCrews } = await import('../server/utils/crewPermission')
 const { revokeKey } = await import('../server/utils/connectTokens')
 const { crewTargets } = await import('../server/utils/crewBoards')
 const { requireCrewManager } = await import('../server/utils/crewProvisioning')
@@ -84,6 +85,11 @@ before(async () => {
     { id: board.shadowA, userId: boss, teamId: otherTeam, name: 'Shadow A (crew)', createdAt: now, updatedAt: now },
     { id: board.shadowB, userId: boss, teamId: otherTeam, name: 'Shadow B (crew)', createdAt: now, updatedAt: now }
   ])
+  // The three levels of the crew permission on: the instance, the team and the boards this file uses.
+  await setInstanceCrews(true, boss)
+  await setTeamCrews(realTeam, true)
+  await setBoardCrews(board.real, true)
+  await setBoardCrews(board.second, true)
 })
 
 after(async () => {
@@ -92,10 +98,12 @@ after(async () => {
   await db.delete(projects).where(inArray(projects.id, Object.values(board)))
   await db.delete(organization).where(inArray(organization.id, [realTeam, otherTeam]))
   await db.delete(user).where(inArray(user.id, [boss, admin, plain, outsider]))
+  await db.delete(teamSettings).where(inArray(teamSettings.teamId, [realTeam, otherTeam]))
+  await db.delete(instanceSettings).where(eq(instanceSettings.id, 'instance'))
 })
 
-test('only the instance admin may make the token, and only for a board in a team they run', async () => {
-  await rejects(issueManagementToken(admin, board.real), 403)
+test('a person in a team they run may make the token for its board, and nobody else may', async () => {
+  await rejects(issueManagementToken(plain, board.real), 403)
   await rejects(issueManagementToken(boss, board.foreign), 403)
   await rejects(issueManagementToken(boss, board.archived), 400)
   await rejects(issueManagementToken(boss, id('no-such-board')), 404)
@@ -164,13 +172,29 @@ test('a revoked token answers token_revoked', async () => {
   assert.equal(codeOf(refusal), 'token_revoked')
 })
 
-test('withdrawing the crew permission cuts a live token off', async () => {
-  const fresh = await issueManagementToken(boss, board.real)
-  await db.update(user).set({ isInstanceAdmin: false }).where(eq(user.id, boss))
+test('withdrawing the crew permission at any level cuts a live token off', async () => {
+  // A team admin who is not the instance admin: the switches hold this token (the instance admin's is never held).
+  const fresh = await issueManagementToken(admin, board.real)
   try {
+    await setTeamCrews(realTeam, false)
     await rejects(requireCrewManager(asToken(fresh.token)), 403)
-    await rejects(issueManagementToken(boss, board.real), 403)
+    await rejects(issueManagementToken(admin, board.real), 403)
+    await setTeamCrews(realTeam, true)
+    await setBoardCrews(board.real, false)
+    await rejects(requireCrewManager(asToken(fresh.token)), 403)
+    await setBoardCrews(board.real, true)
+    await requireCrewManager(asToken(fresh.token))
+    await setInstanceCrews(false, boss)
+    await rejects(requireCrewManager(asToken(fresh.token)), 403)
   } finally {
-    await db.update(user).set({ isInstanceAdmin: true }).where(eq(user.id, boss))
+    await setInstanceCrews(true, boss)
   }
+})
+
+test('a management token of a person who is not the instance admin works while the levels are on', async () => {
+  const made = await issueManagementToken(admin, board.real)
+  const caller = await requireCrewManager(asToken(made.token))
+  assert.equal(caller.boardId, board.real)
+  assert.equal(caller.userId, admin)
+  await revokeKey(admin, made.key.id)
 })
