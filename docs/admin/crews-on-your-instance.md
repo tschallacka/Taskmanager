@@ -40,6 +40,31 @@ The window closes after 10 minutes, when you press **Close now**, or at the firs
 
 To make a permanent key for crew management, press **Create a crews:manage key**. Only you can hold that permission. A key with it manages crews and reaches no board.
 
+### Binding a crew to a board
+
+A crew can be made on a real board in the same call. The crew always works on a **shadow board**, made in the crew's own team; the real board is for people. Only the key's owner can bind, and only to a board of a team the owner runs as owner or admin.
+
+- `GET /api/crews/targets` lists the teams the key's owner runs as owner or admin, each with its boards: `{ "teams": [ { "team_id", "team_name", "userboards": [ ... ] } ] }`. The crew work boards and the shadow boards are left out of the boards.
+- `POST /api/crews` takes an optional `projectId` (the real board) and `teamId` (that board's team, optional; `teamId` alone is a 400). Without `projectId` the request and the answer are the same as before. With it, the answer adds:
+  - `userboard`: the real board, with its shadow boards.
+  - `real_board` and `shadow_board`: each with `board_id`, `board_name` and `url`. Give the crew the **shadow board** `url` as its work board.
+
+A userboard has this shape, with snake_case names:
+
+```json
+{
+  "board_id": "1ddghg5",
+  "board_name": "bliep",
+  "shadowboards": [
+    { "board_id": "2cethu6", "user_id": "335", "crew_ids": [ { "id": "456fgf", "tag": "@wren" } ] }
+  ]
+}
+```
+
+`user_id` is the account that attached the shadow board, and `crew_ids` lists the crew's people on it, with their `@tag`; `id` is that person's account id. A rotate of a crew already on the board keeps its one shadow board. A board that is archived, a crew's own board or a shadow board is refused with a 400, another team's board with a 404, and a board the key's owner may not bind to with a 403. A refused call makes no crew.
+
+`DELETE /api/crews/:slug` takes a bound crew off its boards: the link goes and each shadow board is archived, its notes kept.
+
 ## Behind a reverse proxy
 
 The gate decides "local" from the connection, and treats any `X-Forwarded-For`, `X-Real-IP` or `Forwarded` header as proof of a proxy. Every proxy location that reaches the app should therefore set `X-Real-IP` and `X-Forwarded-For` to the address of the socket it accepted (`$remote_addr` in nginx), not `$proxy_add_x_forwarded_for`. The repository's README has the full deploy note and a one-line check to run once after installing.

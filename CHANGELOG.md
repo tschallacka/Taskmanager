@@ -4,6 +4,7 @@ All notable changes to Arnotes are documented in this file.
 
 ## Unreleased
 
+- **The crew API binds a crew to a board in one call.** `POST /api/crews` takes an optional `projectId` (and `teamId`, the board's team) and then makes the crew's shadow board on that board, by the key's owner; its answer adds `userboard`, `real_board` and `shadow_board` (each with `board_id`, `board_name` and `url`). A rotate keeps the one shadow board. `GET /api/crews/targets` lists the teams the key's owner runs as owner or admin, with their userboards (teams > userboards, snake_case). `DELETE /api/crews/:slug` takes a bound crew off its boards and archives the shadow boards. Without `projectId` the request and answer are unchanged. Help page "Binding a crew to a board", `server/utils/crewBoards.ts`, `tests/crew-userboards.test.ts`.
 - **Extra workers on a forked board.** Three extra workers, Wes, Wilma and Walt Worker, are not forked with the
   standard members. A forked board gets them on request: **Add workers** on the link creates only the ones ticked, each with its
   own account and a key limited to the crew's board, and leaves every fork already there alone. The answer is a file with the new
