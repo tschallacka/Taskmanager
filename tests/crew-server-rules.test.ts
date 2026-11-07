@@ -45,9 +45,11 @@ const columnOf = async (taskId: string) => {
 }
 const setColumn = (taskId: string, columnId: string) => db.update(projectTasks).set({ columnId }).where(eq(projectTasks.id, taskId))
 const comments = (taskId: string) => db.select().from(taskComments).where(eq(taskComments.taskId, taskId))
-// Records a tag add the way the task route now does, as the given person.
+// Records a tag add the way the task route now does, as the given person. Each line gets its own
+// timestamp, so the latest one is the one the setter lookup reads.
+let tagClock = now
 const setTag = (taskId: string, label: string, actorId: string) => db.insert(taskActivity).values({
-  id: id(`act-${label}-${Math.random().toString(36).slice(2)}`), taskId, projectId: crew, actorId, via: 'ui', kind: 'label', detail: { to: label }, createdAt: Date.now()
+  id: id(`act-${label}-${Math.random().toString(36).slice(2)}`), taskId, projectId: crew, actorId, via: 'ui', kind: 'label', detail: { to: label }, createdAt: ++tagClock
 })
 const moved = (taskId: string, columnId: string, actorId: string | null = people.owner) => ({ type: 'task_moved' as const, projectId: crew, taskId, actorId, actorIsAgent: false, detail: columnId })
 
@@ -85,6 +87,8 @@ before(async () => {
     task(t.test!, cols.blocked!, { assigneeId: people.worker, tags: ['test failing'] }),
     { ...task(t.plainTask!, plainCols.todo), projectId: plain, title: 'plain' }
   ])
+  // The gated card has time logged, so the time-log check leaves it in Verify PM for the gates to route.
+  await db.insert(timeEntries).values({ id: id('time-gated'), taskId: t.gated!, projectId: crew, userId: people.worker, minutes: 30, day: '2026-11-07', note: '', createdAt: now })
   await db.insert(projectTasks).values([
     { ...task(sub.cq, pmCol, { parentTaskId: t.violating! }), tags: ['cq violation'] },
     { ...task(sub.ux, pmCol, { parentTaskId: t.gated! }), tags: ['verify ux'] }
@@ -167,15 +171,20 @@ test('gate routing: a gate approval by anyone but the reviewer does not count (n
 })
 
 test('gate routing: the reviewer approves each gate in turn, then the card goes to Verify for Boss', async () => {
-  await setTag(t.gated!, 'ux approved', people.usher)
+  // A reviewer's approval is a tag on the card and a line in the log naming the reviewer, as the route writes it.
+  const approve = async (label: string, actor: string) => {
+    await setTag(t.gated!, label, actor)
+    await db.update(projectTasks).set({ tags: [...(await labelsOf(t.gated!)), label] }).where(eq(projectTasks.id, t.gated!))
+  }
+  await approve('ux approved', people.usher)
   await setColumn(t.gated!, pmCol)
   await fireRules(moved(t.gated!, pmCol, people.pia), newRuleChain())
   assert.deepEqual(await columnOf(t.gated!), { columnId: cols.cq, assigneeId: people.nina })
-  await setTag(t.gated!, 'cq approved', people.nina)
+  await approve('cq approved', people.nina)
   await setColumn(t.gated!, pmCol)
   await fireRules(moved(t.gated!, pmCol, people.pia), newRuleChain())
   assert.deepEqual(await columnOf(t.gated!), { columnId: cols.qa, assigneeId: people.quincy })
-  await setTag(t.gated!, 'qa approved', people.quincy)
+  await approve('qa approved', people.quincy)
   await setColumn(t.gated!, pmCol)
   await fireRules(moved(t.gated!, pmCol, people.pia), newRuleChain())
   assert.deepEqual(await columnOf(t.gated!), { columnId: cols.verify, assigneeId: people.boss })

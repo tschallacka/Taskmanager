@@ -242,7 +242,7 @@ export async function sweepTestClock(now = Date.now()): Promise<number> {
       isNull(projectTasks.deletedAt),
       isNull(projects.archivedAt),
       eq(projects.crewRulesOn, true),
-      sql`${projectTasks.tags} @> '["test failing"]'::jsonb`
+      sql`${projectTasks.tags}::jsonb @> '["test failing"]'::jsonb`
     ))
   let sent = 0
   for (const { task, project } of rows) {
