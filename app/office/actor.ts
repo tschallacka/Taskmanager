@@ -13,7 +13,7 @@ const HAND = new THREE.Quaternion()
 const X_AXIS = new THREE.Vector3(1, 0, 0)
 const Z_AXIS = new THREE.Vector3(0, 0, 1)
 
-export type Gesture = 'reach' | 'knock' | 'startle' | 'facepalm' | 'cheer' | 'scratch' | 'drink' | 'stomp' | 'shrug' | 'stretch' | 'wave' | 'swing' | 'putt'
+export type Gesture = 'reach' | 'knock' | 'startle' | 'facepalm' | 'cheer' | 'scratch' | 'drink' | 'stomp' | 'shrug' | 'stretch' | 'wave' | 'swing' | 'putt' | 'sweep'
 export type WorkStyle = 'type' | 'frantic' | 'hammer' | 'duck' | 'coffee' | 'wrench' | 'spin'
 /** What an idle person does at the desk. Ping-pong is not on the list: it needs two, so the office starts it. */
 export type IdleStyle = 'doze' | 'phone' | 'game'
@@ -43,7 +43,104 @@ const IDLE_STYLES: Record<string, IdleStyle[]> = {
 const ANY_IDLE: IdleStyle[] = ['doze', 'phone', 'game']
 
 const GESTURE_SECONDS: Record<Gesture, number> = {
-  reach: 0.45, knock: 0.9, startle: 0.7, facepalm: 1.4, cheer: 1.3, scratch: 1.3, drink: 1.8, stomp: 0.9, shrug: 0.9, stretch: 1.6, wave: 1.0, swing: 0.35, putt: 1.1
+  reach: 0.45, knock: 0.9, startle: 0.7, facepalm: 1.4, cheer: 1.3, scratch: 1.3, drink: 1.8, stomp: 0.9, shrug: 0.9, stretch: 1.6, wave: 1.0, swing: 0.35, putt: 1.1, sweep: 2.4
+}
+
+/** The gestures a person can be given, in the order the table lists them. Tests pin that every one has a length. */
+export const GESTURE_NAMES = Object.keys(GESTURE_SECONDS) as Gesture[]
+
+/**
+ * The state of a janitor at a desk, from the cleanup flow on the card: she walks there while the plan is being made,
+ * stands by at the desk while the checker looks, and sweeps while the granted steps run. Anything else is no state.
+ */
+export type CleaningState = 'walk' | 'stand' | 'sweep' | null
+export function cleaningStateOf(tags: readonly string[]): CleaningState {
+  if (tags.includes('cleaned')) return null
+  if (tags.includes('cleaning granted')) return 'sweep'
+  if (tags.includes('clean plan')) return 'stand'
+  if (tags.includes('ready to clean')) return 'walk'
+  return null
+}
+
+/** What a role does once it has walked its route: stand by, sweep, or nothing. */
+export type AfterWalk = 'stand' | 'sweep' | 'none'
+
+/**
+ * One role's walk for one state: the points to walk through in order, then what the role does at the end. A stop has a
+ * length in seconds (`stopSeconds`); a badge is a count the office shows at the role's desk (Susy's pokes, Janet's
+ * cleaned). Both are data, so the actor does not know any role.
+ */
+export interface WalkPlan {
+  points: P[]
+  then: AfterWalk
+  stopSeconds?: number
+  badge?: number
+}
+
+/**
+ * A role's piece. Its state is read from the data the office has for that role; its plan is made from the state. The
+ * state's shape is the role's own (Janet's is her cleanup state, Susy's is the person she poked).
+ */
+export interface RolePiece<D, S> {
+  stateOf: (data: D) => S | null
+  plan: (state: S) => WalkPlan | null
+}
+
+/**
+ * The route registry. Each role's piece registers under its crew key in its own file; nobody edits the shared lines to
+ * add one. A key may register once: a second registration is an error, not a silent replacement.
+ */
+export interface RouteRegistry {
+  register: <D, S>(key: string, piece: RolePiece<D, S>) => void
+  planFor: (key: string, data: unknown) => WalkPlan | null
+  /** Where a crew key's desk is, on the office floor; the office sets it from its layout. */
+  setDeskLookup: (lookup: (personKey: string) => P | null) => void
+  /** The target point for walking to a person's desk, or null when the office has no such desk. */
+  deskOf: (personKey: string) => P | null
+  /** A walk to a person's desk, then `then`; null when there is no desk to walk to. */
+  walkToDesk: (personKey: string, then: AfterWalk, extra?: Partial<WalkPlan>) => WalkPlan | null
+  keys: () => string[]
+}
+
+export function createRouteRegistry(): RouteRegistry {
+  const pieces = new Map<string, (data: unknown) => WalkPlan | null>()
+  let lookup: (personKey: string) => P | null = () => null
+  return {
+    register(key, piece) {
+      if (!/^[a-z][a-z0-9-]*$/.test(key)) throw new Error(`"${key}" is not a crew key`)
+      if (pieces.has(key)) throw new Error(`a route is already registered for "${key}"`)
+      pieces.set(key, (data) => {
+        const state = piece.stateOf(data as never)
+        return state === null ? null : piece.plan(state)
+      })
+    },
+    planFor(key, data) {
+      return pieces.get(key)?.(data) ?? null
+    },
+    setDeskLookup(fn) {
+      lookup = fn
+    },
+    deskOf: personKey => lookup(personKey),
+    walkToDesk(personKey, then, extra = {}) {
+      const desk = lookup(personKey)
+      return desk ? { points: [desk], then, ...extra } : null
+    },
+    keys: () => [...pieces.keys()]
+  }
+}
+
+/** The office's own registry: the role pieces register here, in their own files. */
+export const routes = createRouteRegistry()
+
+/** Walks a plan with an actor: the route, then the stop, then what the role does at the end. */
+export async function followPlan(
+  actor: Pick<Actor, 'walk' | 'play'>,
+  plan: WalkPlan,
+  wait: (seconds: number) => Promise<void> = async () => {}
+): Promise<void> {
+  if (plan.points.length) await actor.walk(plan.points)
+  if (plan.stopSeconds) await wait(plan.stopSeconds)
+  if (plan.then === 'sweep') await actor.play('sweep')
 }
 
 /** What each role has printed on the back of the shirt; the name tag above the head stays the first name. */
@@ -350,7 +447,7 @@ export class Actor {
     }
     // A drink is a mug unless they brought a paper cup back from the cooler.
     const drinkProp = this.tool === 'cup' ? 'cup' : 'mug'
-    this.showProp(this.gesture?.name === 'drink' ? drinkProp : this.playing ? 'paddle' : this.tool ?? prop)
+    this.showProp(this.gesture?.name === 'drink' ? drinkProp : this.gesture?.name === 'sweep' ? 'broom' : this.playing ? 'paddle' : this.tool ?? prop)
     this.levelDrink()
     this.levelPutter()
   }
@@ -739,6 +836,13 @@ export class Actor {
       }
       case 'wave':
         r.armR.rotation.z = -2.6 * hump + Math.sin(t * 14) * 0.25 * hump
+        break
+      case 'sweep':
+        // The broom in the right hand, the body leaning into a stroke that goes back and forth across the floor.
+        r.armR.rotation.x = -0.9 * hump
+        r.armL.rotation.x = -0.6 * hump
+        r.torso.rotation.x = 0.25 * hump
+        r.torso.rotation.y = Math.sin(t * 5) * 0.25 * hump
         break
     }
     if (k >= 1) {
