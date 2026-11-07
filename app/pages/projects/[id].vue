@@ -699,6 +699,7 @@ useSeoMeta({
     <KanbanTaskDrawer
       :task="drawerTask"
       @close="closeDrawer"
+      @open-task="openTask($event)"
     />
 
     <!-- Mobile bottom nav -->

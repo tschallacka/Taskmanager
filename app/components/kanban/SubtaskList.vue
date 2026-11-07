@@ -6,6 +6,11 @@ const props = defineProps<{
   readonly: boolean
 }>()
 
+// A click on a row's title opens that subtask in the task panel, the way a card does.
+const emit = defineEmits<{
+  'open-task': [id: string]
+}>()
+
 const {
   subtasks: allSubtasks,
   activeProject,
@@ -248,6 +253,7 @@ onBeforeUnmount(destroySortable)
             @keydown.esc.prevent="onRowEscape(sub, $event)"
             @keydown.tab.prevent="onRowTab(sub, $event)"
             @blur="onRowBlur(sub, $event)"
+            @click="emit('open-task', sub.id)"
           >
           <UAvatar
             v-if="personById(sub.assigneeId)"
@@ -283,6 +289,7 @@ onBeforeUnmount(destroySortable)
         >
           <KanbanSubtaskList
             :parent-task-id="sub.id"
+            @open-task="emit('open-task', $event)"
             :readonly="readonly"
           />
         </div>

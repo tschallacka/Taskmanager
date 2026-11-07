@@ -22,7 +22,7 @@ interface Task {
 
 const props = defineProps<{ task: Task | null }>()
 
-const emit = defineEmits<{ close: [] }>()
+const emit = defineEmits<{ close: [], 'open-task': [id: string] }>()
 
 const toast = useToast()
 const { copyLink } = useTaskLink()
@@ -809,6 +809,7 @@ const menuItems = computed(() => [[
             <KanbanSubtaskList
               v-if="shownTask"
               :parent-task-id="shownTask.id"
+              @open-task="emit('open-task', $event)"
               :readonly="readonly"
             />
           </div>
