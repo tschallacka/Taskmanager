@@ -2,11 +2,15 @@
 // Run from the repo root: node --test crew/janet.test.mjs
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
-import { buildPlan, findWorktree, insideRoot, parseWorktrees, planHash, readScratchList, renderPlan, runPlan, stepsOnBoard, GRANTED, DONE } from './janet.mjs'
+import { assertRemovable, baseBranchOf, buildPlan, checkIds, findWorktree, insideRoot, parseWorktrees, planHash, readScratchList, renderPlan, runPlan, stepsOnBoard, GRANTED, DONE } from './janet.mjs'
+
+const KIT = fileURLToPath(new URL('.', import.meta.url))
+const PEOPLE = { boss: 'Boss', wren: 'Wren Worker', janet: 'Janet Janitor' }
 
 const CARD = 'mw5bfva97wj7rn72ud4'
 
@@ -216,4 +220,80 @@ test('a granted, unchanged plan runs its steps in order, ticks each one and mark
 test('the board steps are read from the subtask titles', () => {
   const steps = stepsOnBoard({ subtasks: [{ id: 'x', title: '[step] file: /a/b' }, { id: 'y', title: 'other' }] })
   assert.deepEqual(steps, [{ kind: 'file', target: '/a/b', id: 'x' }])
+})
+
+test('the ids from the command line are checked before any path is built', () => {
+  assert.ok(checkIds('..', CARD, PEOPLE), 'a `..` who')
+  assert.ok(checkIds('wren/../..', CARD, PEOPLE), 'a who with a slash')
+  assert.ok(checkIds('Wren', CARD, PEOPLE), 'an upper-case who')
+  assert.ok(checkIds('janet', CARD, PEOPLE), 'Janet herself')
+  assert.ok(checkIds('ghost', CARD, PEOPLE), 'not a person of this crew')
+  assert.ok(checkIds('wren', 'mw5/../x', PEOPLE), 'a card id with a slash')
+  assert.ok(checkIds('wren', 'mw5-x', PEOPLE), 'a card id with a dash')
+  assert.equal(checkIds('wren', CARD, PEOPLE), null)
+})
+
+test('the command line refuses a `..` who with exit 2, before reading any folder, and deletes nothing', () => {
+  const f = fixture()
+  const home = mkdtempSync(join(tmpdir(), 'janet-home-'))
+  writeFileSync(join(home, 'crew.json'), JSON.stringify({ product: { repo: f.repo }, people: PEOPLE }))
+  const canary = join(f.root, 'canary.txt')
+  writeFileSync(canary, 'keep')
+  const run = spawnSync(process.execPath, [join(KIT, 'janet.mjs'), 'clean', 'run', '..', CARD], { encoding: 'utf8', env: { ...process.env, CREW_HOME: home } })
+  assert.equal(run.status, 2)
+  assert.match(run.stderr, /refused/)
+  assert.ok(existsSync(canary))
+})
+
+test('a target swapped for a symlink after the plan is refused at removal, and the link\'s target is not touched', () => {
+  const f = fixture()
+  const target = join(f.work, 'a.png')
+  writeFileSync(target, 'x')
+  const p = plan(f, { scratch: ['a.png'] })
+  const step = p.steps.find(s => s.target === target)
+  assert.doesNotThrow(() => assertRemovable(step, [f.work]), 'still a plain file at removal time')
+  const outside = join(f.root, 'outside.txt')
+  writeFileSync(outside, 'theirs')
+  unlinkSync(target)
+  symlinkSync(outside, target)
+  assert.throws(() => assertRemovable(step, [f.work]), /symbolic link/)
+  assert.equal(readFileSync(outside, 'utf8'), 'theirs')
+})
+
+test('a target that is outside the worker\'s folders at removal time is refused', () => {
+  const f = fixture()
+  const outside = join(f.root, 'outside.txt')
+  writeFileSync(outside, 'theirs')
+  assert.throws(() => assertRemovable({ kind: 'file', target: outside }, [f.work]), /outside the worker/)
+  assert.ok(existsSync(outside))
+})
+
+test('a target that is no longer the kind the plan named is refused at removal time', () => {
+  const f = fixture()
+  const target = join(f.work, 'a.png')
+  writeFileSync(target, 'x')
+  assert.throws(() => assertRemovable({ kind: 'dir', target }, [f.work]), /no longer a dir/)
+})
+
+test('the base branch is the origin default, else main, else master, else an error', () => {
+  const f = fixture()
+  assert.equal(baseBranchOf(f.repo, git), 'main')
+
+  git(['symbolic-ref', 'refs/remotes/origin/HEAD', 'refs/remotes/origin/develop'], f.repo)
+  assert.equal(baseBranchOf(f.repo, git), 'develop', 'origin\'s default wins when it is set')
+  git(['symbolic-ref', '--delete', 'refs/remotes/origin/HEAD'], f.repo)
+
+  const onlyMaster = mkdtempSync(join(tmpdir(), 'janet-master-'))
+  git(['init', '-q', '-b', 'master'], onlyMaster)
+  writeFileSync(join(onlyMaster, 'x'), 'x')
+  git(['add', '.'], onlyMaster)
+  git(['commit', '-q', '-m', 'init'], onlyMaster)
+  assert.equal(baseBranchOf(onlyMaster, git), 'master', 'master when there is no main')
+
+  const trunk = mkdtempSync(join(tmpdir(), 'janet-trunk-'))
+  git(['init', '-q', '-b', 'trunk'], trunk)
+  writeFileSync(join(trunk, 'x'), 'x')
+  git(['add', '.'], trunk)
+  git(['commit', '-q', '-m', 'init'], trunk)
+  assert.throws(() => baseBranchOf(trunk, git), /no base branch/)
 })

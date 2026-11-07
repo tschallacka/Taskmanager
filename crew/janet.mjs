@@ -37,6 +37,41 @@ export function insideRoot(root, target) {
   return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel)
 }
 
+// The two names from the command line become paths (the work folder, the plan folder), so they are checked before
+// anything else. `who` must be a person of this crew and not Janet herself; `cardId` is a board id, letters and digits.
+// Returns the reason it is refused, or null.
+export function checkIds(who, cardId, people) {
+  if (!/^[a-z][a-z0-9-]*$/.test(who ?? '')) return `"${who}" is not a person key`
+  if (who === 'janet') return 'Janet does not clean up after herself'
+  if (!people || !Object.prototype.hasOwnProperty.call(people, who)) return `"${who}" is not a person of this crew`
+  if (!/^[A-Za-z0-9]+$/.test(cardId ?? '')) return `"${cardId}" is not a card id`
+  return null
+}
+
+// Re-checked at the moment of each removal, not only when the plan was made: the target must still be a plain file or
+// folder inside one of the worker's roots (the work folder, the worktree), and no link may have taken its place.
+export function assertRemovable(step, roots) {
+  if (!['file', 'dir'].includes(step.kind)) return
+  if (!roots.some(root => insideRoot(root, step.target))) {
+    throw new Error(`refused: ${step.target} is outside the worker's folders`)
+  }
+  if (!existsSync(step.target)) return
+  const stat = lstatSync(step.target)
+  if (stat.isSymbolicLink()) throw new Error(`refused: ${step.target} is now a symbolic link`)
+  if (stat.isDirectory() !== (step.kind === 'dir')) throw new Error(`refused: ${step.target} is no longer a ${step.kind}`)
+}
+
+// The base branch: origin's default when it is known, else `main`, else `master`. A repository with none of them has
+// no base to merge into, so nothing can be shown as merged: that is an error, not a guess.
+export function baseBranchOf(repoRoot, git) {
+  const origin = git(['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'], repoRoot)
+  if (origin.status === 0 && origin.stdout.trim()) return origin.stdout.trim().replace(/^origin\//, '')
+  for (const name of ['main', 'master']) {
+    if (git(['rev-parse', '--verify', '--quiet', `refs/heads/${name}`], repoRoot).status === 0) return name
+  }
+  throw new Error('no base branch found: the repository has no origin default, no main and no master')
+}
+
 // `git worktree list --porcelain`, as entries { path, branch } (branch is the short name, or null when detached).
 export function parseWorktrees(text) {
   return text.split('\n\n').map(block => block.trim()).filter(Boolean).map((block) => {
@@ -278,6 +313,12 @@ async function main(argv) {
     console.error(usage(kit))
     return 2
   }
+  // Before any path is built from them: a `..` or a slash here would make the work folder the crew home itself.
+  const refusal = checkIds(who, cardId, config.people)
+  if (refusal) {
+    console.error(`refused: ${refusal}`)
+    return 2
+  }
   const repoRoot = config.product.repo
   if (!repoRoot) throw new Error('product.repo is not set in crew.json: Janet needs the repository to find worktrees')
   const workFolder = join(here, 'work', who)
@@ -286,7 +327,7 @@ async function main(argv) {
   const worktree = flags.worktree
     ? entries.find(e => resolve(e.path) === resolve(flags.worktree)) ?? { path: resolve(flags.worktree), branch: null }
     : findWorktree(entries, cardId, repoRoot)
-  const base = git(['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'], repoRoot).stdout.trim().replace(/^origin\//, '') || 'main'
+  const base = baseBranchOf(repoRoot, git)
   const plan = buildPlan({
     who, cardId, repoRoot, workFolder, scratch, worktree, base, git,
     prState: branch => prStateFromGh(branch, repoRoot)
@@ -307,12 +348,15 @@ async function main(argv) {
     updateTask: (id, patch) => boardCall('janet', 'update_task', { id, ...patch }, kit),
     postUpdate: (id, text) => postUpdateFile('janet', id, text, kit, join(here, 'work', 'janet', cardId))
   }
+  const roots = [resolve(workFolder), ...(worktree ? [resolve(worktree.path)] : [])]
   const execute = (step) => {
     if (step.kind === 'browser') {
       const run = spawnSync(process.execPath, [join(kit, 'crew.mjs'), step.target, 'browser', 'done'], { stdio: 'inherit' })
       if (run.status !== 0) throw new Error(`browser done failed for ${step.target}`)
     } else if (step.kind === 'file' || step.kind === 'dir') {
-      rmSync(step.target, { recursive: step.kind === 'dir', force: false })
+      // Checked again now, at the removal: the plan may be old, and a link may have taken the target's place since.
+      assertRemovable(step, roots)
+      if (existsSync(step.target)) rmSync(step.target, { recursive: step.kind === 'dir', force: false })
     } else if (step.kind === 'worktree') {
       const run = git(['worktree', 'remove', step.target], repoRoot)
       if (run.status !== 0) throw new Error(`git worktree remove refused ${step.target}`)
