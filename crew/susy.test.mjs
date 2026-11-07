@@ -1,7 +1,7 @@
 // Susy's check, with fake board data (no dev server). Run: cd crew && node --test susy.test.mjs
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { authorKey, cardsFrom, cycleCards, findPokes, keyOfName, staleRoundLine, thresholdsFrom } from './susy.mjs'
+import { authorKey, cardsFrom, cycleCards, findPokes, keyOfName, median, setAgent, staleRoundLine, thresholdsFrom } from './susy.mjs'
 
 const MIN = 60000
 const NOW = Date.UTC(2026, 10, 7, 13, 0, 0)
@@ -34,7 +34,7 @@ test('author keys: a crew agent is its key, a person is not', () => {
 })
 
 test('thresholds: defaults, overridden by crew.json, a bad value falls back', () => {
-  assert.deepEqual(thresholdsFrom({}), { questionMinutes: 10, idleMinutes: 10, gateMinutes: 15, cleanGrantMinutes: 5, cleanPlanMinutes: 10, cleanDoneMinutes: 15 })
+  assert.deepEqual(thresholdsFrom({}), { questionMinutes: 10, idleMinutes: 10, gateMinutes: 15, cleanGrantMinutes: 5, cleanPlanMinutes: 10, cleanDoneMinutes: 15, stuckMinutes: 240 })
   assert.equal(thresholdsFrom({ susy: { questionMinutes: 3, idleMinutes: -1 } }).questionMinutes, 3)
   assert.equal(thresholdsFrom({ susy: { idleMinutes: -1 } }).idleMinutes, 10)
 })
@@ -235,4 +235,48 @@ test('cardsFrom reads the board answer and attaches the updates', () => {
   assert.equal(c.column, 'To do')
   assert.equal(c.assignee, 'Wren Worker')
   assert.equal(c.updates.length, 1)
+})
+
+test('stuck in column: a card far older than the others in its column, at least 4 hours, is poked to its owner', () => {
+  const old = card('s1', { column: 'Verify', assignee: 'Wynn Worker', updatedAt: NOW - 300 * MIN })
+  const peers = [1, 2, 3].map(n => card(`p${n}`, { column: 'Verify', updatedAt: NOW - 20 * MIN }))
+  const pokes = run([old, ...peers]).actions.filter(a => a.cardId === 's1' && a.kind === 'poke')
+  assert.equal(pokes.length, 1)
+  assert.equal(pokes[0].reason, 'stuck in column')
+  assert.equal(pokes[0].to, 'wynn')
+})
+
+test('stuck in column: not when the card is young, not when only as old as its neighbours, not in a resting column', () => {
+  const peers = [1, 2, 3].map(n => card(`q${n}`, { column: 'Verify', updatedAt: NOW - 200 * MIN }))
+  const same = card('t1', { column: 'Verify', updatedAt: NOW - 250 * MIN })
+  assert.equal(run([same, ...peers]).actions.filter(a => a.cardId === 't1').length, 0, 'not three times the median')
+  const young = card('t2', { column: 'Verify', updatedAt: NOW - 100 * MIN })
+  const few = [1, 2, 3].map(n => card(`r${n}`, { column: 'Verify', updatedAt: NOW - 5 * MIN }))
+  assert.equal(run([young, ...few]).actions.filter(a => a.cardId === 't2').length, 0, 'under four hours')
+  const resting = card('t3', { column: 'Blocked', updatedAt: NOW - 600 * MIN })
+  const restPeers = [1, 2, 3].map(n => card(`u${n}`, { column: 'Blocked', updatedAt: NOW - 5 * MIN }))
+  assert.equal(run([resting, ...restPeers]).actions.filter(a => a.cardId === 't3').length, 0, 'Blocked is resting')
+})
+
+test('stuck in column needs at least two other cards in the column', () => {
+  const lone = card('v1', { column: 'Verify', updatedAt: NOW - 600 * MIN })
+  const one = card('v2', { column: 'Verify', updatedAt: NOW - 5 * MIN })
+  assert.equal(run([lone, one]).actions.filter(a => a.cardId === 'v1').length, 0)
+})
+
+test('median: the middle value, or the mean of the two middle ones', () => {
+  assert.equal(median([5, 1, 3]), 3)
+  assert.equal(median([4, 1, 3, 2]), 2.5)
+})
+
+test('setAgent: sets a person id, forgets it with "-", and refuses a value that is not a plain id', () => {
+  assert.deepEqual(setAgent({}, 'wynn', 'a1b2'), { wynn: 'a1b2' })
+  assert.deepEqual(setAgent({ wynn: 'a1b2', pia: 'p9' }, 'wynn', '-'), { pia: 'p9' })
+  assert.throws(() => setAgent({}, 'wynn', 'a b; rm'), /not an agent id/)
+  assert.throws(() => setAgent({}, 'Wynn Worker', 'a1'), /not a person key/)
+})
+
+test('the check reads an agent id Pia wrote, and names it in the SendMessage line', () => {
+  const c = card('w10', { column: 'In progress', assignee: 'Wynn Worker', updatedAt: NOW - 30 * MIN })
+  assert.match(run([c], { agents: setAgent({}, 'wynn', 'ag-42') }).lines[0], /SendMessage to agent ag-42/)
 })

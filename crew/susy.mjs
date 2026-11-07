@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 // Susy, the secretary who pokes people awake. She never does anyone's work, moves no card and starts nobody.
-//   crew susy check    one round: reads the crew board and prints what needs a poke, or a clear, one line each
+//   crew susy check                 one round: reads the crew board and prints what needs a poke, or a clear, one line each
+//   crew susy agent <key> <id>      remember the agent id of a running person (for SendMessage); "-" as id forgets it
 // The board is her memory. Each poke is written on the card as an update by her ("poked <to> | <reason> | at <time>"),
 // and a poke that no longer holds is closed with "cleared <to> | <reason> | at <time>". Nothing is kept in a file
 // about what was found, so a round works out what is needed from the board as it is now. A file in CREW_HOME/.listen
-// holds only the agent ids for SendMessage (written by Pia) and the time of the last round.
+// holds only the agent ids for SendMessage (written by Pia, or with `agent`) and the time of the last round.
 // Rules, thresholds and ladder: see SUSY.md.tmpl. Thresholds come from "susy" in crew.json, with the defaults below.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
@@ -12,15 +13,26 @@ import { crewHome } from './home.mjs'
 import { renameKeys } from './keys.mjs'
 import { rpcResult } from './mentions.mjs'
 
-export const DEFAULTS = { questionMinutes: 10, idleMinutes: 10, gateMinutes: 15, cleanGrantMinutes: 5, cleanPlanMinutes: 10, cleanDoneMinutes: 15 }
+export const DEFAULTS = { questionMinutes: 10, idleMinutes: 10, gateMinutes: 15, cleanGrantMinutes: 5, cleanPlanMinutes: 10, cleanDoneMinutes: 15, stuckMinutes: 240 }
 export const WORKERS = ['wren', 'wick', 'wynn', 'wade']
 export const AGENTS = ['pia', ...WORKERS, 'usher', 'nina', 'quincy']
 export const GATES = { 'Verify PM': 'pia', 'Verify UX': 'usher', 'Verify CQ': 'nina', 'Verify QA': 'quincy' }
-export const NAMES = { pia: 'Pia Planner', wren: 'Wren Worker', wick: 'Wick Worker', wynn: 'Wynn Worker', wade: 'Wade Worker', usher: 'Pietje Precies', nina: 'Nina Nitpick', quincy: 'Quincy Average' }
+// The default display names, the same as config.mjs gives them. A crew.json "people" entry replaces one.
+export const NAMES = {
+  pia: 'Pia Planner', wren: 'Wren Worker', wick: 'Wick Worker', wynn: 'Wynn Worker', wade: 'Wade Worker',
+  usher: 'Usher Xander', nina: 'Nina Nitpick', quincy: 'Quincy Average', susy: 'Susy Secretary',
+  janet: 'Janet Janitor', pat: 'Pat Precheck', tess: 'Tess Triage', rita: 'Rita Reporter'
+}
 export const DEFAULT_CLEANER = 'janet'
+// A card in one of these columns is waiting by design, so the stuck-column rule does not look at it.
+export const RESTING = ['Backlog', 'Blocked', 'Ready for live', 'Done']
+// Stuck-column rule: a card is stuck when it has been in its column at least stuckMinutes, and more than STUCK_FACTOR
+// times the median time of the other cards in that column (at least two others).
+export const STUCK_FACTOR = 3
 const MIN = 60000
 const STALE_ROUND_MINUTES = 5
 const LEDGER = /^(poked|cleared) (\S+) \| (.+?) \| at (\S+)\s*$/
+const AGENT_ID = /^[\w.-]{1,80}$/
 
 /** Thresholds in minutes: the defaults, with any valid number from crew.json's "susy" block. */
 export function thresholdsFrom(crew) {
@@ -43,6 +55,29 @@ export function keyOfName(people = {}) {
   const names = { ...NAMES, ...renameKeys(people) }
   const byName = new Map(Object.entries(names).map(([key, name]) => [name, key]))
   return name => byName.get(name)
+}
+
+/** The median of a list of numbers (the mean of the two middle ones for an even count). */
+export function median(values) {
+  const sorted = [...values].sort((a, b) => a - b)
+  const mid = Math.floor(sorted.length / 2)
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2
+}
+
+/**
+ * The agents map with one person's id set, or removed with "-". Returns a new object; the id must be a plain word,
+ * so a value that could break a SendMessage target is refused.
+ */
+export function setAgent(agents, key, id) {
+  if (!/^\w+$/.test(String(key ?? ''))) throw new Error(`susy: "${key}" is not a person key`)
+  const next = { ...(agents ?? {}) }
+  if (id === '-') {
+    delete next[key]
+    return next
+  }
+  if (!AGENT_ID.test(String(id ?? ''))) throw new Error(`susy: "${id}" is not an agent id`)
+  next[key] = id
+  return next
 }
 
 /** The Susy ledger on a card: her own poked/cleared updates, oldest first. */
@@ -177,6 +212,12 @@ export function candidatesFor(card, th, ctx) {
   const owner = GATES[card.column]
   add('gate untouched', owner ?? 'pia', card.updatedAt, th.gateMinutes, Boolean(owner) && !postedBy(card, [owner], card.updatedAt))
 
+  // Stuck in its column: far longer than the other cards in the same column (see STUCK_FACTOR).
+  const age = ctx.now - card.updatedAt
+  const others = (ctx.columnCards.get(card.column) ?? []).filter(other => other.id !== card.id).map(other => other.age)
+  add('stuck in column', key ?? 'pia', card.updatedAt, th.idleMinutes,
+    !RESTING.includes(card.column) && others.length >= 2 && age >= th.stuckMinutes * MIN && age > STUCK_FACTOR * median(others))
+
   // Blocked by a card with no owner, or in a cycle of blockers.
   const unowned = (card.blockedBy ?? []).some((id) => {
     const blocker = ctx.byId.get(id)
@@ -228,7 +269,13 @@ export function findPokes(cards, opts) {
   const th = thresholdsFrom({ susy: opts.thresholds ?? {} })
   const byId = new Map(cards.map(card => [card.id, card]))
   const busy = new Set(cards.filter(card => card.column === 'In progress').map(card => opts.keyOf(card.assignee)).filter(Boolean))
-  const ctx = { keyOf: opts.keyOf, byId, busy, cycle: cycleCards(cards), cleaner: opts.cleaner ?? DEFAULT_CLEANER, agents: opts.agents ?? {} }
+  const columnCards = new Map()
+  for (const card of cards) {
+    const list = columnCards.get(card.column) ?? []
+    list.push({ id: card.id, age: now - card.updatedAt })
+    columnCards.set(card.column, list)
+  }
+  const ctx = { keyOf: opts.keyOf, byId, busy, cycle: cycleCards(cards), cleaner: opts.cleaner ?? DEFAULT_CLEANER, agents: opts.agents ?? {}, now, columnCards }
   const actions = []
   for (const card of cards) {
     for (const c of candidatesFor(card, th, ctx)) actions.push(...evaluate(card, c, now, ctx))
@@ -268,12 +315,31 @@ function readJson(path, fallback) {
   }
 }
 
+/** `crew susy agent <key> <id>`: set or forget one person's agent id in CREW_HOME/.listen/susy.json. */
+function agentCommand(home, key, id) {
+  const statePath = `${home}/.listen/susy.json`
+  const state = readJson(statePath, {})
+  const agents = setAgent(state.agents, key, id)
+  mkdirSync(`${home}/.listen`, { recursive: true })
+  writeFileSync(statePath, `${JSON.stringify({ ...state, agents })}\n`, { mode: 0o600 })
+  console.log(id === '-' ? `susy: no agent id for ${key} now` : `susy: ${key} is agent ${id}`)
+  return 0
+}
+
 async function main() {
+  const home = crewHome()
+  if (process.argv[2] === 'agent') {
+    try {
+      return agentCommand(home, process.argv[3], process.argv[4])
+    } catch (error) {
+      console.error(error.message)
+      return 64
+    }
+  }
   if (process.argv[2] !== 'check') {
-    console.error('usage: crew susy check')
+    console.error('usage: crew susy check | crew susy agent <key> <id|->')
     return 64
   }
-  const home = crewHome()
   const crew = readJson(`${home}/crew.json`, null) ?? readJson(`${home}/crew.config.json`, null)
   if (!crew) {
     console.error(`susy: no crew.json in ${home}`)

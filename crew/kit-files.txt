@@ -38,6 +38,7 @@ mentions.mjs
 package.json
 postbrief.mjs
 setup.mjs
+susy.mjs
 tm.mjs
 totp.mjs
 unslop.SKILL.md

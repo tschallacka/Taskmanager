@@ -34,6 +34,13 @@ if (first === 'browser' || rest[0] === 'browser') {
   process.exit(run.status ?? 1)
 }
 
+// Susy's round and her agent ids: `crew susy check`, `crew susy agent <key> <id|->`. Any other `crew susy ...` is the
+// person Susy's own board commands, as for every other person.
+if (first === 'susy' && (rest[0] === 'check' || rest[0] === 'agent')) {
+  const run = spawnSync(process.execPath, [join(kit, 'susy.mjs'), ...rest], { stdio: 'inherit' })
+  process.exit(run.status ?? 1)
+}
+
 const script = scripts[first] ?? 'tm.mjs'
 const args = scripts[first] ? rest : process.argv.slice(2)
 const run = spawnSync(process.execPath, [join(kit, script), ...args], { stdio: 'inherit' })
