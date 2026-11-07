@@ -1,4 +1,5 @@
-import { deviceStartAttempts, DEVICE_REQUEST_TTL_MS, DEVICE_POLL_INTERVAL_SECONDS, readStartRequest } from '../../utils/deviceFlow'
+import { DEVICE_REQUEST_TTL_MS, DEVICE_POLL_INTERVAL_SECONDS, readStartRequest } from '../../utils/deviceFlow'
+import { chargeRateLimit, limitsFor, requestAddress } from '../../utils/rateLimits'
 import { startDeviceRequest } from '../../utils/deviceFlowDb'
 
 /**
@@ -7,10 +8,8 @@ import { startDeviceRequest } from '../../utils/deviceFlowDb'
  * page where the person approves the request. Nothing here is a token; the token comes from the poll, once.
  */
 export default defineEventHandler(async (event) => {
-  const ip = getRequestIP(event, { xForwardedFor: true }) ?? 'unknown'
-  if (!deviceStartAttempts.allow(ip, Date.now())) {
-    throw createError({ statusCode: 429, message: 'Too many connection requests. Wait 10 minutes and try again.' })
-  }
+  // The same configurable pairing limit as the code exchange, per client address (X-Real-IP only from the proxy).
+  await chargeRateLimit('pairing', `device-start:${requestAddress(event)}`, await limitsFor('pairing'), event)
 
   const request = readStartRequest(await readBody(event))
   setResponseHeader(event, 'cache-control', 'no-store')

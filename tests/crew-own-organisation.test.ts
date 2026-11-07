@@ -12,6 +12,7 @@ Object.assign(globalThis, { createError })
 
 const { db } = await import('../server/db')
 const { crewBoards, crews, customers, member, organization, projects, user } = await import('../server/db/schema')
+const { allowCrews } = await import('./helpers/crewLevels')
 const { attachCrew, requireOwnCrew } = await import('../server/utils/crewBoards')
 
 const tag = randomBytes(4).toString('hex')
@@ -53,6 +54,7 @@ after(async () => {
 })
 
 test('a crew is given a second board in its own organisation', async () => {
+  await allowCrews(owner, team, [board.second])
   const link = await attachCrew({ crew: await requireOwnCrew(crew, owner), projectId: board.second, teamId: team, userId: owner })
   assert.equal(link.projectId, board.second)
 

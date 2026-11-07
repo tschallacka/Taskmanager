@@ -3,12 +3,12 @@
 import type { H3Event } from 'h3'
 import { and, eq } from 'drizzle-orm'
 import { db } from '../db'
-import { apiKeys, API_KEY_SCOPES, customers, projects } from '../db/schema'
+import { apiKeys, API_KEY_SCOPES, customers, projects, user } from '../db/schema'
 import type { ApiKeyScope } from '../db/schema'
 import { generateApiKey, isApiKeyScope } from './api-keys'
 import { storeReach, teamReachOf } from './keyReach'
 import type { ReachRequest } from './keyReach'
-import { requireInstanceAdmin } from './instanceAdmin'
+import { CREW_SENTENCES, crewPermissionRefusal } from './crewPermission'
 
 export const MAX_KEY_NAME_LENGTH = 60
 const MAX_EXPIRY_DAYS = 3650
@@ -20,7 +20,21 @@ export interface KeyRequest {
 }
 
 /** Reads the name, permissions and expiry of a key request; refuses anything a key cannot carry. */
-export async function readKeyRequest(event: H3Event, body: { name?: unknown, scopes?: unknown, expiresInDays?: unknown }): Promise<KeyRequest> {
+/**
+ * Whether the signed-in person may hold a crews:manage key limited to this board (or none, for the instance admin).
+ * The crew permission decides it: the three levels of crewPermission.ts. A person who is not the instance admin
+ * may only hold one bound to a board, so it reaches that board's crews and nothing else.
+ */
+export async function requireCrewKeyRights(event: H3Event, boardId: string | null): Promise<void> {
+  const userId = event.context.session.user.id
+  const [row] = await db.select({ isInstanceAdmin: user.isInstanceAdmin }).from(user).where(eq(user.id, userId))
+  const ownerIsAdmin = Boolean(row?.isInstanceAdmin)
+  if (!ownerIsAdmin && !boardId) throw createError({ statusCode: 403, message: CREW_SENTENCES.noBoard })
+  const refusal = await crewPermissionRefusal(userId, ownerIsAdmin ? null : boardId)
+  if (refusal) throw createError({ statusCode: 403, message: refusal })
+}
+
+export async function readKeyRequest(event: H3Event, body: { name?: unknown, scopes?: unknown, expiresInDays?: unknown, projectId?: unknown }): Promise<KeyRequest> {
   const name = typeof body.name === 'string' ? body.name.trim() : ''
   if (!name) throw createError({ statusCode: 400, message: 'Give the key a name' })
   if (name.length > MAX_KEY_NAME_LENGTH) {
@@ -28,8 +42,10 @@ export async function readKeyRequest(event: H3Event, body: { name?: unknown, sco
   }
 
   const scopes = [...new Set(Array.isArray(body.scopes) ? body.scopes : [])].filter(isApiKeyScope)
-  // A crew key creates and rotates whole crews; only the instance admin may hold one.
-  if (scopes.includes('crews:manage')) await requireInstanceAdmin(event)
+  // A crew key creates and rotates whole crews, for the board it is limited to (see requireCrewKeyRights).
+  if (scopes.includes('crews:manage')) {
+    await requireCrewKeyRights(event, typeof body.projectId === 'string' && body.projectId !== '' ? body.projectId : null)
+  }
   if (!scopes.length) {
     throw createError({ statusCode: 400, message: `Pick at least one permission (${API_KEY_SCOPES.join(', ')})` })
   }

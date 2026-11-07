@@ -117,6 +117,36 @@ async function changeOwner(event: Event) {
   }
 }
 
+// ─── Crews ─────────────────────────────────────────────────
+// The board level of the crew permission. It is on only where the instance and the team allow crews too.
+
+const crewLevels = ref<{ crewsAllowed: boolean, teamAllowed: boolean, instanceAllowed: boolean } | null>(null)
+const savingCrews = ref(false)
+
+async function loadCrewLevels() {
+  try {
+    crewLevels.value = await $fetch<{ crewsAllowed: boolean, teamAllowed: boolean, instanceAllowed: boolean }>(`/api/projects/${props.projectId}/crews-allowed`)
+  } catch {
+    crewLevels.value = null
+  }
+}
+
+watch(() => props.projectId, loadCrewLevels, { immediate: true })
+
+async function setBoardCrews(allowed: boolean) {
+  error.value = ''
+  savingCrews.value = true
+  try {
+    await $fetch(`/api/projects/${props.projectId}/crews-allowed`, { method: 'PUT', body: { crewsAllowed: allowed } })
+    await loadCrewLevels()
+    flashSaved()
+  } catch (e) {
+    error.value = messageOf(e, 'Could not save the crew setting')
+  } finally {
+    savingCrews.value = false
+  }
+}
+
 // ─── Archive ───────────────────────────────────────────────
 
 const archiving = ref(false)
@@ -251,6 +281,48 @@ async function confirmDelete() {
       >
         Only the project owner can hand the project to someone else.
       </p>
+    </div>
+
+    <div
+      v-if="crewLevels"
+      class="border-t border-default pt-6"
+      data-board-crews
+    >
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 class="text-sm font-semibold text-default">
+            Crews may work on this board
+          </h3>
+          <p class="mt-1 text-xs text-muted">
+            <template v-if="!crewLevels.instanceAllowed">
+              Your admin has not allowed crews on this instance, so this cannot be turned on yet.
+            </template>
+            <template v-else-if="!crewLevels.teamAllowed">
+              The owner or admin of this team has not allowed crews for its boards yet. Ask them first.
+            </template>
+            <template v-else>
+              A crew may only work on a board whose switch is on, and the instance and the team allow crews. Turning this off disables the crews on this board.
+            </template>
+          </p>
+        </div>
+        <USwitch
+          :model-value="crewLevels.crewsAllowed"
+          :disabled="savingCrews || (!crewLevels.crewsAllowed && (!crewLevels.instanceAllowed || !crewLevels.teamAllowed))"
+          aria-label="Crews may work on this board"
+          @update:model-value="setBoardCrews"
+        />
+      </div>
+    </div>
+
+    <div
+      v-if="crewLevels"
+      class="border-t border-default pt-6"
+    >
+      <RateLimitFields
+        :url="`/api/projects/${projectId}/rate-limits`"
+        title="Rate limits for this board"
+        hint="At most this many of each in the window, on top of the team's and the instance's limits."
+      />
     </div>
 
     <div class="border-t border-default pt-6">

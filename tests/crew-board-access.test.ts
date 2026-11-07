@@ -12,6 +12,7 @@ Object.assign(globalThis, { createError })
 
 const { db } = await import('../server/db')
 const schema = await import('../server/db/schema')
+const { allowCrews } = await import('./helpers/crewLevels')
 const { crews, member, organization, projectColumns, projectTasks, projects, user } = schema
 const { attachCrew } = await import('../server/utils/crewBoards')
 const { GRANT_READABLE_TOOLS, isStaffOfShadowedBoard, mayUseReadGrant, readGrantedBoardIds, shadowBoardForStaff } = await import('../server/utils/crewBoardAccess')
@@ -61,6 +62,7 @@ before(async () => {
   await db.insert(projectColumns).values({ id: column, projectId: realBoard, name: 'To do', position: 0, createdAt: now })
   // An internal task: a customer would not see it, and the crew has to.
   await db.insert(projectTasks).values({ id: task, projectId: realBoard, columnId: column, title: 'Secret internal task', visibility: 'internal', position: 0, createdAt: now, updatedAt: now })
+  await allowCrews(boss, realTeam, [realBoard])
   const link = await attachCrew({ crew: (await db.select().from(crews).where(eq(crews.id, crewId)))[0]!, projectId: realBoard, teamId: realTeam, userId: boss })
   shadowBoard = link.shadowProjectId
 })

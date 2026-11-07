@@ -18,6 +18,8 @@ const { attachCrew, detachCrew, findCrewLink } = await import('../server/utils/c
 const { CREW_PEOPLE } = await import('../server/utils/crewProvisioning')
 const { FORK_PEOPLE, extraKeysOf, forkAgentType, forkCrew, forksOfLink, removeForks } = await import('../server/utils/crewForks')
 const { createOrRotateCrew, crewView, disableCrew } = await import('../server/utils/crewProvisioning')
+const { setBoardCrews, setInstanceCrews, setTeamCrews } = await import('../server/utils/crewPermission')
+const { instanceSettings } = await import('../server/db/schema')
 const { readGrantedBoardIds } = await import('../server/utils/crewBoardAccess')
 const { boardFilter } = await import('../server/utils/mcpAccess')
 const { hashApiKey } = await import('../server/utils/api-keys')
@@ -47,7 +49,7 @@ const forkIds = async (linkId: string) =>
 
 before(async () => {
   const at = new Date()
-  await db.insert(user).values({ id: boss, name: boss, email: `${boss}@arnotes.test`, emailVerified: true, createdAt: at, updatedAt: at })
+  await db.insert(user).values({ id: boss, name: boss, email: `${boss}@arnotes.test`, emailVerified: true, createdAt: at, updatedAt: at, isInstanceAdmin: true })
   await db.insert(organization).values([realTeam, crewTeam].map(t => ({ id: t, name: t, slug: t, createdAt: at })))
   await db.insert(member).values([
     { id: id('m1'), organizationId: realTeam, userId: boss, role: 'owner', createdAt: at },
@@ -60,12 +62,17 @@ before(async () => {
     { id: boardC, userId: boss, teamId: realTeam, name: 'Office', createdAt: now, updatedAt: now }
   ])
   crew = (await db.select().from(crews).where(eq(crews.id, crewId)))[0]!
+  // The three levels of the crew permission on for these boards.
+  await setInstanceCrews(true, boss)
+  await setTeamCrews(realTeam, true)
+  for (const board of [boardA, boardB, boardC]) await setBoardCrews(board, true)
   linkA = await attachCrew({ crew, projectId: boardA, teamId: realTeam, userId: boss })
   linkB = await attachCrew({ crew, projectId: boardB, teamId: realTeam, userId: boss })
   linkC = await attachCrew({ crew, projectId: boardC, teamId: realTeam, userId: boss })
 })
 
 after(async () => {
+  await db.delete(instanceSettings).where(eq(instanceSettings.id, 'instance'))
   const forks = (await db.select({ id: user.id }).from(user).where(eq(user.crewId, crewId))).map(u => u.id)
   if (forks.length) await db.delete(user).where(inArray(user.id, forks))
   const shadows = await db.select({ id: projects.id }).from(projects).where(eq(projects.teamId, crewTeam))

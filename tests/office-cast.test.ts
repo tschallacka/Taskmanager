@@ -13,6 +13,8 @@ Object.assign(globalThis, { createError })
 const { db } = await import('../server/db')
 const { crewBoardMembers, crews, member, organization, projects, user } = await import('../server/db/schema')
 const { attachCrew } = await import('../server/utils/crewBoards')
+const { setBoardCrews, setInstanceCrews, setTeamCrews } = await import('../server/utils/crewPermission')
+const { instanceSettings } = await import('../server/db/schema')
 const { forkCrew } = await import('../server/utils/crewForks')
 const { officeCastOf } = await import('../server/utils/officeCast')
 
@@ -56,12 +58,17 @@ before(async () => {
     crewId
   })))
   const [crew] = await db.select().from(crews).where(eq(crews.id, crewId))
+  // The three levels of the crew permission on for the real board.
+  await setInstanceCrews(true, owner)
+  await setTeamCrews(realTeam, true)
+  await setBoardCrews(realBoard, true)
   const link = await attachCrew({ crew: crew!, projectId: realBoard, teamId: realTeam, userId: owner })
   shadowId = link.shadowProjectId
   await forkCrew({ crew: crew!, link, boardName: 'Real board', rotate: false })
 })
 
 after(async () => {
+  await db.delete(instanceSettings).where(eq(instanceSettings.id, 'instance'))
   const accounts = (await db.select({ id: user.id }).from(user).where(eq(user.crewId, crewId))).map(u => u.id)
   if (accounts.length) await db.delete(user).where(inArray(user.id, accounts))
   const boards = (await db.select({ id: projects.id }).from(projects).where(inArray(projects.teamId, [realTeam, crewTeam]))).map(p => p.id)

@@ -16,6 +16,7 @@ import {
 import type { ApiKeyScope, Crew } from '../db/schema'
 import { authenticateApiKey, generateApiKey, hasScope } from './api-keys'
 import { createCrewAccount, crewAddress, personKeyOf } from './crewAccounts'
+import { CREW_SENTENCES, boardOfCrewKey, crewPermissionRefusal } from './crewPermission'
 import { genId } from './projects'
 
 // The people a crew is made of, in the order the response lists them. `team` is the
@@ -408,8 +409,9 @@ export async function purgeCrew(crew: Crew) {
 }
 
 /**
- * Lets a call through only when its key is a live crews:manage key whose owner is the
- * instance admin. Anything else is refused by name, with no detail about the key.
+ * Lets a call through only when its key is a live crews:manage key and the crew permission reaches it: the three
+ * levels (crewPermission.ts) for the key's board. A key of a person who is not the instance admin must be bound to
+ * one board, and a management token always is. Anything else is refused by name, with no detail about the key.
  */
 export async function requireCrewManager(event: H3Event): Promise<CrewCaller> {
   const key = await authenticateApiKey(event)
@@ -417,13 +419,16 @@ export async function requireCrewManager(event: H3Event): Promise<CrewCaller> {
     throw createError({ statusCode: 403, message: 'This key cannot manage crews.' })
   }
   const [owner] = await db.select({ isInstanceAdmin: user.isInstanceAdmin }).from(user).where(eq(user.id, key.userId))
-  if (!owner?.isInstanceAdmin) {
-    throw createError({ statusCode: 403, message: 'Only the instance admin can manage crews.' })
-  }
+  const ownerIsAdmin = Boolean(owner?.isInstanceAdmin)
   if (key.kind === 'management' && !key.projectId) {
     throw createError({ statusCode: 403, message: 'This token is not bound to a board.' })
   }
-  const boardId = key.kind === 'management' ? key.projectId : null
+  if (!ownerIsAdmin && !key.projectId) {
+    throw createError({ statusCode: 403, message: CREW_SENTENCES.noBoard })
+  }
+  const boardId = boardOfCrewKey(key, ownerIsAdmin)
+  const refusal = await crewPermissionRefusal(key.userId, boardId)
+  if (refusal) throw createError({ statusCode: 403, message: refusal })
   return { userId: key.userId, keyId: key.keyId, keyName: key.keyName, boardId }
 }
 

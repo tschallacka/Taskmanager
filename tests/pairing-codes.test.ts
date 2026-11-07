@@ -16,7 +16,8 @@ const { db } = await import('../server/db')
 const { apiKeyBoardScopes, apiKeys, apiKeySecrets, pairingCodes, projects, user } = await import('../server/db/schema')
 const { hashApiKey, refusalForSecret } = await import('../server/utils/api-keys')
 const { createPairingCode, latestPairingOf, redeemPairingCode, regenerateKey, revokeKey, storeBoardScopes } = await import('../server/utils/connectTokens')
-const { pairingCodeDigest, pairingAttempts, PAIRING_CODE_TTL_MS, PAIRING_RATE_LIMIT } = await import('../server/utils/pairing')
+const { pairingCodeDigest, PAIRING_CODE_TTL_MS } = await import('../server/utils/pairing')
+const { DEFAULT_RATE_LIMITS, chargeRateLimit } = await import('../server/utils/rateLimits')
 const { boardFilter } = await import('../server/utils/mcpAccess')
 const { boardScopesOf } = await import('../server/utils/connectTokenRules')
 
@@ -204,11 +205,12 @@ test('a paired token reaches only its granted boards, with only the permissions 
   assert.deepEqual(paired.boards.map(board => board.id).sort(), [boardA, boardB].sort())
 })
 
-test('the exchange is rate limited per address: the attempt after the limit is refused', () => {
+test('the exchange is rate limited per address: the attempt after the limit is refused', async () => {
   const address = `203.0.113.${tag}`
-  for (let i = 0; i < PAIRING_RATE_LIMIT.max; i++) assert.equal(pairingAttempts.allow(address, Date.now()), true)
-  assert.equal(pairingAttempts.allow(address, Date.now()), false)
-  assert.equal(pairingAttempts.allow(`${address}-other`, Date.now()), true)
+  const limits = [DEFAULT_RATE_LIMITS.pairing]
+  for (let i = 0; i < DEFAULT_RATE_LIMITS.pairing.max; i++) await chargeRateLimit('pairing', `address:${address}`, limits)
+  await assert.rejects(chargeRateLimit('pairing', `address:${address}`, limits), (e: { statusCode?: number }) => e.statusCode === 429)
+  await chargeRateLimit('pairing', `address:${address}-other`, limits)
 })
 
 test('regenerating after a pairing still makes the newest secret the only one that works', async () => {

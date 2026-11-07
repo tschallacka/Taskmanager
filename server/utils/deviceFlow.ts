@@ -6,13 +6,11 @@ import { createError } from 'h3'
 import { createHash, randomBytes, randomInt } from 'crypto'
 import { API_KEY_SCOPES } from '../db/schema'
 import type { ApiKeyScope } from '../db/schema'
-import { createAttemptLimiter } from './pairing'
 
 export const DEVICE_REQUEST_TTL_MS = 10 * 60_000
 export const DEVICE_POLL_INTERVAL_SECONDS = 5
-// Starting a request is limited per address; polling is limited per request by the interval (slow_down).
-export const DEVICE_START_RATE_LIMIT = { max: 10, windowMs: 10 * 60_000 }
-export const deviceStartAttempts = createAttemptLimiter(DEVICE_START_RATE_LIMIT.max, DEVICE_START_RATE_LIMIT.windowMs)
+// Starting a request counts against the configurable pairing limit per address (see the route);
+// polling is limited per request by the interval (slow_down).
 
 // No look-alikes: no 0 or O, no 1, I or L.
 const USER_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'

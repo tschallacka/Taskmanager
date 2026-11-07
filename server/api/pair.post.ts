@@ -1,5 +1,6 @@
-import { pairingAttempts, pairingSummary } from '../utils/pairing'
+import { pairingSummary } from '../utils/pairing'
 import { redeemPairingCode } from '../utils/connectTokens'
+import { chargeRateLimit, limitsFor, requestAddress } from '../utils/rateLimits'
 
 interface PairBody {
   code?: unknown
@@ -11,11 +12,10 @@ interface PairBody {
  * the rate limit, the known and the unknown alike.
  */
 export default defineEventHandler(async (event) => {
-  // Behind the proxy the address comes from X-Forwarded-For; the limit is per address.
-  const ip = getRequestIP(event, { xForwardedFor: true }) ?? 'unknown'
-  if (!pairingAttempts.allow(ip, Date.now())) {
-    throw createError({ statusCode: 429, message: 'Too many pairing attempts. Wait 10 minutes and try again.' })
-  }
+  // The limit is per client address (the proxy's X-Real-IP only from the proxy itself, see requestAddress), and
+  // configurable by the instance admin.
+  const ip = requestAddress(event)
+  await chargeRateLimit('pairing', `address:${ip}`, await limitsFor('pairing'), event)
 
   const body = await readBody<PairBody>(event)
   setResponseHeader(event, 'cache-control', 'no-store')

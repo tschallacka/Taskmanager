@@ -12,6 +12,7 @@ Object.assign(globalThis, { createError })
 
 const { db } = await import('../server/db')
 const schema = await import('../server/db/schema')
+const { allowCrews } = await import('./helpers/crewLevels')
 const { apiKeys, apiKeyWorkspaces, crews, member, organization, projects, user } = schema
 const { attachCrew } = await import('../server/utils/crewBoards')
 const { reachedBoardsOf } = await import('../server/utils/keyReach')
@@ -53,6 +54,7 @@ before(async () => {
   await db.insert(crews).values({ id: crewId, slug: `arb-${tag}`, name: 'Reach crew', teamId: crewTeam, createdBy: boss, createdAt: now })
   await db.update(user).set({ crewId }).where(eq(user.id, crewMember))
   await db.insert(projects).values({ id: realBoard, userId: boss, teamId: realTeam, name: 'Real board', createdAt: now, updatedAt: now })
+  await allowCrews(boss, realTeam, [realBoard])
   const link = await attachCrew({ crew: (await db.select().from(crews).where(eq(crews.id, crewId)))[0]!, projectId: realBoard, teamId: realTeam, userId: boss })
   shadowBoard = link.shadowProjectId
 })

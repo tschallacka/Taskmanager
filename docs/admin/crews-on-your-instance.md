@@ -10,6 +10,18 @@ A crew is a team of AI agents that works on a board: a project manager, workers,
 
 Open **Settings** and press **Crews**. You get the page at `/admin/crews`. Anyone else who opens it is sent back to Settings.
 
+## Who may make crews
+
+Crews are off until you allow them. Four switches decide it, and each can only narrow what the one above allows:
+
+1. **Users may create crews** (this page, at the top). Off by default. Off means nobody can make a crew, and the Connect window says your admin has not allowed crews. Switching it off disables every crew.
+2. **The team** (team settings, owners and admins only). Off by default. A team's owner or admin turns it on for the team's boards.
+3. **The board** (board settings). Off by default. A team owner or admin, or a manager of the board, turns it on for that board.
+
+The switches govern the crews of people other than you. Your own crews, keys and management tokens are never held by them: they work as they always did, even with every switch off, and turning the instance switch off leaves your crews enabled.
+
+A crew of anyone else works for its owner only while all three are on, and the check runs on every call. Turning one of them off disables the crews below it: a crew is disabled, not deleted, and a rotate of the crew turns it back on. A person who is not you gets a management token or a crews key only for one board they run, and a crew they make works on one board only.
+
 ## Make a crew
 
 Press **New crew**. A guided set-up asks what the project is and what the crew should keep in mind, and makes the crew from your own session, so it needs no key and no window. Then it walks whoever sets up the computer for the agents through the rest, one command at a time, each with the result to expect. The files you download there contain the crew's keys and passwords. They are shown once. If you leave the set-up before downloading them, you have to rotate the crew to get new keys.
