@@ -32,7 +32,16 @@ export default defineEventHandler(async (event) => {
   }
 
   // The slot is taken before anything is awaited, so the cap counts this stream at once.
-  const key = { keyId: context.keyId, userId: context.userId, teamId: context.teamId, projectId: context.projectId, customerId: context.customerId }
+  const key = {
+    keyId: context.keyId,
+    userId: context.userId,
+    teamId: context.teamId,
+    projectId: context.projectId,
+    customerId: context.customerId,
+    allBoards: context.reach.allBoards,
+    boardIds: context.reach.boardIds,
+    workspaceTeamIds: context.reach.workspaceTeamIds
+  }
   const slot = agentEventHub.reserve(key)
   if (slot === 'rate') {
     throw createError({ statusCode: 429, message: 'Too many event stream connects, try again in a minute' })

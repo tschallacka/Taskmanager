@@ -16,7 +16,7 @@ const schema = await import('../server/db/schema')
 const { apiKeys, crewBoardMembers, crews, member, organization, projects, user } = schema
 const { attachCrew, detachCrew, findCrewLink } = await import('../server/utils/crewBoards')
 const { CREW_PEOPLE } = await import('../server/utils/crewProvisioning')
-const { FORK_PEOPLE, forkAgentType, forkCrew, forksOfLink, removeForks } = await import('../server/utils/crewForks')
+const { FORK_PEOPLE, extraKeysOf, forkAgentType, forkCrew, forksOfLink, removeForks } = await import('../server/utils/crewForks')
 const { createOrRotateCrew, crewView, disableCrew } = await import('../server/utils/crewProvisioning')
 const { readGrantedBoardIds } = await import('../server/utils/crewBoardAccess')
 const { boardFilter } = await import('../server/utils/mcpAccess')
@@ -32,6 +32,7 @@ const crewTeam = id('crew-team')
 const crewId = id('crew')
 const boardA = id('board-a')
 const boardB = id('board-b')
+const boardC = id('board-c')
 
 const rejects = (promise: Promise<unknown>, status: number) =>
   assert.rejects(promise, (e: { statusCode?: number }) => e.statusCode === status)
@@ -39,6 +40,7 @@ const rejects = (promise: Promise<unknown>, status: number) =>
 let crew: typeof crews.$inferSelect
 let linkA: Awaited<ReturnType<typeof attachCrew>>
 let linkB: Awaited<ReturnType<typeof attachCrew>>
+let linkC: Awaited<ReturnType<typeof attachCrew>>
 
 const forkIds = async (linkId: string) =>
   (await db.select({ userId: crewBoardMembers.userId }).from(crewBoardMembers).where(eq(crewBoardMembers.linkId, linkId))).map(r => r.userId)
@@ -54,18 +56,20 @@ before(async () => {
   await db.insert(crews).values({ id: crewId, slug: `tcf-${tag}`, name: 'Fork crew', teamId: crewTeam, createdBy: boss, createdAt: now })
   await db.insert(projects).values([
     { id: boardA, userId: boss, teamId: realTeam, name: 'Internal Tools', createdAt: now, updatedAt: now },
-    { id: boardB, userId: boss, teamId: realTeam, name: 'Acme Website', createdAt: now, updatedAt: now }
+    { id: boardB, userId: boss, teamId: realTeam, name: 'Acme Website', createdAt: now, updatedAt: now },
+    { id: boardC, userId: boss, teamId: realTeam, name: 'Office', createdAt: now, updatedAt: now }
   ])
   crew = (await db.select().from(crews).where(eq(crews.id, crewId)))[0]!
   linkA = await attachCrew({ crew, projectId: boardA, teamId: realTeam, userId: boss })
   linkB = await attachCrew({ crew, projectId: boardB, teamId: realTeam, userId: boss })
+  linkC = await attachCrew({ crew, projectId: boardC, teamId: realTeam, userId: boss })
 })
 
 after(async () => {
   const forks = (await db.select({ id: user.id }).from(user).where(eq(user.crewId, crewId))).map(u => u.id)
   if (forks.length) await db.delete(user).where(inArray(user.id, forks))
   const shadows = await db.select({ id: projects.id }).from(projects).where(eq(projects.teamId, crewTeam))
-  await db.delete(projects).where(inArray(projects.id, [...shadows.map(s => s.id), boardA, boardB]))
+  await db.delete(projects).where(inArray(projects.id, [...shadows.map(s => s.id), boardA, boardB, boardC]))
   await db.delete(organization).where(inArray(organization.id, [realTeam, crewTeam]))
   await db.delete(user).where(eq(user.id, boss))
   await db.$client.end()
@@ -112,7 +116,7 @@ test('a fork reads its own shadow board and the one real board behind it, nothin
   // This run's own fork, found through its board link: other crews in the dev database have a Wren of the same name.
   const [wren] = await db.select({ id: crewBoardMembers.userId }).from(crewBoardMembers)
     .where(and(eq(crewBoardMembers.linkId, linkA.id), eq(crewBoardMembers.personKey, 'wren')))
-  const context = { keyId: 'k', keyName: 'k', userId: wren!.id, teamId: crewTeam, customerId: null, projectId: linkA.shadowProjectId, scopes: ['boards:read', 'boards:write'] as ('boards:read' | 'boards:write')[] }
+  const context = { keyId: 'k', keyName: 'k', userId: wren!.id, teamId: crewTeam, customerId: null, projectId: linkA.shadowProjectId, scopes: ['boards:read', 'boards:write'] as ('boards:read' | 'boards:write')[], reach: { allBoards: false, workspaceTeamIds: [], boardIds: [linkA.shadowProjectId] }, memberTeamIds: [crewTeam] }
   assert.deepEqual(await readGrantedBoardIds(context), [boardA])
   const reach = async (grant: string[]) =>
     (await db.select({ id: projects.id }).from(projects).where(await boardFilter({ ...context, readGrantedBoardIds: grant }))).map(r => r.id).sort()
@@ -174,6 +178,52 @@ test('disabling the crew cuts every fork off: their keys are gone', async () => 
   const keys = await db.select().from(apiKeys).where(inArray(apiKeys.userId, await forkIds(linkA.id)))
   assert.equal(keys.length, 0)
   await db.update(crews).set({ disabledAt: null }).where(eq(crews.id, crewId))
+})
+
+test('extra workers are not forked with the standard members', async () => {
+  await forkCrew({ crew, link: linkC, boardName: 'Office', rotate: false })
+  assert.deepEqual((await forksOfLink(linkC.id)).map(f => f.key), FORK_PEOPLE.map(p => p.key))
+})
+
+let addedC: Awaited<ReturnType<typeof forkCrew>>
+const standardHashesC: string[] = []
+
+test('add on a forked board makes exactly the asked-for extras, with keys limited to the shadow board', async () => {
+  standardHashesC.push(...(await db.select({ hash: apiKeys.keyHash }).from(apiKeys)
+    .where(inArray(apiKeys.userId, await forkIds(linkC.id)))).map(row => row.hash))
+  addedC = await forkCrew({ crew, link: linkC, boardName: 'Office', rotate: false, add: ['wes', 'wilma'] })
+  assert.deepEqual(addedC.map(m => m.key), ['wes', 'wilma'])
+  for (const forked of addedC) {
+    assert.equal(forked.agentType, forkAgentType('Office', forked.name))
+    const [key] = await db.select().from(apiKeys).where(eq(apiKeys.keyHash, hashApiKey(forked.apiKey)))
+    assert.equal(key!.projectId, linkC.shadowProjectId)
+    assert.equal(key!.teamId, crewTeam)
+  }
+  assert.equal((await forkIds(linkC.id)).length, FORK_PEOPLE.length + 2)
+  assert.deepEqual((await forksOfLink(linkC.id)).map(f => f.key), [...FORK_PEOPLE.map(p => p.key), 'wes', 'wilma'])
+})
+
+test('the forks already there keep their keys: none is minted again, and each key minted before still exists', async () => {
+  const hashesNow = (await db.select({ hash: apiKeys.keyHash }).from(apiKeys)
+    .where(inArray(apiKeys.userId, await forkIds(linkC.id)))).map(row => row.hash)
+  assert.equal(standardHashesC.length, FORK_PEOPLE.length)
+  for (const hash of standardHashesC) assert.ok(hashesNow.includes(hash), 'a key minted before the add still exists')
+})
+
+test('a second identical add makes nothing new, and unknown or malformed extras are refused with 400', async () => {
+  assert.deepEqual(await forkCrew({ crew, link: linkC, boardName: 'Office', rotate: false, add: ['wes', 'wilma'] }), [])
+  assert.equal((await forkIds(linkC.id)).length, FORK_PEOPLE.length + 2)
+  assert.throws(() => extraKeysOf(['zed']), (e: { statusCode?: number }) => e.statusCode === 400)
+  assert.throws(() => extraKeysOf('wes'), (e: { statusCode?: number }) => e.statusCode === 400)
+  assert.deepEqual(extraKeysOf(undefined), [])
+  assert.deepEqual(extraKeysOf(['walt', 'walt']), ['walt'])
+})
+
+test('a rotate gives every fork and the extras new keys, and creates the extra that is asked for', async () => {
+  const rotated = await forkCrew({ crew, link: linkC, boardName: 'Office', rotate: true, add: ['walt'] })
+  assert.deepEqual(rotated.map(m => m.key), [...FORK_PEOPLE.map(p => p.key), 'wes', 'wilma', 'walt'])
+  for (const old of addedC) assert.notEqual(rotated.find(m => m.key === old.key)!.apiKey, old.apiKey)
+  assert.equal((await forkIds(linkC.id)).length, FORK_PEOPLE.length + 3)
 })
 
 test('taking the crew off the board removes its forks, and leaves the forks of another board', async () => {

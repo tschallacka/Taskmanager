@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { attachTeamCrew, detachTeamCrew, downloadForkFile, forkTeamCrew, listTeamCrews, unforkTeamCrew } from '~/composables/useTeamCrews'
+import { EXTRA_WORKERS, attachTeamCrew, detachTeamCrew, downloadForkFile, forkTeamCrew, listTeamCrews, unforkTeamCrew } from '~/composables/useTeamCrews'
 import type { ForkResult, TeamCrewLink, TeamCrewsList } from '~/composables/useTeamCrews'
 
 // The crews working on this team's boards. Each one keeps a shadow board of its own, in its own
@@ -139,16 +139,72 @@ const isForkConfirmOpen = computed({
   }
 })
 
+// Extra workers added to a board that is already forked. The others keep their keys and sessions.
+const addFor = ref<TeamCrewLink | null>(null)
+const addPicked = ref<string[]>([])
+const addBusy = ref(false)
+// Set when the answer on screen holds only the workers added now, so its file is named apart from a fork's.
+const forkResultAdded = ref(false)
+const addableWorkers = computed(() => addFor.value
+  ? EXTRA_WORKERS.filter(worker => !addFor.value!.forks.some(fork => fork.key === worker.key))
+  : [])
+
+const isAddOpen = computed({
+  get: () => addFor.value !== null,
+  set: (open) => {
+    if (!open) addFor.value = null
+  }
+})
+
+function openAdd(link: TeamCrewLink) {
+  addFor.value = link
+  addPicked.value = []
+}
+
+function toggleAdd(key: string, on: boolean) {
+  addPicked.value = on ? [...addPicked.value, key] : addPicked.value.filter(picked => picked !== key)
+}
+
+async function addWorkers() {
+  const link = addFor.value
+  if (!link || !addPicked.value.length || addBusy.value) return
+  addBusy.value = true
+  try {
+    const answer = await forkTeamCrew(props.teamId, link.id, false, addPicked.value)
+    addFor.value = null
+    await load()
+    // Every worker asked for already has a fork here: nothing was made, so there is no file to offer.
+    if (!answer.members.length) {
+      toast.add({
+        title: 'Those workers already have forks on this board',
+        description: 'Nothing was added, so there is no file to download.',
+        icon: 'i-lucide-info',
+        duration: 4000
+      })
+      return
+    }
+    forkResult.value = answer
+    forkResultAdded.value = true
+  } catch (e) {
+    fail(e, 'Could not add the workers')
+  } finally {
+    addBusy.value = false
+  }
+}
+
 const isForkResultOpen = computed({
   get: () => forkResult.value !== null,
   set: (open) => {
-    if (!open) forkResult.value = null
+    if (!open) {
+      forkResult.value = null
+      forkResultAdded.value = false
+    }
   }
 })
 
 // The file Boss reads the keys from: the whole answer, passwords included, as it was sent.
 function downloadForks() {
-  if (forkResult.value) downloadForkFile(forkResult.value)
+  if (forkResult.value) downloadForkFile(forkResult.value, forkResultAdded.value ? '-added' : '')
 }
 
 // The guided version of the form above. "Give it a crew" in a board's menu opens it with the board chosen.
@@ -392,6 +448,16 @@ const SELECT_CLASS = 'min-w-0 flex-1 rounded-md border border-default bg-default
               >
                 Remove the forks
               </UButton>
+              <UButton
+                size="xs"
+                color="neutral"
+                variant="soft"
+                icon="i-lucide-user-plus"
+                data-team-crew-add-open
+                @click="openAdd(link)"
+              >
+                Add workers
+              </UButton>
             </template>
           </div>
         </div>
@@ -493,6 +559,51 @@ const SELECT_CLASS = 'min-w-0 flex-1 rounded-md border border-default bg-default
             </UButton>
             <UButton @click="isForkResultOpen = false">
               Done
+            </UButton>
+          </div>
+        </div>
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="isAddOpen"
+      title="Add workers to this board"
+      description="Each extra worker gets its own account and a key that reaches only the crew's board for this board. The forks already here keep their keys and sessions."
+    >
+      <template #body>
+        <div class="space-y-3">
+          <div class="space-y-2">
+            <UCheckbox
+              v-for="worker in addableWorkers"
+              :key="worker.key"
+              :model-value="addPicked.includes(worker.key)"
+              :label="worker.name"
+              :data-add-worker="worker.key"
+              @update:model-value="(on: boolean | 'indeterminate') => toggleAdd(worker.key, on === true)"
+            />
+            <p
+              v-if="!addableWorkers.length"
+              class="text-xs text-muted"
+            >
+              Every extra worker is already forked for this board.
+            </p>
+          </div>
+          <div class="flex justify-end gap-2">
+            <UButton
+              color="neutral"
+              variant="soft"
+              :disabled="addBusy"
+              @click="isAddOpen = false"
+            >
+              Cancel
+            </UButton>
+            <UButton
+              :disabled="!addPicked.length"
+              :loading="addBusy"
+              data-team-crew-add-confirm
+              @click="addWorkers"
+            >
+              Add the workers
             </UButton>
           </div>
         </div>

@@ -7,6 +7,7 @@
 // URLs, people and chat settings; creds.json holds the accounts and keys the board made.
 import { readFileSync, existsSync, readdirSync } from 'node:fs'
 import { crewHome, kitDir } from './home.mjs'
+import { CAST, EXTRA_CAST, forkMemberPlan, forkRole } from './cast.mjs'
 import { migrateCrewHome, renameKeys } from './keys.mjs'
 
 export { kitDir }
@@ -79,12 +80,6 @@ export function loadForks() {
   })
 }
 
-/** The cast role a fork plays, from its agent type: `taskmanager-wren` plays `wren`. Null when it names none. */
-export function forkRole(agentType) {
-  const last = String(agentType).split('-').pop()
-  return CAST.includes(last) ? last : null
-}
-
 export function loadCreds() {
   const file = `${here}creds.json`
   if (!existsSync(file)) {
@@ -113,8 +108,7 @@ export function loadCreds() {
 
 const slugify = text => String(text).toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
 
-// The members Pia starts as agents (Pia herself runs in her own session), the optional log watcher included.
-export const CAST = ['pia', 'wren', 'wick', 'wynn', 'wade', 'usher', 'nina', 'quincy', 'watcher']
+export { CAST, EXTRA_CAST, forkMemberPlan, forkRole }
 
 // The model each person runs on is the Owner's choice, set per person in crew.json under "models" (README, "Models").
 // The kit fixes no model name: a person with no entry gets "haiku", which is Claude Code's name for the cheap tier of
@@ -164,7 +158,7 @@ export const modelProblems = resolvedModels.problems
  * Each member's Claude Code agent type, such as acme-pia-planner: the crew slug first, so two crews
  * on one machine never share one. init.mjs writes the definitions; PROMPTS.md names them.
  */
-export const agentNames = Object.fromEntries(CAST.map(key => [key, `${slugify(config.crew.slug || config.team)}-${slugify(config.people[key])}`]))
+export const agentNames = Object.fromEntries(CAST.filter(key => !EXTRA_CAST.includes(key)).map(key => [key, `${slugify(config.crew.slug || config.team)}-${slugify(config.people[key])}`]))
 
 // A path as one shell word, quoted only when it has to be.
 const shellWord = text => (/^[\w@%+=:,./-]+$/.test(text) ? text : `'${text.replace(/'/g, `'\\''`)}'`)
