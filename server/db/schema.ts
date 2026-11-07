@@ -260,6 +260,9 @@ export const projects = pgTable(
     publicUntil: bigint('public_until', { mode: 'number' }),
     // NULL = active. An archived project is read-only and leaves the project list.
     archivedAt: bigint('archived_at', { mode: 'number' }),
+    // The built-in crew rules (promotion, gate routing, time-log check, failing-test clock) run on a
+    // crew board while this is on. Off turns them off for this board only.
+    crewRulesOn: boolean('crew_rules_on').notNull().default(true),
     createdAt: bigint('created_at', { mode: 'number' }).notNull(),
     updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
   },

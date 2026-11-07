@@ -24,6 +24,7 @@ import { announceTaskCreated } from './agentEvents'
 import { recordAgentAction } from './agentAudit'
 import { pmDiscard, pmGet, pmList, pmQueueStatus, pmRetry, type FailureState } from './githubDeliveryFailures'
 import { fireRules, newRuleChain } from './ruleEngine'
+import { isCrewBoard, tagAddEntries } from './crewRules'
 import type { TriggerKind } from './ruleSpec'
 import { changesToTask, inboxBriefs, logActivity } from './taskActivity'
 import { checkFieldValues, describeFieldValues, listFields, loadFieldValues, setFieldValues } from './customFields'
@@ -1389,13 +1390,16 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
           .returning()
       })
 
-      const entries = await changesToTask(task, { ...fields, ...(title ? { title } : {}) })
+      // On a crew board each label added is a line of its own, naming who added it (the gate routing reads it).
+      const tagLines = labels !== undefined && await isCrewBoard(board.id) ? tagAddEntries(task.tags, normalizeLabels(labels)) : []
+      const entries = [...await changesToTask(task, { ...fields, ...(title ? { title } : {}) }), ...tagLines]
       await logActivity(task, context.userId, entries, 'mcp')
       await notifyTaskChange(board, updated!, context.userId, inboxBriefs(entries))
       if (fields.assigneeId && fields.assigneeId !== task.assigneeId) await notifyAssigned(board, updated!, context.userId, fields.assigneeId)
       if (fieldMap) await asToolErrorAsync(() => setFieldValues(task.id, fieldDefs, fieldMap))
       // Rules hear about each change the update made, as they do from the app.
-      const changes: { type: TriggerKind, detail: string | null }[] = []
+      const changes: { type: TriggerKind | 'tags_changed', detail: string | null }[] = []
+      if (labels !== undefined && normalizeLabels(labels).join('\n') !== task.tags.join('\n')) changes.push({ type: 'tags_changed', detail: null })
       if (fields.completedAt !== undefined && !!fields.completedAt !== !!task.completedAt) {
         changes.push({ type: fields.completedAt ? 'task_completed' : 'task_reopened', detail: null })
       }

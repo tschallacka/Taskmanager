@@ -11,6 +11,7 @@ import { listFields, setFieldValues } from '../../utils/customFields'
 import { notifyAssigned, notifyTaskChange } from '../../utils/notifyEvents'
 import { tellUnblockedOnTrash } from '../../utils/unblockedWatch'
 import { fireRules, newRuleChain } from '../../utils/ruleEngine'
+import { isCrewBoard, tagAddEntries } from '../../utils/crewRules'
 import type { TriggerKind } from '../../utils/ruleSpec'
 
 import type { H3Event } from 'h3'
@@ -22,9 +23,11 @@ async function fireChanges(event: H3Event, projectId: string, task: ProjectTask,
   completedAt?: number | null
   assigneeId?: string | null
   dueOn?: string | null
+  tags?: string[]
 }) {
   const actorId = event.context.session.user.id
-  const changes: { type: TriggerKind, detail: string | null }[] = []
+  const changes: { type: TriggerKind | 'tags_changed', detail: string | null }[] = []
+  if (patch.tags && patch.tags.join('\n') !== task.tags.join('\n')) changes.push({ type: 'tags_changed', detail: null })
   if (patch.columnId && patch.columnId !== task.columnId) changes.push({ type: 'task_moved', detail: patch.columnId })
   if (patch.completedAt !== undefined && !!patch.completedAt !== !!task.completedAt) {
     changes.push({ type: patch.completedAt ? 'task_completed' : 'task_reopened', detail: null })
@@ -141,7 +144,9 @@ export default defineEventHandler(async (event) => {
   // Once the change is saved: put what happened in the task's log, and tell the
   // people on the task.
   const tell = async () => {
-    const entries = await changesToTask(task, patch)
+    // On a crew board each tag added is a line of its own, naming who added it: the gate routing reads it.
+    const tagLines = patch.tags && await isCrewBoard(project.id) ? tagAddEntries(task.tags, patch.tags) : []
+    const entries = [...await changesToTask(task, patch), ...tagLines]
     await logActivity(task, event.context.session.user.id, entries)
     await notifyTaskChange(project, task, event.context.session.user.id, inboxBriefs(entries))
   }
