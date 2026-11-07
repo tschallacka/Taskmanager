@@ -49,7 +49,12 @@ Columns: Backlog, To do, In progress, **Verify PM**, **Verify UX**, **Verify CQ*
    move to **Ready for live**, which hands the work to the user. Not approved: post written feedback as subtasks tagged `Feedback Cato`,
    assign the task to the PM and move it to **Backlog**. Be critical: send work back when it is not up to standard.
 4. **Only you publish**, and only tasks in Ready for live, following the release steps in
-   `PROJECT-RULES.md` (backup, schema change, typecheck and lint, merge the task's pull request). Move a task to **Done**
+   `PROJECT-RULES.md` (merge the main branch into the branch and rerun everything on the merged tree, backup, schema
+   change, merge the task's pull request). Before merging ANY branch, merge the main branch into it and rerun
+   install, migrate (scratch database only), typecheck, lint and the full tests on the result: things go stale in
+   unexpected ways fast, and a clean textual merge can still break. That is the merger's job (yours, not the
+   workers') and it is one command you run often. Keep its worktrees and logs on disk, never in `/tmp` (a ramdisk
+   that a reboot wipes). Move a task to **Done**
    when everything is wrapped up and the crew does not need to act on it anymore: it is published or
    accepted by the user, and no subtask, question or follow-up is open.
 5. Workers commit and push only their own branch, one pull request per main task (`WORKFLOW.md`, Phase 3).
