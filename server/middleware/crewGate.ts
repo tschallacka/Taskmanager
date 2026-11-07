@@ -38,5 +38,7 @@ export default defineEventHandler(async (event) => {
   if (step.closeReason) await closeWindow(step.closeReason, from, now)
 
   if (step.status === 404) throw createError({ statusCode: 404, statusMessage: 'Not Found' })
-  throw createError({ statusCode: 401, statusMessage: 'Unauthorized', message: 'Invalid or missing API key' })
+  // A refused token answers its own sentence (regenerated, revoked, expired), so the agent passes it on.
+  const message = verdict && !verdict.ok && verdict.message ? verdict.message : 'Invalid or missing API key'
+  throw createError({ statusCode: 401, statusMessage: 'Unauthorized', message })
 })

@@ -203,19 +203,24 @@ async function userboardsOfTeam(teamId: string): Promise<UserboardView[]> {
   return Promise.all(boards.map(board => userboardOf(board)))
 }
 
-/** The teams the key's owner runs as owner or admin, each with its userboards: what a crew can be bound to. */
-export async function crewTargets(userId: string) {
+/**
+ * The teams the key's owner runs as owner or admin, each with its userboards: what a crew can be bound to.
+ * With `onlyBoardId` (a management token) only the team of that board, and only its userboard, are listed.
+ */
+export async function crewTargets(userId: string, onlyBoardId?: string) {
   const teams = await db
     .select({ id: organization.id, name: organization.name })
     .from(member)
     .innerJoin(organization, eq(organization.id, member.organizationId))
     .where(and(eq(member.userId, userId), inArray(member.role, ['owner', 'admin'])))
     .orderBy(asc(organization.name))
+  const [only] = onlyBoardId ? await db.select({ teamId: projects.teamId }).from(projects).where(eq(projects.id, onlyBoardId)) : []
+  const shown = onlyBoardId ? teams.filter(team => team.id === only?.teamId) : teams
   return {
-    teams: await Promise.all(teams.map(async team => ({
+    teams: await Promise.all(shown.map(async team => ({
       team_id: team.id,
       team_name: team.name,
-      userboards: await userboardsOfTeam(team.id)
+      userboards: (await userboardsOfTeam(team.id)).filter(board => !onlyBoardId || board.board_id === onlyBoardId)
     })))
   }
 }
@@ -224,7 +229,7 @@ export async function crewTargets(userId: string) {
  * The real board a crew may be bound to, with the refusals attachCrew gives, checked before any crew is made or
  * rotated so that a refused call leaves nothing behind. The caller must be owner or admin of the board's team.
  */
-async function boardToBind(input: { projectId: unknown, teamId: unknown, userId: string, crew: Crew | null }) {
+export async function boardToBind(input: { projectId: unknown, teamId: unknown, userId: string, crew: Crew | null }) {
   const { projectId, teamId, userId, crew } = input
   if (typeof projectId !== 'string' || projectId === '') throw createError({ statusCode: 400, message: 'Pick a board.' })
   if (teamId !== undefined && (typeof teamId !== 'string' || teamId === '')) {

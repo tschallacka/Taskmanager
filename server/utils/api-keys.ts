@@ -59,6 +59,8 @@ export interface ApiKeyContext {
   /** Set when the key is limited to one board; its team is then set too. */
   projectId: string | null
   scopes: ApiKeyScope[]
+  /** 'management' for the 10-minute crew token of one board; 'access' for every other key. */
+  kind?: 'access' | 'management'
   /**
    * Real boards a crew may READ through a crew link, set by the MCP server for a plain read tool only
    * (see crewBoardAccess.ts). Never set on a write call, so those boards do not resolve for it.
@@ -163,6 +165,7 @@ export async function authenticateApiKey(event: H3Event): Promise<ApiKeyContext>
     customerId: key.customerId,
     projectId: key.projectId,
     scopes: key.scopes.filter(isApiKeyScope),
+    kind: key.kind,
     boardScopes: await loadBoardScopes(key),
     reach: await loadKeyReach(key),
     memberTeamIds: await teamIdsOf(key.userId)

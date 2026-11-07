@@ -101,6 +101,8 @@ export interface CrewCaller {
   // Null for a call from the instance admin's Crews page (a session, not a key).
   keyId: string | null
   keyName: string
+  // Set for a management token: the one board it works on. Null for every other caller.
+  boardId?: string | null
 }
 
 type Minted = Map<string, { password: string, apiKey: string }>
@@ -418,7 +420,11 @@ export async function requireCrewManager(event: H3Event): Promise<CrewCaller> {
   if (!owner?.isInstanceAdmin) {
     throw createError({ statusCode: 403, message: 'Only the instance admin can manage crews.' })
   }
-  return { userId: key.userId, keyId: key.keyId, keyName: key.keyName }
+  if (key.kind === 'management' && !key.projectId) {
+    throw createError({ statusCode: 403, message: 'This token is not bound to a board.' })
+  }
+  const boardId = key.kind === 'management' ? key.projectId : null
+  return { userId: key.userId, keyId: key.keyId, keyName: key.keyName, boardId }
 }
 
 /** One agent audit row per crew call, read by the key's owner in the Inbox. Never throws. */

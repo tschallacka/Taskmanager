@@ -1,5 +1,6 @@
 import { audited, crewBySlug, disableCrew, purgeCrew, requireCrewManager } from '../../utils/crewProvisioning'
 import { detachCrewLinks } from '../../utils/crewBoards'
+import { requireCrewOnlyOnOwnBoard } from '../../utils/managementToken'
 
 /**
  * Disables a crew: its keys are revoked and its sessions ended at once, and its
@@ -13,6 +14,7 @@ export default defineEventHandler(async (event) => {
   const purge = getQuery(event).purge === '1'
   return audited<{ slug: string, purged?: boolean, disabled?: boolean }>(caller, purge ? 'purge' : 'disable', slug, async () => {
     const crew = await crewBySlug(slug)
+    await requireCrewOnlyOnOwnBoard(caller, crew)
     await detachCrewLinks(crew.id)
     if (purge) {
       await purgeCrew(crew)
