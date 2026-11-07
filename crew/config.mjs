@@ -43,10 +43,11 @@ export const config = {
   customer: { name: 'The Customer', personName: 'Casey Customer', nick: 'customer', ...raw.customer },
   people: {
     boss: 'Boss', pia: 'Pia Planner', wren: 'Wren Worker', wick: 'Wick Worker', wynn: 'Wynn Worker', wade: 'Wade Worker',
-    usher: 'Usher Xander', nina: 'Nina Nitpick', quincy: 'Quincy Average', contact: 'Casey Contact', watcher: 'Log Watcher',
+    usher: 'Usher Xander', nina: 'Nina Nitpick', quincy: 'Quincy Average', susy: 'Susy Secretary', janet: 'Janet Janitor',
+    pat: 'Pat Precheck', tess: 'Tess Triage', rita: 'Rita Reporter', contact: 'Casey Contact', watcher: 'Log Watcher',
     ...raw.people
   },
-  nicks: { pia: 'pia', wren: 'wren', wick: 'wick', wynn: 'wynn', wade: 'wade', usher: 'usher', nina: 'nina', quincy: 'quincy', ...raw.nicks },
+  nicks: { pia: 'pia', wren: 'wren', wick: 'wick', wynn: 'wynn', wade: 'wade', usher: 'usher', nina: 'nina', quincy: 'quincy', susy: 'susy', janet: 'janet', pat: 'pat', tess: 'tess', rita: 'rita', ...raw.nicks },
   // The chat line is optional and off by default: with no client, meetings and steering go
   // through the board (board messages, `list_messages`).
   chat: { client: '', channel: '#crew', workChannel: '#crewwork', ...raw.chat },
