@@ -109,7 +109,7 @@ function secret(): string {
   return randomBytes(24).toString('base64url')
 }
 
-function baseUrl(): string {
+export function baseUrl(): string {
   return (process.env.BETTER_AUTH_URL || 'http://localhost:3000').replace(/\/$/, '')
 }
 
@@ -141,7 +141,7 @@ async function allAccountsOf(crewId: string) {
  * The crew's own people. A member forked for one board has an account too, but belongs to that board's
  * link: the crew's rotate and its status view leave it alone, or rotating would widen its limited key.
  */
-async function accountsOf(crewId: string) {
+export async function accountsOf(crewId: string) {
   return db
     .select({ id: user.id, name: user.name, email: user.email })
     .from(user)
