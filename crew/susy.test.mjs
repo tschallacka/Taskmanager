@@ -179,6 +179,14 @@ test('a card blocked by a card with no owner is poked to Pia', () => {
   assert.equal(pokes[0].reason, 'blocked by an unowned card')
 })
 
+test('a poke line says who, why, the card and one suggested message; no agent id without Pia writing one', () => {
+  const c = card('m1', { column: 'In progress', assignee: 'Wynn Worker', updatedAt: NOW - 30 * MIN, updates: [update(agent('wynn'), 'secret body text', 15)] })
+  const line = run([c]).lines[0]
+  assert.match(line, /^poke wynn on m1 "card m1": in progress, no update \(15 min; @wynn in a card update \(no agent id\)\)\. Say: "post what you did on m1 "card m1" or move it back to To do" \(to wynn\)$/)
+  assert.ok(!line.includes('secret body text'), 'no card body in the line')
+  assert.ok(!/ag-|agent [0-9a-f]{4}/.test(line), 'no agent id that Pia did not write')
+})
+
 test('cards that block each other in a loop are found', () => {
   const a = card('c1', { blockedBy: ['c2'] })
   const b = card('c2', { blockedBy: ['c1'] })

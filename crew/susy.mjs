@@ -174,14 +174,36 @@ function pokeAction(card, c, to, now, ctx) {
   const agent = ctx.agents?.[to]
   const how = to === 'boss' ? 'write @cato' : agent ? `SendMessage to agent ${agent}` : `@${to} in a card update (no agent id)`
   const minutes = Math.floor((now - c.since) / MIN)
+  const say = suggestedMessage(c.reason, card, to)
   return {
     kind: 'poke',
     to,
     reason: c.reason,
     cardId: card.id,
     marker: `poked ${to} | ${c.reason} | at ${new Date(now).toISOString()}`,
-    text: `poke ${who} on ${card.id} "${card.title}": ${c.reason} (${minutes} min; ${how})`
+    text: `poke ${who} on ${card.id} "${card.title}": ${c.reason} (${minutes} min; ${how}). Say: ${say}`
   }
+}
+
+/**
+ * The one thing the poked session should do, per reason. It names the card by id and title only: never the card's
+ * body, an update, or a key. The running Susy session sends it (SendMessage by agent id, or an @mention on the card).
+ */
+export function suggestedMessage(reason, card, to) {
+  const ask = {
+    'unanswered question': `answer the question on ${card.id} "${card.title}" (get_task, prefix QUESTION)`,
+    'in progress, no update': `post what you did on ${card.id} "${card.title}" or move it back to To do`,
+    'assigned, not started': `start ${card.id} "${card.title}" (move it to In progress) or say why not`,
+    'gate untouched': `review ${card.id} "${card.title}" in ${card.column} and post your result`,
+    'stuck in column': `move ${card.id} "${card.title}" on, or post why it is waiting`,
+    'blocked by an unowned card': `give the blocker of ${card.id} "${card.title}" an owner`,
+    'blocked in a cycle': `break the blocker cycle that includes ${card.id} "${card.title}"`,
+    'ready to clean, not assigned to cleaner': `assign the cleaner to ${card.id} "${card.title}"`,
+    'clean plan, no check': `check the clean plan on ${card.id} "${card.title}"`,
+    'cleaning granted, cleaner not working': `start cleaning ${card.id} "${card.title}"`,
+    'clean done, not checked': `check the clean on ${card.id} "${card.title}"`
+  }
+  return `"${ask[reason] ?? `act on ${card.id} "${card.title}"`}" (to ${to})`
 }
 
 /** Every reason Susy checks for one card, each with its condition. A reason that does not hold is still listed, so its open poke closes. */
