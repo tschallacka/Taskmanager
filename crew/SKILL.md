@@ -59,6 +59,9 @@ Columns: Backlog, To do, In progress, **Verify PM**, **Verify UX**, **Verify CQ*
 
 ## Running it
 
+- **Janet cleans up after a worker, and only when asked.** The card gets `ready to clean`, and Pia or Susy start her.
+  She makes the plan with `crew janet clean plan` (it deletes nothing), and deletes only after the checker sets
+  `cleaning granted` on the plan subtask: `crew janet clean run`. The rules and the tags are in `JANET.md`.
 - **Start Pia, and only Pia.** She needs her own Claude Code session (a subagent cannot start other agents), so
   start it in a real terminal with the `interactive-shell` skill, as `$CREW_HOME/PROMPTS.md` says under "Starting
   Pia", and send her prompt as her first message. Pia starts the workers, the reviewers and the log watcher herself

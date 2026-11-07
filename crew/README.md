@@ -314,6 +314,7 @@ accounts, after which their definitions and the file are yours to delete.
     crew listen <who> [seconds]   wait for new messages for a person (listen.mjs)
     crew watch                    the Boss's watch of the board (watch.mjs)
     crew init                     check the machine, render the documents (init.mjs)
+    crew janet clean plan|run <who> <card> [--dry-run] [--worktree <path>]   Janet's cleanup of a finished worker: the plan deletes nothing, run needs cleaning granted (janet.mjs, JANET.md)
     crew mentions [minutes|--follow]   Pia's updates that write @cato, each printed once: since the last check, or every 60 s for a Monitor (mentions.mjs)
     crew update [--check] [--from <kit folder|kit.tar.gz>] [--kit <folder>]   bring the kit folder up to date (update.mjs)
     crew setup                    make the crew by hand (setup.mjs)
