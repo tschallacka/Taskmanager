@@ -6,6 +6,7 @@ import { authenticateApiKey, hasScope } from '../../utils/api-keys'
 import type { ApiKeyContext } from '../../utils/api-keys'
 import { agentEventHub, currentMembership, parseLastEventId, streamVerdict } from '../../utils/agentEvents'
 import type { StreamConnection } from '../../utils/agentEvents'
+import { boardsGranting } from '../../utils/connectTokenRules'
 
 async function auditConnect(context: ApiKeyContext) {
   try {
@@ -40,6 +41,7 @@ export default defineEventHandler(async (event) => {
     customerId: context.customerId,
     allBoards: context.reach.allBoards,
     boardIds: context.reach.boardIds,
+    readBoardIds: boardsGranting(context.scopes, context.boardScopes, 'boards:read'),
     workspaceTeamIds: context.reach.workspaceTeamIds
   }
   const slot = agentEventHub.reserve(key)

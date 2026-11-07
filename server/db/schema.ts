@@ -763,7 +763,11 @@ export const apiKeys = pgTable(
     // Select all: every board the person can reach, now and later. A flag on the key, not a frozen list.
     allBoards: boolean('all_boards').notNull().default(false),
     // True once the reach is stored in api_key_workspaces and api_key_boards. Older keys get it at start.
-    boardReachSet: boolean('board_reach_set').notNull().default(false)
+    boardReachSet: boolean('board_reach_set').notNull().default(false),
+    // Management tokens (the 10-minute crew token) are kept apart from access tokens. Access is the default.
+    kind: text('kind').$type<'access' | 'management'>().notNull().default('access'),
+    // True once the per-board scopes are stored in api_key_board_scopes. Until then the key's scopes apply to every board.
+    boardScopesSet: boolean('board_scopes_set').notNull().default(false)
   },
   table => [index('api_keys_user_idx').on(table.userId)]
 )
@@ -800,6 +804,37 @@ export const apiKeyBoards = pgTable(
 )
 
 // ─── GitHub integration ───────────────────────────────────────────────────────
+
+// Single boards a key may use, with the permissions it has there. One row per key, board and permission.
+// A key with boardScopesSet reads these; the key's own scopes are the most it can do on any board.
+export const apiKeyBoardScopes = pgTable(
+  'api_key_board_scopes',
+  {
+    id: text('id').primaryKey(),
+    keyId: text('key_id').notNull().references(() => apiKeys.id, { onDelete: 'cascade' }),
+    projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+    scope: text('scope').$type<ApiKeyScope>().notNull(),
+    createdAt: bigint('created_at', { mode: 'number' }).notNull()
+  },
+  table => [
+    uniqueIndex('api_key_board_scopes_key_board_scope_idx').on(table.keyId, table.projectId, table.scope),
+    index('api_key_board_scopes_project_idx').on(table.projectId)
+  ]
+)
+
+// The secrets a token had before, kept as digests only, so an old secret answers with a clear reason
+// (regenerated or revoked) instead of a bare 401. Not tied to the key row: it outlives a revoked key.
+export const apiKeySecrets = pgTable(
+  'api_key_secrets',
+  {
+    id: text('id').primaryKey(),
+    tokenId: text('token_id').notNull(),
+    keyHash: text('key_hash').notNull().unique(),
+    state: text('state').$type<'replaced' | 'revoked'>().notNull(),
+    changedAt: bigint('changed_at', { mode: 'number' }).notNull()
+  },
+  table => [index('api_key_secrets_token_idx').on(table.tokenId)]
+)
 
 // What a link on a task points at. `ref` holds the issue or PR number, the
 // branch name, or the workflow run id, as text, so one column serves all four.

@@ -2,7 +2,8 @@ import type { H3Event } from 'h3'
 import { createHash, randomBytes, timingSafeEqual } from 'crypto'
 import { eq } from 'drizzle-orm'
 import { db } from '../db'
-import { apiKeys, apiKeyBoards, apiKeyWorkspaces, API_KEY_SCOPES, member } from '../db/schema'
+import { apiKeys, apiKeyBoards, apiKeyBoardScopes, apiKeySecrets, apiKeyWorkspaces, API_KEY_SCOPES, member } from '../db/schema'
+import { boardScopesOf, isTokenExpired, tokenRefusal } from './connectTokenRules'
 import type { ApiKey, ApiKeyScope } from '../db/schema'
 import { isTeamMember } from './auth-helpers'
 
@@ -63,6 +64,10 @@ export interface ApiKeyContext {
    * (see crewBoardAccess.ts). Never set on a write call, so those boards do not resolve for it.
    */
   readGrantedBoardIds?: string[]
+  /** The permissions the token has on each board, when they were set per board. Null: the token's own scopes apply to every board. */
+  boardScopes?: Record<string, ApiKeyScope[]> | null
+  /** The permission of the tool being called, set by the MCP dispatch. A token with per-board grants reaches only the boards that grant it. */
+  callScope?: ApiKeyScope
   /** What the key reaches, as its owner chose it. Every grant is still cut down to what the owner can open. */
   reach: KeyReach
   /** The workspaces the owner is a member of right now. A grant from another workspace counts for nothing. */
@@ -136,11 +141,11 @@ export async function authenticateApiKey(event: H3Event): Promise<ApiKeyContext>
   if (!token) throw unauthorized()
 
   const key = await findKey(token)
-  if (!key) throw unauthorized()
+  if (!key) throw (await refusalForSecret(token)) ?? unauthorized()
 
   const now = Date.now()
-  if (key.expiresAt && key.expiresAt <= now) {
-    throw createError({ statusCode: 401, message: 'API key has expired' })
+  if (isTokenExpired(key.expiresAt, now)) {
+    throw tokenRefusal('token_expired')
   }
 
   // A key pinned to a team dies with the owner's membership in it.
@@ -158,6 +163,7 @@ export async function authenticateApiKey(event: H3Event): Promise<ApiKeyContext>
     customerId: key.customerId,
     projectId: key.projectId,
     scopes: key.scopes.filter(isApiKeyScope),
+    boardScopes: await loadBoardScopes(key),
     reach: await loadKeyReach(key),
     memberTeamIds: await teamIdsOf(key.userId)
   }
@@ -190,6 +196,27 @@ async function loadKeyReach(key: ApiKey): Promise<KeyReach> {
     db.select({ projectId: apiKeyBoards.projectId }).from(apiKeyBoards).where(eq(apiKeyBoards.keyId, key.id))
   ])
   return keyReachOf(key, workspaces, boards)
+}
+
+/**
+ * A refusal for a secret that belonged to a token before (regenerated or revoked), or null when the secret
+ * was never issued. The caller then answers the plain 401, so nothing reveals which secrets exist.
+ */
+export async function refusalForSecret(token: string) {
+  const [row] = await db.select({ state: apiKeySecrets.state })
+    .from(apiKeySecrets)
+    .where(eq(apiKeySecrets.keyHash, hashApiKey(token)))
+  if (!row) return null
+  return tokenRefusal(row.state === 'revoked' ? 'token_revoked' : 'token_regenerated')
+}
+
+/** The permissions a key has on each board, or null when none were set per board (its own scopes then apply everywhere). */
+async function loadBoardScopes(key: ApiKey): Promise<Record<string, ApiKeyScope[]> | null> {
+  if (!key.boardScopesSet) return null
+  const rows = await db.select({ projectId: apiKeyBoardScopes.projectId, scope: apiKeyBoardScopes.scope })
+    .from(apiKeyBoardScopes)
+    .where(eq(apiKeyBoardScopes.keyId, key.id))
+  return boardScopesOf(rows)
 }
 
 export async function teamIdsOf(userId: string): Promise<string[]> {

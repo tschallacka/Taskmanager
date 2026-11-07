@@ -176,9 +176,10 @@ async function handleMessage(message: JsonRpcMessage, context: ApiKeyContext) {
 
       try {
         // A crew's read reach on the real boards it works on goes only to a plain read tool.
+        const scoped = { ...context, callScope: tool.scope }
         const callContext = mayUseReadGrant(tool)
-          ? { ...context, readGrantedBoardIds: await readGrantedBoardIds(context) }
-          : context
+          ? { ...scoped, readGrantedBoardIds: await readGrantedBoardIds(context) }
+          : scoped
         const value = await tool.handler(asRecord(params.arguments), callContext)
         if (!tool.readOnly) void announceWrite(tool, value, context)
         // Only what succeeded is recorded; the recording never fails or slows the call.
