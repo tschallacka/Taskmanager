@@ -2,8 +2,8 @@
 // Pure: no renderer, so it runs without three. Run: node --import tsx --test tests/office-roles.test.ts
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { FINDING_TAGS, SORTING_TABLE, isOpenFinding, tessPlan, tessStateOf } from '../app/office/roles/tess-state'
-import { MEETING_OVER, STATUS_EVERY_MS, TYPEWRITER, closesMeeting, ritaPlan, ritaStateOf, statusDue } from '../app/office/roles/rita-state'
+import { FINDING_TAGS, SORTING_TABLE, isOpenFinding, tessPlan, tessStateOf } from '../app/office/roles/tess'
+import { MEETING_OVER, STATUS_EVERY_MS, TYPEWRITER, closesMeeting, ritaPlan, ritaStateOf, statusDue } from '../app/office/roles/rita'
 
 test('a finding is a card with a reviewer violation or a bug tag, until it is triaged', () => {
   for (const tag of FINDING_TAGS) assert.equal(isOpenFinding([tag]), true, `${tag} is a finding`)
