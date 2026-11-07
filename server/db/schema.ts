@@ -836,6 +836,25 @@ export const apiKeySecrets = pgTable(
   table => [index('api_key_secrets_token_idx').on(table.tokenId)]
 )
 
+// One-time pairing codes: a person makes a code for a token, and the agent exchanges it once (POST /api/pair)
+// for the token's secret. Only the SHA-256 digest of the code is stored. `kind` is 'code' now; 'device' is the
+// browser-approval flow, which shares this table.
+export const pairingCodes = pgTable(
+  'pairing_codes',
+  {
+    id: text('id').primaryKey(),
+    tokenId: text('token_id').notNull().references(() => apiKeys.id, { onDelete: 'cascade' }),
+    codeHash: text('code_hash').notNull().unique(),
+    createdBy: text('created_by').notNull().references(() => user.id, { onDelete: 'cascade' }),
+    expiresAt: bigint('expires_at', { mode: 'number' }).notNull(),
+    usedAt: bigint('used_at', { mode: 'number' }),
+    // Who used the code, as a short summary: the client's address and user agent. Shown as "paired by" on the token.
+    usedFrom: text('used_from'),
+    kind: text('kind').$type<'code' | 'device'>().notNull().default('code')
+  },
+  table => [index('pairing_codes_token_idx').on(table.tokenId)]
+)
+
 // What a link on a task points at. `ref` holds the issue or PR number, the
 // branch name, or the workflow run id, as text, so one column serves all four.
 export const GITHUB_LINK_KINDS = ['issue', 'pull', 'branch', 'workflow_run'] as const
