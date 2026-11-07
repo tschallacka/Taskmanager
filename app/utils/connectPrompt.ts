@@ -18,13 +18,13 @@ export function permissionName(scope: string): string {
 }
 
 /** How a token reaches the agent. A pairing code is the default; the token itself is the fallback. */
-export const CONNECT_METHODS: { label: string, value: 'code' | 'token' | 'browser', description: string, disabled?: boolean }[] = [
+export const CONNECT_METHODS: { label: string, value: 'code' | 'token' | 'browser', description: string }[] = [
   { label: 'Pairing code (recommended)', value: 'code', description: 'A one-time code. The agent exchanges it for the token, so the secret stays out of the chat.' },
   { label: 'Show the token itself', value: 'token', description: 'Fallback. Shown once. Do not paste it into a chat.' },
-  { label: 'Browser verification', value: 'browser', description: 'Coming soon: approve the connection in your browser.', disabled: true }
+  { label: 'Browser verification', value: 'browser', description: 'Your Claude asks for the connection, and you approve it in this browser. Nothing secret goes into the chat.' }
 ] as const
 
-export type ConnectMethod = 'code' | 'token'
+export type ConnectMethod = 'code' | 'token' | 'browser'
 
 /** Permission names for a list of scopes, joined for a sentence. */
 export function permissionList(scopes: readonly string[]): string {
@@ -32,6 +32,8 @@ export function permissionList(scopes: readonly string[]): string {
 }
 
 export interface ConnectPromptBoard {
+  /** The board's id, which the agent names when it asks for the connection. */
+  id?: string
   name: string
   workspace: string
   scopes: readonly string[]
@@ -43,8 +45,31 @@ export interface ConnectPromptInput {
   /** The token's name, as the owner gave it. */
   tokenName: string
   boards: ConnectPromptBoard[]
-  /** How the agent gets its token: the code it exchanges, or the token itself. */
-  access: { kind: 'code', code: string, expiresAt: number } | { kind: 'token', token: string }
+  /** How the agent gets its token: the code it exchanges, the token itself, or the browser approval it asks for. */
+  access: { kind: 'code', code: string, expiresAt: number } | { kind: 'token', token: string } | { kind: 'browser' }
+}
+
+/**
+ * The browser steps of a prompt. It carries only the address and the boards asked for, never a secret: the agent
+ * asks for the connection, the person approves it in the browser, and the agent polls until it gets the token once.
+ */
+function browserSteps(origin: string, tokenName: string, boards: ConnectPromptBoard[]): string {
+  const body = JSON.stringify({
+    client_name: tokenName,
+    boards: boards.filter(board => board.id).map(board => ({ boardId: board.id, scopes: [...board.scopes] }))
+  })
+  const quoted = body.replace(/'/g, `'\\''`)
+  return [
+    'Your key is not in this prompt. You get it by approval in the browser, in three steps:',
+    '1. Ask for the connection. Keep the device_code of the reply to yourself, and do not print it:',
+    `  curl -s -X POST ${origin}/api/pair/device -H 'Content-Type: application/json' -d '${quoted}'`,
+    '2. Show me the verification_url and the user_code from the reply, and ask me to open the link and approve. I can take away boards and permissions, not add any.',
+    '3. Poll with the device_code every "interval" seconds, until a reply says approved, denied or expired:',
+    `  curl -s -X POST ${origin}/api/pair/device/poll -H 'Content-Type: application/json' -d '{"device_code":"<device_code>"}'`,
+    '  "pending" means wait and poll again. "slow_down" means wait longer before the next poll.',
+    '  "approved" holds the token, once. Put it in TASKMANAGER_API_KEY, and do not print it.',
+    '  A refusal (denied, expired, or already used) is a message for me: stop, report it to your main agent, and do not retry.'
+  ].join('\n')
 }
 
 /**
@@ -60,17 +85,19 @@ export function connectPrompt(input: ConnectPromptInput): string {
     : ''
   const endpoint = `${input.origin}/api/mcp`
 
-  const auth = input.access.kind === 'code'
-    ? [
-        `Your key is a one-time pairing code: ${input.access.code}`,
-        `It works once and until ${new Date(input.access.expiresAt).toISOString()}. Exchange it on this machine, and do not print the result:`,
-        `  export TASKMANAGER_API_KEY=$(curl -s -X POST ${input.origin}/api/pair -H 'Content-Type: application/json' -d '{"code":"${input.access.code}"}' | node -pe 'JSON.parse(require("fs").readFileSync(0,"utf8")).token')`,
-        'If that does not give you a key that starts with arn_, stop: the exchange was refused. Report the message the server sent to your main agent, and do not retry with this code.'
-      ].join('\n')
-    : [
-        `Your key is the token below. Put it in the environment variable TASKMANAGER_API_KEY, and do not print it:`,
-        `  ${input.access.token}`
-      ].join('\n')
+  const auth = input.access.kind === 'browser'
+    ? browserSteps(input.origin, input.tokenName, input.boards)
+    : input.access.kind === 'code'
+      ? [
+          `Your key is a one-time pairing code: ${input.access.code}`,
+          `It works once and until ${new Date(input.access.expiresAt).toISOString()}. Exchange it on this machine, and do not print the result:`,
+          `  export TASKMANAGER_API_KEY=$(curl -s -X POST ${input.origin}/api/pair -H 'Content-Type: application/json' -d '{"code":"${input.access.code}"}' | node -pe 'JSON.parse(require("fs").readFileSync(0,"utf8")).token')`,
+          'If that does not give you a key that starts with arn_, stop: the exchange was refused. Report the message the server sent to your main agent, and do not retry with this code.'
+        ].join('\n')
+      : [
+          `Your key is the token below. Put it in the environment variable TASKMANAGER_API_KEY, and do not print it:`,
+          `  ${input.access.token}`
+        ].join('\n')
 
   return `Connect to my Taskmanager at ${input.origin}, as the connection "${input.tokenName}".
 
