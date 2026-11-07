@@ -99,9 +99,9 @@ const MOVED = [
   /pre-check Verify,/
 ]
 
-test("Pia's PM section drops the moved duties and names their owners", () => {
+test('Pia\'s PM section drops the moved duties and names their owners', () => {
   const crew = readFileSync(join(KIT, 'CREW.md.tmpl'), 'utf8')
-  const pm = section(crew, "## The PM's job", '## Worker round')
+  const pm = section(crew, '## The PM\'s job', '## Worker round')
   for (const bad of MOVED) assert.doesNotMatch(pm, bad, `PM section does not say ${bad}`)
   for (const owner of ['{{people.pat}}', '{{people.tess}}', '{{people.rita}}', '{{people.janet}}', '{{people.susy}}']) {
     assert.ok(pm.includes(owner), `PM section names ${owner}`)
@@ -119,7 +119,7 @@ test('the rules of the road name Pat for the gate, Tess for bugs and the server 
   assert.match(crew, /a\s+poke is never a reason to start anyone/, 'Susy pokes, Pia still starts people')
 })
 
-test("Pia's launch prompt and UX file drop the triage and the pre-check", () => {
+test('Pia\'s launch prompt and UX file drop the triage and the pre-check', () => {
   const prompts = readFileSync(join(KIT, 'PROMPTS.md.tmpl'), 'utf8')
   const pm = section(prompts, '## PM (', '## Worker (')
   for (const bad of MOVED) assert.doesNotMatch(pm, bad, `PM prompt does not say ${bad}`)
