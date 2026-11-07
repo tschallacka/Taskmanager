@@ -2,6 +2,7 @@
 import * as THREE from 'three'
 import type { Desk, P3 } from './layout'
 import { BOSS_ROOM, DELIVERY_DOOR_Z, FIXTURES, GOLF, ROOM } from './layout'
+import { FIGURES } from './figures'
 
 const materials = new Map<string, THREE.MeshStandardMaterial>()
 
@@ -178,6 +179,7 @@ export function hueColor(text: string, s = 0.62, l = 0.55): string {
 
 export function lookOf(key: string): Look {
   if (LOOKS[key]) return LOOKS[key]
+  if (FIGURES[key]) return FIGURES[key]
   const h = hashOf(key)
   const skins = ['#ffdbac', '#f1c27d', '#e0ac69', '#c68642', '#8d5524']
   const hairs = ['#2b2118', '#6b3420', '#f2c14e', '#111111', '#a0522d']

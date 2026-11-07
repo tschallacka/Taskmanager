@@ -30,6 +30,11 @@ export const CREW_PEOPLE = [
   { key: 'usher', name: 'Usher Xander', role: 'usability tester: browses the dev copy, tries every feature', team: 'member' },
   { key: 'nina', name: 'Nina Nitpick', role: 'code quality reviewer: reviews pull requests, times her review', team: 'member' },
   { key: 'quincy', name: 'Quincy Average', role: 'QA: uses the finished task like a customer or a blind agent', team: 'member' },
+  { key: 'susy', name: 'Susy Secretary', role: 'secretary: pokes the people needed to move a card on', team: 'member' },
+  { key: 'janet', name: 'Janet Janitor', role: 'janitor: cleans up what a worker leaves after a card is done', team: 'member' },
+  { key: 'pat', name: 'Pat Precheck', role: 'PM-gate checker: pre-checks each card in Verify PM', team: 'member' },
+  { key: 'tess', name: 'Tess Triage', role: 'triage: sorts the tester\'s findings and bugs', team: 'member' },
+  { key: 'rita', name: 'Rita Reporter', role: 'reporter: status reports to Boss and meeting minutes', team: 'member' },
   { key: 'customer', name: 'Scrappy Customer', role: 'the customer: asks for things, never sees internal tasks', team: 'contact' },
   { key: 'contact', name: 'Casey Customer', role: 'customer contact: sees only what is shared with the customer', team: 'contact' }
 ] as const
@@ -40,6 +45,20 @@ export const BOARD_COLUMNS = ['Backlog', 'To do', 'In progress', 'Verify PM', 'V
 // contact is not a team member, and the personal workspace shows it the customer's own
 // projects, the same way its key has always worked.
 const CREW_SCOPES: ApiKeyScope[] = ['boards:read', 'boards:write']
+
+// The new roles get read access only until their role cards settle what they may write: the key model
+// has no scope for "post updates but not move" (see the subtask "role scaffolding").
+const READ_ONLY_KEYS: Record<string, ApiKeyScope[]> = {
+  susy: ['boards:read'],
+  janet: ['boards:read'],
+  pat: ['boards:read'],
+  tess: ['boards:read'],
+  rita: ['boards:read']
+}
+
+function scopesOf(key: string): ApiKeyScope[] {
+  return READ_ONLY_KEYS[key] ?? CREW_SCOPES
+}
 
 export interface CrewInput {
   slug: string
@@ -108,7 +127,7 @@ function baseUrl(): string {
   return (process.env.BETTER_AUTH_URL || 'http://localhost:3000').replace(/\/$/, '')
 }
 
-async function mintKey(userId: string, teamId: string | null, name: string): Promise<string> {
+async function mintKey(userId: string, teamId: string | null, name: string, scopes: ApiKeyScope[] = CREW_SCOPES): Promise<string> {
   const generated = generateApiKey()
   await db.insert(apiKeys).values({
     id: genId(),
@@ -117,7 +136,7 @@ async function mintKey(userId: string, teamId: string | null, name: string): Pro
     name,
     keyHash: generated.hash,
     keyPrefix: generated.displayPrefix,
-    scopes: CREW_SCOPES,
+    scopes,
     createdAt: Date.now()
   })
   return generated.token
@@ -282,7 +301,7 @@ async function makeCrew(input: CrewInput, caller: CrewCaller) {
 
     for (const person of CREW_PEOPLE) {
       const contact = person.team === 'contact'
-      const apiKey = await mintKey(accountIds.get(person.key)!, contact ? null : teamId, `crew ${person.key}`)
+      const apiKey = await mintKey(accountIds.get(person.key)!, contact ? null : teamId, `crew ${person.key}`, scopesOf(person.key))
       minted.get(person.key)!.apiKey = apiKey
     }
 
@@ -321,7 +340,7 @@ async function rotateCrew(crew: Crew) {
       .set({ password: await hashPassword(password), updatedAt: new Date() })
       .where(and(eq(account.userId, a.id), eq(account.providerId, 'credential')))
     const contact = roleOf(key)?.team === 'contact'
-    const apiKey = await mintKey(a.id, contact ? null : crew.teamId, `crew ${key}`)
+    const apiKey = await mintKey(a.id, contact ? null : crew.teamId, `crew ${key}`, scopesOf(key))
     minted.set(key, { password, apiKey })
   }
 
@@ -345,7 +364,7 @@ async function rotateCrew(crew: Crew) {
     } else {
       await db.insert(member).values({ id: genId(), organizationId: crew.teamId, userId: id, role: person.team, createdAt: new Date() })
     }
-    const apiKey = await mintKey(id, person.team === 'contact' ? null : crew.teamId, `crew ${person.key}`)
+    const apiKey = await mintKey(id, person.team === 'contact' ? null : crew.teamId, `crew ${person.key}`, scopesOf(person.key))
     minted.set(person.key, { password, apiKey })
   }
 

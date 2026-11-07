@@ -144,6 +144,11 @@ const DUTIES = {
   usher: 'usability tester. Tries the product as a first-time user and files [UX] findings for the PM.',
   nina: 'code quality reviewer. Reviews the diff of each task in Verify before Boss does.',
   quincy: 'QA. Uses the finished task like a customer, or like an agent with no prior knowledge, and files QA violations for the PM.',
+  susy: 'secretary. Pokes the people who are needed to move a card on, and nobody else.',
+  janet: 'janitor. Cleans up a worker\'s leftovers once the worker is done with a card.',
+  pat: 'PM-gate checker. Pre-checks each card in Verify PM against its acceptance criteria.',
+  tess: 'triage. Sorts the tester\'s findings and bugs, and assigns them.',
+  rita: 'reporter. Writes the status reports to Boss and the minutes of meetings.',
   watcher: 'log watcher (optional). Reads the dev logs and reports what matters; changes nothing.'
 }
 for (const key of CAST.filter(member => forkMemberPlan(member) === 'write')) {

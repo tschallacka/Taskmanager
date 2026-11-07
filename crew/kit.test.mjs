@@ -383,7 +383,8 @@ describe('CREW_HOME and the agent types', () => {
     run(home, 'init.mjs', '~/crew-home/acme')
     const agents = join(home, '.claude', 'agents')
     assert.deepEqual(readdirSync(agents).sort(), [
-      'acme-log-watcher.md', 'acme-nina-nitpick.md', 'acme-pia-planner.md', 'acme-quincy-average.md', 'acme-usher-xander.md',
+      'acme-janet-janitor.md', 'acme-log-watcher.md', 'acme-nina-nitpick.md', 'acme-pat-precheck.md', 'acme-pia-planner.md',
+      'acme-quincy-average.md', 'acme-rita-reporter.md', 'acme-susy-secretary.md', 'acme-tess-triage.md', 'acme-usher-xander.md',
       'acme-wade-worker.md', 'acme-wick-worker.md', 'acme-wren-worker.md', 'acme-wynn-worker.md'
     ])
     const pia = readFileSync(join(agents, 'acme-pia-planner.md'), 'utf8')
