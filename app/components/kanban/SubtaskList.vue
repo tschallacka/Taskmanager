@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import Sortable from 'sortablejs'
+import { errorMessage } from '~/utils/untypedFetch'
 
 const props = defineProps<{
   parentTaskId: string
@@ -32,15 +33,29 @@ const grandparentId = computed(() => {
 })
 
 const draft = ref('')
+const draftInput = ref<HTMLInputElement | null>(null)
 
+// Enter or the "Add subtask" button adds the draft as a new row and keeps the
+// field focused for the next one. An empty draft only moves the cursor there.
+// A failed add puts the title back in the field and says why.
 async function addSubtask() {
   const title = draft.value.trim()
-  if (!title || !activeProject.value) return
+  if (!title) {
+    draftInput.value?.focus()
+    return
+  }
+  if (!activeProject.value) {
+    toast.add({ title: 'Could not add the subtask: its project is not loaded', icon: 'i-lucide-alert-triangle', color: 'error' })
+    return
+  }
   draft.value = ''
   try {
     await createSubtask(activeProject.value.id, props.parentTaskId, title)
-  } catch {
-    toast.add({ title: 'Could not add the subtask', icon: 'i-lucide-alert-triangle', color: 'error' })
+    await nextTick()
+    draftInput.value?.focus()
+  } catch (e) {
+    draft.value = title
+    toast.add({ title: errorMessage(e, 'Could not add the subtask'), icon: 'i-lucide-alert-triangle', color: 'error' })
   }
 }
 
@@ -286,10 +301,21 @@ onBeforeUnmount(destroySortable)
         class="size-4 shrink-0 text-dimmed"
       />
       <input
+        ref="draftInput"
         v-model="draft"
         placeholder="Add a subtask…"
+        aria-label="New subtask title"
         class="min-w-0 flex-1 bg-transparent py-0.5 text-sm text-default outline-none placeholder:text-dimmed"
       >
+      <UButton
+        type="submit"
+        size="xs"
+        color="neutral"
+        variant="soft"
+        icon="i-lucide-plus"
+        label="Add subtask"
+        data-add-subtask
+      />
     </form>
   </div>
 </template>
