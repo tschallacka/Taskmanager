@@ -49,3 +49,13 @@ test('the server knows the five people as crew members with the standard crew sc
   }
   assert.ok(!source.includes('READ_ONLY_KEYS'), 'the new roles get CREW_SCOPES, like the other members')
 })
+
+test('Pat has her checklist: the five checks, one PRECHECK verdict, and the two tags she sets', () => {
+  const pat = readFileSync(join(KIT, 'PAT.md.tmpl'), 'utf8')
+  assert.ok(pat.includes('PRECHECK: pass') && pat.includes('PRECHECK: fail'), 'both verdicts are written out')
+  assert.ok(pat.includes('`PM approved`') && pat.includes('`PM violation`'), 'the tags she sets are named')
+  assert.match(pat, /Acceptance criteria/)
+  assert.match(pat, /Screenshot/)
+  const cross = readFileSync(join(KIT, 'CREW.md.tmpl'), 'utf8')
+  assert.ok(cross.includes('| `PM approved` |') && cross.includes('| `PM violation` |'), 'the tag table lists both tags')
+})
