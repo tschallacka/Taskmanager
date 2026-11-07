@@ -23,8 +23,10 @@ const toast = useToast()
 
 // A crew's board, read through the team that keeps it, is read-only for its
 // staff: the server refuses every change to it (403). The drawer only hides
-// these controls for customer contacts, so the list locks itself here as well.
-const locked = computed(() => props.readonly || isReadOnlyBoard.value)
+// these controls for customer contacts, so the list locks itself here as well,
+// and says why in one line where the add row would be (subtaskLock.ts).
+const lock = computed(() => subtaskLockState({ customerReadonly: props.readonly, boardReadOnly: isReadOnlyBoard.value }))
+const locked = computed(() => lock.value.locked)
 
 const subtasks = computed(() => subtasksOf(props.parentTaskId))
 
@@ -323,5 +325,11 @@ onBeforeUnmount(destroySortable)
         data-add-subtask
       />
     </form>
+    <p
+      v-else-if="lock.boardNote"
+      class="py-0.5 pl-[22px] text-xs text-muted"
+    >
+      This board is read-only here: it belongs to the crew.
+    </p>
   </div>
 </template>
