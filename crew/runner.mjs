@@ -15,7 +15,7 @@ import { spawn } from 'node:child_process'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { here, loadCreds } from './config.mjs'
-import { DEFAULTS, formatPlan, planPass, RUNNER_LABEL } from './runner-core.mjs'
+import { DEFAULTS, formatPlan, planPass, repairUnread, RUNNER_LABEL } from './runner-core.mjs'
 import * as opencode from './runner-opencode.mjs'
 
 const kit = fileURLToPath(new URL('.', import.meta.url))
@@ -145,6 +145,8 @@ async function once(argv) {
     }
   }
   const states = readStates(list.map(w => w.key))
+  const repaired = repairUnread(states, cards)
+  if (!dryRun) for (const key of repaired) writeState(key, states)
   const plan = planPass({ workers: list, cards, states, now: Date.now() })
   for (const line of formatPlan(plan)) console.log(line)
   if (dryRun) return
@@ -152,21 +154,26 @@ async function once(argv) {
   for (const item of plan.filter(p => p.action === 'ask')) {
     const worker = list.find(w => w.key === item.key)
     const prev = states[item.key][item.card.id] ?? { runs: 0 }
+    const c = creds ?? loadCreds()
     try {
-      const c = creds ?? loadCreds()
       await postAsk(worker, item.card, c)
-      // Written as soon as the question is on the card, so a later failure cannot post it twice.
-      states[item.key][item.card.id] = { ...prev, asked: true, lastSeenUpdate: item.card.updatedAt }
-      writeState(item.key, states)
-      const after = await readCard(c, c.people[worker.key], item.card.id)
-      states[item.key][item.card.id] = { ...states[item.key][item.card.id], lastSeenUpdate: after.updatedAt }
-      writeState(item.key, states)
-      console.log(`asked for ${item.key} on ${item.card.id}`)
     } catch (err) {
       console.log(`could not ask Pia for ${item.key} on ${item.card.id}: ${err.message}`)
+      continue
     }
-  }
-  // A failed run is counted like any other run, so a card that always fails reaches maxRuns and is asked about.
+    // Written as soon as the question is on the card, so a later failure cannot post it twice. The baseline
+    // is unknown until the card is read again: until then the state is unread and acts on nothing.
+    states[item.key][item.card.id] = { ...prev, asked: true, lastSeenUpdate: null, unread: true }
+    writeState(item.key, states)
+    try {
+      const after = await readCard(c, c.people[worker.key], item.card.id)
+      states[item.key][item.card.id] = { ...states[item.key][item.card.id], lastSeenUpdate: after.updatedAt, unread: false }
+      writeState(item.key, states)
+    } catch (err) {
+      console.log(`could not re-read ${item.card.id}: ${err.message}; the baseline is set on the next pass`)
+    }
+    console.log(`asked for ${item.key} on ${item.card.id}`)
+  }  // A failed run is counted like any other run, so a card that always fails reaches maxRuns and is asked about.
   for (const item of plan.filter(p => p.action === 'start')) {
     const worker = list.find(w => w.key === item.key)
     const prev = states[item.key][item.card.id] ?? { runs: 0 }

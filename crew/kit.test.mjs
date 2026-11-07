@@ -21,9 +21,8 @@ import { fileURLToPath } from 'node:url'
 import { findChromium, request, serve } from './browser-driver.mjs'
 import { boardOrigin, signIn } from './browser.mjs'
 import { crewHome } from './home.mjs'
-import { DEFAULTS, eligibleCards, formatPlan, nextAction, planPass } from './runner-core.mjs'
+import { DEFAULTS, eligibleCards, formatPlan, nextAction, planPass, repairUnread } from './runner-core.mjs'
 import * as opencode from './runner-opencode.mjs'
-
 const KIT = dirname(fileURLToPath(import.meta.url))
 const CREW = join(KIT, 'crew.mjs')
 const DRIVER = join(KIT, 'browser-driver.mjs')
@@ -1087,6 +1086,35 @@ describe('crew runner process', () => {
     const now = 10_000_000
     const asked = { runs: DEFAULTS.maxRuns, lastRunAt: 0, lastSeenUpdate: 100, asked: true }
     assert.equal(nextAction(asked, card({ updatedAt: 999 }), now), 'start')
+  })
+
+  test('a run past maxRuns waits for news and never asks again', () => {
+    const now = 10_000_000
+    const past = { runs: DEFAULTS.maxRuns + 1, lastRunAt: 0, lastSeenUpdate: 100, asked: false }
+    assert.equal(nextAction(past, card({ updatedAt: 100 }), now), 'stop')
+    assert.equal(nextAction(past, card({ updatedAt: 100 }), now + 10 * DEFAULTS.retryMinutes * MINUTE), 'stop')
+    assert.equal(nextAction(past, card({ updatedAt: 999 }), now), 'start')
+  })
+
+  test('a state whose re-read failed acts on nothing until its baseline is known', () => {
+    const now = 10_000_000
+    const unread = { runs: DEFAULTS.maxRuns, lastRunAt: 0, lastSeenUpdate: null, asked: true, unread: true }
+    assert.equal(nextAction(unread, card({ updatedAt: 500 }), now), 'stop')
+  })
+
+  test('repairUnread takes the card as this pass read it as the baseline, and a later update starts the worker', () => {
+    const now = 10_000_000
+    const states = { wes: { c1: { runs: DEFAULTS.maxRuns, lastRunAt: 0, lastSeenUpdate: null, asked: true, unread: true } } }
+    assert.deepEqual(repairUnread(states, { wes: [card({ id: 'c1', updatedAt: 500 })] }), ['wes'])
+    assert.deepEqual(states.wes.c1, { runs: DEFAULTS.maxRuns, lastRunAt: 0, lastSeenUpdate: 500, asked: true, unread: false })
+    assert.equal(nextAction(states.wes.c1, card({ id: 'c1', updatedAt: 500 }), now), 'stop')
+    assert.equal(nextAction(states.wes.c1, card({ id: 'c1', updatedAt: 600 }), now), 'start')
+  })
+
+  test('repairUnread leaves a state alone when its card was not read in this pass', () => {
+    const states = { wes: { c1: { runs: 1, lastRunAt: 0, lastSeenUpdate: null, asked: false, unread: true } } }
+    assert.deepEqual(repairUnread(states, { wes: [] }), [])
+    assert.equal(states.wes.c1.unread, true)
   })
 
   test('the plan starts a pinned worker on its eligible cards and refuses a worker with no pinned model', () => {

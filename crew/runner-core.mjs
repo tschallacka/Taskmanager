@@ -20,26 +20,46 @@ export function eligibleCards(cards) {
 
 /**
  * What the runner does with one card, given what it did before. `state` is { runs, lastRunAt,
- * lastSeenUpdate, asked } for this worker and card, or null when it has never run on it.
+ * lastSeenUpdate, asked, unread } for this worker and card, or null when it has never run on it.
  * `lastSeenUpdate` is the card's updatedAt after the runner's last run or ask, so only a change
- * made by someone else (Pia's answer, a new update) counts as news.
+ * made by someone else (Pia's answer, a new update) counts as news. `unread` means the question was
+ * posted but the card could not be re-read after it, so the baseline is not known yet (repairUnread).
  *   start  run the worker on the card now
  *   wait   it ran recently and nothing new happened on the card
- *   ask    it has used its runs: post a QUESTION to Pia, once
- *   stop   it has used its runs and has already asked: do nothing
+ *   ask    it has used exactly maxRuns: post a QUESTION to Pia, once
+ *   stop   nothing to do: it asked already, it ran past maxRuns, or its baseline is not known yet
  * News on the card starts it at once, even after its runs are used up: an answer from Pia is what
- * it waited for. Otherwise it runs again only after retryMinutes, and never past maxRuns.
+ * it waited for. Before its runs are used up, it runs again only after retryMinutes.
  */
 export function nextAction(state, card, now, options = {}) {
   const { retryMinutes, maxRuns } = { ...DEFAULTS, ...options }
   const runs = state?.runs ?? 0
   if (runs === 0) return 'start'
+  if (state.unread) return 'stop'
   if (card.updatedAt != null && card.updatedAt !== state.lastSeenUpdate) return 'start'
-  if (runs >= maxRuns) return state.asked ? 'stop' : 'ask'
+  if (runs > maxRuns) return 'stop'
+  if (runs === maxRuns) return state.asked ? 'stop' : 'ask'
   if (now - state.lastRunAt >= retryMinutes * 60_000) return 'start'
   return 'wait'
 }
 
+/**
+ * Gives each state whose baseline is unknown the card's updatedAt as this pass read it. Only a card read
+ * in this pass counts. Returns the worker keys whose states changed, so the caller writes them.
+ */
+export function repairUnread(states, cards) {
+  const changed = new Set()
+  for (const [key, byCard] of Object.entries(states)) {
+    for (const [id, state] of Object.entries(byCard)) {
+      if (!state?.unread) continue
+      const card = (cards[key] ?? []).find(c => c.id === id)
+      if (!card || card.updatedAt == null) continue
+      byCard[id] = { ...state, unread: false, lastSeenUpdate: card.updatedAt }
+      changed.add(key)
+    }
+  }
+  return [...changed]
+}
 /**
  * The plan for one pass. `workers` are { key, runner, provider, model } (model null when no name is
  * pinned for it). `cards` maps a key to its cards, `states` maps a key to { [cardId]: state }.
