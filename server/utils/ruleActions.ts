@@ -14,7 +14,8 @@ import { requireAssignable } from './people'
 import { publish, workspaceTopic } from './realtime'
 
 export interface RuleEvent {
-  type: TriggerKind
+  /** `tags_changed` is internal: the built-in crew rules hear it, and no board rule can select it. */
+  type: TriggerKind | 'tags_changed'
   projectId: string
   taskId: string
   actorId: string | null

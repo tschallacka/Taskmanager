@@ -10,6 +10,7 @@ import { isTeamRuleMode, materialiseTeamRule, type TeamAction, type TeamConditio
 import { genId } from './projects'
 import { projectPeople } from './people'
 import { runAction, snapshotTask, type RuleChain, type RuleEvent, type RuleProject } from './ruleActions'
+import { runCrewRules } from './crewRules'
 
 /** A fresh chain for one change made by a person or an agent. */
 export function newRuleChain(): RuleChain {
@@ -146,6 +147,9 @@ async function fire(event: RuleEvent, chain: RuleChain): Promise<void> {
   }).from(projects).where(eq(projects.id, event.projectId))
   // An archived project runs nothing.
   if (!project || project.archivedAt) return
+
+  // The built-in crew rules run first, on a crew board only; they write through the same actions.
+  await runCrewRules(event, project, next => fireRules(next, { id: chain.id, depth: chain.depth + 1, fired: chain.fired }))
 
   const rows = await db.select().from(projectRules)
     .where(and(eq(projectRules.projectId, project.id), eq(projectRules.enabled, true)))
