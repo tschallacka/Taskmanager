@@ -271,7 +271,8 @@ Use `browser` to look and check. Use `run` (Playwright, below) for a script that
    as described above instead of ending.
 2. **Git: your own branch only. The database belongs to Boss.** A worker works in its own git
    worktree on its own branch and commits and pushes only that branch (`{{kit_dir}}/WORKFLOW.md`, Phase 3).
-   Only Boss merges. Nobody pushes to the main branch or force-pushes, and nobody runs `checkout`,
+   Only Boss merges; Boss publishes a branch with `{{node_kit}}/crew.mjs publish <slug> <branch> <title> <msg-file> <pr-file>`
+   (README, "Publish"), which re-checks the branch on the merged tree first. Nobody pushes to the main branch or force-pushes, and nobody runs `checkout`,
    `reset`, `stash`, `rebase`, `clean` or `restore` on work that is not their own. The PM and the
    reviewers use read-only `git status` and `git diff` only. Never run a database push or migration,
    never run `psql` and never delete directories outside your own worktree.

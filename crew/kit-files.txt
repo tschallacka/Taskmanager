@@ -38,6 +38,7 @@ listen.mjs
 mentions.mjs
 package.json
 postbrief.mjs
+publish.mjs
 setup.mjs
 susy.mjs
 tm.mjs
