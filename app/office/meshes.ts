@@ -382,6 +382,12 @@ export function buildPerson(key: string, back?: string): Rig {
   return { root, body, torso, head, armL, armR, legL, legR, handR, handL, carry, props }
 }
 
+/** Every prop the rig carries, in the order the actor can show them. Tests pin this list. */
+export const PROP_NAMES = [
+  'hammer', 'pen', 'magnifier', 'stamp', 'mug', 'wrench', 'phone', 'paddle', 'putter', 'cup',
+  'broom', 'mop'
+] as const
+
 // Janet's tools (the Janitor's cleanup): a broom with its bristles at the bottom, a mop with a cotton head.
 function broom(): THREE.Group {
   const g = new THREE.Group()
