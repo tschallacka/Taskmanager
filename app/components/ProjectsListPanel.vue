@@ -120,6 +120,8 @@ const WORKSPACE_LINKS = [
 ]
 
 const deleteTarget = ref<{ id: string, name: string } | null>(null)
+// The board whose management token dialog is open ("Get AI management token").
+const managementBoard = ref<{ id: string, name: string } | null>(null)
 
 async function confirmDelete() {
   const target = deleteTarget.value
@@ -138,7 +140,20 @@ function menuItems(project: Project) {
     icon: pinned ? 'i-lucide-pin-off' : 'i-lucide-pin',
     onSelect: () => togglePin(project.id)
   }]
-  if (project.audience === 'customer') return [pin]
+  // The two agent links sit next to the pin: the Connect window for this board, and a 10-minute management token.
+  const agent = [
+    {
+      label: 'Connect your Claude',
+      icon: 'i-lucide-plug',
+      onSelect: () => { void navigateTo({ path: '/connect', query: { board: project.id } }) }
+    },
+    {
+      label: 'Get AI management token',
+      icon: 'i-lucide-key-round',
+      onSelect: () => { managementBoard.value = { id: project.id, name: project.name } }
+    }
+  ]
+  if (project.audience === 'customer') return [pin, agent]
   const manage: { label: string, icon: string, onSelect: () => unknown }[] = [
     { label: 'Rename', icon: 'i-lucide-pencil', onSelect: () => startRename(project) }
   ]
@@ -150,7 +165,7 @@ function menuItems(project: Project) {
       onSelect: () => { void navigateTo({ path: '/team', query: { section: 'crews', board: project.id, wizard: '1' } }) }
     })
   }
-  return [pin, manage, [
+  return [pin, agent, manage, [
     {
       label: 'Delete project',
       icon: 'i-lucide-trash-2',
@@ -304,6 +319,12 @@ function menuItems(project: Project) {
         </UDropdownMenu>
       </div>
     </template>
+
+    <ManagementTokenDialog
+      :open="managementBoard !== null"
+      :board="managementBoard"
+      @update:open="(v: boolean) => { if (!v) managementBoard = null }"
+    />
 
     <UModal
       :open="deleteTarget !== null"
