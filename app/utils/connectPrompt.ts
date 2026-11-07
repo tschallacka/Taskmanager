@@ -1,0 +1,130 @@
+// The "Connect your Claude to this board" window: the permissions in plain words, the ways a key can be handed
+// over, and the copy-paste prompt an agent is given. Pure, so the prompt is tested on its own.
+
+/** The permissions a connect token can carry, in the order the window lists them. */
+export const CONNECT_PERMISSIONS = [
+  { scope: 'boards:read', label: 'Read boards and tasks', description: 'Boards, tasks, comments and time logs' },
+  { scope: 'boards:write', label: 'Change tasks', description: 'Create, edit, move and delete tasks, comment, log time' },
+  { scope: 'secrets:read', label: 'Read project secrets', description: 'Names and values of a project\'s secrets. Every read is recorded' },
+  { scope: 'secrets:write', label: 'Change project secrets', description: 'Add, change and delete a project\'s secrets, where you are a project manager' },
+  { scope: 'crews:manage', label: 'Manage crews', description: 'Create and change crews. Only the instance admin can give this' }
+] as const
+
+export type ConnectScope = typeof CONNECT_PERMISSIONS[number]['scope']
+
+/** The plain name of a permission, or the scope itself when it is unknown. */
+export function permissionName(scope: string): string {
+  return CONNECT_PERMISSIONS.find(permission => permission.scope === scope)?.label ?? scope
+}
+
+/** How a token reaches the agent. A pairing code is the default; the token itself is the fallback. */
+export const CONNECT_METHODS: { label: string, value: 'code' | 'token' | 'browser', description: string, disabled?: boolean }[] = [
+  { label: 'Pairing code (recommended)', value: 'code', description: 'A one-time code. The agent exchanges it for the token, so the secret stays out of the chat.' },
+  { label: 'Show the token itself', value: 'token', description: 'Fallback. Shown once. Do not paste it into a chat.' },
+  { label: 'Browser verification', value: 'browser', description: 'Coming soon: approve the connection in your browser.', disabled: true }
+] as const
+
+export type ConnectMethod = 'code' | 'token'
+
+/** Permission names for a list of scopes, joined for a sentence. */
+export function permissionList(scopes: readonly string[]): string {
+  return scopes.map(permissionName).join('; ')
+}
+
+export interface ConnectPromptBoard {
+  name: string
+  workspace: string
+  scopes: readonly string[]
+}
+
+export interface ConnectPromptInput {
+  /** The base URL of this Taskmanager, with no trailing slash. */
+  origin: string
+  /** The token's name, as the owner gave it. */
+  tokenName: string
+  boards: ConnectPromptBoard[]
+  /** How the agent gets its token: the code it exchanges, or the token itself. */
+  access: { kind: 'code', code: string, expiresAt: number } | { kind: 'token', token: string }
+}
+
+/**
+ * The copy-paste prompt for the agent: where the board is, the boards and what is allowed on each, how the agent
+ * authenticates, and what to do on a refusal. A code prompt carries the code and never the token; a token prompt
+ * carries the token, which the owner chose to show.
+ */
+export function connectPrompt(input: ConnectPromptInput): string {
+  const boardLines = input.boards.map(board => `- ${board.name} (${board.workspace}): ${permissionList(board.scopes)}`)
+  const allScopes = new Set(input.boards.flatMap(board => board.scopes))
+  const crewLine = allScopes.has('crews:manage')
+    ? 'A crew works on its own shadow board and never writes to the real board.\n'
+    : ''
+  const endpoint = `${input.origin}/api/mcp`
+
+  const auth = input.access.kind === 'code'
+    ? [
+        `Your key is a one-time pairing code: ${input.access.code}`,
+        `It works once and until ${new Date(input.access.expiresAt).toISOString()}. Exchange it on this machine, and do not print the result:`,
+        `  export TASKMANAGER_API_KEY=$(curl -s -X POST ${input.origin}/api/pair -H 'Content-Type: application/json' -d '{"code":"${input.access.code}"}' | node -pe 'JSON.parse(require("fs").readFileSync(0,"utf8")).token')`,
+        'If that does not give you a key that starts with arn_, stop: the exchange was refused. Report the message the server sent to your main agent, and do not retry with this code.'
+      ].join('\n')
+    : [
+        `Your key is the token below. Put it in the environment variable TASKMANAGER_API_KEY, and do not print it:`,
+        `  ${input.access.token}`
+      ].join('\n')
+
+  return `Connect to my Taskmanager at ${input.origin}, as the connection "${input.tokenName}".
+
+Boards you may use, and what you may do on each:
+${boardLines.join('\n')}
+${crewLine}
+Authentication
+${auth}
+
+Then add the MCP server, exactly as written (the single quotes matter):
+  claude mcp add --scope user --transport http taskmanager ${endpoint} --header 'Authorization: Bearer \${TASKMANAGER_API_KEY}'
+
+Never echo, print, log or paste the key anywhere else, and never send it to another service.
+
+If a call is refused with 401 and a message, stop. Do not retry with this key. Report that message to your main agent, so they can ask me for a new connection.
+If a board is not in the list above, you have no access to it, and you should not try.`
+}
+
+/** A board the window can pick from: the boards the person can open. */
+export interface ConnectBoardChoice {
+  id: string
+  name: string
+  workspace: string
+}
+
+/** A board a token reaches, with what the token may do there. */
+export interface ConnectTokenBoard {
+  id: string
+  name: string
+  workspace: string
+  scopes: string[]
+}
+
+/** One connect token as the window lists it (GET /api/settings/connect-tokens). */
+export interface ConnectTokenRow {
+  id: string
+  name: string
+  keyPrefix: string
+  kind: 'access' | 'management'
+  createdAt: number
+  lastUsedAt: number | null
+  expiresAt: number | null
+  expired: boolean
+  scopes: string[]
+  boards: ConnectTokenBoard[]
+  /** The last pairing of this token: who used the code, and when. Null when no agent has paired yet. */
+  pairedBy: { usedAt: number, usedFrom: string | null } | null
+}
+
+/** A connection the window has just made or changed: what the owner copies once, and the prompt that goes with it. */
+export interface IssuedConnection {
+  /** The panel's title, for example "Connection ready" or "New secret". */
+  title: string
+  tokenName: string
+  boards: ConnectPromptBoard[]
+  access: ConnectPromptInput['access']
+}

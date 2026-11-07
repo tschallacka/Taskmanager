@@ -94,3 +94,34 @@ export function boardsGranting(
   if (!scope) return []
   return Object.keys(boardScopes).filter(projectId => scopesOnBoard(tokenScopes, boardScopes, projectId).includes(scope))
 }
+
+/**
+ * Reads the boards of a token as the window sends them: a list of { projectId, scopes }. Each board once, with
+ * at least one known permission. Returns the grants keyed by board. Whether the boards are the user's is checked
+ * by the caller, which reads the database.
+ */
+export function readBoardGrants(raw: unknown): Record<string, ApiKeyScope[]> {
+  if (!Array.isArray(raw)) throw createError({ statusCode: 400, message: 'Pick the boards this token reaches' })
+  const grants: Record<string, ApiKeyScope[]> = {}
+  for (const item of raw) {
+    const entry = (item && typeof item === 'object' ? item : {}) as { projectId?: unknown, scopes?: unknown }
+    if (typeof entry.projectId !== 'string' || !entry.projectId) {
+      throw createError({ statusCode: 400, message: 'The boards of a token must be ids' })
+    }
+    if (grants[entry.projectId]) throw createError({ statusCode: 400, message: 'A board is listed twice' })
+    const scopes = Array.isArray(entry.scopes) ? [...new Set(entry.scopes)] : []
+    if (scopes.some(scope => !(API_KEY_SCOPES as readonly unknown[]).includes(scope))) {
+      throw createError({ statusCode: 400, message: 'One of the permissions is not known' })
+    }
+    if (!scopes.length) throw createError({ statusCode: 400, message: 'Give each board at least one permission, or leave it out' })
+    grants[entry.projectId] = scopes as ApiKeyScope[]
+  }
+  if (!Object.keys(grants).length) throw createError({ statusCode: 400, message: 'Pick at least one board' })
+  return grants
+}
+
+/** The most a token may do on any board: the union of its grants, in the order the permissions are listed. */
+export function scopesOfGrants(grants: Record<string, ApiKeyScope[]>): ApiKeyScope[] {
+  const all = Object.values(grants).flat()
+  return API_KEY_SCOPES.filter(scope => all.includes(scope))
+}
