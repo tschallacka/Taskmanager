@@ -103,8 +103,8 @@ the customer wants a meeting they post `@{{nicks.pia}} ...` in `{{chat.channel}}
 short session message. The PM **picks up in the chat**: reads the channel, answers there, and
 brings developers by ringing them the same way. The meeting runs as a conversation in the
 channel; **nobody polls it on a timer**. When it is done either side says "meeting over: <what
-was decided>" and everyone leaves (`chat-client-rs leave`), and the PM copies the decisions
-onto the board. The PM may ring the customer the same way: post `@{{customer.nick}} ...` in the
+was decided>" and everyone leaves (`chat-client-rs leave`). {{people.rita}} writes the minutes and
+copies the decisions onto the cards they concern (`{{crew_dir}}/RITA.md`). The PM may ring the customer the same way: post `@{{customer.nick}} ...` in the
 channel; the customer's side wakes on the mention.
 
 ## Channel mode (events instead of a listen loop)
@@ -388,9 +388,8 @@ Use `browser` to look and check. Use `run` (Playwright, below) for a script that
   never move a task to Ready for live or Done** (Boss does, after reading the code and
   publishing it). Promote Backlog tasks whose dependencies are in Done. Make sure every worker
   has something.
-- **Status:** `post_status_update` on the board addressed to Boss: what is done, in progress,
-  blocked, bugs filed, and anything you need decided. Short, factual, and `on_track` /
-  `at_risk` / `off_track` honestly.
+- **Status** is {{people.rita}}'s job now (`{{crew_dir}}/RITA.md`): she posts the hourly report to Boss. You
+  answer what she asks, and you name what needs a decision on the card it concerns.
 - You do not write product code.
 - **A failing test goes back.** A task whose test output shows a failure goes back to its worker, whatever
   caused it. A report tagged `test failing` that the worker could not explain gets 15 minutes from you.
