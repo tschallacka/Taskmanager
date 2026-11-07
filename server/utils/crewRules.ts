@@ -183,8 +183,10 @@ async function routeGates(taskId: string, project: RuleProject, members: Map<str
   const pm = await columnIdNamed(project.id, COLUMN.pm)
   const [task] = await db.select().from(projectTasks).where(and(eq(projectTasks.id, taskId), isNull(projectTasks.deletedAt)))
   if (!task || !pm || task.columnId !== pm) return
-  const pia = members.get('pia')
-  if (!pia || !task.tags.includes(PM_APPROVED) || (await tagSetterOf(taskId, PM_APPROVED)) !== pia) return
+  // Pat Precheck does the PM pre-check now, so her approval counts as Pia's. Older crews have no Pat.
+  const pmSetters = [members.get('pia'), members.get('pat')].filter((account): account is string => !!account)
+  const setter = await tagSetterOf(taskId, PM_APPROVED)
+  if (!pmSetters.length || !task.tags.includes(PM_APPROVED) || !setter || !pmSetters.includes(setter)) return
   const subs = await subtasksOf(taskId)
   const subTags = subs.flatMap(sub => sub.tags)
   const source = await sourceFor(project, RULE_GATES, members)

@@ -21,7 +21,7 @@ const id = (name: string) => `csr-${tag}-${name}`
 const now = Date.now()
 const MIN = 60_000
 
-const people = { owner: id('owner'), pia: id('pia'), usher: id('usher'), nina: id('nina'), quincy: id('quincy'), boss: id('boss'), worker: id('worker'), outsider: id('outsider') }
+const people = { owner: id('owner'), pia: id('pia'), pat: id('pat'), usher: id('usher'), nina: id('nina'), quincy: id('quincy'), boss: id('boss'), worker: id('worker'), outsider: id('outsider') }
 const team = id('team')
 const crew = id('crew-board')
 const shadow = id('shadow')
@@ -36,7 +36,7 @@ const t = Object.fromEntries(['blocker', 'dependent', 'orphan', 'other', 'gated'
 const sub = { cq: id('sub-cq'), ux: id('sub-ux') }
 
 const pmCol = cols.pm!
-const members = [people.owner, people.pia, people.usher, people.nina, people.quincy, people.boss, people.worker, people.outsider]
+const members = [people.owner, people.pia, people.pat, people.usher, people.nina, people.quincy, people.boss, people.worker, people.outsider]
 
 const labelsOf = async (taskId: string) => (await db.select({ tags: projectTasks.tags }).from(projectTasks).where(eq(projectTasks.id, taskId)))[0]!.tags
 const columnOf = async (taskId: string) => {
@@ -70,7 +70,7 @@ before(async () => {
   ])
   await db.insert(crews).values({ id: crewRow, slug: crewRow, name: 'Crew', teamId: team, boardId: crew, createdBy: people.owner, createdAt: now })
   await db.insert(crewBoards).values({ id: link, crewId: crewRow, projectId: crew, shadowProjectId: shadow, createdBy: people.owner, createdAt: now })
-  const roles: [string, string][] = [[people.pia, 'pia'], [people.usher, 'usher'], [people.nina, 'nina'], [people.quincy, 'quincy'], [people.boss, 'boss'], [people.worker, 'worker']]
+  const roles: [string, string][] = [[people.pia, 'pia'], [people.pat, 'pat'], [people.usher, 'usher'], [people.nina, 'nina'], [people.quincy, 'quincy'], [people.boss, 'boss'], [people.worker, 'worker']]
   await db.insert(crewBoardMembers).values(roles.map(([userId, personKey]) => ({ id: id(`cbm-${personKey}`), linkId: link, userId, personKey, agentType: 'x', createdAt: now })))
   const task = (taskId: string, columnId: string, extra: Partial<typeof projectTasks.$inferInsert> = {}) => ({
     id: taskId, projectId: crew, columnId, title: taskId.slice(-8), visibility: 'internal' as const, position: 0, createdAt: now, updatedAt: now, ...extra
@@ -253,6 +253,38 @@ test('failing-test clock: a card that has left Blocked is not noted (negative)',
   await db.insert(taskActivity).values({ id: id('act-left'), taskId: left, projectId: crew, actorId: people.worker, via: 'ui', kind: 'moved', detail: { to: 'Blocked' }, createdAt: now - 60 * MIN })
   await sweepTestClock(now)
   assert.equal((await comments(left)).length, 0)
+})
+
+// A card in Verify PM with time logged, so the time-log check leaves it for the gate routing.
+const newPmCard = async (name: string) => {
+  const cardId = id(`task-pm-${name}`)
+  await db.insert(projectTasks).values({ id: cardId, projectId: crew, columnId: pmCol, title: name, visibility: 'internal', position: 20 + Math.floor(Math.random() * 1000), assigneeId: people.worker, tags: [], createdAt: now, updatedAt: now })
+  await db.insert(timeEntries).values({ id: id(`time-${name}`), taskId: cardId, projectId: crew, userId: people.worker, minutes: 30, day: '2026-11-07', note: '', createdAt: now })
+  return cardId
+}
+// Records a PM approval the way the route writes it: the tag on the card, and a line naming who set it.
+const pmApprove = async (cardId: string, setter: string) => {
+  await setTag(cardId, 'pm approved', setter)
+  await db.update(projectTasks).set({ tags: ['pm approved'] }).where(eq(projectTasks.id, cardId))
+  await fireRules({ type: 'tags_changed', projectId: crew, taskId: cardId, actorId: setter, actorIsAgent: false, detail: null }, newRuleChain())
+}
+
+test('gate routing: a PM approval set by Pat routes the card on, as Pia\'s does', async () => {
+  const card = await newPmCard('pat-sets')
+  await pmApprove(card, people.pat)
+  assert.deepEqual(await columnOf(card), { columnId: cols.cq, assigneeId: people.nina })
+})
+
+test('gate routing: a PM approval set by Pia routes the card on', async () => {
+  const card = await newPmCard('pia-sets')
+  await pmApprove(card, people.pia)
+  assert.deepEqual(await columnOf(card), { columnId: cols.cq, assigneeId: people.nina })
+})
+
+test('gate routing: a PM approval set by a worker does nothing (negative)', async () => {
+  const card = await newPmCard('worker-sets')
+  await pmApprove(card, people.worker)
+  assert.equal((await columnOf(card)).columnId, pmCol)
 })
 
 test('pure parts: the gate order, the stages, the tag lines and the crew column set', () => {
