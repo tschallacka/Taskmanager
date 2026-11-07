@@ -10,6 +10,7 @@ import type { Errand, OfficePerson, OfficeSnapshot, Place } from '../../shared/o
 import { Actor, routes } from './actor'
 import type { Beat, IdleStyle } from './actor'
 import './roles/janet'
+import './roles/pat'
 import { stepBall } from './ballistics'
 import type { BallWorld } from './ballistics'
 import { buildLayout, FIXTURES, GOLF, ROOM } from './layout'
