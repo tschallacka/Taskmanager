@@ -42,10 +42,10 @@ test('the example config names each role, with its nick', () => {
   }
 })
 
-test('the server knows the five people, read-only until their role cards settle the scopes', () => {
+test('the server knows the five people as crew members with the standard crew scopes', () => {
   const source = readFileSync(join(REPO, 'server', 'utils', 'crewProvisioning.ts'), 'utf8')
   for (const [key, name] of Object.entries(NAMES)) {
     assert.ok(source.includes(`{ key: '${key}', name: '${name}'`), `CREW_PEOPLE has ${key}`)
   }
-  for (const key of Object.keys(ROLES)) assert.match(source, new RegExp(`\\b${key}: \\['boards:read'\\]`), `${key} is read-only`)
+  assert.ok(!source.includes('READ_ONLY_KEYS'), 'the new roles get CREW_SCOPES, like the other members')
 })

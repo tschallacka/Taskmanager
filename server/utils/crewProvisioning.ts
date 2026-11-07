@@ -46,20 +46,6 @@ export const BOARD_COLUMNS = ['Backlog', 'To do', 'In progress', 'Verify PM', 'V
 // projects, the same way its key has always worked.
 const CREW_SCOPES: ApiKeyScope[] = ['boards:read', 'boards:write']
 
-// The new roles get read access only until their role cards settle what they may write: the key model
-// has no scope for "post updates but not move" (see the subtask "role scaffolding").
-const READ_ONLY_KEYS: Record<string, ApiKeyScope[]> = {
-  susy: ['boards:read'],
-  janet: ['boards:read'],
-  pat: ['boards:read'],
-  tess: ['boards:read'],
-  rita: ['boards:read']
-}
-
-function scopesOf(key: string): ApiKeyScope[] {
-  return READ_ONLY_KEYS[key] ?? CREW_SCOPES
-}
-
 export interface CrewInput {
   slug: string
   name: string
@@ -127,7 +113,7 @@ function baseUrl(): string {
   return (process.env.BETTER_AUTH_URL || 'http://localhost:3000').replace(/\/$/, '')
 }
 
-async function mintKey(userId: string, teamId: string | null, name: string, scopes: ApiKeyScope[] = CREW_SCOPES): Promise<string> {
+async function mintKey(userId: string, teamId: string | null, name: string): Promise<string> {
   const generated = generateApiKey()
   await db.insert(apiKeys).values({
     id: genId(),
@@ -136,7 +122,7 @@ async function mintKey(userId: string, teamId: string | null, name: string, scop
     name,
     keyHash: generated.hash,
     keyPrefix: generated.displayPrefix,
-    scopes,
+    scopes: CREW_SCOPES,
     createdAt: Date.now()
   })
   return generated.token
@@ -301,7 +287,7 @@ async function makeCrew(input: CrewInput, caller: CrewCaller) {
 
     for (const person of CREW_PEOPLE) {
       const contact = person.team === 'contact'
-      const apiKey = await mintKey(accountIds.get(person.key)!, contact ? null : teamId, `crew ${person.key}`, scopesOf(person.key))
+      const apiKey = await mintKey(accountIds.get(person.key)!, contact ? null : teamId, `crew ${person.key}`)
       minted.get(person.key)!.apiKey = apiKey
     }
 
@@ -340,7 +326,7 @@ async function rotateCrew(crew: Crew) {
       .set({ password: await hashPassword(password), updatedAt: new Date() })
       .where(and(eq(account.userId, a.id), eq(account.providerId, 'credential')))
     const contact = roleOf(key)?.team === 'contact'
-    const apiKey = await mintKey(a.id, contact ? null : crew.teamId, `crew ${key}`, scopesOf(key))
+    const apiKey = await mintKey(a.id, contact ? null : crew.teamId, `crew ${key}`)
     minted.set(key, { password, apiKey })
   }
 
@@ -364,7 +350,7 @@ async function rotateCrew(crew: Crew) {
     } else {
       await db.insert(member).values({ id: genId(), organizationId: crew.teamId, userId: id, role: person.team, createdAt: new Date() })
     }
-    const apiKey = await mintKey(id, person.team === 'contact' ? null : crew.teamId, `crew ${person.key}`, scopesOf(person.key))
+    const apiKey = await mintKey(id, person.team === 'contact' ? null : crew.teamId, `crew ${person.key}`)
     minted.set(person.key, { password, apiKey })
   }
 

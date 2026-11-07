@@ -184,7 +184,7 @@ export function lookOf(key: string): Look {
   const skins = ['#ffdbac', '#f1c27d', '#e0ac69', '#c68642', '#8d5524']
   const hairs = ['#2b2118', '#6b3420', '#f2c14e', '#111111', '#a0522d']
   const wear: Look['headwear'][] = ['none', 'spiky', 'beanie', 'cap', 'curly']
-  return { shirt: hueColor(key), pants: '#343a40', skin: skins[h % 5]!, hair: hairs[(h >> 3) % 5]!, headwear: wear[(h >> 6) % 5]! }
+  return { shirt: hueColor(key), pants: '#343a40', skin: skins[h % 5]!, hair: hairs[(h >>> 3) % 5]!, headwear: wear[(h >>> 6) % 5]! }
 }
 
 /** Dark ink on a light background, white on a dark one. */
