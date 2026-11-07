@@ -67,6 +67,12 @@ Where the tools come from: the AI text editor, tailpipe, `interactive-shell`, `g
 | blocked | Anyone | Waiting; the blocker is linked |
 | split help | Pia | She cannot split the task into subtasks and needs Cato to do it |
 | test failing | Anyone who sees a failing test they cannot explain | A test fails and nobody knows why. The task is `Blocked`. Pia raises it with Cato. Cato removes the tag when the suite passes |
+| ready to clean | The worker when done, or Pia / Susy | The card's worker is finished. Assigns the card to Janet. The cleanup flow is in JANET.md |
+| clean plan | Janet | On the plan subtask `[Clean plan] <card>`: one subtask per step |
+| cleaning granted | The checker (Pia, or Susy) | On the plan subtask: the steps are allowed. Only this lets Janet delete |
+| clean done | Janet | On the plan subtask: every step ticked or skipped with a reason |
+| cleaned | The checker | On the plan subtask: the steps were checked on disk. A card with `ready to clean` and no `cleaned` is not finished |
+| clean refused | The checker | On the plan subtask: a step is not allowed, with a note on that step. Janet replans that step only |
 
 ## 4. Timing: the rules for every agent
 
