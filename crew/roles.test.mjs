@@ -78,3 +78,61 @@ test('the Rita figure is registered and gets her own look, not the placeholder',
   assert.match(figures, /rita: RITA_LOOK/, 'FIGURES names rita')
   assert.ok(existsSync(join(REPO, 'app', 'office', 'figures', 'rita.ts')), 'the figure file exists')
 })
+
+// Pia's text (the PM's job, her launch prompt, her UX file, the skill's roles) no longer carries the duties the
+// other roles and the server took over, and each duty names its owner.
+const section = (text, from, to) => {
+  const start = text.indexOf(from)
+  assert.ok(start >= 0, `"${from}" is in the file`)
+  const end = to ? text.indexOf(to, start + from.length) : text.length
+  return text.slice(start, end)
+}
+const MOVED = [
+  /pre-check Verify tasks/i,
+  /Promote Backlog tasks/,
+  /the PM assigns each bug/i,
+  /triage the tester/i,
+  /gets 15 minutes from you/,
+  /the PM checks it and moves it to \*\*Done\*\*/,
+  /post_status_update/,
+  /the PM moves it to \*\*Verify\*\*/,
+  /pre-check Verify,/
+]
+
+test("Pia's PM section drops the moved duties and names their owners", () => {
+  const crew = readFileSync(join(KIT, 'CREW.md.tmpl'), 'utf8')
+  const pm = section(crew, "## The PM's job", '## Worker round')
+  for (const bad of MOVED) assert.doesNotMatch(pm, bad, `PM section does not say ${bad}`)
+  for (const owner of ['{{people.pat}}', '{{people.tess}}', '{{people.rita}}', '{{people.janet}}', '{{people.susy}}']) {
+    assert.ok(pm.includes(owner), `PM section names ${owner}`)
+  }
+  assert.match(pm, /Round 1/, 'planning stays with Pia')
+  assert.match(pm, /QUESTION:/, 'answering questions stays with Pia')
+})
+
+test('the rules of the road name Pat for the gate, Tess for bugs and the server for the routing', () => {
+  const crew = readFileSync(join(KIT, 'CREW.md.tmpl'), 'utf8')
+  assert.ok(crew.includes('{{people.pat}} pre-checks it'), 'rule 7: Pat pre-checks Verify PM')
+  assert.ok(crew.includes('the server routes'), 'rule 7: the server routes the gates')
+  assert.ok(crew.includes('{{people.tess}} triages each bug'), 'rule 9: Tess triages bugs')
+  assert.ok(crew.includes('the server posts a note to the PM at 15 minutes'), 'rule 6b: the server runs the test clock')
+  assert.match(crew, /a\s+poke is never a reason to start anyone/, 'Susy pokes, Pia still starts people')
+})
+
+test("Pia's launch prompt and UX file drop the triage and the pre-check", () => {
+  const prompts = readFileSync(join(KIT, 'PROMPTS.md.tmpl'), 'utf8')
+  const pm = section(prompts, '## PM (', '## Worker (')
+  for (const bad of MOVED) assert.doesNotMatch(pm, bad, `PM prompt does not say ${bad}`)
+  assert.ok(pm.includes('{{people.tess}}') && pm.includes('{{people.rita}}'), 'PM prompt names Tess and Rita')
+  const ux = readFileSync(join(KIT, 'PIA-UX.md.tmpl'), 'utf8')
+  assert.doesNotMatch(ux, /^## Triage/m, 'the UX file has no triage steps any more')
+  assert.ok(ux.includes('{{people.tess}} triages them'), 'the UX file names Tess as the triager')
+})
+
+test('the skill names who has each duty now', () => {
+  const skill = readFileSync(join(KIT, 'SKILL.md'), 'utf8')
+  const pia = skill.split('\n').find(line => line.startsWith('| `pia` |')) ?? ''
+  assert.ok(pia && !/pre-check|triage/i.test(pia), 'the pia row names no pre-check or triage')
+  assert.ok(skill.includes('Pat (`pat`) pre-checks it'), 'the board section names Pat')
+  assert.ok(skill.includes('Tess triages'), 'the bugs and findings name Tess')
+})
