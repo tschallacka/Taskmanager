@@ -70,7 +70,7 @@ Where the tools come from: the AI text editor, tailpipe, `interactive-shell`, `g
 
 ## 4. Timing: the rules for every agent
 
-"Start the timer" and "stop the timer" mean the MCP tools `start_timer` and `stop_timer` (decided in Q57, still to be built). Until they exist, post a task update that starts with the word Started and names the activity, and log the minutes with `log_time` at the end.
+"Start the timer" and "stop the timer" mean the MCP tools `start_timer` and `stop_timer` (decided in Q57). Use the timers. When a timer cannot run, post a task update that starts with the word Started and names the activity, and log the minutes with `log_time` at the end.
 
 1. One running piece of work per agent at a time. Starting a new task means ending the previous one first.
 2. Time is logged on the task you worked on, with a note naming the activity: `intake`, `triage`, `build`, `ux review`, `code review`, `qa`, `pm check`, `final review`, `rework`.
@@ -83,7 +83,7 @@ Where the tools come from: the AI text editor, tailpipe, `interactive-shell`, `g
    - Usher, one review pass: 30 minutes. Nina: 30 minutes. Quincy: 45 minutes.
    - Cato final review: 30 minutes per merge request.
    - Cato splitting a task for Pia: 15 minutes per task.
-5. Pia sweeps for stale timers on each wake-up: any task In progress with no update for 60 minutes gets a ping to its worker, and after a second wake-up goes back to To do unassigned.
+5. Pia sweeps for stale timers on each wake-up: any task In progress with no update for 60 minutes gets a ping to its worker, and after a second wake-up Pia moves it to To do, unassigned, and says why in an update.
 6. Pia's weekly figure to Cato: time per phase per task, so slow phases show.
 
 ## 5. Wake-ups
@@ -196,7 +196,7 @@ Hard rule 9 applies to every agent. This is what happens when it cannot be follo
 7. **Stale timers and silence.** Pia's sweep in section 4.
 8. **Priority meanings.** Urgent: before anything else. High: next. Normal: in order. Low: only when idle.
 9. **Human interrupts.** A message from the Owner to Cato that changes direction: Cato tells Pia, Pia parks affected tasks in Blocked with a reason.
-10. **Shutdown.** When a crew is disabled, Pia first moves every In progress task back to To do unassigned with a note.
+10. **Shutdown.** When a crew is disabled, Pia first moves every In progress task to To do, unassigned, with a note.
 
 ## 8. What the code does today (checked 2026-11-05)
 
