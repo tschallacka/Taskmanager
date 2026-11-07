@@ -1,4 +1,5 @@
 import { audited, crewBySlug, crewView, requireCrewManager } from '../../utils/crewProvisioning'
+import { requireCrewOnOwnBoard } from '../../utils/managementToken'
 
 /** The crew without secrets: its ids, board link, disabled mark and each person's sign-in and key use. */
 export default defineEventHandler(async (event) => {
@@ -6,6 +7,7 @@ export default defineEventHandler(async (event) => {
   const slug = String(getRouterParam(event, 'slug') ?? '')
   return audited(caller, 'read', slug, async () => {
     const crew = await crewBySlug(slug)
+    await requireCrewOnOwnBoard(caller, crew)
     return { result: await crewView(crew), summary: 'read' }
   })
 })

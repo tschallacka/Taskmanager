@@ -128,8 +128,11 @@ export async function checkCrewKey(event: H3Event): Promise<KeyVerdict> {
   try {
     context = await authenticateApiKey(event)
   } catch (error) {
-    const message = (error as { message?: string }).message ?? ''
-    return { ok: false, reason: /expired/i.test(message) ? 'expired' : 'bad key' }
+    const refusal = error as { message?: string, data?: { code?: string } }
+    const message = refusal.message ?? ''
+    // A token refusal (regenerated, revoked, expired) carries its sentence; a plain 401 carries none.
+    const sentence = refusal.data?.code ? message : undefined
+    return { ok: false, reason: /expired/i.test(message) ? 'expired' : 'bad key', message: sentence }
   }
   if (!hasScope(context, CREW_KEY_SCOPE)) return { ok: false, reason: 'wrong scope' }
   const [row] = await db.select({ isInstanceAdmin: user.isInstanceAdmin }).from(user).where(eq(user.id, context.userId))

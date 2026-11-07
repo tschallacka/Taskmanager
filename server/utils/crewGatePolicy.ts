@@ -11,7 +11,8 @@ export const FORWARDING_HEADERS = ['x-forwarded-for', 'x-real-ip', 'forwarded'] 
 
 export type Peer = { kind: 'tcp', address: string } | { kind: 'unix' } | { kind: 'unseen' } | { kind: 'unknown' }
 
-export type KeyVerdict = { ok: true, keyId: string } | { ok: false, reason: 'bad key' | 'expired' | 'wrong scope' | 'not admin' }
+// `message` is the sentence a token refusal carries (regenerated, revoked, expired); the gate answers it.
+export type KeyVerdict = { ok: true, keyId: string } | { ok: false, reason: 'bad key' | 'expired' | 'wrong scope' | 'not admin', message?: string }
 
 export function isCrewApiPath(path: string): boolean {
   const bare = path.split('?')[0] ?? ''

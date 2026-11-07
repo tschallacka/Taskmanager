@@ -1,6 +1,7 @@
 import { createError } from 'h3'
 import { audited, createOrRotateCrew, parseCrewInput, requireCrewManager } from '../../utils/crewProvisioning'
 import { makeBoundCrew } from '../../utils/crewBoards'
+import { requireCreateOnOwnBoard } from '../../utils/managementToken'
 
 /**
  * Makes a crew: its team, accounts, customer, board and one key per account. A slug
@@ -22,6 +23,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const outcome = await audited(caller, 'create', input.slug, async () => {
+    await requireCreateOnOwnBoard(caller, input.slug, body.projectId)
     const made = body.projectId === undefined
       ? await createOrRotateCrew(input, caller)
       : await makeBoundCrew(input, caller, { projectId: body.projectId, teamId: body.teamId })
