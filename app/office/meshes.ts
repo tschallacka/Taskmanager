@@ -366,7 +366,9 @@ export function buildPerson(key: string, back?: string): Rig {
     phone: phone(),
     paddle: paddle(),
     putter: putter(),
-    cup: cup()
+    cup: cup(),
+    broom: broom(),
+    mop: mop()
   }
   const leftHanded = new Set(['mug', 'cup', 'phone'])
   for (const [name, prop] of Object.entries(props)) {
@@ -378,6 +380,21 @@ export function buildPerson(key: string, back?: string): Rig {
     if ((o as THREE.Mesh).isMesh) o.castShadow = true
   })
   return { root, body, torso, head, armL, armR, legL, legR, handR, handL, carry, props }
+}
+
+// Janet's tools (the Janitor's cleanup): a broom with its bristles at the bottom, a mop with a cotton head.
+function broom(): THREE.Group {
+  const g = new THREE.Group()
+  g.add(cyl(0.025, 0.025, 1, '#8b5a2b', { y: -0.25 }))
+  g.add(box(0.3, 0.14, 0.08, '#d4a017', { y: -0.8 }))
+  return g
+}
+
+function mop(): THREE.Group {
+  const g = new THREE.Group()
+  g.add(cyl(0.025, 0.025, 0.9, '#8b5a2b', { y: -0.2 }))
+  g.add(cyl(0.16, 0.12, 0.14, '#e9ecef', { y: -0.75 }))
+  return g
 }
 
 function hammer(): THREE.Group {

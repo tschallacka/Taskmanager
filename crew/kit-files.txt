@@ -32,6 +32,7 @@ fonts.conf.tmpl
 guard.sh
 home.mjs
 init.mjs
+janet.mjs
 keys.mjs
 listen.mjs
 mentions.mjs

@@ -3,7 +3,9 @@
 // card adds its figure as app/office/figures/<key>.ts and lists it below.
 import type { Look } from '../meshes'
 import { PAT } from './pat'
+import { look as janet } from './janet'
 
 export const FIGURES: Record<string, Look> = {
-  pat: PAT
+  pat: PAT,
+  janet
 }

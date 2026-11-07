@@ -333,6 +333,16 @@ Use `browser` to look and check. Use `run` (Playwright, below) for a script that
    | `blocked` | anyone | waiting; the blocker is linked |
    | `split help` | the PM | she cannot split the task and needs Boss to |
    | `test failing` | anyone | a test fails and nobody knows why; the task is in Blocked |
+   | `ready to clean` | the worker when done, or Pia / Susy | the card's worker is finished; assigns the card to {{people.janet}} |
+   | `clean plan` | {{people.janet}} | the plan subtask `[Clean plan] <card>`, with one subtask per step |
+   | `cleaning granted` | the checker (Pia, or Susy) | on the plan subtask: the plan is allowed; only this lets {{people.janet}} delete |
+   | `clean done` | {{people.janet}} | on the plan subtask: every step ticked or skipped with a reason |
+   | `cleaned` | the checker | on the plan subtask: the steps were checked on disk; the cleanup is over |
+   | `clean refused` | the checker | on the plan subtask: a step is not allowed, with a note on that step |
+   The cleanup is a flow of its own (JANET.md). A card with `ready to clean` and no `cleaned` is not finished.
+   Workers keep a `.crew-scratch` list (one path per line) of what they create for a card: scratch files,
+   screenshots, temp folders. {{people.janet}} removes only what that list names, and only inside the worker's
+   own folders.
 7c. **Time your work.** Every worker logs time with `log_time` on the task or subtask you worked on,
    once when you move it to Verify and again after each round of fixes:
    `log_time {"task":"<id>","duration":"1h 15m","note":"<what>"}`. Count the real working time,
