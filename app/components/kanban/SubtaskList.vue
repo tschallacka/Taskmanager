@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import Sortable from 'sortablejs'
+import { errorMessage } from '~/utils/untypedFetch'
 
 const props = defineProps<{
   parentTaskId: string
@@ -14,10 +15,18 @@ const {
   createSubtask,
   updateTask,
   moveSubtask,
-  deleteTask
+  deleteTask,
+  isReadOnlyBoard
 } = useProjects()
 
 const toast = useToast()
+
+// A crew's board, read through the team that keeps it, is read-only for its
+// staff: the server refuses every change to it (403). The drawer only hides
+// these controls for customer contacts, so the list locks itself here as well,
+// and says why in one line where the add row would be (subtaskLock.ts).
+const lock = computed(() => subtaskLockState({ customerReadonly: props.readonly, boardReadOnly: isReadOnlyBoard.value }))
+const locked = computed(() => lock.value.locked)
 
 const subtasks = computed(() => subtasksOf(props.parentTaskId))
 
@@ -32,15 +41,29 @@ const grandparentId = computed(() => {
 })
 
 const draft = ref('')
+const draftInput = ref<HTMLInputElement | null>(null)
 
+// Enter or the "Add subtask" button adds the draft as a new row and keeps the
+// field focused for the next one. An empty draft only moves the cursor there.
+// A failed add puts the title back in the field and says why.
 async function addSubtask() {
   const title = draft.value.trim()
-  if (!title || !activeProject.value) return
+  if (!title) {
+    draftInput.value?.focus()
+    return
+  }
+  if (!activeProject.value) {
+    toast.add({ title: 'Could not add the subtask: its project is not loaded', icon: 'i-lucide-alert-triangle', color: 'error' })
+    return
+  }
   draft.value = ''
   try {
     await createSubtask(activeProject.value.id, props.parentTaskId, title)
-  } catch {
-    toast.add({ title: 'Could not add the subtask', icon: 'i-lucide-alert-triangle', color: 'error' })
+    await nextTick()
+    draftInput.value?.focus()
+  } catch (e) {
+    draft.value = title
+    toast.add({ title: errorMessage(e, 'Could not add the subtask'), icon: 'i-lucide-alert-triangle', color: 'error' })
   }
 }
 
@@ -187,10 +210,10 @@ function destroySortable() {
 // a teammate).
 const siblingSignature = computed(() => subtasks.value.map(t => `${t.id}:${t.position}`).join(','))
 
-watch([siblingSignature, () => props.readonly], async () => {
+watch([siblingSignature, locked], async () => {
   await nextTick()
   destroySortable()
-  if (props.readonly || !listEl.value) return
+  if (locked.value || !listEl.value) return
   // Unique per parent so items can only be dragged among their own siblings —
   // re-nesting across levels is deliberately keyboard-only (Tab/Shift+Tab).
   sortable = Sortable.create(listEl.value, {
@@ -220,7 +243,7 @@ onBeforeUnmount(destroySortable)
       >
         <div class="group/sub flex items-center gap-2 py-0.5">
           <UIcon
-            v-if="!readonly"
+            v-if="!locked"
             name="i-lucide-grip-vertical"
             class="kanban-subtask-handle size-3.5 shrink-0 cursor-grab text-dimmed opacity-0 transition-opacity group-hover/sub:opacity-100"
           />
@@ -228,7 +251,7 @@ onBeforeUnmount(destroySortable)
             type="button"
             class="shrink-0"
             :class="sub.completedAt != null ? 'text-success' : 'text-dimmed hover:text-success'"
-            :disabled="readonly"
+            :disabled="locked"
             :aria-label="sub.completedAt != null ? 'Mark subtask as not done' : 'Mark subtask as done'"
             @click="toggleSubtask(sub)"
           >
@@ -240,7 +263,7 @@ onBeforeUnmount(destroySortable)
           <input
             :ref="(el) => setInputRef(sub.id, el as Element | null)"
             :value="sub.title"
-            :readonly="readonly"
+            :readonly="locked"
             class="min-w-0 flex-1 bg-transparent py-0.5 text-sm outline-none"
             :class="sub.completedAt != null ? 'text-muted line-through decoration-1' : 'text-default'"
             @keydown.enter.prevent="onRowEnter(sub, $event)"
@@ -255,7 +278,7 @@ onBeforeUnmount(destroySortable)
             size="3xs"
           />
           <UButton
-            v-if="!readonly"
+            v-if="!locked"
             icon="i-lucide-x"
             size="xs"
             color="neutral"
@@ -271,13 +294,13 @@ onBeforeUnmount(destroySortable)
         >
           <KanbanSubtaskList
             :parent-task-id="sub.id"
-            :readonly="readonly"
+            :readonly="locked"
           />
         </div>
       </li>
     </ul>
     <form
-      v-if="!readonly"
+      v-if="!locked"
       class="flex items-center gap-2 py-0.5 pl-[22px]"
       @submit.prevent="addSubtask"
     >
@@ -286,10 +309,27 @@ onBeforeUnmount(destroySortable)
         class="size-4 shrink-0 text-dimmed"
       />
       <input
+        ref="draftInput"
         v-model="draft"
         placeholder="Add a subtask…"
+        aria-label="New subtask title"
         class="min-w-0 flex-1 bg-transparent py-0.5 text-sm text-default outline-none placeholder:text-dimmed"
       >
+      <UButton
+        type="submit"
+        size="xs"
+        color="neutral"
+        variant="soft"
+        icon="i-lucide-plus"
+        label="Add subtask"
+        data-add-subtask
+      />
     </form>
+    <p
+      v-else-if="lock.boardNote"
+      class="py-0.5 pl-[22px] text-xs text-muted"
+    >
+      This board is read-only here: it belongs to the crew.
+    </p>
   </div>
 </template>
