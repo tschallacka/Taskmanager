@@ -29,14 +29,22 @@ test('the placeholder is the same every time for one key, and differs between ke
   assert.notEqual(lookOf('susy').shirt, lookOf('janet').shirt)
 })
 
+test('Pat has her own figure in the registry: a cap and round glasses, not the placeholder', { skip: SKIP }, async () => {
+  const { lookOf, FIGURES } = await load()
+  assert.equal(FIGURES.pat, lookOf('pat'))
+  assert.equal(lookOf('pat').headwear, 'cap')
+  assert.equal(lookOf('pat').glasses, 'round')
+})
+
 test('a figure in the registry is used instead of the placeholder', { skip: SKIP }, async () => {
   const { lookOf, FIGURES } = await load()
+  const own = FIGURES.pat
   const before = lookOf('pat').shirt
   FIGURES.pat = { ...lookOf('pat'), shirt: '#123456' }
   try {
     assert.equal(lookOf('pat').shirt, '#123456')
   } finally {
-    delete FIGURES.pat
+    FIGURES.pat = own!
   }
   assert.equal(lookOf('pat').shirt, before)
 })
