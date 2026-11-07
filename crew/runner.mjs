@@ -58,25 +58,39 @@ function writeState(key, states) {
   writeFileSync(join(stateDir(), `${key}.json`), JSON.stringify(states[key], null, 2) + '\n', { mode: 0o600 })
 }
 
-// The cards a worker is on, read with its own key: my_tasks gives the ids, get_task the column and labels.
-async function cardsOf(worker, creds) {
+// One tools/call to the board with a worker's own key. A JSON-RPC error, a tool error and an answer with
+// no text all throw, so a failed read is never taken for an empty board (the rule mentions.mjs keeps too).
+async function callTool(creds, person, name, args) {
+  if (!person?.apiKey) throw new Error(`no key for this worker in creds.json`)
+  const res = await fetch(`${creds.base}/api/mcp`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'accept': 'application/json, text/event-stream', 'authorization': `Bearer ${person.apiKey}` },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } })
+  })
+  if (!res.ok) throw new Error(`${name}: HTTP ${res.status}`)
+  const body = await res.json()
+  if (body?.error) throw new Error(`${name}: ${body.error.message ?? 'JSON-RPC error'}`)
+  const text = body?.result?.content?.[0]?.text
+  if (body?.result?.isError) throw new Error(`${name}: ${text ?? 'failed'}`)
+  if (typeof text !== 'string') throw new Error(`${name}: the answer has no content`)
+  return JSON.parse(text)
+}
+
+// One card as the runner needs it, read with the worker's own key.
+async function readCard(creds, person, id) {
+  const full = await callTool(creds, person, 'get_task', { id })
+  if (typeof full?.id !== 'string') throw new Error(`get_task ${id}: the answer names no task`)
+  return { id: full.id, title: full.title, column: full.column, labels: full.labels ?? [], completed: Boolean(full.completed), updatedAt: full.updatedAt }
+}
+
+// The cards a worker is on, on this board: my_tasks gives the ids, get_task the column and labels.
+async function readCards(worker, creds) {
   const person = creds.people[worker.key]
-  if (!person?.apiKey) throw new Error(`no key for ${worker.key} in creds.json`)
-  const call = async (name, args) => {
-    const res = await fetch(`${creds.base}/api/mcp`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'accept': 'application/json, text/event-stream', 'authorization': `Bearer ${person.apiKey}` },
-      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } })
-    })
-    const body = await res.json()
-    return JSON.parse(body.result?.content?.[0]?.text ?? 'null')
-  }
-  const mine = await call('my_tasks', {})
+  const mine = await callTool(creds, person, 'my_tasks', {})
   const cards = []
   for (const task of mine?.tasks ?? []) {
-    if (task.board?.id !== creds.board.id) continue
-    const full = await call('get_task', { id: task.id })
-    cards.push({ id: full.id, title: full.title, column: full.column, labels: full.labels ?? [], completed: Boolean(full.completed), updatedAt: full.updatedAt })
+    if (task.board?.id !== creds.board?.id) continue
+    cards.push(await readCard(creds, person, task.id))
   }
   return cards
 }
@@ -85,12 +99,13 @@ function message(card) {
   return `Work on the Taskmanager card ${card.id} "${card.title}". Read it with get_task, then do what it asks, in your own branch.`
 }
 
-// Runs one worker on one card, to the end of the process. Resolves with the session id, if one was printed.
-function runOnce(worker, card) {
+// Runs one worker on one card, to the end of the process, continuing `session` when there is one.
+// Resolves with the session id the run printed (null if none); rejects when the run exits non-zero.
+function runOnce(worker, card, session) {
   const adapter = ADAPTERS[worker.runner]
   const workDir = join(here, 'runners', worker.key, 'work')
   mkdirSync(workDir, { recursive: true })
-  const argv = adapter.args({ model: worker.model, message: message(card) })
+  const argv = adapter.args({ model: worker.model, message: message(card), session })
   return new Promise((resolve, reject) => {
     const child = spawn(worker.runner, argv, { cwd: workDir, env: { ...process.env, ...adapter.env({}) }, stdio: ['ignore', 'pipe', 'pipe'] })
     let out = ''
@@ -102,7 +117,7 @@ function runOnce(worker, card) {
     })
     child.on('error', reject)
     child.on('close', (code) => {
-      if (code !== 0) reject(new Error(`${worker.runner} exited ${code}`))
+      if (code !== 0) reject(new Error(`${worker.runner} exited ${code}: ${out.trim().slice(-300)}`))
       else resolve(adapter.parseSession(out))
     })
   })
@@ -110,13 +125,8 @@ function runOnce(worker, card) {
 
 // Posts the one QUESTION to Pia, from the worker's own key, on the card it could not finish.
 async function postAsk(worker, card, creds) {
-  const person = creds.people[worker.key]
   const body = `QUESTION: @pia the runner has used its ${DEFAULTS.maxRuns} runs on this card without it moving on. Which way should ${worker.key} go next? The runner stops here until a new update.`
-  await fetch(`${creds.base}/api/mcp`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'accept': 'application/json, text/event-stream', 'authorization': `Bearer ${person.apiKey}` },
-    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'post_task_update', arguments: { id: card.id, body } } })
-  })
+  await callTool(creds, creds.people[worker.key], 'post_task_update', { id: card.id, body })
 }
 
 async function once(argv) {
@@ -126,27 +136,62 @@ async function once(argv) {
   const list = workers()
   const cards = {}
   for (const worker of list) {
-    cards[worker.key] = cardsFile ? JSON.parse(readFileSync(cardsFile, 'utf8'))[worker.key] ?? [] : await cardsOf(worker, creds)
+    try {
+      cards[worker.key] = cardsFile ? JSON.parse(readFileSync(cardsFile, 'utf8'))[worker.key] ?? [] : await readCards(worker, creds)
+    } catch (err) {
+      // A worker whose cards cannot be read gets no run this pass; the others still go.
+      console.log(`could not read the cards of ${worker.key}: ${err.message}`)
+      cards[worker.key] = []
+    }
   }
   const states = readStates(list.map(w => w.key))
   const plan = planPass({ workers: list, cards, states, now: Date.now() })
   for (const line of formatPlan(plan)) console.log(line)
   if (dryRun) return
-  // A card that used its runs is not run again: the worker asks Pia once, and the runner stops there.
+  // A card that used its runs is not run again until Pia writes on it: the worker asks once, and waits.
   for (const item of plan.filter(p => p.action === 'ask')) {
-    const creds2 = creds ?? loadCreds()
-    await postAsk(list.find(w => w.key === item.key), item.card, creds2)
-    states[item.key][item.card.id] = { ...states[item.key][item.card.id], asked: true }
-    writeState(item.key, states)
-    console.log(`asked for ${item.key} on ${item.card.id}`)
+    const worker = list.find(w => w.key === item.key)
+    const prev = states[item.key][item.card.id] ?? { runs: 0 }
+    try {
+      const c = creds ?? loadCreds()
+      await postAsk(worker, item.card, c)
+      // Written as soon as the question is on the card, so a later failure cannot post it twice.
+      states[item.key][item.card.id] = { ...prev, asked: true, lastSeenUpdate: item.card.updatedAt }
+      writeState(item.key, states)
+      const after = await readCard(c, c.people[worker.key], item.card.id)
+      states[item.key][item.card.id] = { ...states[item.key][item.card.id], lastSeenUpdate: after.updatedAt }
+      writeState(item.key, states)
+      console.log(`asked for ${item.key} on ${item.card.id}`)
+    } catch (err) {
+      console.log(`could not ask Pia for ${item.key} on ${item.card.id}: ${err.message}`)
+    }
   }
+  // A failed run is counted like any other run, so a card that always fails reaches maxRuns and is asked about.
   for (const item of plan.filter(p => p.action === 'start')) {
     const worker = list.find(w => w.key === item.key)
-    const session = await runOnce(worker, item.card)
-    const state = states[item.key][item.card.id] ?? { runs: 0 }
-    states[item.key][item.card.id] = { ...state, runs: state.runs + 1, lastRunAt: Date.now(), lastSeenUpdate: item.card.updatedAt, session }
+    const prev = states[item.key][item.card.id] ?? { runs: 0 }
+    const started = Date.now()
+    let session = null
+    let error = null
+    try {
+      session = await runOnce(worker, item.card, prev.session ?? null)
+    } catch (err) {
+      error = err.message
+    }
+    // The card's updatedAt after the run: the worker's own updates are then seen, not news for the next pass.
+    let lastSeenUpdate = item.card.updatedAt
+    if (creds) {
+      try {
+        lastSeenUpdate = (await readCard(creds, creds.people[worker.key], item.card.id)).updatedAt
+      } catch (err) {
+        console.log(`could not re-read ${item.card.id}: ${err.message}; the next pass may count the worker's own update as news`)
+      }
+    }
+    const runNo = prev.runs + 1
+    states[item.key][item.card.id] = { runs: runNo, lastRunAt: started, lastSeenUpdate, asked: false, session, lastError: error }
     writeState(item.key, states)
-    console.log(`ran ${item.key} on ${item.card.id}${session ? ` (session ${session})` : ''}`)
+    if (error) console.log(`failed ${item.key} on ${item.card.id} (run ${runNo}): ${error}`)
+    else console.log(`ran ${item.key} on ${item.card.id} (run ${runNo})${session ? ` (session ${session})` : ''}`)
   }
 }
 

@@ -1079,8 +1079,14 @@ describe('crew runner process', () => {
   test('after maxRuns the runner asks Pia once, then stops, and no run is started', () => {
     const now = 10_000_000
     const used = { runs: DEFAULTS.maxRuns, lastRunAt: 0, lastSeenUpdate: 100 }
-    assert.equal(nextAction(used, card({ updatedAt: 999 }), now), 'ask')
-    assert.equal(nextAction({ ...used, asked: true }, card({ updatedAt: 999 }), now), 'stop')
+    assert.equal(nextAction(used, card({ updatedAt: 100 }), now), 'ask')
+    assert.equal(nextAction({ ...used, asked: true }, card({ updatedAt: 100 }), now), 'stop')
+  })
+
+  test('after maxRuns and a question, a new update on the card (Pia answering) starts the worker again', () => {
+    const now = 10_000_000
+    const asked = { runs: DEFAULTS.maxRuns, lastRunAt: 0, lastSeenUpdate: 100, asked: true }
+    assert.equal(nextAction(asked, card({ updatedAt: 999 }), now), 'start')
   })
 
   test('the plan starts a pinned worker on its eligible cards and refuses a worker with no pinned model', () => {
@@ -1110,6 +1116,43 @@ describe('crew runner process', () => {
   test('the session id is read from the JSON lines opencode prints, and none is invented', () => {
     assert.equal(opencode.parseSession('not json\n{"type":"step"}\n{"sessionID":"ses_42"}\n'), 'ses_42')
     assert.equal(opencode.parseSession('{"type":"step"}\n'), null)
+  })
+
+  test('a failed run is counted, the pass goes on to the next worker, and a capped card is asked about, not run again', () => {
+    const home = mkdtempSync(join(tmpdir(), 'crew-runner-'))
+    const bin = mkdtempSync(join(tmpdir(), 'crew-runner-bin-'))
+    try {
+      writeFileSync(join(home, 'crew.json'), JSON.stringify({ runners: { wes: 'opencode/ollama', wick: 'opencode/ollama' } }))
+      // A creds file pointing at a closed port: the ask fails with a network error, not a real board.
+      writeFileSync(join(home, 'creds.json'), JSON.stringify({ base: 'http://127.0.0.1:9', board: { id: 'b1' }, people: { wes: { apiKey: 'k' }, wick: { apiKey: 'k' } } }))
+      writeFileSync(join(bin, 'opencode'), '#!/bin/sh\necho boom >&2\nexit 1\n', { mode: 0o755 })
+      const cards = join(home, 'cards.json')
+      writeFileSync(cards, JSON.stringify({ wes: [card({ id: 't1' })], wick: [card({ id: 't2' })] }))
+      const stateFile = (key) => join(home, 'runners', 'state', `${key}.json`)
+      const pass = () => spawnSync(process.execPath, [join(KIT, 'runner.mjs'), 'once', '--cards', cards], { encoding: 'utf8', env: { ...process.env, CREW_HOME: home, PATH: `${bin}:${process.env.PATH}` } })
+      const first = pass()
+      assert.equal(first.status, 0, first.stderr)
+      assert.match(first.stdout, /failed wes on t1 \(run 1\)/)
+      assert.match(first.stdout, /failed wick on t2 \(run 1\)/, 'the second worker still runs after the first fails')
+      assert.equal(JSON.parse(readFileSync(stateFile('wes'), 'utf8'))['t1'].runs, 1, 'the failed run is recorded')
+      // Make the retry window pass, and use up the runs: the next failed run is the last one.
+      for (const key of ['wes', 'wick']) {
+        const id = key === 'wes' ? 't1' : 't2'
+        const state = JSON.parse(readFileSync(stateFile(key), 'utf8'))
+        state[id] = { ...state[id], runs: DEFAULTS.maxRuns - 1, lastRunAt: 0 }
+        writeFileSync(stateFile(key), JSON.stringify(state))
+      }
+      const second = pass()
+      assert.match(second.stdout, /failed wes on t1 \(run 3\)/)
+      // Now the cap is reached: the runner tries to ask Pia (no board here, so the ask fails) and runs nothing.
+      const third = pass()
+      assert.doesNotMatch(third.stdout, /failed wes on t1 \(run 4\)/)
+      assert.match(third.stdout, /could not ask Pia for wes on t1/)
+      assert.equal(JSON.parse(readFileSync(stateFile('wes'), 'utf8'))['t1'].runs, 3)
+    } finally {
+      rmSync(home, { recursive: true, force: true })
+      rmSync(bin, { recursive: true, force: true })
+    }
   })
 
   test('the dry run prints the plan from a cards file and starts nothing', () => {

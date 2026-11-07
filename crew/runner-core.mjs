@@ -21,18 +21,21 @@ export function eligibleCards(cards) {
 /**
  * What the runner does with one card, given what it did before. `state` is { runs, lastRunAt,
  * lastSeenUpdate, asked } for this worker and card, or null when it has never run on it.
+ * `lastSeenUpdate` is the card's updatedAt after the runner's last run or ask, so only a change
+ * made by someone else (Pia's answer, a new update) counts as news.
  *   start  run the worker on the card now
  *   wait   it ran recently and nothing new happened on the card
  *   ask    it has used its runs: post a QUESTION to Pia, once
  *   stop   it has used its runs and has already asked: do nothing
- * A card is run again only when it has changed since the last run, or after retryMinutes.
+ * News on the card starts it at once, even after its runs are used up: an answer from Pia is what
+ * it waited for. Otherwise it runs again only after retryMinutes, and never past maxRuns.
  */
 export function nextAction(state, card, now, options = {}) {
   const { retryMinutes, maxRuns } = { ...DEFAULTS, ...options }
   const runs = state?.runs ?? 0
   if (runs === 0) return 'start'
-  if (runs >= maxRuns) return state.asked ? 'stop' : 'ask'
   if (card.updatedAt != null && card.updatedAt !== state.lastSeenUpdate) return 'start'
+  if (runs >= maxRuns) return state.asked ? 'stop' : 'ask'
   if (now - state.lastRunAt >= retryMinutes * 60_000) return 'start'
   return 'wait'
 }
