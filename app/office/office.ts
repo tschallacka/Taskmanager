@@ -7,7 +7,7 @@ import {
   JAR, SHELF, SHREDDER
 } from '../../shared/office/model'
 import type { Errand, OfficePerson, OfficeSnapshot, Place } from '../../shared/office/model'
-import { Actor, routes } from './actor'
+import { Actor, roundSharpCorners, routes } from './actor'
 import type { Beat, IdleStyle } from './actor'
 import './roles/janet'
 import './roles/pat'
@@ -460,7 +460,9 @@ export class OfficeScene {
       return (ax * bx + az * bz) / ((Math.hypot(ax, az) * Math.hypot(bx, bz)) || 1)
     }
     while (legs.length > 2 && off(route[0]!) > 0.5 && turnAt(1) < -0.4) legs.splice(1, 1)
-    await actor.walk(legs.slice(1))
+    // A sharp corner on the path (the graph turns back at a node, such as round a table) is cut, so the body does not
+    // snap round at the node in one stride.
+    await actor.walk(roundSharpCorners(legs).slice(1))
   }
 
   private async goHome(actor: Actor) {
