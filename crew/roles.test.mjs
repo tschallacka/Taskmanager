@@ -59,3 +59,22 @@ test('Pat has her checklist: the five checks, one PRECHECK verdict, and the two 
   const cross = readFileSync(join(KIT, 'CREW.md.tmpl'), 'utf8')
   assert.ok(cross.includes('| `PM approved` |') && cross.includes('| `PM violation` |'), 'the tag table lists both tags')
 })
+
+test('Rita writes the status to Boss and the minutes, and the PM no longer does', () => {
+  const rita = readFileSync(join(KIT, 'RITA.md.tmpl'), 'utf8')
+  assert.match(rita, /post_status_update/, 'the hourly report is post_status_update to Boss')
+  assert.match(rita, /on_track/)
+  assert.match(rita, /meeting over/, 'the minutes follow "meeting over:"')
+  assert.match(rita, /Secret-free/, 'her reports carry no credential')
+  const prompts = readFileSync(join(KIT, 'PROMPTS.md.tmpl'), 'utf8')
+  assert.ok(prompts.includes('## Reporter ('), 'the launch prompt has a Reporter section')
+  const crew = readFileSync(join(KIT, 'CREW.md.tmpl'), 'utf8')
+  assert.ok(!crew.includes('- **Status:** `post_status_update`'), 'the PM no longer posts the status')
+  assert.ok(crew.includes('RITA.md'), 'CREW.md points at Rita for status and minutes')
+})
+
+test('the Rita figure is registered and gets her own look, not the placeholder', () => {
+  const figures = readFileSync(join(REPO, 'app', 'office', 'figures', 'index.ts'), 'utf8')
+  assert.match(figures, /rita: RITA_LOOK/, 'FIGURES names rita')
+  assert.ok(existsSync(join(REPO, 'app', 'office', 'figures', 'rita.ts')), 'the figure file exists')
+})
