@@ -7,8 +7,9 @@ import {
   JAR, SHELF, SHREDDER
 } from '../../shared/office/model'
 import type { Errand, OfficePerson, OfficeSnapshot, Place } from '../../shared/office/model'
-import { Actor } from './actor'
+import { Actor, routes } from './actor'
 import type { Beat, IdleStyle } from './actor'
+import './roles/janet'
 import { stepBall } from './ballistics'
 import type { BallWorld } from './ballistics'
 import { buildLayout, FIXTURES, GOLF, ROOM } from './layout'
@@ -315,6 +316,8 @@ export class OfficeScene {
 
     const layout = buildLayout(this.cast)
     this.layout = layout
+    // A role's desk is its seat node on the floor: the role pieces name a person key and get the point from here.
+    routes.setDeskLookup(personKey => layout.graph.nodes.get(layout.seatNode(personKey)) ?? null)
     for (const person of this.cast) {
       const desk = layout.desks.get(person.key)
       if (!desk) continue
