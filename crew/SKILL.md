@@ -21,7 +21,8 @@ If it is, run `crew watch` to see where the run stands.
 | --- | --- | --- |
 | `boss` | the owner's login (you act through it, the crew never does) | applies schema changes, reviews code, publishes, reads reports |
 | `customer` | the customer (you, in a second role) | asks for things, answers the PM, only sees customer-visible tasks |
-| `pia` | the project manager (Haiku) | the customer's contact: plans tasks, assigns, pre-checks Verify, triages UX findings |
+| `pia` | the project manager (Haiku) | the customer's contact: plans tasks, answers questions, steers and starts the workers |
+| `pat`, `tess`, `rita`, `janet`, `susy` | the pre-checker, the triage clerk, the reporter, the janitor, the poker (Haiku) | Pat pre-checks Verify PM; Tess triages findings and bugs; Rita writes the status and minutes; Janet cleans after a worker; Susy pokes people who stopped |
 | `wren` `wick` `wynn` `wade` | the workers (Haiku) | build, test in their own browser profile, report |
 | `usher` | Usher Xander, the usability tester (Haiku) | reviews a task in `Verify UX`, tries every feature, files `[UX]` findings for the PM |
 | `nina` | Nina Nitpick, the code quality reviewer (Haiku) | reviews a task in `Verify CQ`, files `CQ violation` subtasks, tags `CQ approved` |
@@ -36,8 +37,8 @@ Columns: Backlog, To do, In progress, **Verify PM**, **Verify UX**, **Verify CQ*
 1. The PM puts ready tasks in To do, the rest in Backlog. A worker moves a task to In progress,
    builds it, tests it in the browser, attaches a screenshot, runs the tests (none may fail), posts an
    update and moves it to **Verify PM**.
-2. The PM checks it in **Verify PM** (diff, lint, evidence, time log) and sends clearly wrong work back
-   to To do. Then it passes the gates, each owned by one person, and returns to **Verify PM** after
+2. Pat (`pat`) pre-checks it in **Verify PM** (diff, lint, evidence, time log) and sends clearly wrong work back
+   to To do. Then the server routes it through the gates on a crew board, each owned by one person, and returns to **Verify PM** after
    each: **Verify UX** (the usher, only when a subtask is tagged `verify UX`), **Verify CQ** (the
    nitpicker) and **Verify QA** (Quincy). Each reviewer files problems as subtasks (`UX violation`,
    `CQ violation`, `QA violation`) and tags the task `UX approved`, `CQ approved` or `QA approved`
@@ -53,9 +54,10 @@ Columns: Backlog, To do, In progress, **Verify PM**, **Verify UX**, **Verify CQ*
    accepted by the user, and no subtask, question or follow-up is open.
 5. Workers commit and push only their own branch, one pull request per main task (`WORKFLOW.md`, Phase 3).
    Only you merge. The PM and the reviewers never commit or push, and nobody but you touches the database.
-6. Bugs: anyone files a `[BUG]` task in the Bugs column; the PM assigns it, a worker fixes it and
+6. Bugs: anyone files a `[BUG]` task in the Bugs column; Tess triages it and assigns it, a worker fixes it and
    moves it through Verify like anything else.
-7. UX review: the tester files `[UX]` tasks to the PM; unclear ones become a chat meeting with you.
+7. UX review: the tester files `[UX]` findings; Tess triages them. Pia answers their questions, and unclear product
+   points become a chat meeting with you.
 
 ## Running it
 
