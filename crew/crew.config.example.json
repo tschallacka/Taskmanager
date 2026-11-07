@@ -44,5 +44,26 @@
     "psql": "",
     "url": ""
   },
-  "subagentsDir": ""
+  "subagentsDir": "",
+  "publish": {
+    "repo": "/absolute/path/to/the/product/repository (empty: product.repo)",
+    "remote": "origin",
+    "base": "main",
+    "dir": "",
+    "install": "",
+    "link": [],
+    "typecheck": "",
+    "lint": "",
+    "lintFiles": "",
+    "test": "",
+    "migrate": "",
+    "scratchDatabase": "",
+    "schemaFiles": [],
+    "lockFiles": [],
+    "commitName": "",
+    "commitEmail": "",
+    "attribution": [],
+    "pr": "gh pr create --base {base} --head {branch} --title {title} --body-file {pr}",
+    "timeout": 600
+  }
 }

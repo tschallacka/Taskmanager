@@ -58,7 +58,9 @@ export const config = {
   subagentsDir: raw.subagentsDir ?? '',
   // The slug the crew API files this crew under (setup.mjs reads it).
   crew: raw.crew ?? {},
-  devLog: raw.devLog ?? `${here}dev.log`
+  devLog: raw.devLog ?? `${here}dev.log`,
+  // The merger's `crew publish` (publish.mjs validates it and names every problem); the repository defaults to the product's.
+  publish: { repo: raw.product?.repo ?? '', ...raw.publish }
 }
 
 // The columns every board needs, in this order. The crew API creates them.

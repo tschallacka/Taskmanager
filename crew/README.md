@@ -318,10 +318,36 @@ accounts, after which their definitions and the file are yours to delete.
     crew mentions [minutes|--follow]   Pia's updates that write @cato, each printed once: since the last check, or every 60 s for a Monitor (mentions.mjs)
     crew update [--check] [--from <kit folder|kit.tar.gz>] [--kit <folder>]   bring the kit folder up to date (update.mjs)
     crew setup                    make the crew by hand (setup.mjs)
+    crew publish <slug> <branch> <title> <msg-file> <pr-file>   the merger's one command: squash a branch onto a fresh base, check the merged tree, push, open the pull request (publish.mjs, below)
     crew <who> browser goto|shot|eval|console|tabs|close-tab|done   the shared browser (browser.mjs)
     crew browser status|shutdown  the shared browser for everyone
 
 The old file names (`tm.mjs`, `listen.mjs`, ...) still work.
+
+## Publish (the merger's one command)
+
+`crew publish <slug> <branch> <title> <msg-file> <pr-file>` puts a finished branch onto the base the way the merger wants it. It fetches the base, makes a clean worktree from the fetched base at `<crew home>/publish/wt-<slug>` (logs in `<crew home>/publish/logs`, never `/tmp`), squashes the branch into it, and runs on the merged tree: the install, the schema migration against the scratch database, the typecheck, the lint of the changed files and the full suite. Only when all of them pass does it commit, push the branch `crew-<slug>` and open the pull request. The main checkout is never touched, and nothing is merged or deployed.
+
+Every setting is `publish` in `crew.json` (the example is in `crew.config.example.json`). The repository defaults to `product.repo`:
+
+| setting | what it does |
+| --- | --- |
+| `repo`, `remote`, `base` | the repository, its remote and the base branch (`origin`, `main` by default) |
+| `dir` | where the worktrees and logs go (default `<crew home>/publish`) |
+| `install`, `link` | the install command in the worktree; `link` is a list of untracked folders (such as `node_modules`) shared from the repository for the checks, and removed before the commit |
+| `typecheck`, `lint`, `lintFiles`, `test` | the checks. `lint` gets the changed files at `{files}`; `lintFiles` is a regular expression they must match |
+| `migrate`, `scratchDatabase` | the migration runs only with `DATABASE_URL` set to `scratchDatabase`. Without a scratch database it is skipped with a note |
+| `schemaFiles`, `lockFiles` | the files that make the merger act by hand: a note is printed when one of them changed |
+| `commitName`, `commitEmail` | the commit identity (both or neither; neither uses the repository's own) |
+| `attribution` | lines appended to the commit message, such as a `Co-Authored-By:` line |
+| `pr` | the pull request command, with `{base}`, `{branch}`, `{title}`, `{pr}` (the body file) and `{slug}` filled in and quoted |
+| `timeout` | seconds per command (600 by default) |
+
+An empty command skips its step and prints `skipped: publish.<setting> is empty`. A misspelt setting or a wrong type stops the run and names the setting.
+
+The exit codes: 0 published; 1 a git or setup failure; 2 usage; 3 a merge conflict, which prints the conflicted files and keeps the worktree for a hand merge; 4 a check failed, and nothing was pushed. `FORCE=1` goes on past a failed check and pushes anyway, and says so in the summary. Every command gets `DATABASE_URL` from `scratchDatabase` only; one from the environment is never passed on.
+
+`crew.mjs` runs it as `publish.mjs`; `publish.test.mjs` runs it against throwaway git repositories in a folder under the kit's own folder, removed after each run.
 
 Post long text from a file, not inline JSON: write the Markdown to a file and run `crew wren update <taskId> body.md`. An update is internal (staff only) unless `--customer` is given; a customer contact's update is customer-visible whatever the flag says, because the server decides. The board prints `posted as internal` or `posted as customer`. An empty body, a file over 200 KB, invalid UTF-8 or NUL bytes exit 65; a missing file, a symlink or a non-file exits 66; an unknown flag exits 64; a board that cannot be reached exits 69 (try again). The one-line form is `crew wren mcp post_task_update`, with a JSON object holding the id and the body.
 
