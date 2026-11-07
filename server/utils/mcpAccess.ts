@@ -15,6 +15,7 @@ import { customerIdsOf, projectAccessFilter, sessionProjectFilter } from './auth
 import type { Audience } from './auth-helpers'
 import { guestProjectIdsOf } from './guests'
 import { McpToolError } from './mcpToolKit'
+import { boardsGranting } from './connectTokenRules'
 
 /** Whether the key is cut down to one customer's boards, or to single boards and not to a whole workspace. */
 export function isNarrowedKey(context: Pick<ApiKeyContext, 'customerId' | 'reach'>): boolean {
@@ -56,11 +57,14 @@ export async function boardFilter(context: ApiKeyContext) {
   ]
   const granted = or(...grants) ?? sql`false`
   const narrowed = context.customerId ? and(granted, eq(projects.customerId, context.customerId)) : granted
-  const reachable = and(open, narrowed)
+  // A token with per-board grants reaches only the boards that grant the permission of this call.
+  const perBoard = boardsGranting(context.scopes, context.boardScopes, context.callScope)
+  const onGrantedBoards = perBoard === null ? undefined : perBoard.length ? inArray(projects.id, perBoard) : sql`false`
+  const reachable = and(open, narrowed, onGrantedBoards)
 
   // A crew's read reach on the real boards it works on; only a plain read call carries it.
   const crewRead = context.readGrantedBoardIds ?? []
-  return crewRead.length ? or(reachable, inArray(projects.id, crewRead)) : reachable
+  return crewRead.length ? or(reachable, and(inArray(projects.id, crewRead), onGrantedBoards)) : reachable
 }
 
 /**

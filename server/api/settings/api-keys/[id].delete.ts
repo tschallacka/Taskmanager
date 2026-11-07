@@ -1,17 +1,10 @@
-import { and, eq } from 'drizzle-orm'
-import { db } from '../../../db'
-import { apiKeys } from '../../../db/schema'
+import { revokeKey } from '../../../utils/connectTokens'
 
-/** Revokes a key by deleting it. Any agent still holding it stops working at once. */
+/** Revokes a key. Any agent still holding it stops working at once, and its next call is told the token was revoked. */
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')!
   const userId = event.context.session.user.id
 
-  const [deleted] = await db
-    .delete(apiKeys)
-    .where(and(eq(apiKeys.id, id), eq(apiKeys.userId, userId)))
-    .returning({ id: apiKeys.id })
-
-  if (!deleted) throw createError({ statusCode: 404, message: 'API key not found' })
+  if (!await revokeKey(userId, id)) throw createError({ statusCode: 404, message: 'API key not found' })
   return { ok: true }
 })

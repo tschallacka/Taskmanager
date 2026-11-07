@@ -190,6 +190,8 @@ export interface AgentStreamGrant {
   allBoards?: boolean
   workspaceTeamIds?: (string | null)[]
   boardIds?: string[]
+  /** A token with per-board grants: the only boards it may read. Null for a token with no per-board grant. */
+  readBoardIds?: string[] | null
 }
 
 /**
@@ -200,6 +202,7 @@ export interface AgentStreamGrant {
  * gets nothing from any other.
  */
 export function deliverableTo(record: Pick<AgentEventRecord, 'audience' | 'teamId'> & Partial<Pick<AgentEventRecord, 'board' | 'customerId'>>, keyTeamId: string | null, reach: AgentStreamGrant = {}): boolean {
+  if (reach.readBoardIds && !reach.readBoardIds.includes(record.board ?? '')) return false
   if (reach.projectId && record.board !== reach.projectId) return false
   if (reach.customerId && record.customerId !== reach.customerId) return false
   if (reach.allBoards || reach.boardIds || reach.workspaceTeamIds) return deliverableByGrant(record, reach)
@@ -307,6 +310,7 @@ interface Stream {
   /** The grant the key was given (see AgentStreamGrant); a stream with none follows the columns above. */
   allBoards?: boolean
   boardIds?: string[]
+  readBoardIds?: string[] | null
   workspaceTeamIds?: (string | null)[]
   customerId: string | null
   connection: StreamConnection | null
@@ -416,6 +420,7 @@ export class AgentEventHub {
       projectId: key.projectId ?? null,
       allBoards: key.allBoards,
       boardIds: key.boardIds,
+      readBoardIds: key.readBoardIds,
       workspaceTeamIds: key.workspaceTeamIds,
       customerId: key.customerId ?? null,
       connection: null,
