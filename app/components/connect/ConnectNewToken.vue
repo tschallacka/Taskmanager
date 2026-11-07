@@ -56,7 +56,20 @@ async function create() {
   if (!canCreate.value) return
   creating.value = true
   const picked = Object.entries(grants.value).map(([projectId, scopes]) => ({ projectId, scopes }))
+  const boards = picked.map(pick => ({
+    id: pick.projectId,
+    name: boardOf(pick.projectId)?.name ?? 'A board',
+    workspace: boardOf(pick.projectId)?.workspace ?? '',
+    scopes: pick.scopes
+  }))
   try {
+    // Browser verification makes no token now: the agent asks for it, and the token comes when the person approves.
+    if (method.value === 'browser') {
+      emit('issued', { title: 'Connection requested', tokenName: name.value.trim(), boards, access: { kind: 'browser' } })
+      name.value = ''
+      grants.value = {}
+      return
+    }
     const response = await $fetch<{ token?: string, key: { id: string } }>('/api/settings/connect-tokens', {
       method: 'POST',
       body: {
@@ -66,11 +79,6 @@ async function create() {
         reveal: method.value === 'token' ? 'token' : undefined
       }
     })
-    const boards = picked.map(pick => ({
-      name: boardOf(pick.projectId)?.name ?? 'A board',
-      workspace: boardOf(pick.projectId)?.workspace ?? '',
-      scopes: pick.scopes
-    }))
     let access: IssuedConnection['access']
     if (method.value === 'token' && response.token) {
       access = { kind: 'token', token: response.token }

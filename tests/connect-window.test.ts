@@ -5,7 +5,7 @@ import { describe, test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createError } from 'h3'
 import { readBoardGrants, scopesOfGrants } from '../server/utils/connectTokenRules'
-import { connectPrompt, permissionName } from '../app/utils/connectPrompt'
+import { CONNECT_METHODS, connectPrompt, permissionName } from '../app/utils/connectPrompt'
 
 Object.assign(globalThis, { createError })
 
@@ -113,5 +113,40 @@ describe('the copy-paste prompt', () => {
   test('permissions have plain names, and an unknown one keeps its scope', () => {
     assert.equal(permissionName('boards:write'), 'Change tasks')
     assert.equal(permissionName('something:else'), 'something:else')
+  })
+})
+
+describe('browser verification in the window', () => {
+  const boards = [{ id: 'board-1', name: 'Office', workspace: 'Personal', scopes: ['boards:read', 'boards:write'] }]
+
+  test('the browser choice is offered and no longer marked coming soon', () => {
+    const browser = CONNECT_METHODS.find(method => method.value === 'browser')
+    assert.ok(browser)
+    assert.equal('disabled' in browser, false)
+    assert.doesNotMatch(browser.description, /Coming soon/)
+  })
+
+  test('the browser prompt carries the address and the boards, and no secret', () => {
+    const prompt = connectPrompt({ origin: ORIGIN, tokenName: 'Laptop', boards, access: { kind: 'browser' } })
+    assert.match(prompt, new RegExp(`${ORIGIN}/api/pair/device`))
+    assert.match(prompt, new RegExp(`${ORIGIN}/api/pair/device/poll`))
+    assert.match(prompt, /"boardId":"board-1"/)
+    assert.match(prompt, /"client_name":"Laptop"/)
+    assert.match(prompt, /verification_url/)
+    assert.match(prompt, /TASKMANAGER_API_KEY/)
+    assert.doesNotMatch(prompt, /tm-pair-/)
+    assert.doesNotMatch(prompt, /arn_/)
+    assert.doesNotMatch(prompt, /api\/pair\b(?!\/)/, 'the code exchange is not part of the browser flow')
+  })
+
+  test('the browser prompt quotes a client name with a single quote safely for the shell', () => {
+    const prompt = connectPrompt({ origin: ORIGIN, tokenName: 'Ann\'s laptop', boards, access: { kind: 'browser' } })
+    assert.match(prompt, /"client_name":"Ann'\\''s laptop"/)
+  })
+
+  test('the browser prompt keeps the refusal line for the agent', () => {
+    const prompt = connectPrompt({ origin: ORIGIN, tokenName: 'Laptop', boards, access: { kind: 'browser' } })
+    assert.match(prompt, /do not retry/)
+    assert.match(prompt, /report it to your main agent/)
   })
 })

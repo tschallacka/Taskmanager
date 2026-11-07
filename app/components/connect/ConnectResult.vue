@@ -41,7 +41,11 @@ async function copy(text: string, which: 'key' | 'prompt', title: string) {
   }
 }
 
-const keyText = computed(() => (props.issued.access.kind === 'code' ? props.issued.access.code : props.issued.access.token))
+const keyText = computed(() => {
+  const access = props.issued.access
+  if (access.kind === 'code') return access.code
+  return access.kind === 'token' ? access.token : ''
+})
 
 function expiresText(expiresAt: number): string {
   return format(new Date(expiresAt), 'p')
@@ -73,6 +77,13 @@ function expiresText(expiresAt: number): string {
             Give your agent this code, or the prompt below. The code works once and until {{ expiresText(issued.access.expiresAt) }}. The agent exchanges it for its key, so the key itself never goes through the chat.
           </p>
           <p
+            v-else-if="issued.access.kind === 'browser'"
+            class="text-xs text-muted"
+          >
+            Nothing is shown here to copy. Give your agent the prompt below. It asks for this connection, and a link comes back
+            for you to open and approve. The key is made when you approve, and it is never shown in a chat.
+          </p>
+          <p
             v-else
             class="text-xs text-muted"
           >
@@ -89,7 +100,10 @@ function expiresText(expiresAt: number): string {
         />
       </div>
 
-      <div class="flex flex-col sm:flex-row gap-2 min-w-0">
+      <div
+        v-if="issued.access.kind !== 'browser'"
+        class="flex flex-col sm:flex-row gap-2 min-w-0"
+      >
         <code
           data-connect-key
           class="flex-1 min-w-0 text-sm font-mono bg-default border border-default rounded-md px-3 py-2 break-all"

@@ -855,6 +855,28 @@ export const pairingCodes = pgTable(
   table => [index('pairing_codes_token_idx').on(table.tokenId)]
 )
 
+// Browser verification (device flow): an agent starts a request, the person approves it in the browser, and the
+// agent polls until it gets the token once. Only the SHA-256 digests of the device code (polled by the agent) and
+// the user code (typed on the approve page) are stored. `requested` holds the boards and permissions the agent
+// asked for, and after approval the narrowed grant the person chose. The token is minted at the first approved
+// poll, so `token_id` stays empty until then.
+export const pairingDeviceRequests = pgTable(
+  'pairing_device_requests',
+  {
+    id: text('id').primaryKey(),
+    deviceCodeHash: text('device_code_hash').notNull().unique(),
+    userCodeHash: text('user_code_hash').notNull().unique(),
+    clientName: text('client_name').notNull(),
+    requested: json('requested').$type<{ boardId: string, scopes: ApiKeyScope[] }[]>().notNull(),
+    status: text('status').$type<'pending' | 'approved' | 'denied'>().notNull().default('pending'),
+    tokenId: text('token_id').references(() => apiKeys.id, { onDelete: 'set null' }),
+    approvedBy: text('approved_by').references(() => user.id, { onDelete: 'cascade' }),
+    expiresAt: bigint('expires_at', { mode: 'number' }).notNull(),
+    lastPolledAt: bigint('last_polled_at', { mode: 'number' }),
+    createdAt: bigint('created_at', { mode: 'number' }).notNull()
+  }
+)
+
 // What a link on a task points at. `ref` holds the issue or PR number, the
 // branch name, or the workflow run id, as text, so one column serves all four.
 export const GITHUB_LINK_KINDS = ['issue', 'pull', 'branch', 'workflow_run'] as const
