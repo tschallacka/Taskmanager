@@ -4,8 +4,10 @@
 import type { Look } from '../meshes'
 import { PAT } from './pat'
 import { TESS } from './tess'
+import { look as janet } from './janet'
 
 export const FIGURES: Record<string, Look> = {
   pat: PAT,
-  tess: TESS
+  tess: TESS,
+  janet
 }
