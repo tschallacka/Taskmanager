@@ -3,8 +3,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { GESTURE_NAMES, cleaningStateOf, createRouteRegistry, followPlan, routes } from '../app/office/actor'
-import type { WalkPlan } from '../app/office/actor'
 import { PROP_NAMES } from '../app/office/meshes'
+import '../app/office/roles/janet'
 
 test('the rig carries the shared piece\'s props, each once: broom, mop and magnifier', () => {
   for (const name of ['broom', 'mop', 'magnifier']) {
@@ -30,47 +30,73 @@ test('no cleaning tags, or a finished cleanup, is no state: nothing is shown for
   assert.equal(cleaningStateOf(['ready to clean', 'clean plan', 'cleaning granted', 'cleaned']), null)
 })
 
-// An example role's route: from the desk to the bin and back, then sweep. Used only by these tests.
-const EXAMPLE_DESK = { x: 1, z: 2 }
-const EXAMPLE_BIN = { x: 4, z: 2 }
-function exampleRoute(state: 'walk' | 'stand' | 'sweep'): WalkPlan | null {
-  if (state === 'walk') return { points: [EXAMPLE_BIN, EXAMPLE_DESK], then: 'none' }
-  if (state === 'sweep') return { points: [EXAMPLE_DESK], then: 'sweep' }
-  return null
+// Two dummy roles with their own kinds of state: a janitor-like one (tags) and a poker-like one (a count of pokes).
+const DESK = { x: 1, z: 2 }
+const BIN = { x: 4, z: 2 }
+
+function registryWithDesks() {
+  const registry = createRouteRegistry()
+  registry.setDeskLookup(personKey => (personKey === 'wren' ? DESK : null))
+  return registry
 }
 
-test('a role registers its route once, under a crew key, and gets its plan for a state', () => {
-  const registry = createRouteRegistry()
-  registry.register('example', exampleRoute)
-  assert.deepEqual(registry.keys(), ['example'])
-  assert.deepEqual(registry.planFor('example', 'walk'), { points: [EXAMPLE_BIN, EXAMPLE_DESK], then: 'none' })
-  assert.equal(registry.planFor('example', 'stand'), null, 'no route for a state that has no walk')
-  assert.equal(registry.planFor('example', null), null, 'no state, no route')
-  assert.equal(registry.planFor('nobody', 'walk'), null, 'a key with no registration has no route')
+test('a role brings its own state: the registry gives its plan from the data the role reads its state from', () => {
+  const registry = registryWithDesks()
+  registry.register<{ tags: string[] }, 'walk' | 'sweep'>('example', {
+    stateOf: data => (data.tags.includes('go') ? 'walk' : data.tags.includes('done') ? 'sweep' : null),
+    plan: state => ({ points: [BIN], then: state === 'walk' ? 'none' : 'sweep' })
+  })
+  registry.register<{ pokes: number }, { pokes: number }>('poker', {
+    stateOf: data => (data.pokes > 0 ? { pokes: data.pokes } : null),
+    plan: state => ({ points: [DESK], then: 'stand', badge: state.pokes })
+  })
+  assert.deepEqual(registry.keys(), ['example', 'poker'])
+  assert.deepEqual(registry.planFor('example', { tags: ['go'] }), { points: [BIN], then: 'none' })
+  assert.deepEqual(registry.planFor('example', { tags: ['done'] }), { points: [BIN], then: 'sweep' })
+  assert.equal(registry.planFor('example', { tags: [] }), null, 'no state from the data, no plan')
+  assert.deepEqual(registry.planFor('poker', { pokes: 3 }), { points: [DESK], then: 'stand', badge: 3 })
+  assert.equal(registry.planFor('poker', { pokes: 0 }), null)
 })
 
 test('a second registration for a key is refused, not silently replaced; a key that is not a crew key is refused', () => {
-  const registry = createRouteRegistry()
-  registry.register('example', exampleRoute)
-  assert.throws(() => registry.register('example', () => null), /already registered/)
-  assert.throws(() => registry.register('Example', exampleRoute), /not a crew key/)
-  assert.throws(() => registry.register('../x', exampleRoute), /not a crew key/)
-  assert.deepEqual(registry.planFor('example', 'walk'), { points: [EXAMPLE_BIN, EXAMPLE_DESK], then: 'none' })
+  const registry = registryWithDesks()
+  const piece = { stateOf: () => 'x' as const, plan: () => ({ points: [], then: 'none' as const }) }
+  registry.register('example', piece)
+  assert.throws(() => registry.register('example', piece), /already registered/)
+  assert.throws(() => registry.register('Example', piece), /not a crew key/)
+  assert.throws(() => registry.register('../x', piece), /not a crew key/)
 })
 
-test('the office registry starts empty: no role piece is shown until its own piece registers', () => {
-  assert.deepEqual(routes.keys(), [])
-  assert.equal(routes.planFor('janet', 'walk'), null)
+test('an unknown key plans nothing', () => {
+  const registry = registryWithDesks()
+  assert.equal(registry.planFor('nobody', { tags: ['go'] }), null)
 })
 
-test('an actor walks the plan\'s points in order and then sweeps', async () => {
+test('walking to a desk names only the person key: the target comes from the desk lookup, and a person without a desk has none', () => {
+  const registry = registryWithDesks()
+  assert.deepEqual(registry.deskOf('wren'), DESK)
+  assert.equal(registry.deskOf('ghost'), null)
+  assert.deepEqual(registry.walkToDesk('wren', 'sweep', { badge: 2 }), { points: [DESK], then: 'sweep', badge: 2 })
+  assert.equal(registry.walkToDesk('ghost', 'sweep'), null)
+})
+
+test('the office registry has Janet\'s piece only: her state comes from her cleanup tags, and no state means no route', () => {
+  assert.deepEqual(routes.keys(), ['janet'])
+  assert.equal(routes.planFor('janet', { tags: [], worker: 'wren' }), null, 'no cleanup state, no route')
+  assert.equal(routes.planFor('nobody', { tags: ['ready to clean'], worker: 'wren' }), null)
+})
+
+test('an actor walks the plan\'s points in order, then waits, then sweeps', async () => {
   const calls: string[] = []
   const actor = {
     walk: async (points: { x: number, z: number }[]) => { calls.push(`walk ${points.map(p => `${p.x},${p.z}`).join(' ')}`) },
     play: async (name: string) => { calls.push(`play ${name}`) }
   }
-  await followPlan(actor, { points: [EXAMPLE_BIN, EXAMPLE_DESK], then: 'sweep' })
-  assert.deepEqual(calls, ['walk 4,2 1,2', 'play sweep'])
+  const wait = async (seconds: number) => {
+    calls.push(`wait ${seconds}`)
+  }
+  await followPlan(actor, { points: [BIN, DESK], then: 'sweep', stopSeconds: 2 }, wait)
+  assert.deepEqual(calls, ['walk 4,2 1,2', 'wait 2', 'play sweep'])
 })
 
 test('a plan with no points and nothing after it does nothing; a plan that stands by does not play a gesture', async () => {
@@ -80,6 +106,6 @@ test('a plan with no points and nothing after it does nothing; a plan that stand
     play: async () => { calls.push('play') }
   }
   await followPlan(actor, { points: [], then: 'none' })
-  await followPlan(actor, { points: [EXAMPLE_DESK], then: 'stand' })
+  await followPlan(actor, { points: [DESK], then: 'stand' })
   assert.deepEqual(calls, ['walk'])
 })

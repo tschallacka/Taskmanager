@@ -65,47 +65,81 @@ export function cleaningStateOf(tags: readonly string[]): CleaningState {
 /** What a role does once it has walked its route: stand by, sweep, or nothing. */
 export type AfterWalk = 'stand' | 'sweep' | 'none'
 
-/** One role's walk for one state: the points to walk through in order, then what the role does at the end. */
+/**
+ * One role's walk for one state: the points to walk through in order, then what the role does at the end. A stop has a
+ * length in seconds (`stopSeconds`); a badge is a count the office shows at the role's desk (Susy's pokes, Janet's
+ * cleaned). Both are data, so the actor does not know any role.
+ */
 export interface WalkPlan {
   points: P[]
   then: AfterWalk
+  stopSeconds?: number
+  badge?: number
 }
 
-/** A role's piece: for a state it gives the walk, or null when that role has nothing to do in that state. */
-export type RoutePlanner = (state: NonNullable<CleaningState>) => WalkPlan | null
+/**
+ * A role's piece. Its state is read from the data the office has for that role; its plan is made from the state. The
+ * state's shape is the role's own (Janet's is her cleanup state, Susy's is the person she poked).
+ */
+export interface RolePiece<D, S> {
+  stateOf: (data: D) => S | null
+  plan: (state: S) => WalkPlan | null
+}
 
 /**
- * The route registry. Each role's piece registers its planner under its crew key; nobody edits the shared lines to add
- * one. A key may register once: a second registration is an error, not a silent replacement.
+ * The route registry. Each role's piece registers under its crew key in its own file; nobody edits the shared lines to
+ * add one. A key may register once: a second registration is an error, not a silent replacement.
  */
 export interface RouteRegistry {
-  register: (key: string, planner: RoutePlanner) => void
-  planFor: (key: string, state: CleaningState) => WalkPlan | null
+  register: <D, S>(key: string, piece: RolePiece<D, S>) => void
+  planFor: (key: string, data: unknown) => WalkPlan | null
+  /** Where a crew key's desk is, on the office floor; the office sets it from its layout. */
+  setDeskLookup: (lookup: (personKey: string) => P | null) => void
+  /** The target point for walking to a person's desk, or null when the office has no such desk. */
+  deskOf: (personKey: string) => P | null
+  /** A walk to a person's desk, then `then`; null when there is no desk to walk to. */
+  walkToDesk: (personKey: string, then: AfterWalk, extra?: Partial<WalkPlan>) => WalkPlan | null
   keys: () => string[]
 }
 
 export function createRouteRegistry(): RouteRegistry {
-  const planners = new Map<string, RoutePlanner>()
+  const pieces = new Map<string, (data: unknown) => WalkPlan | null>()
+  let lookup: (personKey: string) => P | null = () => null
   return {
-    register(key, planner) {
+    register(key, piece) {
       if (!/^[a-z][a-z0-9-]*$/.test(key)) throw new Error(`"${key}" is not a crew key`)
-      if (planners.has(key)) throw new Error(`a route is already registered for "${key}"`)
-      planners.set(key, planner)
+      if (pieces.has(key)) throw new Error(`a route is already registered for "${key}"`)
+      pieces.set(key, (data) => {
+        const state = piece.stateOf(data as never)
+        return state === null ? null : piece.plan(state)
+      })
     },
-    planFor(key, state) {
-      if (!state) return null
-      return planners.get(key)?.(state) ?? null
+    planFor(key, data) {
+      return pieces.get(key)?.(data) ?? null
     },
-    keys: () => [...planners.keys()]
+    setDeskLookup(fn) {
+      lookup = fn
+    },
+    deskOf: personKey => lookup(personKey),
+    walkToDesk(personKey, then, extra = {}) {
+      const desk = lookup(personKey)
+      return desk ? { points: [desk], then, ...extra } : null
+    },
+    keys: () => [...pieces.keys()]
   }
 }
 
 /** The office's own registry: the role pieces register here, in their own files. */
 export const routes = createRouteRegistry()
 
-/** Walks a plan with an actor: the route first, then what the role does at the end. */
-export async function followPlan(actor: Pick<Actor, 'walk' | 'play'>, plan: WalkPlan): Promise<void> {
+/** Walks a plan with an actor: the route, then the stop, then what the role does at the end. */
+export async function followPlan(
+  actor: Pick<Actor, 'walk' | 'play'>,
+  plan: WalkPlan,
+  wait: (seconds: number) => Promise<void> = async () => {}
+): Promise<void> {
   if (plan.points.length) await actor.walk(plan.points)
+  if (plan.stopSeconds) await wait(plan.stopSeconds)
   if (plan.then === 'sweep') await actor.play('sweep')
 }
 
