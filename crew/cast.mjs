@@ -9,7 +9,7 @@ export const EXTRA_CAST = ['wes', 'wilma', 'walt']
 // her own session; the optional log watcher included) get an agent definition. The extra workers (EXTRA_CAST) play
 // their role from their forks, but run on their own model and get no agent definition.
 
-export const CAST = ['pia', 'wren', 'wick', 'wynn', 'wade', 'usher', 'nina', 'quincy', 'watcher', ...EXTRA_CAST]
+export const CAST = ['pia', 'wren', 'wick', 'wynn', 'wade', 'usher', 'nina', 'quincy', 'susy', 'janet', 'pat', 'tess', 'rita', 'watcher', ...EXTRA_CAST]
 
 /**
  * What init does with one member of a forks file: `write` an agent definition for a standard member, `skip` an

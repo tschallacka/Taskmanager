@@ -25,9 +25,14 @@
     "usher": "Usher Xander",
     "nina": "Nina Nitpick",
     "quincy": "Quincy Average",
+    "susy": "Susy Secretary",
+    "janet": "Janet Janitor",
+    "pat": "Pat Precheck",
+    "tess": "Tess Triage",
+    "rita": "Rita Reporter",
     "contact": "Casey Contact"
   },
-  "nicks": { "pia": "pia", "wren": "wren", "wick": "wick", "wynn": "wynn", "wade": "wade", "usher": "usher", "nina": "nina", "quincy": "quincy" },
+  "nicks": { "pia": "pia", "wren": "wren", "wick": "wick", "wynn": "wynn", "wade": "wade", "usher": "usher", "nina": "nina", "quincy": "quincy", "susy": "susy", "janet": "janet", "pat": "pat", "tess": "tess", "rita": "rita" },
   "chat": {
     "client": "/absolute/path/to/chat-client-rs (leave empty to run without the chat line)",
     "channel": "#acme",
