@@ -8,6 +8,7 @@
 //   crew watch                 the Boss's board watcher (watch.mjs)
 //   crew init                  check the machine and render the documents (init.mjs)
 //   crew janet clean plan|run <who> <card> [--dry-run]   Janet's cleanup of a worker's leftovers (janet.mjs)
+//   crew janet stale plan|run <card> [--dry-run]         the crew's stale worktrees: plan, then run what is granted (janet.mjs)
 //   crew publish <slug> <branch> <title> <msg-file> <pr-file>   the merger's one command: squash onto a fresh base, check, push, open the PR (publish.mjs)
 //   crew totp <file>           the current authenticator code for a dev copy's two-factor secret (totp.mjs)
 //   crew setup                 make the crew by hand through the crew API (setup.mjs)

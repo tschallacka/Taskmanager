@@ -71,6 +71,26 @@ Work the steps in order. Each one the kit does is ticked on its step subtask (`c
 saying what was done. A step you skip gets an update saying why and is not ticked. When every step is ticked or
 skipped, set `clean done` on the plan subtask, with one update that lists what was removed and what was left.
 
+## Stale worktrees (the sweep)
+
+A worktree of the crew that has had no work for more than `staleHours` (crew.json, `"janet": { "staleHours": 24 }`)
+is cleaned up on the standing card, the same way as a card's plan (the same grant, the same hash):
+
+```
+{{node_kit}}/crew.mjs janet stale plan <card> [--dry-run]   # the plan, posted as the subtask `[Clean plan] stale worktrees`
+{{node_kit}}/crew.mjs janet stale run <card> [--dry-run]    # runs it, only once the plan carries `cleaning granted`
+```
+
+"Idle since" is the newest of: the last commit, the newest change in the tree, the card's last update. A worktree is
+removable when it is stale, not in use, has no uncommitted work, and is not a detached HEAD. Its folder goes. Its local
+branch goes only when the branch is merged into the base with no open pull request.
+
+- Uncommitted work is never removed: a worktree with any (modified, staged, untracked outside its `.crew-scratch` list)
+  is listed `needs the worker: uncommitted work`, and Susy pokes the owner.
+- Committed work that is not pushed keeps its branch, and the plan lists `kept: unpushed commits on <branch>`.
+- `run` checks each worktree again right before its removal, and skips one that is dirty or in use now (listed as skipped).
+- Janet never commits, stashes or discards anyone's work. The main checkout, the publish worktrees' branches and
+  anything outside the crew's folders are never touched.
 ## Rules
 
 - Delete nothing without `cleaning granted`. Delete only steps of the granted plan.

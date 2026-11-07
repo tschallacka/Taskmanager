@@ -3,6 +3,8 @@
 //
 //   crew janet clean plan <who> <card> [--dry-run] [--worktree <path>]   works out the plan, deletes nothing
 //   crew janet clean run  <who> <card> [--dry-run] [--worktree <path>]   deletes, but only a granted plan
+//   crew janet stale plan <card> [--dry-run]   the crew's stale worktrees: the plan, posted as a subtask of the card
+//   crew janet stale run  <card> [--dry-run]   removes what a granted stale plan names (clean, unpushed kept, see JANET.md)
 //
 // The safety rules (the Janet card, and CREW.md rule 7b):
 // - nothing is deleted without `cleaning granted` on the plan subtask, and only the steps of that plan;
@@ -16,8 +18,8 @@
 // run it against a fake worktree. Only the command line at the bottom reads crew.json.
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { existsSync, lstatSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
-import { isAbsolute, join, relative, resolve } from 'node:path'
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 export const SCRATCH_LIST = '.crew-scratch'
@@ -79,6 +81,7 @@ export function parseWorktrees(text) {
     for (const line of block.split('\n')) {
       if (line.startsWith('worktree ')) entry.path = line.slice('worktree '.length)
       if (line.startsWith('branch refs/heads/')) entry.branch = line.slice('branch refs/heads/'.length)
+      if (line === 'locked' || line.startsWith('locked ')) entry.locked = true
     }
     return entry
   })
@@ -239,10 +242,17 @@ export function runPlan({ plan, board, dryRun, execute, log }) {
   if (boardHash !== plan.hash) {
     throw new Error(`refused: the granted steps (${boardHash}) are not the steps allowed now (${plan.hash}): the plan changed since the grant, replan`)
   }
+  const skipped = []
   for (const step of plan.steps) {
     log(`${dryRun ? 'would do' : 'doing'}: ${stepTitle(step)}`)
     if (dryRun) continue
-    execute(step)
+    // A step may refuse at the moment it happens (a worktree that became dirty since the plan): it is skipped, not ticked.
+    const outcome = execute(step)
+    if (outcome?.skipped) {
+      skipped.push(outcome.skipped)
+      log(`skipped: ${outcome.skipped}`)
+      continue
+    }
     const boardStep = onBoard.find(s => s.kind === step.kind && s.target === step.target)
     if (boardStep) {
       board.updateTask(boardStep.id, { completed: true })
@@ -251,9 +261,337 @@ export function runPlan({ plan, board, dryRun, execute, log }) {
   }
   if (!dryRun) {
     board.updateTask(plan.planId, { tags: [...tags.filter(t => t !== DONE), DONE] })
-    board.postUpdate(plan.planId, `Clean done: ${plan.steps.length} step(s) done, ${plan.refused.length} item(s) left, see the list above.`)
+    const note = skipped.length ? `, ${skipped.length} skipped at the removal (${skipped.join('; ')})` : ''
+    board.postUpdate(plan.planId, `Clean done: ${plan.steps.length - skipped.length} step(s) done, ${plan.refused.length} item(s) left, see the list above${note}.`)
   }
-  return { done: plan.steps.length, dryRun }
+  return { done: plan.steps.length - skipped.length, skipped, dryRun }
+}
+
+// ── Stale worktrees ──────────────────────────────────────────────────────────
+// `janet stale plan|run <card>`: the crew's worktrees that have had no work for more than `staleHours` (crew.json,
+// "janet": { "staleHours": 24 }). The same flow as a card's clean plan: the plan is a subtask of the standing card,
+// granted with `cleaning granted`, and `run` refuses unless the steps allowed now are the granted ones (same hash).
+// Uncommitted work is never removed: a worktree with any is listed as `needs the worker`. Janet never commits, stashes
+// or discards someone else's work.
+
+export const STALE_PLAN_TITLE = '[Clean plan] stale worktrees'
+export const DEFAULT_STALE_HOURS = 24
+const PROTECTED = ['main', 'master', 'develop']
+// Ignored folders the tools rebuild: they go with a worktree. Any other ignored file may be a local secret or setting,
+// so it keeps the worktree.
+const REBUILDABLE = ['node_modules', '.next', 'dist', 'coverage']
+const CARD_IN_NAME = /(mw[a-z0-9]{5,})/
+
+export function staleHoursOf(crewJson) {
+  const value = crewJson?.janet?.staleHours ?? DEFAULT_STALE_HOURS
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+    throw new Error('crew.json janet.staleHours must be a number above 0')
+  }
+  return value
+}
+
+// The crew's worktrees: inside the crew home (the workers' and Boss's publish folders), or beside the repository and
+// named after it (`arnotes-wick-<card>`). Any other worktree of the repository is not the crew's and is never touched.
+export function belongsToCrew(path, repoRoot, crewHome) {
+  const target = resolve(path)
+  const repo = resolve(repoRoot)
+  return insideRoot(crewHome, target) || (dirname(target) === dirname(repo) && basename(target).startsWith(`${basename(repo)}-`))
+}
+
+// The card a worktree was made for, from its branch (`wick/<card>-title`) or else its folder name; null when neither has one.
+export function cardIdOf(entry) {
+  const match = CARD_IN_NAME.exec(entry.branch ?? '') ?? CARD_IN_NAME.exec(entry.path)
+  return match ? match[1] : null
+}
+
+// Whether a process has the folder, or a folder inside it, as its working folder: an agent or a shell at work there.
+// Reads /proc (Linux); null where that cannot be read, and the worktree is then kept. A process whose folder cannot be
+// read (another user's) is not counted.
+export function inUseProbe(path) {
+  let pids
+  try {
+    pids = readdirSync('/proc').filter(name => /^\d+$/.test(name))
+  } catch {
+    return null
+  }
+  for (const pid of pids) {
+    try {
+      const cwd = readlinkSync(`/proc/${pid}/cwd`)
+      if (resolve(cwd) === resolve(path) || insideRoot(path, cwd)) return true
+    } catch {
+      // The process ended, or its folder is not readable by this user.
+    }
+  }
+  return false
+}
+
+function mtimeOf(path) {
+  try {
+    return lstatSync(path).mtimeMs
+  } catch {
+    return 0
+  }
+}
+
+function sizeKb(path) {
+  const run = spawnSync('du', ['-sk', path], { encoding: 'utf8' })
+  const kb = Number.parseInt(run.stdout ?? '', 10)
+  return Number.isFinite(kb) ? kb : 0
+}
+
+/**
+ * What is uncommitted in a worktree, and what it may still lose. `dirty` lists every change that is not on the
+ * worktree's `.crew-scratch` list (modified, staged, untracked, ignored-but-not-rebuildable); `scratch` lists what the
+ * list allows to go; `fileMs` is the newest change in the tree. Nothing is changed here.
+ */
+export function scanWorktree(path, git) {
+  const root = resolve(path)
+  const status = git(['status', '--porcelain=v1', '-z', '--untracked-files=all', '--ignored=traditional', '--no-renames'], root)
+  const lines = status.stdout.split('\0').filter(Boolean).map(line => ({ code: line.slice(0, 2), rel: line.slice(3) }))
+  const scratchFile = join(root, SCRATCH_LIST)
+  const listed = existsSync(scratchFile)
+    ? readScratchList(readFileSync(scratchFile, 'utf8')).map(entryPath => resolve(root, entryPath)).filter(target => insideRoot(root, target))
+    : []
+  const trackedIn = rel => git(['ls-files', '--', rel], root).stdout.trim() !== ''
+  const scratch = new Map() // target -> is a folder
+  const dirty = []
+  let fileMs = 0
+  for (const { code, rel } of lines) {
+    const abs = resolve(root, rel.replace(/\/$/, ''))
+    if (code === '!!') {
+      if (!REBUILDABLE.includes(rel.replace(/\/$/, '').split('/')[0])) dirty.push(`${rel} (ignored)`)
+      continue
+    }
+    fileMs = Math.max(fileMs, mtimeOf(abs))
+    if (code !== '??') {
+      dirty.push(`${rel} (${code.trim()})`)
+      continue
+    }
+    if (abs === scratchFile) {
+      scratch.set(abs, false)
+      continue
+    }
+    const onList = listed.find(target => target === abs || insideRoot(target, abs))
+    if (!onList) {
+      dirty.push(`${rel} (untracked)`)
+      continue
+    }
+    if (!scratch.has(onList)) {
+      const stat = lstatSync(onList)
+      if (stat.isSymbolicLink() || (stat.isDirectory() && existsSync(join(onList, '.git')))) {
+        dirty.push(`${rel} (on the scratch list, but a link or a repository)`)
+        continue
+      }
+      if (stat.isDirectory() && trackedIn(relative(root, onList))) {
+        dirty.push(`${rel} (in a listed folder with tracked files)`)
+        continue
+      }
+      scratch.set(onList, stat.isDirectory())
+    }
+  }
+  return { dirty, scratch: [...scratch].map(([target, isDir]) => ({ target, isDir })), fileMs }
+}
+
+/**
+ * What git and the disk say about one worktree. Nothing is changed here. `cardUpdated(cardId)` is the card's last
+ * update in ms, null when the card cannot be read; `inUse(path)` is inUseProbe's answer.
+ */
+export function gatherFacts(entry, { repoRoot, base, git, cardUpdated, inUse }) {
+  const path = resolve(entry.path)
+  const head = git(['rev-parse', 'HEAD'], path)
+  if (head.status !== 0) return { readable: false }
+  const tip = head.stdout.trim()
+  const commitMs = Number(git(['log', '-1', '--format=%ct', tip], path).stdout.trim() || 0) * 1000
+  const scan = scanWorktree(path, git)
+  const merged = git(['merge-base', '--is-ancestor', tip, base], repoRoot).status === 0
+  const remote = entry.branch ? git(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${entry.branch}`], repoRoot).stdout.trim() : ''
+  const cardId = cardIdOf(entry)
+  return {
+    readable: true,
+    locked: Boolean(entry.locked),
+    commitMs,
+    fileMs: scan.fileMs,
+    cardMs: cardId ? cardUpdated(cardId) : undefined,
+    dirty: scan.dirty,
+    scratch: scan.scratch,
+    merged,
+    pushed: remote !== '' && remote === tip,
+    inUse: inUse(path),
+    sizeKb: sizeKb(path)
+  }
+}
+
+/**
+ * Works out the stale plan. Nothing is deleted or posted here. `facts(entry)` says what is known about one worktree
+ * (gatherFacts, or a stand-in in the tests); `prState(branch)` is GitHub's answer for a branch.
+ * A worktree is removable when it is stale, not in use, has no uncommitted work, and is not detached. Its folder goes;
+ * its branch goes only when merged into the base with no open pull request, else the branch is kept (listed).
+ * Returns { steps, refused, hash, roots, freedKb }.
+ */
+export function stalePlan({ entries, repoRoot, base, crewHome, now, staleMs, facts, prState }) {
+  const steps = []
+  const refused = []
+  const roots = []
+  let freedKb = 0
+  for (const entry of entries) {
+    const path = resolve(entry.path)
+    if (path === resolve(repoRoot) || !belongsToCrew(path, repoRoot, crewHome)) continue
+    const f = facts(entry)
+    const cardKnown = f.cardMs !== null
+    const idleMs = f.readable && cardKnown ? now - Math.max(f.commitMs, f.fileMs, f.cardMs ?? 0) : null
+    const idle = idleMs === null ? null : Math.floor(idleMs / 3600000)
+    const stale = idleMs !== null && idleMs >= staleMs
+    let verdict
+    if (!f.readable) verdict = 'not readable: kept'
+    else if (f.locked) verdict = 'locked: kept'
+    else if (!cardKnown) verdict = 'its card cannot be read: kept'
+    else if (!stale) verdict = `fresh (idle ${idle} h): kept`
+    else if (entry.branch && (PROTECTED.includes(entry.branch) || entry.branch === base)) verdict = 'shared branch: kept'
+    else if (f.inUse !== false) verdict = 'in use, or unknown: kept'
+    else if (f.dirty.length) verdict = `needs the worker: uncommitted work (${f.dirty.join(', ')})`
+    else if (!entry.branch) verdict = 'needs the worker: detached HEAD, its commits would be lost'
+    else verdict = 'removable'
+    if (verdict !== 'removable') {
+      refused.push({ target: path, reason: verdict })
+      continue
+    }
+    for (const s of f.scratch) steps.push({ kind: s.isDir ? 'dir' : 'file', target: s.target, reason: 'on the worktree\'s scratch list' })
+    steps.push({ kind: 'worktree', target: path, reason: `idle ${idle} h, clean, ${f.merged ? `merged into ${base}` : 'its commits kept on the branch'}` })
+    roots.push(path)
+    freedKb += f.sizeKb
+    if (!f.merged) {
+      refused.push({ target: entry.branch, reason: f.pushed ? 'kept: not merged into the base (tip pushed)' : `kept: unpushed commits on ${entry.branch}` })
+      continue
+    }
+    const state = prState(entry.branch)
+    if (['none', 'closed', 'merged'].includes(state)) {
+      steps.push({ kind: 'branch', target: entry.branch, reason: `merged into ${base}, no open pull request` })
+    } else {
+      refused.push({ target: entry.branch, reason: state === 'open' ? 'kept: open pull request' : 'kept: pull request state unknown' })
+    }
+  }
+  return { steps, refused, hash: planHash(steps), roots, freedKb }
+}
+
+export function renderStalePlan(plan, staleHours) {
+  return `Stale worktrees: no work for more than ${staleHours} h, clean, not in use. Freed when run: about ${(plan.freedKb / 1024).toFixed(1)} MB.\n\n${renderPlan(plan)}`
+}
+
+// One step of a granted stale plan, with the checks made again at the moment it happens. A worktree that is in use or
+// has uncommitted work now is skipped, and says so; nothing else is decided here. Returns { skipped: reason } or undefined.
+export function removeStep(step, { roots, repoRoot, git, inUse, scan }) {
+  if (step.kind === 'file' || step.kind === 'dir') {
+    assertRemovable(step, roots)
+    if (existsSync(step.target)) rmSync(step.target, { recursive: step.kind === 'dir', force: false })
+    return undefined
+  }
+  if (step.kind === 'worktree') {
+    if (inUse(step.target) !== false) return { skipped: `${step.target} is in use now` }
+    const now = scan(step.target)
+    if (now.dirty.length) return { skipped: `needs the worker: uncommitted work (${now.dirty.join(', ')})` }
+    if (git(['worktree', 'remove', step.target], repoRoot).status !== 0) return { skipped: `git worktree remove refused ${step.target}` }
+    return undefined
+  }
+  if (step.kind === 'branch') {
+    if (git(['branch', '-d', step.target], repoRoot).status !== 0) return { skipped: `git branch -d refused ${step.target}` }
+    return undefined
+  }
+  throw new Error(`refused: ${step.kind} is not a step of a stale plan`)
+}
+
+// The open stale plan of the standing card: the `[Clean plan] stale worktrees` subtask not yet tagged `cleaned`.
+function openStalePlan(card, kit) {
+  const open = (card.subtasks ?? [])
+    .filter(sub => (sub.title ?? '').startsWith(STALE_PLAN_TITLE))
+    .filter(sub => !(boardCall('janet', 'get_task', { id: sub.id }, kit).tags ?? []).includes('cleaned'))
+  if (open.length > 1) throw new Error('refused: more than one open stale plan on the card')
+  return open[0] ?? null
+}
+
+// Posts the plan: the plan subtask under the card (assigned to Janet, tagged `clean plan`), one step subtask per step,
+// and the plan as an update on it. Returns the plan subtask's id.
+function postStalePlan(config, here, kit, cardId, plan, text) {
+  if (openStalePlan(boardCall('janet', 'get_task', { id: cardId }, kit), kit)) {
+    throw new Error('refused: an open stale plan is already on the card: run it, or have it cleaned, first')
+  }
+  const work = join(here, 'work', 'janet', cardId)
+  mkdirSync(work, { recursive: true })
+  writeFileSync(join(work, 'stale-plan.json'), JSON.stringify(plan, null, 2))
+  const made = boardCall('janet', 'create_task', { title: STALE_PLAN_TITLE, parent: cardId, assignee: config.people.janet }, kit)
+  const planId = made?.id
+  if (!planId) throw new Error('the board did not return the id of the plan subtask')
+  boardCall('janet', 'update_task', { id: planId, tags: ['clean plan'] }, kit)
+  for (const step of plan.steps) {
+    boardCall('janet', 'create_task', { title: stepTitle(step), parent: planId, description: step.reason }, kit)
+  }
+  postUpdateFile('janet', planId, text, kit, work)
+  return planId
+}
+
+function janetBoard(kit, work) {
+  return {
+    getTask: id => boardCall('janet', 'get_task', { id }, kit),
+    updateTask: (id, patch) => boardCall('janet', 'update_task', { id, ...patch }, kit),
+    postUpdate: (id, text) => postUpdateFile('janet', id, text, kit, work)
+  }
+}
+
+function staleConfig(here) {
+  const file = join(here, 'crew.json')
+  return existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : {}
+}
+
+async function staleMain(config, here, kit, mode, cardId, dryRun) {
+  if (!['plan', 'run'].includes(mode) || !/^[A-Za-z0-9]+$/.test(cardId ?? '')) {
+    console.error(`usage: crew janet stale plan|run <card> [--dry-run]   (kit ${kit})`)
+    return 2
+  }
+  const repoRoot = config.product.repo
+  if (!repoRoot) throw new Error('product.repo is not set in crew.json: Janet needs the repository to find worktrees')
+  const staleHours = staleHoursOf(staleConfig(here))
+  const base = baseBranchOf(repoRoot, git)
+  const entries = parseWorktrees(git(['worktree', 'list', '--porcelain'], repoRoot).stdout)
+  // A card that cannot be read leaves its worktree kept: the idle time is then unknown.
+  const cardUpdated = (id) => {
+    try {
+      const at = Date.parse(boardCall('janet', 'get_task', { id }, kit).updatedAt)
+      return Number.isFinite(at) ? at : null
+    } catch {
+      return null
+    }
+  }
+  const plan = stalePlan({
+    entries,
+    repoRoot,
+    base,
+    crewHome: here,
+    now: Date.now(),
+    staleMs: staleHours * 3600000,
+    facts: entry => gatherFacts(entry, { repoRoot, base, git, cardUpdated, inUse: inUseProbe }),
+    prState: branch => prStateFromGh(branch, repoRoot)
+  })
+  if (mode === 'plan') {
+    const text = renderStalePlan(plan, staleHours)
+    console.log(text)
+    if (dryRun) {
+      console.log('dry run: nothing posted')
+      return 0
+    }
+    console.log(`posted: plan subtask ${postStalePlan(config, here, kit, cardId, plan, text)} on ${cardId}`)
+    return 0
+  }
+  const planSub = openStalePlan(boardCall('janet', 'get_task', { id: cardId }, kit), kit)
+  if (!planSub) throw new Error(`refused: no open "${STALE_PLAN_TITLE}" subtask on the card: plan first`)
+  const execute = step => removeStep(step, { roots: plan.roots, repoRoot, git, inUse: inUseProbe, scan: path => scanWorktree(path, git) })
+  const result = runPlan({
+    plan: { ...plan, planId: planSub.id },
+    board: janetBoard(kit, join(here, 'work', 'janet', cardId)),
+    dryRun,
+    execute,
+    log: line => console.log(line)
+  })
+  console.log(dryRun ? 'dry run: nothing removed' : `done: ${result.done} step(s), skipped ${result.skipped.length}, about ${(plan.freedKb / 1024).toFixed(1)} MB freed`)
+  return 0
 }
 
 // ── The command line ─────────────────────────────────────────────────────────
@@ -280,7 +618,7 @@ export function prStateFromGh(branch, repoRoot) {
 }
 
 function boardCall(who, tool, args, kit) {
-  const run = spawnSync(process.execPath, [join(kit, 'crew.mjs'), who, 'mcp', tool, JSON.stringify(args)], { encoding: 'utf8' })
+  const run = spawnSync(process.execPath, [join(kit, 'tm.mjs'), who, 'mcp', tool, JSON.stringify(args)], { encoding: 'utf8' })
   if (run.status !== 0) throw new Error(`board call ${tool} failed: ${(run.stderr || run.stdout).trim().slice(0, 300)}`)
   try {
     return JSON.parse(run.stdout)
@@ -293,7 +631,7 @@ function postUpdateFile(who, id, text, kit, work) {
   const file = join(work, 'janet-update.md')
   mkdirSync(work, { recursive: true })
   writeFileSync(file, text)
-  const run = spawnSync(process.execPath, [join(kit, 'crew.mjs'), who, 'update', id, file, '--internal'], { encoding: 'utf8' })
+  const run = spawnSync(process.execPath, [join(kit, 'tm.mjs'), who, 'update', id, file, '--internal'], { encoding: 'utf8' })
   if (run.status !== 0) throw new Error(`posting the update failed: ${(run.stderr || run.stdout).trim().slice(0, 300)}`)
 }
 
@@ -309,6 +647,8 @@ async function main(argv) {
   if (at >= 0) flags.worktree = argv[at + 1]
   const args = argv.filter((a, i) => !a.startsWith('--') && (at < 0 || (i !== at && i !== at + 1)))
   const [verb, mode, who, cardId] = args
+  // `janet stale plan|run <card>`: the third word is the standing card, not a person.
+  if (verb === 'stale') return staleMain(config, here, kit, mode, who, flags.dryRun)
   if (verb !== 'clean' || !['plan', 'run'].includes(mode) || !who || !cardId) {
     console.error(usage(kit))
     return 2
