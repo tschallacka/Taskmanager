@@ -5,7 +5,7 @@
 export const RUNNER_LABEL = 'runner'
 const ACTIVE_COLUMNS = new Set(['to do', 'in progress'])
 
-export const DEFAULTS = { retryMinutes: 30, maxRuns: 3 }
+export const DEFAULTS = { retryMinutes: 30, maxRuns: 3, runTimeoutMinutes: 30 }
 
 /** A card a runner may take: To do or In progress, labelled `runner`, not finished. */
 export function isEligible(card) {
@@ -19,11 +19,21 @@ export function eligibleCards(cards) {
 }
 
 /**
+ * The card as the runner needs it, from a get_task answer. `updateCount` is updatesMatched, the number of
+ * updates on the card. Posting an update does not change updatedAt, so the count is what shows news.
+ */
+export function cardFrom(full) {
+  if (typeof full?.id !== 'string') throw new Error('get_task: the answer names no task')
+  if (typeof full.updatesMatched !== 'number') throw new Error(`get_task ${full.id}: the answer gives no updatesMatched`)
+  return { id: full.id, title: full.title, column: full.column, labels: full.labels ?? [], completed: Boolean(full.completed), updateCount: full.updatesMatched }
+}
+
+/**
  * What the runner does with one card, given what it did before. `state` is { runs, lastRunAt,
- * lastSeenUpdate, asked, unread } for this worker and card, or null when it has never run on it.
- * `lastSeenUpdate` is the card's updatedAt after the runner's last run or ask, so only a change
- * made by someone else (Pia's answer, a new update) counts as news. `unread` means the question was
- * posted but the card could not be re-read after it, so the baseline is not known yet (repairUnread).
+ * lastSeenCount, asked, unread } for this worker and card, or null when it has never run on it.
+ * `lastSeenCount` is the card's updateCount after the runner's last run or ask, so only an update made by
+ * someone else (Pia's answer, a new update) counts as news. `unread` means the card could not be re-read
+ * after the runner's own run or question, so the baseline is not known yet (repairUnread).
  *   start  run the worker on the card now
  *   wait   it ran recently and nothing new happened on the card
  *   ask    it has used exactly maxRuns: post a QUESTION to Pia, once
@@ -36,7 +46,7 @@ export function nextAction(state, card, now, options = {}) {
   const runs = state?.runs ?? 0
   if (runs === 0) return 'start'
   if (state.unread) return 'stop'
-  if (card.updatedAt != null && card.updatedAt !== state.lastSeenUpdate) return 'start'
+  if (card.updateCount != null && card.updateCount !== state.lastSeenCount) return 'start'
   if (runs > maxRuns) return 'stop'
   if (runs === maxRuns) return state.asked ? 'stop' : 'ask'
   if (now - state.lastRunAt >= retryMinutes * 60_000) return 'start'
@@ -44,7 +54,7 @@ export function nextAction(state, card, now, options = {}) {
 }
 
 /**
- * Gives each state whose baseline is unknown the card's updatedAt as this pass read it. Only a card read
+ * Gives each state whose baseline is unknown the card's updateCount as this pass read it. Only a card read
  * in this pass counts. Returns the worker keys whose states changed, so the caller writes them.
  */
 export function repairUnread(states, cards) {
@@ -53,13 +63,14 @@ export function repairUnread(states, cards) {
     for (const [id, state] of Object.entries(byCard)) {
       if (!state?.unread) continue
       const card = (cards[key] ?? []).find(c => c.id === id)
-      if (!card || card.updatedAt == null) continue
-      byCard[id] = { ...state, unread: false, lastSeenUpdate: card.updatedAt }
+      if (!card || card.updateCount == null) continue
+      byCard[id] = { ...state, unread: false, lastSeenCount: card.updateCount }
       changed.add(key)
     }
   }
   return [...changed]
 }
+
 /**
  * The plan for one pass. `workers` are { key, runner, provider, model } (model null when no name is
  * pinned for it). `cards` maps a key to its cards, `states` maps a key to { [cardId]: state }.

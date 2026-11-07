@@ -15,7 +15,7 @@ import { spawn } from 'node:child_process'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { here, loadCreds } from './config.mjs'
-import { DEFAULTS, formatPlan, planPass, repairUnread, RUNNER_LABEL } from './runner-core.mjs'
+import { cardFrom, DEFAULTS, formatPlan, planPass, repairUnread, RUNNER_LABEL } from './runner-core.mjs'
 import * as opencode from './runner-opencode.mjs'
 
 const kit = fileURLToPath(new URL('.', import.meta.url))
@@ -78,9 +78,7 @@ async function callTool(creds, person, name, args) {
 
 // One card as the runner needs it, read with the worker's own key.
 async function readCard(creds, person, id) {
-  const full = await callTool(creds, person, 'get_task', { id })
-  if (typeof full?.id !== 'string') throw new Error(`get_task ${id}: the answer names no task`)
-  return { id: full.id, title: full.title, column: full.column, labels: full.labels ?? [], completed: Boolean(full.completed), updatedAt: full.updatedAt }
+  return cardFrom(await callTool(creds, person, 'get_task', { id }))
 }
 
 // The cards a worker is on, on this board: my_tasks gives the ids, get_task the column and labels.
@@ -99,24 +97,34 @@ function message(card) {
   return `Work on the Taskmanager card ${card.id} "${card.title}". Read it with get_task, then do what it asks, in your own branch.`
 }
 
-// Runs one worker on one card, to the end of the process, continuing `session` when there is one.
-// Resolves with the session id the run printed (null if none); rejects when the run exits non-zero.
+// Runs one worker on one card, to the end of the process or the timeout, continuing `session` when there is one.
+// Resolves with the session id the run printed (null if none); rejects when the run exits non-zero or runs past
+// the timeout. CREW_RUN_TIMEOUT_MS overrides the timeout (a test uses it).
 function runOnce(worker, card, session) {
   const adapter = ADAPTERS[worker.runner]
   const workDir = join(here, 'runners', worker.key, 'work')
   mkdirSync(workDir, { recursive: true })
   const argv = adapter.args({ model: worker.model, message: message(card), session })
+  const timeoutMs = Number(process.env.CREW_RUN_TIMEOUT_MS) || DEFAULTS.runTimeoutMinutes * 60_000
   return new Promise((resolve, reject) => {
     const child = spawn(worker.runner, argv, { cwd: workDir, env: { ...process.env, ...adapter.env({}) }, stdio: ['ignore', 'pipe', 'pipe'] })
     let out = ''
+    const timer = setTimeout(() => {
+      child.kill('SIGTERM')
+      reject(new Error(`${worker.runner} ran past ${timeoutMs} ms and was stopped`))
+    }, timeoutMs)
     child.stdout.on('data', (chunk) => {
       out += chunk
     })
     child.stderr.on('data', (chunk) => {
       out += chunk
     })
-    child.on('error', reject)
+    child.on('error', (err) => {
+      clearTimeout(timer)
+      reject(err)
+    })
     child.on('close', (code) => {
+      clearTimeout(timer)
       if (code !== 0) reject(new Error(`${worker.runner} exited ${code}: ${out.trim().slice(-300)}`))
       else resolve(adapter.parseSession(out))
     })
@@ -163,17 +171,18 @@ async function once(argv) {
     }
     // Written as soon as the question is on the card, so a later failure cannot post it twice. The baseline
     // is unknown until the card is read again: until then the state is unread and acts on nothing.
-    states[item.key][item.card.id] = { ...prev, asked: true, lastSeenUpdate: null, unread: true }
+    states[item.key][item.card.id] = { ...prev, asked: true, lastSeenCount: null, unread: true }
     writeState(item.key, states)
     try {
       const after = await readCard(c, c.people[worker.key], item.card.id)
-      states[item.key][item.card.id] = { ...states[item.key][item.card.id], lastSeenUpdate: after.updatedAt, unread: false }
+      states[item.key][item.card.id] = { ...states[item.key][item.card.id], lastSeenCount: after.updateCount, unread: false }
       writeState(item.key, states)
     } catch (err) {
       console.log(`could not re-read ${item.card.id}: ${err.message}; the baseline is set on the next pass`)
     }
     console.log(`asked for ${item.key} on ${item.card.id}`)
-  }  // A failed run is counted like any other run, so a card that always fails reaches maxRuns and is asked about.
+  }
+  // A failed run is counted like any other run, so a card that always fails reaches maxRuns and is asked about.
   for (const item of plan.filter(p => p.action === 'start')) {
     const worker = list.find(w => w.key === item.key)
     const prev = states[item.key][item.card.id] ?? { runs: 0 }
@@ -185,17 +194,19 @@ async function once(argv) {
     } catch (err) {
       error = err.message
     }
-    // The card's updatedAt after the run: the worker's own updates are then seen, not news for the next pass.
-    let lastSeenUpdate = item.card.updatedAt
+    // The card's update count after the run: the worker's own updates are then seen, not news for the next
+    // pass. When that read fails, the baseline is unknown and the next pass sets it from its own read.
+    let baseline = { lastSeenCount: item.card.updateCount ?? null, unread: false }
     if (creds) {
       try {
-        lastSeenUpdate = (await readCard(creds, creds.people[worker.key], item.card.id)).updatedAt
+        baseline = { lastSeenCount: (await readCard(creds, creds.people[worker.key], item.card.id)).updateCount, unread: false }
       } catch (err) {
-        console.log(`could not re-read ${item.card.id}: ${err.message}; the next pass may count the worker's own update as news`)
+        baseline = { lastSeenCount: null, unread: true }
+        console.log(`could not re-read ${item.card.id}: ${err.message}; the baseline is set on the next pass`)
       }
     }
     const runNo = prev.runs + 1
-    states[item.key][item.card.id] = { runs: runNo, lastRunAt: started, lastSeenUpdate, asked: false, session, lastError: error }
+    states[item.key][item.card.id] = { runs: runNo, lastRunAt: started, ...baseline, asked: false, session, lastError: error }
     writeState(item.key, states)
     if (error) console.log(`failed ${item.key} on ${item.card.id} (run ${runNo}): ${error}`)
     else console.log(`ran ${item.key} on ${item.card.id} (run ${runNo})${session ? ` (session ${session})` : ''}`)

@@ -21,8 +21,9 @@ import { fileURLToPath } from 'node:url'
 import { findChromium, request, serve } from './browser-driver.mjs'
 import { boardOrigin, signIn } from './browser.mjs'
 import { crewHome } from './home.mjs'
-import { DEFAULTS, eligibleCards, formatPlan, nextAction, planPass, repairUnread } from './runner-core.mjs'
+import { cardFrom, DEFAULTS, eligibleCards, formatPlan, nextAction, planPass, repairUnread } from './runner-core.mjs'
 import * as opencode from './runner-opencode.mjs'
+
 const KIT = dirname(fileURLToPath(import.meta.url))
 const CREW = join(KIT, 'crew.mjs')
 const DRIVER = join(KIT, 'browser-driver.mjs')
@@ -1046,7 +1047,7 @@ describe('crew runner models', () => {
 // ---------- crew runner process: eligibility, retry and maxRuns, the plan, the adapter, and a dry run ----------
 describe('crew runner process', () => {
   const MINUTE = 60_000
-  const card = (over = {}) => ({ id: 'c1', title: 'A card', column: 'To do', labels: ['runner'], completed: false, updatedAt: 100, ...over })
+  const card = (over = {}) => ({ id: 'c1', title: 'A card', column: 'To do', labels: ['runner'], completed: false, updateCount: 1, ...over })
   const pinnedOllama = 'ollama/qwen3-coder-64k'
 
   test('only To do and In progress cards labelled runner, not finished, are eligible', () => {
@@ -1063,7 +1064,7 @@ describe('crew runner process', () => {
 
   test('a card is started first, left alone while it is recent, and started again after retryMinutes', () => {
     const now = 10_000_000
-    const state = { runs: 1, lastRunAt: now - MINUTE, lastSeenUpdate: 100 }
+    const state = { runs: 1, lastRunAt: now - MINUTE, lastSeenCount: 1 }
     assert.equal(nextAction(null, card(), now), 'start')
     assert.equal(nextAction(state, card(), now), 'wait')
     assert.equal(nextAction({ ...state, lastRunAt: now - (DEFAULTS.retryMinutes + 1) * MINUTE }, card(), now), 'start')
@@ -1071,52 +1072,63 @@ describe('crew runner process', () => {
 
   test('a new update on the card starts it again at once, whatever the clock says', () => {
     const now = 10_000_000
-    const state = { runs: 1, lastRunAt: now - MINUTE, lastSeenUpdate: 100 }
-    assert.equal(nextAction(state, card({ updatedAt: 200 }), now), 'start')
+    const state = { runs: 1, lastRunAt: now - MINUTE, lastSeenCount: 1 }
+    assert.equal(nextAction(state, card({ updateCount: 2 }), now), 'start')
+  })
+
+  test('a real get_task answer where only updatesMatched changes is news, since updatedAt does not move on an update', () => {
+    const answer = updatesMatched => ({ id: 'c1', board: { id: 'b1' }, column: 'In progress', title: 'A card', labels: ['runner'], completed: false, assignee: 'Wes', blocked: false, updatedAt: '2026-11-07T13:35:30.148Z', updates: [], updatesMatched, updatesShown: 0 })
+    const now = 10_000_000
+    const state = { runs: 1, lastRunAt: now - MINUTE, lastSeenCount: cardFrom(answer(16)).updateCount }
+    assert.equal(nextAction(state, cardFrom(answer(16)), now), 'wait', 'the same count is not news')
+    assert.equal(nextAction(state, cardFrom(answer(17)), now), 'start', 'a new update is news, though updatedAt stayed the same')
+  })
+
+  test('a get_task answer with no updatesMatched is refused, never read as no news', () => {
+    assert.throws(() => cardFrom({ id: 'c1', column: 'To do', labels: [] }), /no updatesMatched/)
   })
 
   test('after maxRuns the runner asks Pia once, then stops, and no run is started', () => {
     const now = 10_000_000
-    const used = { runs: DEFAULTS.maxRuns, lastRunAt: 0, lastSeenUpdate: 100 }
-    assert.equal(nextAction(used, card({ updatedAt: 100 }), now), 'ask')
-    assert.equal(nextAction({ ...used, asked: true }, card({ updatedAt: 100 }), now), 'stop')
+    const used = { runs: DEFAULTS.maxRuns, lastRunAt: 0, lastSeenCount: 1 }
+    assert.equal(nextAction(used, card({ updateCount: 1 }), now), 'ask')
+    assert.equal(nextAction({ ...used, asked: true }, card({ updateCount: 1 }), now), 'stop')
   })
 
   test('after maxRuns and a question, a new update on the card (Pia answering) starts the worker again', () => {
     const now = 10_000_000
-    const asked = { runs: DEFAULTS.maxRuns, lastRunAt: 0, lastSeenUpdate: 100, asked: true }
-    assert.equal(nextAction(asked, card({ updatedAt: 999 }), now), 'start')
+    const asked = { runs: DEFAULTS.maxRuns, lastRunAt: 0, lastSeenCount: 1, asked: true }
+    assert.equal(nextAction(asked, card({ updateCount: 2 }), now), 'start')
   })
 
   test('a run past maxRuns waits for news and never asks again', () => {
     const now = 10_000_000
-    const past = { runs: DEFAULTS.maxRuns + 1, lastRunAt: 0, lastSeenUpdate: 100, asked: false }
-    assert.equal(nextAction(past, card({ updatedAt: 100 }), now), 'stop')
-    assert.equal(nextAction(past, card({ updatedAt: 100 }), now + 10 * DEFAULTS.retryMinutes * MINUTE), 'stop')
-    assert.equal(nextAction(past, card({ updatedAt: 999 }), now), 'start')
+    const past = { runs: DEFAULTS.maxRuns + 1, lastRunAt: 0, lastSeenCount: 1, asked: false }
+    assert.equal(nextAction(past, card({ updateCount: 1 }), now), 'stop')
+    assert.equal(nextAction(past, card({ updateCount: 1 }), now + 10 * DEFAULTS.retryMinutes * MINUTE), 'stop')
+    assert.equal(nextAction(past, card({ updateCount: 2 }), now), 'start')
   })
 
   test('a state whose re-read failed acts on nothing until its baseline is known', () => {
     const now = 10_000_000
-    const unread = { runs: DEFAULTS.maxRuns, lastRunAt: 0, lastSeenUpdate: null, asked: true, unread: true }
-    assert.equal(nextAction(unread, card({ updatedAt: 500 }), now), 'stop')
+    const unread = { runs: DEFAULTS.maxRuns, lastRunAt: 0, lastSeenCount: null, asked: true, unread: true }
+    assert.equal(nextAction(unread, card({ updateCount: 5 }), now), 'stop')
   })
 
-  test('repairUnread takes the card as this pass read it as the baseline, and a later update starts the worker', () => {
+  test('repairUnread takes the count as this pass read it as the baseline, and a later update starts the worker', () => {
     const now = 10_000_000
-    const states = { wes: { c1: { runs: DEFAULTS.maxRuns, lastRunAt: 0, lastSeenUpdate: null, asked: true, unread: true } } }
-    assert.deepEqual(repairUnread(states, { wes: [card({ id: 'c1', updatedAt: 500 })] }), ['wes'])
-    assert.deepEqual(states.wes.c1, { runs: DEFAULTS.maxRuns, lastRunAt: 0, lastSeenUpdate: 500, asked: true, unread: false })
-    assert.equal(nextAction(states.wes.c1, card({ id: 'c1', updatedAt: 500 }), now), 'stop')
-    assert.equal(nextAction(states.wes.c1, card({ id: 'c1', updatedAt: 600 }), now), 'start')
+    const states = { wes: { c1: { runs: DEFAULTS.maxRuns, lastRunAt: 0, lastSeenCount: null, asked: true, unread: true } } }
+    assert.deepEqual(repairUnread(states, { wes: [card({ id: 'c1', updateCount: 5 })] }), ['wes'])
+    assert.deepEqual(states.wes.c1, { runs: DEFAULTS.maxRuns, lastRunAt: 0, lastSeenCount: 5, asked: true, unread: false })
+    assert.equal(nextAction(states.wes.c1, card({ id: 'c1', updateCount: 5 }), now), 'stop')
+    assert.equal(nextAction(states.wes.c1, card({ id: 'c1', updateCount: 6 }), now), 'start')
   })
 
   test('repairUnread leaves a state alone when its card was not read in this pass', () => {
-    const states = { wes: { c1: { runs: 1, lastRunAt: 0, lastSeenUpdate: null, asked: false, unread: true } } }
+    const states = { wes: { c1: { runs: 1, lastRunAt: 0, lastSeenCount: null, asked: false, unread: true } } }
     assert.deepEqual(repairUnread(states, { wes: [] }), [])
     assert.equal(states.wes.c1.unread, true)
   })
-
   test('the plan starts a pinned worker on its eligible cards and refuses a worker with no pinned model', () => {
     const plan = planPass({
       workers: [
@@ -1177,6 +1189,26 @@ describe('crew runner process', () => {
       assert.doesNotMatch(third.stdout, /failed wes on t1 \(run 4\)/)
       assert.match(third.stdout, /could not ask Pia for wes on t1/)
       assert.equal(JSON.parse(readFileSync(stateFile('wes'), 'utf8'))['t1'].runs, 3)
+    } finally {
+      rmSync(home, { recursive: true, force: true })
+      rmSync(bin, { recursive: true, force: true })
+    }
+  })
+
+  test('a run past the timeout is stopped, counted as a failed run, and the pass goes on', () => {
+    const home = mkdtempSync(join(tmpdir(), 'crew-runner-'))
+    const bin = mkdtempSync(join(tmpdir(), 'crew-runner-bin-'))
+    try {
+      writeFileSync(join(home, 'crew.json'), JSON.stringify({ runners: { wes: 'opencode/ollama' } }))
+      writeFileSync(join(home, 'creds.json'), JSON.stringify({ base: 'http://127.0.0.1:9', board: { id: 'b1' }, people: { wes: { apiKey: 'k' } } }))
+      // exec, so the timeout's SIGTERM reaches the sleep itself and the pipe closes.
+      writeFileSync(join(bin, 'opencode'), '#!/bin/sh\nexec sleep 30\n', { mode: 0o755 })
+      const cards = join(home, 'cards.json')
+      writeFileSync(cards, JSON.stringify({ wes: [card({ id: 't1' })] }))
+      const run = spawnSync(process.execPath, [join(KIT, 'runner.mjs'), 'once', '--cards', cards], { encoding: 'utf8', timeout: 20_000, env: { ...process.env, CREW_HOME: home, CREW_RUN_TIMEOUT_MS: '300', PATH: `${bin}:${process.env.PATH}` } })
+      assert.equal(run.status, 0, run.stderr)
+      assert.match(run.stdout, /failed wes on t1 \(run 1\): opencode ran past 300 ms and was stopped/)
+      assert.equal(JSON.parse(readFileSync(join(home, 'runners', 'state', 'wes.json'), 'utf8'))['t1'].runs, 1)
     } finally {
       rmSync(home, { recursive: true, force: true })
       rmSync(bin, { recursive: true, force: true })
