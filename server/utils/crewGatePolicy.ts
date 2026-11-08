@@ -12,7 +12,11 @@ export const FORWARDING_HEADERS = ['x-forwarded-for', 'x-real-ip', 'forwarded'] 
 export type Peer = { kind: 'tcp', address: string } | { kind: 'unix' } | { kind: 'unseen' } | { kind: 'unknown' }
 
 // `message` is the sentence a token refusal carries (regenerated, revoked, expired); the gate answers it.
-export type KeyVerdict = { ok: true, keyId: string } | { ok: false, reason: 'bad key' | 'expired' | 'wrong scope' | 'not admin', message?: string }
+// `management` is set when the presented key is a management token (kind 'management') or was one: only such a
+// key may pass the gate from a remote peer, and only such a key's refusal sentence reaches a remote caller.
+// `boardId` is the one board a passing management token works on, for its rate limit.
+export type KeyVerdict = { ok: true, keyId: string, management?: boolean, boardId?: string | null }
+  | { ok: false, reason: 'bad key' | 'expired' | 'wrong scope' | 'not admin', message?: string, management?: boolean }
 
 export function isCrewApiPath(path: string): boolean {
   const bare = path.split('?')[0] ?? ''
@@ -158,10 +162,16 @@ export type GateStep = { pass: true } | { pass: false, status: 401 | 404, outcom
  * crews:manage key; a failed key answers 401 and, while the window is open, closes it.
  */
 export function decide(input: GateInput): GateStep {
+  const verdict = input.verdict
+  // A remote caller with a live management token passes whatever the window says: the one remote key the gate lets through.
+  if (!input.local && verdict?.ok && verdict.management) return { pass: true }
   if (!input.local && !input.windowOpen) {
+    // A management token that expired or was regenerated answers its own sentence; any other remote call is the plain 404.
+    if (verdict && !verdict.ok && verdict.management) {
+      return { pass: false, status: 401, outcome: verdict.reason, closeReason: null }
+    }
     return { pass: false, status: 404, outcome: 'remote, window closed', closeReason: null }
   }
-  const verdict = input.verdict
   if (!verdict) {
     return { pass: false, status: 401, outcome: 'no key check', closeReason: null }
   }

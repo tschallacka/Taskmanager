@@ -1,9 +1,12 @@
-import { auditRefusal, checkCrewKey, closeWindow, expireWindowIfDue, readGate, windowIsOpen } from '../utils/crewGate'
+import { auditRefusal, checkCrewKey, closeWindow, expireWindowIfDue, readGate, remoteManagementVerdict, windowIsOpen } from '../utils/crewGate'
 import { auditPeer, bucketOf, decide, isCrewApiPath, isLocalRequest, limitedStatus, noteDenial, overDenialLimit, peerOf, rateKey, trustSocket } from '../utils/crewGatePolicy'
+import { chargeRateLimit, limitsFor, requestAddress, scopeOfBoard } from '../utils/rateLimits'
 
 // Every call on /api/crews and /api/crews/* passes here first (BRIEF-crew-feature 2b).
 // A remote caller, or any caller while the window is shut and it is not local, gets a plain
-// 404 that gives nothing away. Everything else must present a crews:manage key.
+// 404 that gives nothing away. Everything else must present a crews:manage key. The one remote
+// key that passes is a live management token (kind 'management', bound to one board); the
+// instance admin's unbound key stays local-only.
 // Refused calls are counted per caller in its own bucket (local or remote), see crewGatePolicy.
 export default defineEventHandler(async (event) => {
   if (!isCrewApiPath(event.path)) return
@@ -28,9 +31,17 @@ export default defineEventHandler(async (event) => {
   const gate = await expireWindowIfDue(await readGate(), now)
   const windowOpen = windowIsOpen(gate, now)
 
-  const verdict = local || windowOpen ? await checkCrewKey(event) : null
+  const verdict = local || windowOpen ? await checkCrewKey(event) : await remoteManagementVerdict(event)
   const step = decide({ local, windowOpen, tempKeyId: gate.tempKeyId, verdict })
-  if (step.pass) return
+  if (step.pass) {
+    // A remote management token is charged per token and per address, with the limits of its board, like the other agent calls.
+    if (!local && verdict?.ok && verdict.management) {
+      const limits = await limitsFor('tasks', await scopeOfBoard(verdict.boardId))
+      await chargeRateLimit('tasks', `management-token:${verdict.keyId}`, limits, event)
+      await chargeRateLimit('tasks', `management-address:${requestAddress(event)}`, limits, event)
+    }
+    return
+  }
 
   noteDenial(bucket, key, now)
   // A refusal that closes the window is written now, before the window closes and the caller is answered.
