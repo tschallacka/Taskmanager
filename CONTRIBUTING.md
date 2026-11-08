@@ -39,6 +39,8 @@ node scripts/bump-version.mjs tag --push   # annotated tag v<version> on a commi
 
 The tag mode fetches `origin master` first, refuses a tag that already exists and a commit that is not on `origin/master`, and pushes only that one tag, and only with `--push`. The tests are in `tests/bump-version.test.ts`.
 
+The pipeline makes the release, not a person. Every pull request must raise the version above master's (the `version-bumped` check, so run the publish script above before you push). Once a commit is on master and its CI is green, the `tag` job runs the tag mode for it and creates the GitHub Release: a pre-release while the major is 0, its notes generated since the previous tag (the first release says so instead). Nothing is attached to it. A re-run on the same commit changes nothing. A master commit whose version is already tagged at another commit (no bump, for example a dependency refresh) gets a notice and no tag and no release; the job stays green.
+
 ## Bug Reports
 
 Include the Taskmanager version, browser, deployment method, relevant sanitized logs, reproduction steps, expected behavior, and actual behavior. Do not post security vulnerabilities in public issues.

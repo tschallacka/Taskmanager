@@ -1,6 +1,13 @@
 name: ci
 
-on: push
+on:
+  push:
+    # With only tags-ignore given, GitHub runs nothing for branch pushes: the branches are named too.
+    branches:
+      - '**'
+    # The release tags this workflow creates are pushes too; they must not run it again.
+    tags-ignore:
+      - 'v*'
 
 jobs:
   ci:
@@ -26,3 +33,112 @@ jobs:
 
       - name: Build
         run: bun run build
+
+  # A push to any branch other than master: package.json must be strictly above master's version.
+  version-bumped:
+    if: github.ref != 'refs/heads/master'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Compare the version with master
+        run: |
+          git fetch --quiet origin "+refs/heads/master:refs/remotes/origin/master"
+          mine=$(node -p "require('./package.json').version")
+          master=$(git show origin/master:package.json | node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0, "utf8")).version)')
+          node -e '
+            const parse = (text, where) => {
+              const match = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.exec(text)
+              if (!match) {
+                console.log(`${where}: "${text}" is not a plain x.y.z version (no prerelease or build suffix)`)
+                process.exit(1)
+              }
+              return match.slice(1).map(Number)
+            }
+            const [mine, master] = [parse(process.argv[1], "package.json"), parse(process.argv[2], "origin/master package.json")]
+            const first = [0, 1, 2].map(i => mine[i] - master[i]).find(difference => difference !== 0) ?? 0
+            if (first <= 0) {
+              console.log(`package.json says ${process.argv[1]}, master is at ${process.argv[2]}: every pull request raises the version (node scripts/bump-version.mjs patch|feature|breaking)`)
+              process.exit(1)
+            }
+            console.log(`package.json says ${process.argv[1]}, master is at ${process.argv[2]}: the version is raised`)
+          ' "$mine" "$master"
+
+  # Only a green master is tagged: this job runs after ci and only for a push to master.
+  tag:
+    needs: [ci]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Git identity for the bot
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Tag the release
+        id: tag
+        run: |
+          version=$(node -p "require('./package.json').version")
+          tag="v$version"
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            tagged=$(git rev-list -n 1 "refs/tags/$tag")
+            if [ "$tagged" = "$(git rev-parse HEAD)" ]; then
+              echo "$tag already tags this commit: nothing to do"
+              echo "at_head=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            # Not a failure: master also gets commits that are not pull requests and carry no bump. The
+            # version-bumped check on branches is what enforces the bump.
+            echo "version $version is already tagged at $(git rev-parse --short "$tagged"): no new tag for this commit"
+            exit 0
+          fi
+          node scripts/bump-version.mjs tag --ref HEAD --push
+          echo "at_head=true" >> "$GITHUB_OUTPUT"
+
+      - name: Create the GitHub Release
+        # Only for a tag that points at this commit: a tag on another commit gets no release.
+        if: steps.tag.outputs.at_head == 'true'
+        run: |
+          # RELEASE_DRY_RUN=1 prints the gh calls instead of making them (for a reviewer to read).
+          run_gh() {
+            if [ -n "$RELEASE_DRY_RUN" ]; then echo "would run: gh $*"; else gh "$@"; fi
+          }
+          version=$(node -p "require('./package.json').version")
+          tag="v$version"
+          short=$(git rev-parse --short HEAD)
+          if [ -n "$RELEASE_DRY_RUN" ] || ! gh release view "$tag" >/dev/null 2>&1; then
+            : # a release that does not exist yet is made below
+          else
+            echo "release $tag already exists: nothing to do"
+            exit 0
+          fi
+          # The previous tag, if there is one; the first release has none and says so instead of listing the whole history.
+          previous=$(git describe --tags --abbrev=0 --match 'v*' "$tag^" 2>/dev/null || true)
+          notes=$(mktemp)
+          printf 'Taskmanager %s (%s)\n\n' "$version" "$short" > "$notes"
+          if [ -n "$previous" ]; then
+            gh api --method POST "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
+              -f tag_name="$tag" -f target_commitish="$GITHUB_SHA" -f previous_tag_name="$previous" \
+              --jq .body >> "$notes"
+          else
+            echo "First tagged release." >> "$notes"
+          fi
+          # While the major is 0 the release is a pre-release; from 1.0.0 it is a normal release.
+          case "$version" in
+            0.*) kind="--prerelease" ;;
+            *) kind="--latest" ;;
+          esac
+          run_gh release create "$tag" --verify-tag --title "Taskmanager $version" --notes-file "$notes" $kind
