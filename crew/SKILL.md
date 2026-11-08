@@ -1,11 +1,11 @@
 ---
 name: taskmanager-crew
-description: Run a crew of cheap agents (Haiku unless the Owner picks another model per person) (a project manager, four workers, a usability tester, a code quality reviewer, each with its own browser profile) that build and test ANY product on a Taskmanager board, with Claude as the customer and code reviewer, an optional log watcher, and a chat line for meetings. Use when asked to "set up the crew", "have the haiku workers build X", "start a UX review", or to continue a crew run.
+description: Run a crew of cheap agents (the model is the Owner's choice per person, the cheap tier by default) (a project manager, four workers, three reviewers for UX, code quality and QA, extra workers on request, each with its own browser profile) that build and test ANY product on a Taskmanager board, with Claude as the customer and code reviewer, an optional log watcher, and a chat line for meetings. Use when asked to "set up the crew", "have the cheap workers build X", "start a UX review", or to continue a crew run.
 ---
 
 # Taskmanager crew
 
-Haiku does the cheap work; Claude (you, "Boss") spends its budget only where judgement is needed: the
+The cheap models do the work; Claude (you, "Boss") spends its budget only where judgement is needed: the
 customer's request, answers to the PM, the code review, and the publish. The kit is project
 agnostic: everything that belongs to one product lives in `crew.json` and
 `PROJECT-RULES.md`. The kit is served by Taskmanager (`/crew/kit.tar.gz`, `/crew/SKILL.md`). Board tool details are in the `taskmanager` skill (`/api/settings/skill`); do not repeat them here. Run the kit with `crew <who> <command>`, `crew listen`, `crew watch`.
@@ -21,13 +21,14 @@ If it is, run `crew watch` to see where the run stands.
 | --- | --- | --- |
 | `boss` | the owner's login (you act through it, the crew never does) | applies schema changes, reviews code, publishes, reads reports |
 | `customer` | the customer (you, in a second role) | asks for things, answers the PM, only sees customer-visible tasks |
-| `pia` | the project manager (Haiku) | the customer's contact: plans tasks, assigns, pre-checks Verify, triages UX findings |
-| `wren` `wick` `wynn` `wade` | the workers (Haiku) | build, test in their own browser profile, report |
-| `usher` | Usher Xander, the usability tester (Haiku) | reviews a task in `Verify UX`, tries every feature, files `[UX]` findings for the PM |
-| `nina` | Nina Nitpick, the code quality reviewer (Haiku) | reviews a task in `Verify CQ`, files `CQ violation` subtasks, tags `CQ approved` |
-| `quincy` | Quincy Average, QA (Haiku) | uses a task in `Verify QA` like a customer or a blind agent, files `QA violation` subtasks, tags `QA approved` |
+| `pia` | the project manager (the Owner's model choice) | the customer's contact: plans tasks, assigns, pre-checks Verify PM, triages UX findings |
+| `wren` `wick` `wynn` `wade` | the workers (the Owner's model choice per person) | build, test in their own browser profile, report |
+| `usher` | Usher Xander, the usability tester | reviews a task in `Verify UX`, tries every feature, files `UX violation` subtasks for the PM |
+| `nina` | Nina Nitpick, the code quality reviewer | reviews a task in `Verify CQ`, files `CQ violation` subtasks, tags `CQ approved` |
+| `quincy` | Quincy Average, QA | uses a task in `Verify QA` like a customer or a blind agent, files `QA violation` subtasks, tags `QA approved` |
+| `wes` `wilma` `walt` | the extra workers (forked onto a board later, on their own model, no agent definition) | build, like the workers |
 | `contact` | a read-only customer contact | lets anyone check what a customer sees |
-| log watcher (Haiku) | no login | reads the dev log, crew transcripts and new bugs; flags problems to you |
+| log watcher | no login | reads the dev log, crew transcripts and new bugs; flags problems to you |
 
 ## The board and who moves what
 
@@ -37,7 +38,7 @@ Columns: Backlog, To do, In progress, **Verify PM**, **Verify UX**, **Verify CQ*
    builds it, tests it in the browser, attaches a screenshot, runs the tests (none may fail), posts an
    update and moves it to **Verify PM**.
 2. The PM checks it in **Verify PM** (diff, lint, evidence, time log) and sends clearly wrong work back
-   to To do. Then it passes the gates, each owned by one person, and returns to **Verify PM** after
+   to In progress, assigned to its worker. Then it passes the gates, each owned by one person, and returns to **Verify PM** after
    each: **Verify UX** (the usher, only when a subtask is tagged `verify UX`), **Verify CQ** (the
    nitpicker) and **Verify QA** (Quincy). Each reviewer files problems as subtasks (`UX violation`,
    `CQ violation`, `QA violation`) and tags the task `UX approved`, `CQ approved` or `QA approved`
@@ -46,7 +47,7 @@ Columns: Backlog, To do, In progress, **Verify PM**, **Verify UX**, **Verify CQ*
 3. **You review the code in Verify**: read the diff of the owned files (do not trust the summary),
    run lint and the typecheck, look at the screenshot, **try it yourself** in a browser. Approved:
    move to **Ready for live**, which hands the work to the user. Not approved: post written feedback as subtasks tagged `Feedback Cato`,
-   assign the task to the PM and move it to **Backlog**. Be critical: send work back when it is not up to standard.
+   assign the task to the PM for triage. Be critical: send work back when it is not up to standard.
 4. **Only you publish**, and only tasks in Ready for live, following the release steps in
    `PROJECT-RULES.md` (backup, schema change, typecheck and lint, merge the task's pull request). Move a task to **Done**
    when everything is wrapped up and the crew does not need to act on it anymore: it is published or
@@ -55,7 +56,7 @@ Columns: Backlog, To do, In progress, **Verify PM**, **Verify UX**, **Verify CQ*
    Only you merge. The PM and the reviewers never commit or push, and nobody but you touches the database.
 6. Bugs: anyone files a `[BUG]` task in the Bugs column; the PM assigns it, a worker fixes it and
    moves it through Verify like anything else.
-7. UX review: the tester files `[UX]` tasks to the PM; unclear ones become a chat meeting with you.
+7. UX review: the tester files `UX violation` subtasks to the PM; unclear ones become a chat meeting with you.
 
 ## Running it
 

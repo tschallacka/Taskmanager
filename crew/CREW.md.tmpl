@@ -129,12 +129,11 @@ on the customer's answers, and on what Boss and the PM ask of you.
   with your default if unanswered). Do not start unclear work.
 - `reply` with `needs_feedback_from_me`: you have asked a `QUESTION:` on this card at some point. The event does not
   say whether this reply answers it. Find your question with `get_task` and `"prefix": "QUESTION:"`, then read
-  everything after it with `"since": "<that question's update id>"`. If it does answer it, move the card back to To
-  do (or In progress, if its worker is still on it), assign the worker who asked or the right one, post one update
+  everything after it with `"since": "<that question's update id>"`. If it does answer it, move the card to **In progress**,
+  assigned to the worker who asked or the right one (rule 1), post one update
   saying what changed, and start or resume that worker (see "How the PM starts a worker or reviewer"). If it does not, deal with it as below.
 - `reply` without it: read the new comment. If it asks the crew something, answer on the card. Otherwise do nothing.
-- `task_moved` (a card you own or created moved into Verify, Ready for live, Done or Bugs): Verify, pre-check it as
-  "The PM's job" section says. Bugs: rule 9 in "The rules of the road". Ready for live and Done: nothing, Boss publishes.
+- `task_moved` (a card you own or created moved into Verify PM, Verify, Ready for live, Done or Bugs): Verify PM is pre-checked as "The PM's job" section says. Bugs: rule 9 in "The rules of the road". Ready for live and Done: nothing, Boss publishes.
 - `unblocked` (the last open blocker of a card you are on finished, so the card may start): read it with `get_task`. Nothing moved by itself.
 - `task_assigned` (a card was assigned to you): plan it or take it, as for `task_created`.
 - `mention` (your name was written in a comment): `get_task`, and answer on the card.
@@ -142,8 +141,7 @@ on the customer's answers, and on what Boss and the PM ask of you.
 The four GitHub events below reach the crew once the GitHub webhook slice (GH3) is on master;
 until then nothing emits them.
 - `pipeline_failed` (a check on a pull request of one of your cards failed): no new card. The assignee reads the
-  failure on the pull request and fixes it on the same card. If the card is in Verify, move it back to To do with one
-  update that names the failure and `PR #n`, so its worker fixes it there.
+  failure on the pull request and fixes it on the same card. If the card is in Verify, move it to **In progress**, assigned to its worker (rule 1), with one update that names the failure and `PR #n`.
 - `pipeline_passed` (the checks on that pull request passed): nothing to do. Boss reviews a card in Verify.
 - `merged_staging` (the pull request went into staging): check the staging result on the card and the pull request,
   then tell the customer in `{{chat.channel}}` what is on staging (`@{{customer.nick}} ...`). Copy what you said onto
@@ -157,17 +155,17 @@ until then nothing emits them.
 only its own events. `task_assigned` is the signal to work: `get_task`, move the card to In progress, and work as
 in "Worker round". Feedback from Boss or the PM arrives as `reply` (the owner of a card hears of each comment on
 it): read the thread and fix exactly what it says. `mention`: answer on the card. The PM starts the
-workers as Haiku subagents, which hold no channel: they are started as described below and keep their listen loop.
+workers as subagents, with the model from the table at the top of `PROMPTS.md`, which hold no channel: they are started as described below and keep their listen loop.
 
 A worker with its own channel also gets `pipeline_failed`, `pipeline_passed` and the two merges on a card assigned
 to it. On `pipeline_failed`: read the failure on the pull request, fix it on the same card, run `pr.mjs` again to
-update the same pull request, put `PR #n` in the update, and move the card to Verify. No new card.
+update the same pull request, put `PR #n` in the update, and move the card to **Verify PM**. No new card.
 
 **Boss.** Boss's channel brings what concerns Boss. A `task_moved` reaches Boss only for a card Boss owns or created:
 the server sends a move to the card's assignee and creator, nobody else. So Boss does not hear of every card that
 reaches Verify. Boss reviews the other Verify cards from the board (`{{node_kit}}/watch.mjs`), or when the PM
 mentions Boss. A review is decided on the code: approved means Ready for live; not approved means written feedback
-on the card and back to To do. Boss also gets `mention` and `reply` on its own cards, and the GitHub events
+on the card, as `Feedback Cato` subtasks, and back to the PM. Boss also gets `mention` and `reply` on its own cards, and the GitHub events
 (`merged_staging` needs nothing from Boss, `merged_production` means Boss moves the card to Done as it publishes,
 and `pipeline_passed` on a card in Verify is a review, as above). Boss hears `pipeline_failed` only as the card's
 assignee or creator, and then it is that owner's fix. Boss does not plan work. The PM does.
@@ -201,7 +199,7 @@ The workers **keep running**: they do not end a round and wait to be woken. Ever
 with one command, which waits and then prints only what is new:
 
 ```
-{{node_kit}}/listen.mjs <you> [seconds]     # you = pia, wren, wick, wynn, wade, usher, nina or quincy
+{{node_kit}}/listen.mjs <you> [seconds]     # you = pia, wren, wick, wynn, wade, wes, wilma, walt, usher, nina or quincy
 ```
 
 It prints `CHAT` lines (a message in `{{chat.workChannel}}`, where the PM steers the workers; for the PM
@@ -304,7 +302,7 @@ Use `browser` to look and check. Use `run` (Playwright, below) for a script that
    - **Verify CQ**: {{people.nina}} (`NINA.md`). Never skipped. She tags `CQ approved`.
    - **Verify QA**: {{people.quincy}} (`QUINCY.md`). Never skipped. He tags `QA approved`.
    A reviewer's finding is a subtask under the task, tagged `UX violation`, `CQ violation` or `QA violation`,
-   assigned to the PM, who gives it to a worker. The task returns to **Verify PM** after every gate. Nobody
+   assigned to the PM, who gives the fix to a worker: the card goes to **In progress**, assigned to that worker, then back to the gate that found it (rule 1). The task returns to **Verify PM** after every gate. Nobody
    sets another person's tag: the PM checks in the task's activity log who set an approval.
    When every gate has approved, the PM moves the task to **Verify**, assigned to Boss. Boss reads the code
    in Verify: approved means Ready for live, which hands the work to the Owner (the customer-visible update says
@@ -328,23 +326,11 @@ Use `browser` to look and check. Use `run` (Playwright, below) for a script that
    | `split help` | the PM | she cannot split the task and needs Boss to |
    | `test failing` | anyone | a test fails and nobody knows why; the task is in Blocked |
 7c. **Time your work.** Every worker logs time with `log_time` on the task or subtask you worked on,
-   once when you move it to Verify and again after each round of fixes:
+   once when you move it to **Verify PM** and again after each round of fixes:
    `log_time {"task":"<id>","duration":"1h 15m","note":"<what>"}`. Count the real working time,
    rounded up to 5 minutes. The code reviewer and the tester log their own time on the same task.
-   A task without a time log goes back to To do.
-7d. **Subtasks.** A finding that touches several steps or screens is one card with subtasks: create
-   them with `create_task` and `parent: "<card id>"`. The fix is a subtask assigned to a coder; the
-   coder adds his own subtasks under it for UX checks, assigned to the tester (`[UX check] ...`: what
-   to test, where, at 1280 and 390 px). The tester works those subtasks like any card: `RETEST:
-   pass|fail` with numbered steps, then marks it finished. **A subtask does not move between columns**
-   (it lives in its parent's panel, and `move_task` refuses it). Its state is the updates on it plus the
-   completed flag: `update_task` with `completed: true` when it is finished. To get a subtask reviewed,
-   the worker posts an update `READY FOR REVIEW: <what to look at>` on the subtask AND on its parent
-   card, so the PM, the nitpicker and the tester (who watch Verify and `get_task` of the parent) see it.
-   Boss approves a subtask with an update on it; the parent card moves when all its subtasks are
-   completed. A card is finished only when all its subtasks are. Note: `parent` needs a Taskmanager
-   version whose `create_task` accepts it (run `tools` to see). Without it, the card's description
-   carries the checklist instead (one line per fix and per UX check), and you tick it off in updates.
+   A task without a time log goes back to **In progress**, assigned to its worker.
+7d. **Subtasks.** A finding that touches several steps or screens is one card with subtasks: create them with `create_task` and `parent: "<card id>"`. The fix is a subtask assigned to a coder. **A subtask does not move between columns** (it lives in its parent's panel, and `move_task` refuses it). Its state is the updates on it plus the completed flag: `update_task` with `completed: true` when it is finished. A card is finished only when all its subtasks are. Boss's feedback comes as subtasks tagged `Feedback Cato`; the reviewers' findings are subtasks tagged as in rule 7b.
 8. **Ask, don't guess.** If a task is unclear, post an update starting with `QUESTION:` on that
    task, then switch to another task. The PM answers in the thread. Read the thread
    (`get_task`) before you continue a task.
@@ -354,7 +340,7 @@ Use `browser` to look and check. Use `run` (Playwright, below) for a script that
    page/URL, and a screenshot attached. One bug per task; check the column first so you do not
    file a duplicate. The PM assigns each bug to a worker (a bug in a task someone owns goes
    back to that owner), the worker fixes it in the files the bug's task names, attaches proof
-   and moves it to **Verify**, the PM checks it and moves it to **Done**.
+   and moves it to **Verify PM** like any task. Only Boss moves it to **Done**.
 10. **Clean up your test data.** Every scratch project, task or rule you create for a test is
     deleted when the test is done, pass or fail. Name scratch things `scratch:` plus your key
     so they can be told apart, and list any you could not delete in your report.
@@ -374,14 +360,8 @@ Use `browser` to look and check. Use `run` (Playwright, below) for a script that
   the workers with no overlapping files (one task owns a shared file such as the schema, and
   tasks that need it wait for it). Put ready tasks in **To do**, later ones in **Backlog**,
   assign every task.
-- **Every round:** read the chat line, **Verify**, and every thread with a `QUESTION:`. Answer
-  questions. Pre-check Verify tasks so Boss does not have to: read the diff of the owned files
-  (`git diff`/`git status`, read-only), run lint on them, open the page and look at the
-  screenshot. If it is plainly not right, move it back to **To do** with specific feedback. If
-  it looks right, post an update "PM checked: <what you saw>" and leave it in **Verify**. **You
-  never move a task to Ready for live or Done** (Boss does, after reading the code and
-  publishing it). Promote Backlog tasks whose dependencies are in Done. Make sure every worker
-  has something.
+- **Every round, first: no idle workers.** Before anything else, give each free worker the next startable Backlog card. Cards that touch the same files go to the same worker.
+- **Then:** read the chat line, **Verify PM**, and every thread with a `QUESTION:`. Answer questions. Pre-check Verify PM tasks so Boss does not have to: read the diff of the owned files (`git diff`/`git status`, read-only), run lint on them, open the page and look at the screenshot. If it is plainly not right, send it back: the card goes to **In progress**, assigned to its worker (rule 1), with specific feedback. If it looks right, post an update "PM checked: <what you saw>" and send it on through the gates. **You never move a task to Ready for live or Done** (Boss does, after reading the code and publishing it). Promote Backlog tasks whose dependencies are in Done.
 - **Status:** `post_status_update` on the board addressed to Boss: what is done, in progress,
   blocked, bugs filed, and anything you need decided. Short, factual, and `on_track` /
   `at_risk` / `off_track` honestly.
@@ -406,6 +386,5 @@ Use `browser` to look and check. Use `run` (Playwright, below) for a script that
    read the card with `"since": "<that id>"`.
 2. Do the work inside your owned files. Test it in your browser. Lint it.
 3. `attach` a screenshot, then post an update from a file (`update`, see "Your tool") with: what you built, the files you changed,
-   how you tested it, anything left over. Log your time (rule 7c). If a person sees the change, add
-   a `[UX check]` subtask for the tester (rule 7d). Then `move_task` to **Verify**.
+   how you tested it, anything left over. Log your time (rule 7c). If a person sees the change, tag the subtask `verify UX`. Then `move_task` to **Verify PM**.
 4. If the PM or Boss sent a task back, read the feedback and fix exactly that.

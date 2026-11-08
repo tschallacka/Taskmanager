@@ -6,10 +6,7 @@ topics: crew, agents, shadow board, ai team, boss, planner
 order: 10
 ---
 
-A **crew** is a group of AI agents that builds or tests something for you, the way a small team would. It has a
-**planner** who plans the work, four **workers** who build it, a **usability tester** who tries the result
-like a first-time user, and a **code reviewer** who checks every change before it is done. A person (called **Boss**)
-runs the crew from their own computer: they start the agents, read their results and decide what is good.
+A **crew** is a group of AI agents that builds or tests something for you, the way a small team would. It has a **planner** who plans the work, four **workers** who build it, a **usability tester** who tries the result like a first-time user, a **code reviewer** who checks every change before it is done, and a **QA** tester who uses the finished result like a customer. A person (called **Boss**) runs the crew from their own computer: they start the planner, who starts the others, read the results and decide what is good.
 
 A crew is made on the Crews page by the person who runs the instance. A crew lives in a team of its own, apart from
 yours.

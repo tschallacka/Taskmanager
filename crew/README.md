@@ -1,8 +1,8 @@
 # The crew kit
 
-A crew is a team of cheap agents (a project manager, four workers, a usability tester and a
-code reviewer, all Haiku except the instance admin's Claude) that builds and tests a product on
-a Taskmanager board. This folder is the kit: the scripts and the templates the agents read.
+A crew is a team of agents (a project manager, four workers, three reviewers for usability, code quality and QA, and
+extra workers on request), each on the model the Owner chose for that person, by default the cheap tier. It builds and
+tests a product on a Taskmanager board. This folder is the kit: the scripts and the templates the agents read.
 
 Taskmanager serves the kit itself, so it always matches the instance it talks to:
 

@@ -63,9 +63,7 @@ have covered in `{{crew_dir}}/work/usher/coverage.md` so nothing is skipped.
 
 ## How to file a finding
 
-One finding per task, on the board `{{board.name}}`, column **Backlog**, label `ux`,
-**assigned to {{people.pia}}**, title `[UX] <short, plain>`. Before you file, `search_tasks` for the
-same finding and add a comment to the existing task instead of filing twice. Description, in this shape:
+One finding per subtask, tagged `UX violation`, assigned to {{people.pia}}, under the card whose change you are testing. When no card covers the finding, post it as an update on the nearest open card, tag it `UX violation` and tag `@{{nicks.pia}}`; Pia decides where it goes. Before you file, read the card's subtasks (`get_task`) and add to the existing one instead of filing twice. Description, in this shape:
 
 ```
 ## Where
@@ -98,9 +96,7 @@ sentence to show, the docs/help link or the short how-to, the empty state. Keep 
 Severity: blocker | high | medium | low
 ```
 
-Attach a screenshot (`{{node_kit}}/tm.mjs usher attach <taskId> <image>`). Create the task with
-`{{node_kit}}/tm.mjs usher mcp create_task '@file.json'` (board, column Backlog, title, description,
-labels ["ux"], assignee "{{people.pia}}"). Visibility internal.
+Attach a screenshot (`{{node_kit}}/tm.mjs usher attach <taskId> <image>`). Create the subtask with `{{node_kit}}/tm.mjs usher mcp create_task '@file.json'` (board, `parent` set to the card's id, title, description, tag `UX violation`, assignee "{{people.pia}}"). Visibility internal.
 
 If the PM asks a question on a task (`QUESTION:`), answer it in a comment there. If the PM asks
 for a meeting, join `{{chat.channel}}` as `{{nicks.usher}}`, say what you saw (one short message at a time),
@@ -125,20 +121,9 @@ exact words on the task, tag `blocked`, tag `@{{nicks.pia}}` and take the next t
 5. No test may fail. A failing test you cannot explain after 30 minutes: post the test name, the exact failure line
    and what you tried, tag the task `test failing`, tag `@{{nicks.pia}}` and move it to **Blocked**.
 
-## Standing job: re-test every changed UX item
+## Re-test after fixes
 
-Your role is UI tester, always, not only in a review round. Whenever a `[UX]` or `[BUG]` task that you
-filed (or any task that changes what a person sees) reaches **Verify** or is published, you test it
-again in the browser at 1280 and 390 px, the way a first-time user would, and post the result on the
-task: `RETEST: pass` or `RETEST: fail` with numbered steps and a screenshot. A fail goes back to
-To do through {{people.pia}}. Also look at the neighbours of every change (the same screen, the same
-words used elsewhere) for new friction the change introduced. A bug you cannot make happen: ask for
-nothing, write down what you tried (steps, counts), and say "not reproducible by me" so
-{{people.pia}} can close it.
-
-Coders add `[UX check]` subtasks for you under their fix. Take them like cards (`my_tasks`), do the
-check, post `RETEST: pass|fail` with numbered steps, log your testing time on the subtask
-(`log_time`, see CREW.md 7c), and mark the subtask completed (`update_task` with `completed: true`) when it passes; a subtask is never moved between columns.
+There is no standing job between passes. A fixed finding is checked inside the pass that filed it (step 3 of "Reviewing a task in Verify UX"). A bug you cannot make happen: write down what you tried (steps, counts) and say "not reproducible by me" in an update, so {{people.pia}} can close it. Log your testing time on the card (`log_time`, see CREW.md 7c).
 
 Every report you post, a finding, a retest or a bug, carries numbered steps. No exceptions.
 

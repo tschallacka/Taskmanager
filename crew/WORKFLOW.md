@@ -12,6 +12,7 @@ The workflow of a Taskmanager crew, approved by the Owner on 2026-11-05. "Owner"
 | Usher Xander | UX tester. | Same level as the workers, fresh start every pass | Pia |
 | Nina Nitpick | Code quality reviewer. | Same level as the workers, fresh start every pass | Pia |
 | Quincy Average | QA. Uses the result like a customer or a blind agent. | Same level as the workers, fresh start every pass | Pia |
+| Wes, Wilma, Walt | The extra workers. Forked onto a board later. They run on their own model and get no agent definition. | The Owner's choice per person | Pia only |
 
 Rules that hold everywhere:
 
@@ -26,7 +27,7 @@ Rules that hold everywhere:
   - One outcome per subtask. Two outcomes are two subtasks.
   - A reader who finds something with two readings does not pick one. They post the exact words that have two readings to Pia (Pia to Cato), mark the task `blocked`, and take the next task. The writer answers by rewriting the original text, so the next reader meets no ambiguity either.
 - **Who starts whom, and who talks to whom.** Cato starts Pia. Pia starts her workers and her reviewers herself. Cato does not start them, does not watch what they do, and is never the go-between for their messages: workers and reviewers talk to Pia, and Pia talks to Cato. Cato learns about the work from the board (his tasks, the Verify column) and from Pia's summaries. When Pia is unavailable, something is wrong and Cato restarts her. Pia is unavailable when her session has ended or stopped, or when a task assigned to her has had no update, move or tag from her for two of Cato's wake-ups. If she is unavailable again after one restart, Cato tells the Owner. Cato does not do her work in the meantime. In the same way, Pia restarts a worker or a reviewer who is unavailable.
-- Each person has a real username in Taskmanager (`wade`, `wren`, `pia`, `usher`, `nina`, `quincy`, `cato`), never `w1` or `w2`. `@wade` in a task update puts a notification in Wade's inbox, but only when Wade is a member of the project the task is on. A Wade on another project is not tagged (Q58).
+- Each person has a real username in Taskmanager (`wade`, `wren`, `pia`, `usher`, `nina`, `quincy`, `cato`), never `w1` or `w2`. The extra workers are `wes`, `wilma` and `walt`. `@wade` in a task update puts a notification in Wade's inbox, but only when Wade is a member of the project the task is on. A Wade on another project is not tagged (Q58).
 - Markers (tags that approve something) may only be set by their owner, see the tag table. Pia checks who set a marker in the task's activity log before she trusts it.
 
 ### Hard rules for every agent
@@ -48,6 +49,8 @@ Where the tools come from: the AI text editor, tailpipe, `interactive-shell`, `g
 `Backlog` -> `To do` -> `In progress` -> `Verify PM` -> `Verify UX` -> `Verify CQ` -> `Verify QA` -> `Verify` (Cato) -> `Ready for live` -> `Done`.
 `Ready for live` means the work is handed to the Owner, who can take it live or accept it. The crew has nothing more to build on it, but it may still have to answer questions. `Done` means everything is wrapped up and the crew does not need to act on it anymore: the Owner has taken it live or accepted it, it is merged, and no subtask, question or follow-up is open. Cato moves a task into both columns.
 `Blocked` for work waiting on an answer, and `Bugs` for defects nobody has triaged. A task is in exactly one column.
+
+**Rule 1.** Work being done is `In progress`, assigned to the fork of the person doing it. Fixing a finding: the card goes to `In progress`, assigned to the worker, then back to the gate that found it. Never "back to To do".
 
 ## 3. Tags (who sets them)
 
@@ -83,17 +86,18 @@ Where the tools come from: the AI text editor, tailpipe, `interactive-shell`, `g
    - Usher, one review pass: 30 minutes. Nina: 30 minutes. Quincy: 45 minutes.
    - Cato final review: 30 minutes per merge request.
    - Cato splitting a task for Pia: 15 minutes per task.
-5. Pia sweeps for stale timers on each wake-up: any task In progress with no update for 60 minutes gets a ping to its worker, and after a second wake-up Pia moves it to To do, unassigned, and says why in an update.
+5. Pia sweeps for stale timers on each wake-up: any task In progress with no update for 60 minutes gets a ping to its worker. Each later wake-up with still no update gets another ping and an update from Pia that names the time since the last update. The task stays In progress with its worker.
 6. Pia's weekly figure to Cato: time per phase per task, so slow phases show.
 
 ## 5. Wake-ups
 
-- Everyone checks their inbox first on every wake-up (`list_notifications`, then `my_tasks`). Items where they were pinged come first.
+- **No idle workers, first.** On every wake-up Pia gives each free worker the next startable Backlog card before she reads her inbox. Cards that touch the same files go to the same worker.
+- Everyone checks their inbox on every wake-up (`list_notifications`, then `my_tasks`). Items where they were pinged come first.
 - Workers and reviewers wake on assignment. As a fallback they wake every 10 minutes while they have an open task.
 - Pia wakes on any inbox item, and every 10 minutes while any task is open.
 - Cato checks his inbox (`list_notifications`), his tasks (`my_tasks`) and the `Verify` column at the start of every turn. When he can schedule a wake-up, he schedules one 10 minutes ahead while a task is assigned to him or waiting in `Verify`, and 30 minutes ahead otherwise. He handles a `split help` task or a question that names him first, then a task in `Verify`, then anything else. He also checks that Pia is available, and restarts her when she is not (section 1).
 - Idle ladder: with nothing to do, wake after 5, then 15, then 30 minutes, and stay at 30 until something arrives. This keeps cheap models cheap.
-- If the inbox is empty, Pia looks at Backlog, picks the highest priority task she may work on, and triages it.
+- If the inbox is empty and no worker is free, Pia looks at Backlog, picks the highest priority task she may work on, and triages it.
 
 ## 6. The flow, phase by phase
 
@@ -117,7 +121,7 @@ Where the tools come from: the AI text editor, tailpipe, `interactive-shell`, `g
    - A subtask too big for the time-box is split again. A split is not finished until every subtask passes the no-ambiguity rules in section 1: where research found two ways to do it, she picks one, writes down which and why in one line, and the subtask names only that one.
 3. She sets a priority (urgent, high, normal, low) and an estimate. The estimate is in minutes and is the sum of the subtask estimates.
 4. She assigns to the worker already in that area, otherwise a worker with no open task. No worker holds more than one In progress task.
-5. Moves it to `To do`, starts the worker if the worker is not running (Pia starts her workers herself), logs the time, goes to the next task.
+5. Moves it to `To do`, starts the worker herself if the worker is not running, logs the time, goes to the next task.
 6. A question she cannot answer: tag `@cato` with the question, move the task to `Blocked`, take the next task. When Cato answers, she passes it on and unblocks.
 
 ### Phase 3: Build (worker)
@@ -131,7 +135,7 @@ Where the tools come from: the AI text editor, tailpipe, `interactive-shell`, `g
 ### Phase 4: Verify PM (Pia)
 
 1. Check against the brief and the acceptance lines: every subtask carries `verify CQ` and `verify QA`, plus `verify UX` where it modified a UX element, evidence attached, the pull request exists and is named right, no "I think it is done". The test output in the evidence shows 0 failures. Output with a failure goes back to the worker, whatever caused it.
-2. Anything missing: back to the worker as a subtask, task to `In progress`.
+2. Anything missing: back to the worker as a subtask, task to `In progress`, assigned to the worker (rule 1, section 2).
 3. Send the task through every gate, in this order: `Verify UX`, `Verify CQ`, `Verify QA`. A UX element is anything a user sees or interacts with: a screen, a component, a text, a layout, a style, a form, an error message, an email. Pia corrects a `verify UX` tag the worker got wrong, in either direction.
    - Any subtask has `verify UX`: assign Usher and move to `Verify UX`.
    - No subtask has `verify UX`: skip `Verify UX`, assign Nina, move to `Verify CQ`, and say in an update that UX was skipped because no UX element was modified.
@@ -144,7 +148,7 @@ Where the tools come from: the AI text editor, tailpipe, `interactive-shell`, `g
 1. Tests usability, accessibility, responsiveness, logical flow, guidance on where to go next, no dead ends. The test is: could a person with no browser experience work it out.
 2. Test the whole changed flow in context, not only the diff.
 3. Each issue becomes its own subtask tagged `UX violation`, assigned to Pia. Narrow, one issue each.
-4. Pia picks the worker. If the original worker is gone or compacted, she gives it to whoever is free and puts the context in the subtask.
+4. Pia picks the worker. If the original worker is gone or compacted, she gives it to whoever is free and puts the context in the subtask. The card goes to `In progress`, assigned to that worker, then back to `Verify UX` (rule 1, section 2).
 5. When fixes come back he re-checks each, then runs the whole flow once more, since fixes change flows.
 6. No open issues: tag `UX approved`, move to `Verify PM`, assign Pia, log time.
 
@@ -153,14 +157,14 @@ Where the tools come from: the AI text editor, tailpipe, `interactive-shell`, `g
 1. Checks the branch for duplicated code, logic errors, security problems, code style and static analysis, and that the code that delivers behaviour is covered by tests.
 2. Keeps tests lean: no test that repeats what another test already proves.
 3. Flags comments that restate the code. Comments stay only where the reason is not visible in the code.
-4. Each finding is a subtask tagged `CQ violation`, assigned to Pia.
+4. Each finding is a subtask tagged `CQ violation`, assigned to Pia. Pia gives the fix to a worker: the card goes to `In progress`, assigned to the worker, then back to `Verify CQ` (rule 1, section 2).
 5. After fixes she re-checks the changes and the files they touched. Nothing left: tag `CQ approved`, move to `Verify PM`, assign Pia, log time.
 6. If a CQ fix changes what the user sees, Pia sends the task through UX again.
 
 ### Phase 7: Verify QA (Quincy)
 
 1. Uses the result as a customer would, following the user stories and their scenarios when present. For code or API work, uses it as an agent would with no prior knowledge.
-2. Each implementation or usage gap is a subtask tagged `QA violation`, assigned to Pia.
+2. Each implementation or usage gap is a subtask tagged `QA violation`, assigned to Pia. Pia gives the fix to a worker: the card goes to `In progress`, assigned to the worker, then back to `Verify QA` (rule 1, section 2).
 3. Nothing left: tag `QA approved`, move to `Verify PM`, assign Pia, log time.
 
 ### Phase 8: Verify PM to Verify (Pia)
@@ -196,7 +200,7 @@ Hard rule 9 applies to every agent. This is what happens when it cannot be follo
 7. **Stale timers and silence.** Pia's sweep in section 4.
 8. **Priority meanings.** Urgent: before anything else. High: next. Normal: in order. Low: only when idle.
 9. **Human interrupts.** A message from the Owner to Cato that changes direction: Cato tells Pia, Pia parks affected tasks in Blocked with a reason.
-10. **Shutdown.** When a crew is disabled, Pia first moves every In progress task to To do, unassigned, with a note.
+10. **Shutdown.** When a crew is disabled, Pia first posts a note on every In progress task that the crew is shut down. Each task stays In progress with its worker.
 
 ## 8. What the code does today (checked 2026-11-05)
 
@@ -206,6 +210,7 @@ Hard rule 9 applies to every agent. This is what happens when it cannot be follo
 - A crew board made after 2026-11-05 has the columns Backlog, To do, In progress, Verify PM, Verify UX, Verify CQ, Verify QA, Verify, Ready for live, Done, Blocked and Bugs, and an agent hears a card moving into any review gate or Blocked. Boards made before that keep their old columns. The kit documents describe the gates (`CREW.md.tmpl` rules 7 and 7b, `PIA-UX.md.tmpl`, `NINA.md.tmpl`, `USHER.md.tmpl`, `QUINCY.md.tmpl`, `SKILL.md`). Quincy is in the cast (key `quincy`), in the crew API, in forks and in `init.mjs`. A crew made before Quincy existed gets his account on its next rotate; a fork made before then has no Quincy until it is forked again. Nina's key is `nina` and Pia's is `pia` (renamed 2026-11-05, Q70).
 - The agents have `log_time`, `list_time`, `start_timer` and `stop_timer` over MCP.
 - Boss starts only Pia (2026-11-05). She runs as her own Claude Code session, with or without a channel, and starts her workers, reviewers and log watcher herself with the `Agent` tool (`PROMPTS.md.tmpl`, "Starting Pia"; `CREW.md.tmpl`, "How the PM starts a worker or reviewer"). The `WAKE` comment is gone: a comment that asks Boss to start someone is text, not an order. Not tested end to end: starting Pia's session through the `interactive-shell` skill, and Pia starting subagents from a session that holds a channel. The reasoning is that a subagent cannot start other agents, but a top-level session can.
+- The office view is the 3D room of a crew board: the seating of the crew on that board, the Office tab.
 
 ## 9. Decisions
 

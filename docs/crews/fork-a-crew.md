@@ -6,17 +6,18 @@ topics: fork, crew, agents, keys, accounts, init, agent type
 order: 40
 ---
 
-A crew works the same way on every board it is given: one planner, four workers, a tester and a reviewer for all of
+A crew works the same way on every board it is given: one planner, four workers, a tester, a code reviewer and QA for all of
 them. When it works on **several boards**, you often want agents that belong to one board each, so you can tell which
 agent worked on which board and so one agent's key reaches only its own board. That is a **fork**.
 
-A fork makes seven agents from the crew's working members, each named for the board and the person, for example
+A fork makes eight agents from the crew's working members, each named for the board and the person, for example
 `internal-tools-wren`:
 
 - the planner,
 - the four workers,
 - the usability tester,
-- the code reviewer.
+- the code reviewer,
+- QA, the tester who uses the result like a customer.
 
 **Boss** (who runs the crew) stays one for the whole crew, and the customer logins belong to the product, so neither
 is forked.
@@ -30,7 +31,7 @@ You can fork a crew you made yourself, once a board has it.
 
 1. Open **Team**, then **Crews**.
 2. Under the link, press **Fork the crew for this board**. (The **Step by step** form offers it too, as step two.)
-3. A box lists the seven forks with their keys. **They are shown once.** Press **Download** and keep the file
+3. A box lists the eight forks with their keys. **They are shown once.** Press **Download** and keep the file
    `forks-<crew>-<board>.json`; it also holds each account's password, so keep it as private as a password.
 
 The link then lists the forked agents by name.
@@ -45,7 +46,7 @@ On the computer that runs the crew, give the file to the crew kit:
 CREW_HOME=~/crew-home/<crew> node <kit folder>/init.mjs --forks ~/Downloads/forks-<crew>-<board>.json
 ```
 
-It stores the file where only you can read it and writes one agent type per fork. Start Boss's Claude Code session
+It stores the file where only you can read it and writes one agent type per fork. Start Pia's Claude Code session
 after that (or send an open one a new message): Claude Code reads the new agent types then. Each fork does the role
 of the member it was made from and signs in as its own name:
 
@@ -61,7 +62,7 @@ lost or leaked. Hand the new file over the same way: running `init.mjs --forks` 
 
 ## Add extra workers
 
-Some boards need more hands than the seven: a second set of workers, for example a local model on a small card. The
+Some boards need more hands than the eight: a second set of workers, for example a local model on a small card. The
 board keeps three extra workers, **Wes**, **Wilma** and **Walt Worker**, that are not forked with the others. On a
 forked board, **Add workers** lists the extras not yet there. Tick the ones you want and press **Add the workers**:
 each gets its own account and a key that reaches only the crew's board for this board, and a file with only the new
@@ -73,7 +74,7 @@ extras new keys together with the others.
 
 ## Remove the forks
 
-**Remove the forks** asks you to confirm (**Remove**), then deletes the seven accounts and their keys. The crew stays on the board. Their agent
+**Remove the forks** asks you to confirm (**Remove**), then deletes the eight accounts and their keys. The crew stays on the board. Their agent
 definitions and the file on the crew's computer are then yours to delete. Taking the crew off the board removes
 the forks too.
 
