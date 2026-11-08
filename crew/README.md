@@ -350,6 +350,8 @@ The exit codes: 0 published; 1 a git or setup failure; 2 usage; 3 a merge confli
 
 `crew.mjs` runs it as `publish.mjs`; `publish.test.mjs` runs it against throwaway git repositories in a folder under the kit's own folder, removed after each run.
 
+**Changelog fragments (Taskmanager).** A change adds `changelog.d/<card-id>-<slug>.md` instead of a line in `CHANGELOG.md` (CONTRIBUTING.md, "Changelog"). The publish that bumps the version folds them in: `node scripts/bump-version.mjs changelog` puts them under the new version heading, deletes them, and must run on the merged tree before the version commit is made, with `changelog.d` and `CHANGELOG.md` staged with it. The kit's own publish does not run that fold: it is a step of the repository's publish script, and a worker never runs it or edits `CHANGELOG.md`.
+
 Post long text from a file, not inline JSON: write the Markdown to a file and run `crew wren update <taskId> body.md`. An update is internal (staff only) unless `--customer` is given; a customer contact's update is customer-visible whatever the flag says, because the server decides. The board prints `posted as internal` or `posted as customer`. An empty body, a file over 200 KB, invalid UTF-8 or NUL bytes exit 65; a missing file, a symlink or a non-file exits 66; an unknown flag exits 64; a board that cannot be reached exits 69 (try again). The one-line form is `crew wren mcp post_task_update`, with a JSON object holding the id and the body.
 
 ## The shared browser
