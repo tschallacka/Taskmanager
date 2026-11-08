@@ -59,7 +59,7 @@ A **management token** (the sidebar link **Get AI management token** on a board)
 A crew can be made on a real board in the same call. The crew always works on a **shadow board**, made in the crew's own team; the real board is for people. Only the key's owner can bind, and only to a board of a team the owner runs as owner or admin.
 
 - `GET /api/crews/targets` lists the teams the key's owner runs as owner or admin, each with its boards: `{ "teams": [ { "team_id", "team_name", "userboards": [ ... ] } ] }`. The crew work boards and the shadow boards are left out of the boards.
-- `POST /api/crews` takes an optional `projectId` (the real board) and `teamId` (that board's team, optional; `teamId` alone is a 400). Without `projectId` the request and the answer are the same as before. With it, the answer adds:
+- `POST /api/crews` takes an optional `projectId` (the real board) and `teamId` (that board's team, optional; `teamId` alone is a 400). Its answer has no keys or passwords: see *The keys and passwords* below. With `projectId`, the answer also adds:
   - `userboard`: the real board, with its shadow boards.
   - `real_board` and `shadow_board`: each with `board_id`, `board_name` and `url`. Give the crew the **shadow board** `url` as its work board.
 
@@ -78,6 +78,19 @@ A userboard has this shape, with snake_case names:
 `user_id` is the account that attached the shadow board, and `crew_ids` lists the crew's people on it, with their `@tag`; `id` is that person's account id. A rotate of a crew already on the board keeps its one shadow board. A board that is archived, a crew's own board or a shadow board is refused with a 400, another team's board with a 404, and a board the key's owner may not bind to with a 403. A refused call makes no crew.
 
 `DELETE /api/crews/:slug` takes a bound crew off its boards: the link goes and each shadow board is archived, its notes kept.
+
+## The keys and passwords
+
+**Breaking for API clients:** `POST /api/crews` no longer returns a crew's keys and passwords, for any caller and on a create or a `rotate: true` alike. Its answer lists each person (`id`, `name`, `role`, `email` and `tag`, the person's short key such as `wren`) with no secret, and adds `keys_url` and `keys_note`. The one-time keys come from the keys route.
+
+`POST /api/crews/:slug/keys` makes a fresh set of keys and passwords for every account of the crew. The previous ones stop working at once, as with `rotate`, and a disabled crew is turned back on. It takes the same key as the other crew calls (a management token reaches only a crew bound to its own board) and answers with plain text, one line per secret, to save and source:
+
+```sh
+curl -s -X POST -H "Authorization: Bearer $KEY" https://taskmanager.example.com/api/crews/scrapheap/keys -o crew-keys.env
+chmod 600 crew-keys.env
+```
+
+The first line is a comment that says the file is secret. Each further line is `export TASKMANAGER_CREW_<SLUG>_<PERSON>_API_KEY=...` or `export TASKMANAGER_CREW_<SLUG>_<PERSON>_PASSWORD=...`, with the slug and the person's key upper-cased and dashes turned into underscores. `?format=json` answers the JSON shape the create answer had (the crew, its people with `password` and `apiKey`, the team and the board), for tools that want it. Both answers are `Cache-Control: no-store`. The secrets are never written to the log or to the agent audit.
 
 ## Behind a reverse proxy
 

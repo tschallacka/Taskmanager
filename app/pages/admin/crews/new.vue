@@ -89,7 +89,8 @@ async function makeCrew(rotate = false) {
   making.value = true
   exists.value = null
   try {
-    creds.value = await $fetch<CrewCreds>('/api/admin/crews', {
+    // The create answers without secrets. The keys come from the keys route, once, and are shown on this page only.
+    const made = await $fetch<{ crew: { slug: string } }>('/api/admin/crews', {
       method: 'POST',
       body: {
         slug: form.slug,
@@ -98,6 +99,7 @@ async function makeCrew(rotate = false) {
         rotate
       }
     })
+    creds.value = await $fetch<CrewCreds>(`/api/admin/crews/${made.crew.slug}/keys?format=json`, { method: 'POST' })
   } catch (e) {
     const status = (e as { statusCode?: number }).statusCode
     // The API's wording is for API callers ("send rotate: true"); this page has a button for it.

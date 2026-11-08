@@ -1,5 +1,5 @@
 import { createError } from 'h3'
-import { audited, createOrRotateCrew, parseCrewInput, requireCrewManager } from '../../utils/crewProvisioning'
+import { answerWithoutSecrets, audited, createOrRotateCrew, parseCrewInput, requireCrewManager } from '../../utils/crewProvisioning'
 import { makeBoundCrew } from '../../utils/crewBoards'
 import { requireCreateOnOwnBoard } from '../../utils/managementToken'
 import { isInstanceAdmin } from '../../utils/crewPermission'
@@ -7,8 +7,8 @@ import { chargeRateLimit, limitsFor, scopeOfBoard } from '../../utils/rateLimits
 
 /**
  * Makes a crew: its team, accounts, customer, board and one key per account. A slug
- * already taken answers 409 (with no secrets) unless `rotate` is true, which gives every
- * account new keys and a new password and answers with them once.
+ * already taken answers 409 unless `rotate` is true, which gives every account new keys and a new password.
+ * The answer never carries a key or a password, for any caller: they come from POST /api/crews/:slug/keys, once.
  * With `projectId` (and optionally `teamId`, the real board's team) the crew is also bound to
  * that board: its shadow board is made and linked, and the answer adds the userboard and the
  * real and shadow boards. Without `projectId` the request and the answer are the same as before.
@@ -36,7 +36,8 @@ export default defineEventHandler(async (event) => {
       ? await createOrRotateCrew(input, caller)
       : await makeBoundCrew(input, caller, { projectId: body.projectId, teamId: body.teamId })
     const summary = made.status === 201 ? 'created' : 'rotated keys of'
-    return { result: made, summary }
+    // No secret in this answer, for any caller: the keys route gives the keys and passwords, once.
+    return { result: answerWithoutSecrets(made, input.slug), summary }
   })
   setResponseStatus(event, outcome.status)
   return outcome.body
