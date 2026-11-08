@@ -1237,6 +1237,24 @@ describe('crew runner process', () => {
       rmSync(bin, { recursive: true, force: true })
     }
   })
+  test('--test-run without --cards is refused: no worker starts, no ask reaches the board, and nothing is written', () => {
+    const home = mkdtempSync(join(tmpdir(), 'crew-runner-'))
+    const bin = mkdtempSync(join(tmpdir(), 'crew-runner-bin-'))
+    try {
+      writeFileSync(join(home, 'crew.json'), JSON.stringify({ runners: { wes: 'opencode/ollama' } }))
+      const started = join(home, 'started')
+      writeFileSync(join(bin, 'opencode'), `#!/bin/sh\ntouch ${started}\n`, { mode: 0o755 })
+      const run = spawnSync(process.execPath, [join(KIT, 'runner.mjs'), 'once', '--test-run'], { encoding: 'utf8', env: { ...process.env, CREW_HOME: home, PATH: `${bin}:${process.env.PATH}` } })
+      assert.equal(run.status, 64, run.stderr)
+      assert.match(run.stderr, /--test-run needs --cards/)
+      assert.equal(run.stdout, '')
+      assert.equal(existsSync(started), false, 'no worker was started')
+      assert.equal(existsSync(join(home, 'runners')), false, 'no state was written')
+    } finally {
+      rmSync(home, { recursive: true, force: true })
+      rmSync(bin, { recursive: true, force: true })
+    }
+  })
 
   test('a run that ignores SIGTERM is sent SIGKILL after the grace period, and the pass goes on', () => {
     const home = mkdtempSync(join(tmpdir(), 'crew-runner-'))

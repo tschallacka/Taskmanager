@@ -156,6 +156,7 @@ async function once(argv) {
   const cardsFile = argv.includes('--cards') ? argv[argv.indexOf('--cards') + 1] : null
   if (argv.includes('--cards') && !cardsFile) return refuse('--cards names no file')
   if (cardsFile && !dryRun && !testRun) return refuse('--cards needs --dry-run (a rehearsal: nothing starts) or --test-run (the test-only flag: runs start, no ask is posted)')
+  if (testRun && !cardsFile) return refuse('--test-run needs --cards: without it the runs would post asks to the real board')
   const creds = cardsFile ? null : loadCreds()
   const list = workers()
   const cards = {}
