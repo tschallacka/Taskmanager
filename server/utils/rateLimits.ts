@@ -22,13 +22,15 @@ export interface RateLimit {
 export const DEFAULT_RATE_LIMITS: Record<RateLimitKind, RateLimit> = {
   tasks: { max: 600, windowSeconds: 3600 },
   pairing: { max: 10, windowSeconds: 600 },
-  crews: { max: 20, windowSeconds: 86400 }
+  crews: { max: 20, windowSeconds: 86400 },
+  imports: { max: 20, windowSeconds: 86400 }
 }
 
 const WHAT: Record<RateLimitKind, string> = {
   tasks: 'tasks created',
   pairing: 'pairing code exchanges',
-  crews: 'crews or management tokens made'
+  crews: 'crews or management tokens made',
+  imports: 'board backups imported'
 }
 
 const MAX_LIMIT = 100_000

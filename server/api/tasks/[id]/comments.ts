@@ -25,6 +25,7 @@ export default defineEventHandler(async (event) => {
         editedAt: taskComments.editedAt,
         createdVia: taskComments.createdVia,
         replyToId: taskComments.replyToId,
+        authorLabel: taskComments.authorLabel,
         userName: user.name,
         // An agent's update is signed with the key it was posted with, so the
         // log says "Claude Code" where the work was actually an agent's.
@@ -36,7 +37,11 @@ export default defineEventHandler(async (event) => {
       .where(and(eq(taskComments.taskId, id), commentVisibilityFilter(project.audience)))
       .orderBy(asc(taskComments.createdAt))
     // A GitHub copy is signed GitHub here too, not with the owner's account (see signedName).
-    return attachReplyPreviews(id, rows.map(row => ({ ...row, userName: signedName(row) })), project.audience)
+    // An update imported from another board names its author as it was there, and says it was imported.
+    return attachReplyPreviews(id, rows.map(row => ({
+      ...row,
+      userName: row.authorLabel ? `${row.authorLabel}, imported` : signedName(row)
+    })), project.audience)
   }
 
   if (event.method !== 'POST') {
