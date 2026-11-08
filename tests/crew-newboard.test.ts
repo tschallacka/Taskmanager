@@ -39,8 +39,10 @@ const names = { made: 'Fresh board', refused: 'Refused board' }
 const caller = (userId: string) => ({ userId, keyId: null, keyName: 'test key' })
 const management = (userId: string, boardId: string) => ({ userId, keyId: id('mgmt'), keyName: 'management', boardId })
 const product = { name: 'New board product' }
+// h3's createError carries the sentence in `message` on some versions and `statusMessage` on others.
+const msgOf = (e: { statusMessage?: string, message?: string }) => e.statusMessage ?? e.message
 const rejects = (promise: Promise<unknown>, status: number, message?: string) =>
-  assert.rejects(promise, (e: { statusCode?: number, statusMessage?: string }) => e.statusCode === status && (message === undefined || e.statusMessage === message))
+  assert.rejects(promise, (e: { statusCode?: number, statusMessage?: string }) => e.statusCode === status && (message === undefined || msgOf(e) ===message))
 
 let made: { made: { status: number, body: any }, boardId: string } | null = null
 
@@ -107,18 +109,18 @@ test('a crew with newBoard gets a new board in the team, owned by the caller, wi
 test('the newBoard shape and name are checked before anything is made', () => {
   assert.equal(parseNewBoard({ slug: 'x' }, caller(boss)), null, 'no newBoard, no change')
   assert.throws(() => parseNewBoard({ newBoard: { name: 'A' }, projectId: board.real, teamId: realTeam }, caller(boss)),
-    (e: { statusCode?: number, statusMessage?: string }) => e.statusCode === 400 && e.statusMessage === 'Send projectId or newBoard, not both.')
+    (e: { statusCode?: number, statusMessage?: string }) => e.statusCode === 400 && msgOf(e) ==='Send projectId or newBoard, not both.')
   assert.throws(() => parseNewBoard({ newBoard: { name: 'A' } }, caller(boss)),
-    (e: { statusCode?: number, statusMessage?: string }) => e.statusCode === 400 && e.statusMessage === 'newBoard needs a teamId.')
+    (e: { statusCode?: number, statusMessage?: string }) => e.statusCode === 400 && msgOf(e) ==='newBoard needs a teamId.')
   assert.throws(() => parseNewBoard({ newBoard: { name: '   ' }, teamId: realTeam }, caller(boss)),
-    (e: { statusCode?: number, statusMessage?: string }) => e.statusCode === 400 && e.statusMessage === 'newBoard.name must be text of 1 to 120 characters.')
+    (e: { statusCode?: number, statusMessage?: string }) => e.statusCode === 400 && msgOf(e) ==='newBoard.name must be text of 1 to 120 characters.')
   assert.throws(() => parseNewBoard({ newBoard: { name: 'a'.repeat(121) }, teamId: realTeam }, caller(boss)),
-    (e: { statusCode?: number, statusMessage?: string }) => e.statusCode === 400 && e.statusMessage === 'newBoard.name must be text of 1 to 120 characters.')
+    (e: { statusCode?: number, statusMessage?: string }) => e.statusCode === 400 && msgOf(e) ==='newBoard.name must be text of 1 to 120 characters.')
   assert.throws(() => parseNewBoard({ newBoard: {}, teamId: realTeam }, caller(boss)), (e: { statusCode?: number }) => e.statusCode === 400)
   assert.deepEqual(parseNewBoard({ newBoard: { name: '  Sprint  ' }, teamId: realTeam }, caller(boss)), { teamId: realTeam, name: 'Sprint' })
   assert.deepEqual(parseNewBoard({ newBoard: { name: 'a'.repeat(120) }, teamId: realTeam }, caller(boss))?.name.length, 120)
   assert.throws(() => parseNewBoard({ newBoard: { name: 'Sprint' }, teamId: realTeam }, management(boss, board.real)),
-    (e: { statusCode?: number, statusMessage?: string }) => e.statusCode === 403 && e.statusMessage === 'A management token cannot create a new board.')
+    (e: { statusCode?: number, statusMessage?: string }) => e.statusCode === 403 && msgOf(e) ==='A management token cannot create a new board.')
 })
 
 test('a plain member, a key of another team, and a rotate of the crew already made are refused', async () => {
