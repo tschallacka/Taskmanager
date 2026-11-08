@@ -7,6 +7,7 @@ import { randomBytes } from 'node:crypto'
 import { createError } from 'h3'
 import { eq, inArray } from 'drizzle-orm'
 import { decide, type KeyVerdict } from '../server/utils/crewGatePolicy'
+import { TOKEN_REFUSAL_MESSAGES } from '../server/utils/connectTokenRules'
 
 // Nitro provides createError and getRequestHeader as globals; the token and gate code expect them.
 Object.assign(globalThis, { createError })
@@ -21,7 +22,7 @@ const asToken = (token: string) => {
 const { db } = await import('../server/db')
 const { apiKeys, apiKeySecrets, crewBoards, crews, instanceSettings, member, organization, projects, teamSettings, user } = await import('../server/db/schema')
 const { generateApiKey } = await import('../server/utils/api-keys')
-const { rotateSecret } = await import('../server/utils/connectTokens')
+const { revokeKey, rotateSecret } = await import('../server/utils/connectTokens')
 const { remoteManagementVerdict, isManagementToken, checkCrewKey } = await import('../server/utils/crewGate')
 const { setBoardCrews, setInstanceCrews, setTeamCrews } = await import('../server/utils/crewPermission')
 const { issueManagementToken } = await import('../server/utils/managementToken')
@@ -177,4 +178,38 @@ test('a regenerated management token answers the regenerated sentence', async ()
   assert.equal(verdict.management, true)
   assert.match(verdict.message ?? '', /regenerated/)
   assert.deepEqual(decide({ local: REMOTE, windowOpen: false, tempKeyId: null, verdict }), { pass: false, status: 401, outcome: 'bad key', closeReason: null })
+})
+
+test('a revoked management token answers the revoked sentence, and is still a management token', async () => {
+  const made = await issueManagementToken(boss, board)
+  createdTokenKeyIds.push(made.key.id)
+  assert.equal(await revokeKey(boss, made.key.id), true)
+  asToken(made.token)
+  assert.equal(await isManagementToken({} as never), true)
+  const verdict = await remoteManagementVerdict({} as never)
+  assert.ok(verdict && !verdict.ok)
+  assert.equal(verdict.management, true)
+  assert.equal(verdict.message, TOKEN_REFUSAL_MESSAGES.token_revoked)
+  assert.match(verdict.message ?? '', /revoked/)
+  assert.deepEqual(decide({ local: REMOTE, windowOpen: false, tempKeyId: null, verdict }), { pass: false, status: 401, outcome: 'bad key', closeReason: null })
+})
+
+test('a revoked access token is not a management token: the gate answers 404 for it', async () => {
+  const generated = generateApiKey()
+  const accessId = id('revoked-access')
+  createdTokenKeyIds.push(accessId)
+  await db.insert(apiKeys).values({
+    id: accessId,
+    userId: boss,
+    teamId: null,
+    name: 'revoked access token',
+    keyHash: generated.hash,
+    keyPrefix: generated.displayPrefix,
+    scopes: ['crews:manage'],
+    createdAt: now
+  })
+  assert.equal(await revokeKey(boss, accessId), true)
+  asToken(generated.token)
+  assert.equal(await isManagementToken({} as never), false)
+  assert.equal(await remoteManagementVerdict({} as never), null)
 })
