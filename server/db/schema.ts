@@ -146,7 +146,7 @@ export const instanceSettings = pgTable('instance_settings', {
 })
 
 // A limit on agent calls: at most `max` of them in each window of `windowSeconds`.
-export const RATE_LIMIT_KINDS = ['tasks', 'pairing', 'crews'] as const
+export const RATE_LIMIT_KINDS = ['tasks', 'pairing', 'crews', 'imports'] as const
 export type RateLimitKind = typeof RATE_LIMIT_KINDS[number]
 export type RateLimitSettings = Partial<Record<RateLimitKind, { max: number, windowSeconds: number }>>
 
@@ -435,6 +435,9 @@ export const taskActivity = pgTable(
     taskId: text('task_id').notNull().references(() => projectTasks.id, { onDelete: 'cascade' }),
     projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
     actorId: text('actor_id').references(() => user.id, { onDelete: 'set null' }),
+    // The name the actor had in the board this line was imported from, when the actor is not a
+    // person of this instance (a board import). NULL for every line written here.
+    authorLabel: text('author_label'),
     // How it was done: the app, an agent over MCP, or the AI assistant.
     via: text('via').$type<ActivitySource>().notNull().default('ui'),
     kind: text('kind').$type<TaskActivityKind>().notNull(),
@@ -689,6 +692,9 @@ export const taskComments = pgTable(
     // account because that is whose workspace it is, but it does not get to
     // wear their name — see `createdVia` below.
     userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+    // The name the author had in the board this update was imported from, when the author is not a
+    // person of this instance (a board import; the update then belongs to the importer). NULL otherwise.
+    authorLabel: text('author_label'),
     // Inline Markdown, stored as written. A person types it in the drawer and an
     // agent posts it over MCP; both speak the same narrow subset.
     body: text('body').notNull(),
@@ -1490,3 +1496,28 @@ export const taskDependencies = pgTable(
 )
 
 export type TaskDependency = typeof taskDependencies.$inferSelect
+
+// What a board import has loaded, one row per backup row it wrote: a card (kind `task`), a message, a
+// status update or a rule. A second import of the same board finds these rows and skips what is in them.
+// `source_task_id` is the id the backup gave the row (whatever its kind); `target_id` is the row written
+// here; `task_id` is the card, for a task row only (it goes with the card if the card is removed).
+export const boardImports = pgTable(
+  'board_imports',
+  {
+    id: text('id').primaryKey(),
+    projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+    // The idempotency key of the import that wrote the row: the backup's board id and checksum, unless given.
+    importKey: text('import_key').notNull(),
+    kind: text('kind').notNull().default('task'),
+    sourceInstance: text('source_instance').notNull(),
+    sourceBoardId: text('source_board_id').notNull(),
+    sourceTaskId: text('source_task_id').notNull(),
+    taskId: text('task_id').references(() => projectTasks.id, { onDelete: 'cascade' }),
+    targetId: text('target_id').notNull(),
+    importedAt: bigint('imported_at', { mode: 'number' }).notNull()
+  },
+  table => [
+    uniqueIndex('board_imports_source_idx').on(table.projectId, table.kind, table.sourceInstance, table.sourceBoardId, table.sourceTaskId),
+    index('board_imports_task_id_idx').on(table.taskId)
+  ]
+)

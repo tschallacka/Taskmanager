@@ -19,6 +19,13 @@ Thanks for helping improve Taskmanager.
 
 Keep changes focused and preserve compatibility with existing persisted notes. Do not commit generated SQL, snapshots, or migration metadata.
 
+### Board backups and imports
+
+- The backup format is `shared/backup/schema.ts`: the types, the JSON Schema and the validator. Change it only with a new version.
+- The export is `server/utils/boardBackup.ts`. The import is split in two: `server/utils/boardImportPlan.ts` plans it and touches no database (a dry run stops there), and `server/utils/boardImport.ts` writes the plan in one transaction. An import must not call the notification, agent-event, rule, GitHub or activity code: it writes its rows as they are in the file.
+- The import's schema changes are additive: `task_comments.author_label`, `task_activity.author_label` and the `board_imports` table. Tests run against a scratch database, never the shared one.
+- Documentation: [Import a board backup](docs/team/board-import.md) and [Back up a board](docs/team/board-backup.md).
+
 ## Releases
 
 `scripts/bump-version.mjs` is the one place that changes the version. Pick the kind of change by what it means:
