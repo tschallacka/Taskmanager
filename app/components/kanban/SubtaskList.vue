@@ -97,6 +97,13 @@ async function commitTitle(sub: { id: string, title: string }, input: HTMLInputE
   }
 }
 
+// A click on the row opens the subtask, but not a click on its own input (the
+// rename field) or a button in the row.
+function onRowClick(sub: { id: string }, event: Event) {
+  if ((event.target as Element).closest('input, button')) return
+  emit('open-task', sub.id)
+}
+
 async function onRowBlur(sub: { id: string, title: string }, event: Event) {
   await commitTitle(sub, event.target as HTMLInputElement)
 }
@@ -224,7 +231,10 @@ onBeforeUnmount(destroySortable)
         :data-id="sub.id"
         class="kanban-subtask-row"
       >
-        <div class="group/sub flex items-center gap-2 py-0.5">
+        <div
+          class="group/sub flex items-center gap-2 py-0.5"
+          @click="onRowClick(sub, $event)"
+        >
           <UIcon
             v-if="!readonly"
             name="i-lucide-grip-vertical"
@@ -253,7 +263,6 @@ onBeforeUnmount(destroySortable)
             @keydown.esc.prevent="onRowEscape(sub, $event)"
             @keydown.tab.prevent="onRowTab(sub, $event)"
             @blur="onRowBlur(sub, $event)"
-            @click="emit('open-task', sub.id)"
           >
           <UAvatar
             v-if="personById(sub.assigneeId)"
@@ -289,8 +298,8 @@ onBeforeUnmount(destroySortable)
         >
           <KanbanSubtaskList
             :parent-task-id="sub.id"
-            @open-task="emit('open-task', $event)"
             :readonly="readonly"
+            @open-task="emit('open-task', $event)"
           />
         </div>
       </li>
