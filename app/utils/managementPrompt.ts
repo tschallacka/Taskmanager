@@ -28,14 +28,23 @@ Never paste it anywhere else: not into a file, a log, a task, a comment, a chat 
 The calls you may make, all on ${api}:
 1. See the boards a crew can be bound to: GET ${api}/crews/targets
    The answer lists "teams", each with "userboards". Your board is the userboard with "board_id": "${input.boardId}".
-2. Make a crew for this board, or rotate a crew already on it: POST ${api}/crews
+2. Make a crew for this board: POST ${api}/crews
    Send JSON: {"slug": "<short name, 2 to 63 characters, a to z, 0 to 9 and hyphens>", "name": "<crew name>", "product": {"name": "<product name>"}, "projectId": "${input.boardId}"}
+   Keep the slug: it names the folder of the keys in step 3. If the slug is already taken the call answers 409. Then send the same call again with "rotate": true, which makes new keys for that crew.
    The answer has the crew's "slug", its people (id, name, role, email and tag, no keys), "keys_url", "keys_note", and these boards, each with "board_id", "board_name" and "url":
    - "real_board": the board of the people. Do not write to it.
    - "shadow_board": the crew's work board. Give the crew this board's "url" as its work board.
    - "userboard": the real board with its shadow boards.
-   The keys are not in the answer. POST the "keys_url" with the same token and no body: the answer is plain text, one export line per person and secret. Save it to a file with mode 600. Never print it, log it or read it back.
-3. Take a crew off this board: DELETE ${api}/crews/<slug>
+   The crew's own board, "crew.boardUrl", is not the work board. Do not give it to the crew, unless the owner decides otherwise.
+   The answer holds no keys and no passwords. They come from the keys route in step 3, once.
+3. Get the keys: POST the "keys_url" with the same token and no body. The answer is plain text: one export line per person and secret. Save it, once, to a file that only the user can read:
+   - The folder is ~/.config/taskmanager/<slug>/ (mode 700) and the file in it is keys.env (mode 600), outside any repository. Make them with:
+     umask 077; mkdir -p -m 700 ~/.config/taskmanager/<slug>; curl -s -f -X POST -H "Authorization: Bearer <token>" "<keys_url>" -o ~/.config/taskmanager/<slug>/keys.env
+   - Never print the file, open it, read it back, or paste a key into a chat, a task, a log or a file of your own. Tell the user the path, and nothing else about the keys.
+   - If keys.env already exists, do not overwrite it. Save the answer to a new name next to it (keys-2.env, keys-3.env, and so on) and tell the user that name.
+   - Each name is TASKMANAGER_CREW_<SLUG>_<PERSON>_API_KEY or TASKMANAGER_CREW_<SLUG>_<PERSON>_PASSWORD, with the slug and the person upper-cased and dashes turned into underscores. The file loads into a shell with: . ~/.config/taskmanager/<slug>/keys.env
+   - Every call to keys_url makes new keys, and the old ones stop working at once. Call it once, and again only when the file was lost.
+4. Take a crew off this board: DELETE ${api}/crews/<slug>
    The crew's shadow board is archived, and what the crew wrote on it is kept.
 
 Rules:

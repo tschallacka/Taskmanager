@@ -68,6 +68,51 @@ describe('the management prompt', () => {
   })
 })
 
+describe('the management prompt: the one-time keys', () => {
+  test('the create answer holds no keys: the keys come from keys_url, in step 3', () => {
+    const prompt = managementPrompt(input)
+    assert.match(prompt, /The answer holds no keys and no passwords\. They come from the keys route in step 3, once\./)
+    assert.match(prompt, /3\. Get the keys: POST the "keys_url" with the same token and no body\./)
+  })
+
+  test('the keys are saved to a folder of mode 700 and a file of mode 600, under the user\'s config folder', () => {
+    const prompt = managementPrompt(input)
+    assert.match(prompt, /The folder is ~\/\.config\/taskmanager\/<slug>\/ \(mode 700\) and the file in it is keys\.env \(mode 600\), outside any repository\./)
+    assert.match(prompt, /umask 077; mkdir -p -m 700 ~\/\.config\/taskmanager\/<slug>; curl -s -f -X POST -H "Authorization: Bearer <token>" "<keys_url>" -o ~\/\.config\/taskmanager\/<slug>\/keys\.env/)
+  })
+
+  test('the keys are never printed, read back or pasted, and only the path goes to the user', () => {
+    const prompt = managementPrompt(input)
+    assert.match(prompt, /Never print the file, open it, read it back, or paste a key into a chat, a task, a log or a file of your own\. Tell the user the path, and nothing else about the keys\./)
+  })
+
+  test('an existing keys.env is not overwritten: the answer goes to a new name next to it', () => {
+    const prompt = managementPrompt(input)
+    assert.match(prompt, /If keys\.env already exists, do not overwrite it\. Save the answer to a new name next to it \(keys-2\.env, keys-3\.env, and so on\) and tell the user that name\./)
+  })
+
+  test('the file loads into a shell, and the names of its variables are spelled out', () => {
+    const prompt = managementPrompt(input)
+    assert.match(prompt, /The file loads into a shell with: \. ~\/\.config\/taskmanager\/<slug>\/keys\.env/)
+    assert.match(prompt, /TASKMANAGER_CREW_<SLUG>_<PERSON>_API_KEY or TASKMANAGER_CREW_<SLUG>_<PERSON>_PASSWORD, with the slug and the person upper-cased and dashes turned into underscores\./)
+  })
+
+  test('each call to keys_url makes new keys, so it is called once', () => {
+    const prompt = managementPrompt(input)
+    assert.match(prompt, /Every call to keys_url makes new keys, and the old ones stop working at once\. Call it once, and again only when the file was lost\./)
+  })
+
+  test('a taken slug answers 409, and "rotate": true makes new keys for that crew', () => {
+    const prompt = managementPrompt(input)
+    assert.match(prompt, /If the slug is already taken the call answers 409\. Then send the same call again with "rotate": true, which makes new keys for that crew\./)
+  })
+
+  test('the crew\'s own board is not the work board: the shadow board is', () => {
+    const prompt = managementPrompt(input)
+    assert.match(prompt, /The crew's own board, "crew\.boardUrl", is not the work board\. Do not give it to the crew, unless the owner decides otherwise\./)
+  })
+})
+
 describe('the countdown', () => {
   test('reads as minutes and seconds, rounding up, and stops at 0:00', () => {
     assert.equal(countdownText(10 * 60_000), '10:00')
