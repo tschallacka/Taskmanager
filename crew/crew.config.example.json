@@ -62,6 +62,7 @@
     "lockFiles": [],
     "commitName": "",
     "commitEmail": "",
+    "version": { "file": "package.json", "bump": "patch" },
     "attribution": [],
     "pr": "gh pr create --base {base} --head {branch} --title {title} --body-file {pr}",
     "timeout": 600

@@ -11,7 +11,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { dirname, join } from 'node:path'
 import { after, describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { expandPlaceholders, parseSettings, shellQuote } from './publish.mjs'
+import { bumpVersion, expandPlaceholders, parseSettings, placeVersionLine, rewriteVersion, shellQuote, versionProblems } from './publish.mjs'
 
 const KIT = dirname(fileURLToPath(import.meta.url))
 const PUBLISH = join(KIT, 'publish.mjs')
@@ -36,7 +36,8 @@ function write(file, text) {
 
 // A bare origin, and a work repository pushed to it with a base commit on main. The feature branch adds the given
 // files and changes shared.txt. mainChange, when given, moves main on shared.txt after the branch was cut (a conflict).
-function fixture({ mainChange = null, featureFiles = {} } = {}) {
+// baseFiles are written into the base commit on top of the default package.json.
+function fixture({ mainChange = null, featureFiles = {}, baseFiles = {} } = {}) {
   const root = mkdtempSync(join(KIT, '.publish-test-'))
   roots.push(root)
   const origin = join(root, 'origin.git')
@@ -48,6 +49,7 @@ function fixture({ mainChange = null, featureFiles = {} } = {}) {
   git(work, ['config', 'user.email', 'owner@example.test'])
   write(join(work, 'shared.txt'), 'one\n')
   write(join(work, 'package.json'), '{}\n')
+  for (const [file, text] of Object.entries(baseFiles)) write(join(work, file), text)
   git(work, ['add', '-A'])
   git(work, ['commit', '-q', '-m', 'base'])
   git(work, ['remote', 'add', 'origin', origin])
@@ -77,6 +79,7 @@ function publish(fx, settings, args, env = {}, product = { repo: fx.work }) {
   const childEnv = { ...process.env, CREW_HOME: fx.home }
   delete childEnv.FORCE
   delete childEnv.DATABASE_URL
+  delete childEnv.BUMP
   Object.assign(childEnv, env)
   return spawnSync(process.execPath, [PUBLISH, ...args], { encoding: 'utf8', env: childEnv })
 }
@@ -240,5 +243,143 @@ describe('the settings publish reads from crew.json', () => {
   test('a quote in a title cannot break the command it is written into', () => {
     assert.equal(shellQuote('it\'s'), '\'it\'\\\'\'s\'')
     assert.equal(expandPlaceholders('echo {title} {files} {unknown}', { title: 'it\'s', files: ['a b.ts', 'c.ts'] }), 'echo \'it\'\\\'\'s\' \'a b.ts\' \'c.ts\' {unknown}')
+  })
+})
+
+describe('the version bump: publish.version and BUMP', () => {
+  // A package.json on main with the given text; the feature branch leaves it alone unless `extra` replaces it.
+  const pkgText = (version, indent = 2) => `${JSON.stringify({ name: 'app', version }, null, indent)}\n`
+  const withPackage = (text, extra = {}) => fixture({ baseFiles: { 'package.json': text }, featureFiles: { 'feature.txt': 'feature\n', ...extra } })
+  const pkgOn = (fx, ref = 'crew-feat') => JSON.parse(git(fx.origin, ['show', `${ref}:package.json`]))
+  const messageOn = (fx, ref = 'crew-feat') => git(fx.origin, ['log', '-1', '--format=%B', ref])
+  // publish with a version setting (an empty object is the defaults: patch of package.json) and a pull request command
+  const bumpRun = (fx, settings = {}, env = {}) => publish(fx, { version: {}, pr: touched(fx), ...settings }, args(fx), env)
+
+  test('an empty version object bumps the patch of package.json on the merged tree, and the summary shows old -> new', () => {
+    const fx = withPackage(pkgText('1.0.0'))
+    const run = bumpRun(fx)
+    assert.equal(run.status, 0, out(run))
+    assert.match(out(run), /^version: 1\.0\.0 -> 1\.0\.1 \(patch\)$/m)
+    assert.equal(pkgOn(fx).version, '1.0.1')
+    assert.match(messageOn(fx), /Version 1\.0\.0 -> 1\.0\.1\./)
+  })
+
+  test('minor and major move the version the semver way; none leaves it alone and says so', () => {
+    for (const [bump, next] of [['minor', '1.1.0'], ['major', '2.0.0']]) {
+      const fx = withPackage(pkgText('1.0.3'))
+      const run = bumpRun(fx, { version: { bump } })
+      assert.equal(run.status, 0, out(run))
+      assert.equal(pkgOn(fx).version, next)
+    }
+    const fx = withPackage(pkgText('1.0.0'))
+    const run = bumpRun(fx, { version: { bump: 'none' } })
+    assert.equal(run.status, 0, out(run))
+    assert.match(out(run), /version: not bumped \(none\)/)
+    assert.equal(pkgOn(fx).version, '1.0.0')
+    assert.doesNotMatch(messageOn(fx), /Version /)
+  })
+
+  test('BUMP for one run overrides publish.version.bump; a value other than the four is refused', () => {
+    const minor = withPackage(pkgText('1.0.0'))
+    const run = bumpRun(minor, { version: { bump: 'patch' } }, { BUMP: 'minor' })
+    assert.equal(run.status, 0, out(run))
+    assert.equal(pkgOn(minor).version, '1.1.0')
+
+    const none = withPackage(pkgText('1.0.0'))
+    assert.match(out(bumpRun(none, { version: { bump: 'patch' } }, { BUMP: 'none' })), /version: not bumped \(none\)/)
+    assert.equal(pkgOn(none).version, '1.0.0')
+
+    const bad = bumpRun(withPackage(pkgText('1.0.0')), {}, { BUMP: 'huge' })
+    assert.equal(bad.status, 2, out(bad))
+    assert.match(bad.stderr, /BUMP=huge is not one of patch, minor, major, none/)
+  })
+
+  test('without publish.version nothing is bumped: the skip is printed, and a BUMP for the run is named as ignored', () => {
+    const fx = withPackage(pkgText('1.0.0'))
+    const run = publish(fx, { pr: touched(fx) }, args(fx), { BUMP: 'minor' })
+    assert.equal(run.status, 0, out(run))
+    assert.match(out(run), /version: skipped, publish\.version is empty \(BUMP=minor ignored\)/)
+    assert.equal(pkgOn(fx).version, '1.0.0')
+  })
+
+  test('a version that is not plain x.y.z is refused with exit 4, and nothing is pushed', () => {
+    const fx = withPackage(pkgText('1.0.0-beta.1'))
+    const run = bumpRun(fx)
+    assert.equal(run.status, 4, out(run))
+    assert.match(run.stderr, /has no plain x\.y\.z "version" \(found "1\.0\.0-beta\.1"\)/)
+    assert.equal(onOrigin(fx, 'crew-feat'), false)
+    assert.equal(existsSync(join(fx.root, 'pr.called')), false)
+  })
+
+  test('a branch that already moved the version is left as it is: no second bump, and no version line in the message', () => {
+    const fx = withPackage(pkgText('1.0.0'), { 'package.json': pkgText('1.4.0') })
+    const run = bumpRun(fx)
+    assert.equal(run.status, 0, out(run))
+    assert.match(out(run), /^version: already bumped by the branch \(1\.0\.0 -> 1\.4\.0\), left as is$/m)
+    assert.equal(pkgOn(fx).version, '1.4.0')
+    assert.doesNotMatch(messageOn(fx), /Version /)
+  })
+
+  test('the version line goes before the trailers the message ends with, and the attribution after them', () => {
+    const fx = withPackage(pkgText('1.0.0'))
+    write(fx.msg, 'Add the feature\n\nBody line.\n\nClaude-Session: https://example.test/s\n')
+    const run = bumpRun(fx, { attribution: ['Co-Authored-By: Test <test@example.test>'] })
+    assert.equal(run.status, 0, out(run))
+    assert.equal(messageOn(fx), 'Add the feature\n\nBody line.\n\nVersion 1.0.0 -> 1.0.1.\n\nClaude-Session: https://example.test/s\n\nCo-Authored-By: Test <test@example.test>')
+  })
+
+  test('the rest of package.json stays as it was: indentation, key order, line ends; a nested "version" is left alone', () => {
+    const text = '{\n    "name": "app",\n    "version": "2.10.9",\n    "private": true,\n    "scripts": {\n        "version": "echo"\n    }\n}'
+    const fx = withPackage(text)
+    const run = bumpRun(fx)
+    assert.equal(run.status, 0, out(run))
+    assert.equal(git(fx.origin, ['show', 'crew-feat:package.json']), text.replace('"version": "2.10.9"', '"version": "2.10.10"'))
+  })
+
+  test('the rewrite of a standard package.json is what npm version writes', { skip: spawnSync('npm', ['--version']).status !== 0 && 'npm is not installed' }, () => {
+    const root = mkdtempSync(join(KIT, '.publish-test-'))
+    roots.push(root)
+    const text = pkgText('1.2.3')
+    write(join(root, 'package.json'), text)
+    const npm = spawnSync('npm', ['version', 'minor', '--no-git-tag-version', '--ignore-scripts'], { cwd: root, encoding: 'utf8' })
+    assert.equal(npm.status, 0, out(npm))
+    assert.equal(rewriteVersion(text, '1.2.3', '1.3.0'), readFileSync(join(root, 'package.json'), 'utf8'))
+  })
+})
+
+describe('the version helpers and settings', () => {
+  test('bumpVersion moves one step: patch, minor or major', () => {
+    assert.equal(bumpVersion('1.2.3', 'patch'), '1.2.4')
+    assert.equal(bumpVersion('1.2.3', 'minor'), '1.3.0')
+    assert.equal(bumpVersion('1.2.3', 'major'), '2.0.0')
+    assert.equal(bumpVersion('9.9.9', 'patch'), '9.9.10')
+  })
+
+  test('rewriteVersion changes only the top-level version value, and is null without one', () => {
+    assert.equal(rewriteVersion('{\n\t"version": "1.0.0"\n}\n', '1.0.0', '1.0.1'), '{\n\t"version": "1.0.1"\n}\n')
+    assert.equal(rewriteVersion('{"a":{"version":"1.0.0"}}', '1.0.0', '1.0.1'), null)
+  })
+
+  test('placeVersionLine puts the line last without trailers, and before the trailers with them', () => {
+    assert.equal(placeVersionLine('Add it', 'Version 1.0.0 -> 1.0.1.'), 'Add it\n\nVersion 1.0.0 -> 1.0.1.')
+    assert.equal(placeVersionLine('Add it\n\nCo-Authored-By: A <a@example.test>', 'Version 1.0.0 -> 1.0.1.'), 'Add it\n\nVersion 1.0.0 -> 1.0.1.\n\nCo-Authored-By: A <a@example.test>')
+  })
+
+  test('versionProblems names a bad bump, an unknown key, a file that is not a .json inside the repository', () => {
+    assert.deepEqual(versionProblems({ bump: 'patch', file: 'package.json' }), [])
+    assert.match(versionProblems({ bump: 'huge' }).join('\n'), /publish\.version\.bump must be one of patch, minor, major, none/)
+    assert.match(versionProblems({ size: 'big' }).join('\n'), /publish\.version\.size is not a setting/)
+    assert.match(versionProblems({ file: 'VERSION' }).join('\n'), /publish\.version\.file must be a \.json file inside the repository/)
+    assert.match(versionProblems({ file: '../package.json' }).join('\n'), /publish\.version\.file must be a \.json file inside the repository/)
+    assert.match(versionProblems({ file: '/abs/package.json' }).join('\n'), /publish\.version\.file must be a \.json file inside the repository/)
+    assert.match(versionProblems('minor').join('\n'), /publish\.version must be an object/)
+  })
+
+  test('parseSettings: an absent or empty version is no bump; an object gets the defaults', () => {
+    assert.equal(parseSettings({ repo: '/r' }).settings.version, null)
+    assert.equal(parseSettings({ repo: '/r', version: '' }).settings.version, null)
+    assert.deepEqual(parseSettings({ repo: '/r', version: {} }).settings.version, { file: 'package.json', bump: 'patch' })
+    assert.deepEqual(parseSettings({ repo: '/r', version: { bump: 'major' } }).settings.version, { file: 'package.json', bump: 'major' })
+    assert.match(parseSettings({ repo: '/r', version: { bump: 'huge' } }).problems.join('\n'), /publish\.version\.bump must be one of/)
   })
 })
