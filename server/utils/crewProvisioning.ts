@@ -312,7 +312,7 @@ async function makeCrew(input: CrewInput, caller: CrewCaller) {
 }
 
 /** New passwords, new keys and ended sessions for every account of a crew. Re-enables it. */
-async function rotateCrew(crew: Crew) {
+export async function rotateCrew(crew: Crew) {
   const accounts = await accountsOf(crew.id)
   const ids = accounts.map(a => a.id)
   if (ids.length) {
@@ -477,4 +477,33 @@ export async function audited<T>(
  */
 export async function enableCrew(crew: Crew) {
   await db.update(crews).set({ disabledAt: null }).where(eq(crews.id, crew.id))
+}
+
+export const KEYS_NOTE = 'The secrets are not in this answer: POST keys_url to get them, as env text, once.'
+
+/**
+ * The create and rotate answer, for every caller: the same crew, team and board, its people listed without any secret
+ * (id, name, role, email and tag), and where the keys come from (keys_url). The keys route makes and gives them.
+ */
+export function answerWithoutSecrets(made: { status: 200 | 201, body: unknown }, slug: string) {
+  const body = made.body as { people: Record<string, { id: string, name: string, role: string, email: string }> }
+  const people = Object.fromEntries(Object.entries(body.people).map(([tag, p]) => [tag, { id: p.id, name: p.name, role: p.role, email: p.email, tag }]))
+  return { status: made.status, body: { ...body, people, keys_url: `${baseUrl()}/api/crews/${slug}/keys`, keys_note: KEYS_NOTE } }
+}
+
+const envName = (text: string) => text.toUpperCase().replace(/-/g, '_')
+
+/**
+ * The crew's secrets as shell lines, for the keys route: a comment, then one export per person and secret.
+ * Each name is TASKMANAGER_CREW_<SLUG>_<PERSON>_API_KEY or _PASSWORD. Nothing else is written.
+ */
+export function crewKeysEnv(answer: { crew: { slug: string }, people: Record<string, unknown> }, now = Date.now()): string {
+  const prefix = `TASKMANAGER_CREW_${envName(answer.crew.slug)}`
+  const lines = [`# Taskmanager crew ${answer.crew.slug}, made ${new Date(now).toISOString()}. Secret. Keep this file 0600.`]
+  for (const [tag, entry] of Object.entries(answer.people)) {
+    const person = entry as { apiKey?: string, password?: string }
+    lines.push(`export ${prefix}_${envName(tag)}_API_KEY=${person.apiKey}`)
+    lines.push(`export ${prefix}_${envName(tag)}_PASSWORD=${person.password}`)
+  }
+  return `${lines.join('\n')}\n`
 }

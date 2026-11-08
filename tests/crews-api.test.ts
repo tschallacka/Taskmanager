@@ -70,8 +70,34 @@ function toolJson(reply: Reply): any {
   return text ? JSON.parse(text) : null
 }
 
-let loginPromise: Promise<void> | null = null
+/** The secrets of the env text the keys route answers, per person key: the API key and the password. */
+function parseEnv(text: string, slug: string): Record<string, { apiKey?: string, password?: string }> {
+  const prefix = `TASKMANAGER_CREW_${slug.toUpperCase().replace(/-/g, '_')}_`
+  const people: Record<string, { apiKey?: string, password?: string }> = {}
+  for (const line of text.split('\n')) {
+    const match = line.match(new RegExp(`^export ${prefix}([A-Z]+)_(API_KEY|PASSWORD)=(\\S+)$`))
+    if (!match) continue
+    const person = match[1]!.toLowerCase()
+    people[person] ??= {}
+    people[person][match[2] === 'API_KEY' ? 'apiKey' : 'password'] = match[3]
+  }
+  return people
+}
 
+/** Gets the crew's keys from the keys route (env text, the default) and puts them into a create or rotate answer. */
+async function withKeys(answer: Reply): Promise<Reply> {
+  const keys = await call('POST', `/api/crews/${answer.json.crew.slug}/keys`, adminKey)
+  assert.equal(keys.status, 200, keys.text.slice(0, 300))
+  assert.match(keys.headers.get('content-type') ?? '', /^text\/plain/)
+  assert.equal(keys.headers.get('cache-control'), 'no-store')
+  assert.ok(!keys.text.includes('{'), 'the default answer is env text, not JSON')
+  for (const [key, secrets] of Object.entries(parseEnv(keys.text, answer.json.crew.slug))) {
+    Object.assign(answer.json.people[key], secrets)
+  }
+  return answer
+}
+
+let loginPromise: Promise<void> | null = null
 /** Signs the admin in and mints a boards key of its own, once per run. */
 function login(): Promise<void> {
   if (!loginPromise) {
@@ -141,6 +167,9 @@ test('create makes the crew and returns its people once', { skip }, async () => 
   await ready()
   created = await call('POST', '/api/crews', adminKey, { slug, name: 'Scratch crew', product: { name: 'Scratch product' } })
   assert.equal(created.status, 201, created.text.slice(0, 300))
+  assert.ok(!created.text.includes('arn_'), 'the create answer carries no key')
+  assert.ok(!created.text.includes('"password"'), 'the create answer carries no password')
+  created = await withKeys(created)
   for (const key of ['boss', 'pia', 'wren', 'wick', 'wynn', 'wade', 'usher', 'nina', 'quincy', 'customer', 'contact']) {
     const person = created.json.people[key]
     assert.ok(person, `person ${key} is in the response`)
@@ -264,12 +293,13 @@ test('rotate gives new keys and passwords and kills the old ones', { skip }, asy
   const old = created.json.people.wren
   const rotated = await call('POST', '/api/crews', adminKey, { slug, name: 'Scratch crew', product: { name: 'Scratch product' }, rotate: true })
   assert.equal(rotated.status, 200, rotated.text.slice(0, 300))
-  const fresh = rotated.json.people.wren
+  const keyed = await withKeys(rotated)
+  const fresh = keyed.json.people.wren
   assert.notEqual(fresh.apiKey, old.apiKey)
   assert.equal((await call('POST', '/api/mcp', old.apiKey, { jsonrpc: '2.0', id: 1, method: 'tools/list' })).status, 401)
   assert.equal((await call('POST', '/api/mcp', fresh.apiKey, { jsonrpc: '2.0', id: 1, method: 'tools/list' })).status, 200)
   assert.equal((await signIn(old.email, old.password)).status, 401)
-  created = rotated
+  created = keyed
 })
 
 test('disable cuts the crew off at once', { skip }, async () => {
@@ -287,7 +317,7 @@ test('a disabled crew is 409 without rotate and live again with it', { skip }, a
   assert.equal((await call('POST', '/api/crews', adminKey, { slug, name: 'Scratch crew', product: { name: 'Scratch product' } })).status, 409)
   const back = await call('POST', '/api/crews', adminKey, { slug, name: 'Scratch crew', product: { name: 'Scratch product' }, rotate: true })
   assert.equal(back.status, 200)
-  created = back
+  created = await withKeys(back)
 })
 
 test('purge removes the crew; a second purge finds nothing', { skip }, async () => {
