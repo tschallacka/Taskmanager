@@ -69,4 +69,4 @@ On the workbench, a deploy builds next to the running release, backs up the data
 
 ## Maintenance mode
 
-Set `MAINTENANCE_MODE` to `1`, `true`, `yes` or `on`, or create a file called `maintenance.on` in the server's working directory, and every request is answered 503 with `Retry-After`: a small page for browsers and JSON for the API. `/api/health` still answers. Due-date rules pause too. The file needs no restart, so `touch maintenance.on` before a deploy and `rm maintenance.on` after. `MAINTENANCE_FILE` renames the file.
+Set `MAINTENANCE_MODE` to `1`, `true`, `yes` or `on`, or create a file called `maintenance.on` in the server's working directory, and every request is answered 503 with `Retry-After`: a small page for browsers and JSON for the API. `/api/health` and `/api/version` still answer. Due-date rules pause too. The file needs no restart, so `touch maintenance.on` before a deploy and `rm maintenance.on` after. `MAINTENANCE_FILE` renames the file.

@@ -2,8 +2,8 @@ import { inMaintenance } from '../utils/maintenance'
 
 const RETRY_AFTER_SECONDS = 60
 
-// The health check stays up so a proxy or a deploy script can tell the app is running.
-const OPEN_PATHS = ['/api/health']
+// The health check and the version stay up so a proxy, a deploy script or an agent can tell the app is running and which version it is.
+const OPEN_PATHS = ['/api/health', '/api/version']
 
 const PAGE = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
