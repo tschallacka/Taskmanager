@@ -4,12 +4,13 @@
 //   "runners": { "wes": "opencode/ollama" }
 // and whose model is pinned in runner-models.json (step 1). The rules are in runner-core.mjs.
 //
-//   runner once [--dry-run] [--cards <file.json>]   one pass: plan, then run what the plan starts
+//   runner once [--dry-run | --test-run] [--cards <file.json>]   one pass: plan, then run what the plan starts
 //   runner status                                    the state of each runner worker
 //
 // --dry-run prints the plan and starts nothing. --cards reads the cards from a file instead of the
-// board ({ "<key>": [ card, ... ] }), so a pass can be rehearsed without a board. A runner never posts
-// on the board in a dry run.
+// board ({ "<key>": [ card, ... ] }). A --cards pass needs one of two flags: --dry-run (a rehearsal: nothing
+// starts) or --test-run (the test-only flag: runs start, which tests do with a fake opencode, but no ask is
+// posted to a board). Without either, --cards is refused.
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { join } from 'node:path'
@@ -20,6 +21,9 @@ import * as opencode from './runner-opencode.mjs'
 
 const kit = fileURLToPath(new URL('.', import.meta.url))
 const ADAPTERS = { opencode }
+// A run that ignores SIGTERM is sent SIGKILL this long after it (CREW_RUN_KILL_MS overrides it, a test uses it).
+const KILL_AFTER_MS = 5_000
+
 
 function runnerEntries() {
   const raw = JSON.parse(readFileSync(`${here}crew.json`, 'utf8'))
@@ -109,8 +113,10 @@ function runOnce(worker, card, session) {
   return new Promise((resolve, reject) => {
     const child = spawn(worker.runner, argv, { cwd: workDir, env: { ...process.env, ...adapter.env({}) }, stdio: ['ignore', 'pipe', 'pipe'] })
     let out = ''
+    let killer = null
     const timer = setTimeout(() => {
       child.kill('SIGTERM')
+      killer = setTimeout(() => child.kill('SIGKILL'), Number(process.env.CREW_RUN_KILL_MS) || KILL_AFTER_MS)
       reject(new Error(`${worker.runner} ran past ${timeoutMs} ms and was stopped`))
     }, timeoutMs)
     child.stdout.on('data', (chunk) => {
@@ -121,10 +127,12 @@ function runOnce(worker, card, session) {
     })
     child.on('error', (err) => {
       clearTimeout(timer)
+      clearTimeout(killer)
       reject(err)
     })
     child.on('close', (code) => {
       clearTimeout(timer)
+      clearTimeout(killer)
       if (code !== 0) reject(new Error(`${worker.runner} exited ${code}: ${out.trim().slice(-300)}`))
       else resolve(adapter.parseSession(out))
     })
@@ -137,9 +145,17 @@ async function postAsk(worker, card, creds) {
   await callTool(creds, creds.people[worker.key], 'post_task_update', { id: card.id, body })
 }
 
+function refuse(message) {
+  console.error(`runner once: ${message}`)
+  process.exitCode = 64
+}
+
 async function once(argv) {
   const dryRun = argv.includes('--dry-run')
+  const testRun = argv.includes('--test-run')
   const cardsFile = argv.includes('--cards') ? argv[argv.indexOf('--cards') + 1] : null
+  if (argv.includes('--cards') && !cardsFile) return refuse('--cards names no file')
+  if (cardsFile && !dryRun && !testRun) return refuse('--cards needs --dry-run (a rehearsal: nothing starts) or --test-run (the test-only flag: runs start, no ask is posted)')
   const creds = cardsFile ? null : loadCreds()
   const list = workers()
   const cards = {}
@@ -162,7 +178,11 @@ async function once(argv) {
   for (const item of plan.filter(p => p.action === 'ask')) {
     const worker = list.find(w => w.key === item.key)
     const prev = states[item.key][item.card.id] ?? { runs: 0 }
-    const c = creds ?? loadCreds()
+    if (cardsFile) {
+      console.log(`would ask Pia for ${item.key} on ${item.card.id}: not posted in a --cards run`)
+      continue
+    }
+    const c = creds
     try {
       await postAsk(worker, item.card, c)
     } catch (err) {
@@ -206,7 +226,8 @@ async function once(argv) {
       }
     }
     const runNo = prev.runs + 1
-    states[item.key][item.card.id] = { runs: runNo, lastRunAt: started, ...baseline, asked: false, session, lastError: error }
+    // A failed run keeps the session of the last run that had one, so the next run can still continue it.
+    states[item.key][item.card.id] = { runs: runNo, lastRunAt: started, ...baseline, asked: false, session: error ? (prev.session ?? null) : session, lastError: error }
     writeState(item.key, states)
     if (error) console.log(`failed ${item.key} on ${item.card.id} (run ${runNo}): ${error}`)
     else console.log(`ran ${item.key} on ${item.card.id} (run ${runNo})${session ? ` (session ${session})` : ''}`)
@@ -228,7 +249,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (command === 'once') await once(rest)
   else if (command === 'status') status()
   else {
-    console.error('usage: runner once [--dry-run] [--cards <file.json>] | runner status')
+    console.error('usage: runner once [--dry-run | --test-run] [--cards <file.json>] | runner status')
     process.exit(64)
   }
 }

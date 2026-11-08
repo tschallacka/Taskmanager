@@ -1129,6 +1129,7 @@ describe('crew runner process', () => {
     assert.deepEqual(repairUnread(states, { wes: [] }), [])
     assert.equal(states.wes.c1.unread, true)
   })
+
   test('the plan starts a pinned worker on its eligible cards and refuses a worker with no pinned model', () => {
     const plan = planPass({
       workers: [
@@ -1169,7 +1170,7 @@ describe('crew runner process', () => {
       const cards = join(home, 'cards.json')
       writeFileSync(cards, JSON.stringify({ wes: [card({ id: 't1' })], wick: [card({ id: 't2' })] }))
       const stateFile = (key) => join(home, 'runners', 'state', `${key}.json`)
-      const pass = () => spawnSync(process.execPath, [join(KIT, 'runner.mjs'), 'once', '--cards', cards], { encoding: 'utf8', env: { ...process.env, CREW_HOME: home, PATH: `${bin}:${process.env.PATH}` } })
+      const pass = () => spawnSync(process.execPath, [join(KIT, 'runner.mjs'), 'once', '--cards', cards, '--test-run'], { encoding: 'utf8', env: { ...process.env, CREW_HOME: home, PATH: `${bin}:${process.env.PATH}` } })
       const first = pass()
       assert.equal(first.status, 0, first.stderr)
       assert.match(first.stdout, /failed wes on t1 \(run 1\)/)
@@ -1179,15 +1180,16 @@ describe('crew runner process', () => {
       for (const key of ['wes', 'wick']) {
         const id = key === 'wes' ? 't1' : 't2'
         const state = JSON.parse(readFileSync(stateFile(key), 'utf8'))
-        state[id] = { ...state[id], runs: DEFAULTS.maxRuns - 1, lastRunAt: 0 }
+        state[id] = { ...state[id], runs: DEFAULTS.maxRuns - 1, lastRunAt: 0, session: 'ses_keep' }
         writeFileSync(stateFile(key), JSON.stringify(state))
       }
       const second = pass()
       assert.match(second.stdout, /failed wes on t1 \(run 3\)/)
-      // Now the cap is reached: the runner tries to ask Pia (no board here, so the ask fails) and runs nothing.
+      // Now the cap is reached: the runner would ask Pia, which a --cards run does not post, and runs nothing.
+      assert.equal(JSON.parse(readFileSync(stateFile('wes'), 'utf8'))['t1'].session, 'ses_keep', 'a failed run keeps the earlier session id')
       const third = pass()
       assert.doesNotMatch(third.stdout, /failed wes on t1 \(run 4\)/)
-      assert.match(third.stdout, /could not ask Pia for wes on t1/)
+      assert.match(third.stdout, /would ask Pia for wes on t1: not posted in a --cards run/)
       assert.equal(JSON.parse(readFileSync(stateFile('wes'), 'utf8'))['t1'].runs, 3)
     } finally {
       rmSync(home, { recursive: true, force: true })
@@ -1205,10 +1207,49 @@ describe('crew runner process', () => {
       writeFileSync(join(bin, 'opencode'), '#!/bin/sh\nexec sleep 30\n', { mode: 0o755 })
       const cards = join(home, 'cards.json')
       writeFileSync(cards, JSON.stringify({ wes: [card({ id: 't1' })] }))
-      const run = spawnSync(process.execPath, [join(KIT, 'runner.mjs'), 'once', '--cards', cards], { encoding: 'utf8', timeout: 20_000, env: { ...process.env, CREW_HOME: home, CREW_RUN_TIMEOUT_MS: '300', PATH: `${bin}:${process.env.PATH}` } })
+      const run = spawnSync(process.execPath, [join(KIT, 'runner.mjs'), 'once', '--cards', cards, '--test-run'], { encoding: 'utf8', timeout: 20_000, env: { ...process.env, CREW_HOME: home, CREW_RUN_TIMEOUT_MS: '300', PATH: `${bin}:${process.env.PATH}` } })
       assert.equal(run.status, 0, run.stderr)
       assert.match(run.stdout, /failed wes on t1 \(run 1\): opencode ran past 300 ms and was stopped/)
       assert.equal(JSON.parse(readFileSync(join(home, 'runners', 'state', 'wes.json'), 'utf8'))['t1'].runs, 1)
+    } finally {
+      rmSync(home, { recursive: true, force: true })
+      rmSync(bin, { recursive: true, force: true })
+    }
+  })
+
+  test('--cards without --dry-run or --test-run is refused: no worker starts, and nothing is written', () => {
+    const home = mkdtempSync(join(tmpdir(), 'crew-runner-'))
+    const bin = mkdtempSync(join(tmpdir(), 'crew-runner-bin-'))
+    try {
+      writeFileSync(join(home, 'crew.json'), JSON.stringify({ runners: { wes: 'opencode/ollama' } }))
+      const started = join(home, 'started')
+      writeFileSync(join(bin, 'opencode'), `#!/bin/sh\ntouch ${started}\n`, { mode: 0o755 })
+      const cards = join(home, 'cards.json')
+      writeFileSync(cards, JSON.stringify({ wes: [card({ id: 't1' })] }))
+      const run = spawnSync(process.execPath, [join(KIT, 'runner.mjs'), 'once', '--cards', cards], { encoding: 'utf8', env: { ...process.env, CREW_HOME: home, PATH: `${bin}:${process.env.PATH}` } })
+      assert.equal(run.status, 64, run.stderr)
+      assert.match(run.stderr, /--cards needs --dry-run/)
+      assert.equal(run.stdout, '')
+      assert.equal(existsSync(started), false, 'no worker was started')
+      assert.equal(existsSync(join(home, 'runners')), false, 'no state was written')
+    } finally {
+      rmSync(home, { recursive: true, force: true })
+      rmSync(bin, { recursive: true, force: true })
+    }
+  })
+
+  test('a run that ignores SIGTERM is sent SIGKILL after the grace period, and the pass goes on', () => {
+    const home = mkdtempSync(join(tmpdir(), 'crew-runner-'))
+    const bin = mkdtempSync(join(tmpdir(), 'crew-runner-bin-'))
+    try {
+      writeFileSync(join(home, 'crew.json'), JSON.stringify({ runners: { wes: 'opencode/ollama' } }))
+      // The shell sets TERM to ignored and execs sleep, which inherits that: only SIGKILL stops it.
+      writeFileSync(join(bin, 'opencode'), '#!/bin/sh\ntrap "" TERM\nexec sleep 30\n', { mode: 0o755 })
+      const cards = join(home, 'cards.json')
+      writeFileSync(cards, JSON.stringify({ wes: [card({ id: 't1' })] }))
+      const run = spawnSync(process.execPath, [join(KIT, 'runner.mjs'), 'once', '--cards', cards, '--test-run'], { encoding: 'utf8', timeout: 20_000, env: { ...process.env, CREW_HOME: home, CREW_RUN_TIMEOUT_MS: '300', CREW_RUN_KILL_MS: '300', PATH: `${bin}:${process.env.PATH}` } })
+      assert.equal(run.status, 0, run.stderr)
+      assert.match(run.stdout, /failed wes on t1 \(run 1\): opencode ran past 300 ms and was stopped/)
     } finally {
       rmSync(home, { recursive: true, force: true })
       rmSync(bin, { recursive: true, force: true })

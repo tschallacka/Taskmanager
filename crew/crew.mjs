@@ -22,7 +22,7 @@ const [first, ...rest] = process.argv.slice(2)
 const scripts = { listen: 'listen.mjs', watch: 'watch.mjs', init: 'init.mjs', setup: 'setup.mjs', channel: 'channel.mjs', update: 'update.mjs', mentions: 'mentions.mjs', runner: 'runner.mjs' }
 
 if (!first || first === '-h' || first === '--help') {
-  console.log('usage: crew <who> <command ...> | crew <who> browser <command> | crew browser status|shutdown | crew listen <who> [sec] | crew watch | crew init | crew setup | crew channel <who> | crew mentions [minutes|--follow] | crew runner once [--dry-run] [--cards <file.json>] | crew runner status | crew update [--check] [--from <kit folder|kit.tar.gz>] [--kit <folder>]')
+  console.log('usage: crew <who> <command ...> | crew <who> browser <command> | crew browser status|shutdown | crew listen <who> [sec] | crew watch | crew init | crew setup | crew channel <who> | crew mentions [minutes|--follow] | crew runner once [--dry-run | --test-run] [--cards <file.json>] | crew runner status | crew update [--check] [--from <kit folder|kit.tar.gz>] [--kit <folder>]')
   process.exit(first ? 0 : 2)
 }
 
