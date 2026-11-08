@@ -38,8 +38,9 @@ Replace the examples below with your own facts; delete lines that do not apply.
 
 0. Before merging ANY branch: merge the main branch into it (or squash it onto a fresh main in a worktree on disk,
    never in `/tmp`) and rerun everything on the result, as one command: `<for example: crew publish ...>`. Install,
-   migrate on a scratch database only, typecheck, lint, the full tests. Stop on a conflict or a failure. This is the
-   merger's job (Boss), not the workers': things go stale in unexpected ways fast.
+   migrate on a scratch database only, typecheck, lint, the full tests. Stop on a conflict or a failure. The same run
+   bumps the version (`publish.version`, README "Publish"), so no branch does. This is the merger's job (Boss), not the
+   workers': things go stale in unexpected ways fast.
 1. Back up the database: `<command>`
 2. Apply the schema change: `<command>`
 3. Typecheck and lint (already part of step 0 on the merged tree): `<command>`

@@ -14,23 +14,76 @@
 // - a conflict stops with exit 3 and leaves the worktree for a hand merge;
 // - a failing check stops with exit 4 before anything is pushed, unless FORCE=1 is set;
 // - a command never sees a database URL from the environment: DATABASE_URL is the scratch database or nothing;
+// - the version is bumped on the merged tree (publish.version, or BUMP for one run), never on the branch, and a branch
+//   that already moved the version is left as it is;
 // - nothing is merged, deployed or migrated against a real database; the kit has no step for that.
 //
 // Exit codes: 0 published, 1 a git or setup failure, 2 usage, 3 merge conflict, 4 a check failed (nothing pushed).
 import { spawnSync } from 'node:child_process'
 import { existsSync, lstatSync, mkdirSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { crewHome } from './home.mjs'
 
-// The settings and what kind each one is. "list" is an array of strings, "number" a whole number of seconds.
+// The settings and what kind each one is. "list" is an array of strings, "number" a whole number of seconds,
+// "version" an object { file, bump } (see versionProblems).
 const KINDS = {
   repo: 'string', remote: 'string', base: 'string', dir: 'string', install: 'string', link: 'list',
   typecheck: 'string', lint: 'string', lintFiles: 'string', test: 'string', migrate: 'string', scratchDatabase: 'string',
   schemaFiles: 'list', lockFiles: 'list', commitName: 'string', commitEmail: 'string', attribution: 'list',
-  pr: 'string', timeout: 'number'
+  pr: 'string', timeout: 'number', version: 'version'
 }
-const DEFAULTS = { remote: 'origin', base: 'main', dir: '', link: [], lint: '', lintFiles: '', schemaFiles: [], lockFiles: [], attribution: [], timeout: 600 }
+const DEFAULTS = { remote: 'origin', base: 'main', dir: '', link: [], lint: '', lintFiles: '', schemaFiles: [], lockFiles: [], attribution: [], timeout: 600, version: null }
+
+// The version bumps: patch, minor, major, or none (the version is left alone; say why in the pull request).
+export const BUMPS = ['patch', 'minor', 'major', 'none']
+const SEMVER = /^\d+\.\d+\.\d+$/
+
+/**
+ * publish.version: { "file": "package.json", "bump": "patch" }. Empty, null or absent means no bump. The file is a .json
+ * file inside the repository and must carry a plain x.y.z "version"; bump is one of BUMPS (patch by default).
+ */
+export function versionProblems(value) {
+  if (typeof value !== 'object' || Array.isArray(value)) return ['publish.version must be an object, such as { "file": "package.json", "bump": "patch" }']
+  const problems = []
+  for (const key of Object.keys(value)) {
+    if (!['file', 'bump'].includes(key)) problems.push(`publish.version.${key} is not a setting (the settings are file, bump)`)
+  }
+  const file = value.file ?? 'package.json'
+  if (typeof file !== 'string' || !/\.json$/.test(file) || isAbsolute(file) || file.split(/[\\/]/).includes('..')) {
+    problems.push('publish.version.file must be a .json file inside the repository, such as package.json')
+  }
+  if (value.bump !== undefined && !BUMPS.includes(value.bump)) problems.push(`publish.version.bump must be one of ${BUMPS.join(', ')}`)
+  return problems
+}
+
+/** The version of a package.json text, or null when it has none or is not JSON. */
+export function versionOf(text) {
+  try {
+    return JSON.parse(text)?.version ?? null
+  } catch {
+    return null
+  }
+}
+
+/** x.y.z moved by one step: patch, minor or major. The caller has checked the version is plain semver. */
+export function bumpVersion(version, bump) {
+  const [major, minor, patch] = version.split('.').map(Number)
+  if (bump === 'major') return `${major + 1}.0.0`
+  if (bump === 'minor') return `${major}.${minor + 1}.0`
+  return `${major}.${minor}.${patch + 1}`
+}
+
+/**
+ * The text with its top-level "version" value changed, every other byte kept (indentation, key order, line ends).
+ * Null when no top-level "version" line with the old value is found.
+ */
+export function rewriteVersion(text, from, to) {
+  const indent = /^\{\s*\n([ \t]+)"/.exec(text)?.[1] ?? '  '
+  const line = new RegExp(`^(${indent}"version"\\s*:\\s*)"${from.replace(/\./g, '\\.')}"`, 'm')
+  if (!line.test(text)) return null
+  return text.replace(line, `$1"${to}"`)
+}
 
 /**
  * The publish settings as the kit reads them: the defaults filled in, and every problem named. An unknown key is a
@@ -46,7 +99,12 @@ export function parseSettings(raw = {}) {
   for (const [key, kind] of Object.entries(KINDS)) {
     const value = raw[key]
     if (value === undefined || value === null) continue
-    if (kind === 'string' && typeof value !== 'string') problems.push(`publish.${key} must be a string`)
+    if (kind === 'version') {
+      if (value === '') continue
+      const versionIssues = versionProblems(value)
+      if (versionIssues.length) problems.push(...versionIssues)
+      else settings.version = { file: value.file ?? 'package.json', bump: value.bump ?? 'patch' }
+    } else if (kind === 'string' && typeof value !== 'string') problems.push(`publish.${key} must be a string`)
     else if (kind === 'list' && (!Array.isArray(value) || value.some(item => typeof item !== 'string'))) problems.push(`publish.${key} must be a list of strings`)
     else if (kind === 'number' && (!Number.isInteger(value) || value < 1)) problems.push(`publish.${key} must be a whole number of seconds`)
     else settings[key] = value
@@ -77,6 +135,18 @@ export function expandPlaceholders(template, values) {
     const value = values[key]
     return Array.isArray(value) ? value.map(shellQuote).join(' ') : shellQuote(value)
   })
+}
+
+/**
+ * The commit message with the version line placed before its attribution trailers (Co-Authored-By, Claude-Session), as
+ * publish.sh does it. The message is given without trailing blank lines; the result has none either.
+ */
+export function placeVersionLine(message, line) {
+  const lines = message.split('\n')
+  const at = lines.findIndex(text => /^(Co-Authored-By|Claude-Session):/.test(text))
+  if (at < 0) return `${message}\n\n${line}`
+  const head = lines.slice(0, at).join('\n').replace(/\s+$/, '')
+  return `${head}\n\n${line}\n\n${lines.slice(at).join('\n')}`
 }
 
 /** The notes the merged change earns: a schema or a lock file changed, which the merger has to act on by hand. */
@@ -145,6 +215,43 @@ function check(ctx, name, label, command, forced) {
   stop(ctx, 4, `stop before pushing: the ${label} failed (FORCE=1 pushes anyway)`)
 }
 
+// The version bump (publish.version, or BUMP for this run), made on the merged tree: the version line is rewritten and
+// staged, so the bump lands on the freshest base and parallel pull requests never conflict on it. Returns the line the
+// commit message carries, `Version old -> new.`, or null when the version is left as it is.
+function versionStep(ctx, baseRef, override) {
+  const version = ctx.settings.version
+  if (!version) {
+    say(override ? `version: skipped, publish.version is empty (BUMP=${override} ignored)` : 'version: skipped, publish.version is empty, so the version was not bumped')
+    return null
+  }
+  const bump = override || version.bump
+  if (bump === 'none') {
+    say('version: not bumped (none)')
+    return null
+  }
+  const path = join(ctx.wt, version.file)
+  if (!existsSync(path)) stop(ctx, 1, `publish.version.file ${version.file} does not exist in the merged tree`)
+  const text = readFileSync(path, 'utf8')
+  const current = versionOf(text)
+  if (typeof current !== 'string' || !SEMVER.test(current)) {
+    stop(ctx, 4, `${version.file} has no plain x.y.z "version" (found ${JSON.stringify(current)}), so it cannot be bumped: nothing pushed`)
+  }
+  const base = git(ctx.wt, ['show', `${baseRef}:${version.file}`])
+  const before = base.ok ? versionOf(base.stdout) : null
+  if (before !== null && before !== current) {
+    say(`version: already bumped by the branch (${before} -> ${current}), left as is`)
+    return null
+  }
+  const next = bumpVersion(current, bump)
+  const rewritten = rewriteVersion(text, current, next)
+  if (rewritten === null || versionOf(rewritten) !== next) stop(ctx, 4, `could not rewrite the top-level "version" of ${version.file}: nothing pushed`)
+  writeFileSync(path, rewritten)
+  const staged = git(ctx.wt, ['add', version.file])
+  if (!staged.ok) stop(ctx, 1, `git add ${version.file} failed:\n${staged.output}`)
+  say(`version: ${current} -> ${next} (${bump})`)
+  return `Version ${current} -> ${next}.`
+}
+
 function usage() {
   console.error('usage: crew publish <slug> <branch> <title> <msg-file> <pr-file>')
   process.exit(2)
@@ -155,6 +262,11 @@ async function main(argv) {
   if (argv.length !== 5 || !slug || !branch || !title || !msgFile || !prFile) usage()
   if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) {
     console.error(`"${slug}" is not a slug: lower-case letters, digits and dashes`)
+    process.exit(2)
+  }
+  const override = process.env.BUMP ?? ''
+  if (override && !BUMPS.includes(override)) {
+    console.error(`BUMP=${override} is not one of ${BUMPS.join(', ')}`)
     process.exit(2)
   }
   const { config } = await import('./config.mjs')
@@ -209,6 +321,7 @@ async function main(argv) {
   say(tail(git(ctx.wt, ['status', '--short']).stdout, 40) || '  (nothing)')
   const changed = git(ctx.wt, ['diff', '--cached', '--name-only']).stdout.split('\n').filter(Boolean)
   if (!changed.length) stop(ctx, 1, `nothing to publish: ${branch} adds nothing to ${baseRef}`)
+  const versionLine = versionStep(ctx, baseRef, override)
   const addedFiles = git(ctx.wt, ['diff', '--cached', '--name-only', '--diff-filter=AM']).stdout.split('\n').filter(Boolean)
 
   for (const note of changeNotes(changed, settings)) {
@@ -249,7 +362,9 @@ async function main(argv) {
 
   const identity = settings.commitName ? ['-c', `user.name=${settings.commitName}`, '-c', `user.email=${settings.commitEmail}`] : []
   if (!settings.commitName) say('commit: the repository\'s own git identity (publish.commitName is empty)')
-  const body = readFileSync(msgFile, 'utf8').replace(/\s+$/, '') + (settings.attribution.length ? `\n\n${settings.attribution.join('\n')}` : '') + '\n'
+  let body = readFileSync(msgFile, 'utf8').replace(/\s+$/, '')
+  if (versionLine) body = placeVersionLine(body, versionLine)
+  body += (settings.attribution.length ? `\n\n${settings.attribution.join('\n')}` : '') + '\n'
   say('commit:')
   const committed = git(ctx.wt, [...identity, 'commit', '-q', '-F', '-'], body)
   if (!committed.ok) stop(ctx, 1, `commit failed:\n${committed.output}`)

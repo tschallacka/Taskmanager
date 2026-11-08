@@ -339,6 +339,7 @@ Every setting is `publish` in `crew.json` (the example is in `crew.config.exampl
 | `migrate`, `scratchDatabase` | the migration runs only with `DATABASE_URL` set to `scratchDatabase`. Without a scratch database it is skipped with a note |
 | `schemaFiles`, `lockFiles` | the files that make the merger act by hand: a note is printed when one of them changed |
 | `commitName`, `commitEmail` | the commit identity (both or neither; neither uses the repository's own) |
+| `version` | the version bump, made on the merged tree: `{ "file": "package.json", "bump": "patch" }` (the file is a `.json` file in the repository; `bump` is `patch`, `minor`, `major` or `none`, patch by default). Empty means no bump. `BUMP=minor crew publish ...` overrides `bump` for one run. The bump needs a plain `x.y.z` version, is staged, and adds `Version old -> new.` to the commit message before the attribution lines. A branch that already changed the version is left as it is |
 | `attribution` | lines appended to the commit message, such as a `Co-Authored-By:` line |
 | `pr` | the pull request command, with `{base}`, `{branch}`, `{title}`, `{pr}` (the body file) and `{slug}` filled in and quoted |
 | `timeout` | seconds per command (600 by default) |
