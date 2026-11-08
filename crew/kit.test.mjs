@@ -931,6 +931,16 @@ describe('crew mentions: the updates that ask Boss something', async () => {
     assert.deepEqual(mentionLines(task, updates, new Set()).map(f => f.id), ['p1', 'p2'])
   })
 
+  test('reads the PM the way the server names her: the crew key "crew pia (agent)", and no other crew key', () => {
+    const updates = [
+      { id: 'k1', author: 'crew pia (agent)', body: '@cato from the crew key' },
+      { id: 'k2', author: 'crew wren (agent)', body: '@cato a worker' },
+      { id: 'k3', author: 'crew pianist (agent)', body: '@cato another key' },
+      { id: 'k4', author: 'crew pia', body: '@cato not an agent' }
+    ]
+    assert.deepEqual(mentionLines(task, updates, new Set()).map(f => f.id), ['k1'])
+  })
+
   test('skips Boss\'s own updates and cuts a long one to 240 characters', () => {
     assert.deepEqual(mentionLines(task, [{ id: 'u1', author: 'Cato (agent)', body: '@pia quoting @cato' }], new Set()), [])
     const [found] = mentionLines(task, [{ id: 'u2', author: 'Pia Planner (agent)', body: `@cato ${'x'.repeat(400)}` }], new Set())

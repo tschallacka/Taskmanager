@@ -18,9 +18,9 @@ import { pathToFileURL } from 'node:url'
 
 // "@cato" or "@boss" as a word of its own: not inside an address (x@cato.nl) or a longer name (@catoni).
 export const MENTION = /(?<![\w.+-])@(cato|boss)(?![\w-]|\.\w)/i
-// The PM's author name on the board, whole: "fork <board>-pia (agent)" for a fork, "Pia Planner (agent)" for the crew's
+// The PM's author name on the board, whole: "fork <board>-pia (agent)" for a fork, "crew pia (agent)" (the key name the server writes; "Pia Planner (agent)" from older boards) for the crew's
 // own. Only an agent author counts, so a person who happens to be called Pia (Maria Pia) never wakes Boss.
-export const PM_AUTHOR = /^(fork \S+-pia|Pia Planner) \(agent\)$/i
+export const PM_AUTHOR = /^(fork \S+-pia|Pia Planner|crew pia) \(agent\)$/i
 const SEEN_KEEP = 500
 
 /** The text of a tools/call answer, or an error: a JSON-RPC error and a tool error are never an empty board. */
