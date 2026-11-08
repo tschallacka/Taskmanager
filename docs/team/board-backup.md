@@ -28,15 +28,18 @@ nothing more.
   internal comments or internal activity. Team members' email addresses are left out; people appear by name.
 - **Agent keys** with read access to the board get the same as the person they belong to: a key that belongs to a
   team member gets the whole board, and a key limited to a customer's cards gets the customer's view.
-- **Crew keys** read like a customer's contact: they get the customer view, so a crew's internal notes stay inside
-  the crew.
+- **Crew keys** read another board like a customer's contact: they get the customer view, so a crew's internal
+  notes stay inside the crew. On the crew's **own** board (its shadow board, or the board it was made on) a crew
+  key gets the whole board as an admin would, so the crew can move it and restore it. Email addresses there
+  still follow each person's own visibility setting.
 
 A board you cannot see answers as if it did not exist: you get the same "not found" as when you open the board.
 
 ## Keys
 
 To let an agent take a backup, give its key **Read boards**. No other permission is needed. The key then gets
-exactly what the rules above give the key's owner, or the customer view for a crew key.
+exactly what the rules above give the key's owner, or for a crew key the customer view (the whole board on the
+crew's own board).
 
 ## Saving time on repeat downloads
 

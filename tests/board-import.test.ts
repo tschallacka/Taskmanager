@@ -259,8 +259,8 @@ test('no side effects: a 50-card import sends no notification, fires no rule and
   assert.equal(card.updatedAt, at + 7)
 })
 
-test('the admin rule: the instance admin, or an owner or admin of the team; never a crew', () => {
-  const base = { isInstanceAdmin: false, teamRole: null as string | null, personalOwner: false, isCrew: false }
+test('the admin rule: the instance admin, or an owner or admin of the team; a crew only on its own board', () => {
+  const base = { isInstanceAdmin: false, teamRole: null as string | null, personalOwner: false, isCrew: false, crewOwnsBoard: false }
   assert.equal(imp.importRefusal({ ...base, teamRole: 'owner' }), null)
   assert.equal(imp.importRefusal({ ...base, teamRole: 'admin' }), null)
   assert.notEqual(imp.importRefusal({ ...base, teamRole: 'member' }), null, 'a plain member is refused')
@@ -269,6 +269,37 @@ test('the admin rule: the instance admin, or an owner or admin of the team; neve
   assert.equal(imp.importRefusal({ ...base, personalOwner: true }), null, 'the owner of a personal board')
   assert.notEqual(imp.importRefusal({ ...base, teamRole: 'owner', isCrew: true }), null, 'a crew is refused even as an owner')
   assert.notEqual(imp.importRefusal({ ...base, isInstanceAdmin: true, isCrew: true }), null, 'a crew is refused even for the instance admin')
+  assert.equal(imp.importRefusal({ ...base, isCrew: true, crewOwnsBoard: true }), null, 'a crew imports into its own board')
+})
+
+test('a crew\'s own boards: its shadow board and the board it was made on, in its own team; never a real board', async () => {
+  const access = await import('../server/utils/crewBoardAccess')
+  const crewTeam = id('crew-team')
+  const crewId = id('own-crew')
+  const workBoard = id('crew-work')
+  const shadow = id('crew-shadow')
+  const real = id('crew-real')
+  const otherCrew = id('other-crew')
+  await db.insert(organization).values({ id: crewTeam, name: `Crew team ${tag}`, slug: id('crew-team-slug'), createdAt: new Date(at) })
+  created.teams.push(crewTeam)
+  await makeBoard(workBoard, `Work ${tag}`, [{ id: id('work-todo'), name: 'To do', position: 0 }], crewTeam, owner)
+  await makeBoard(shadow, `Shadow ${tag}`, [{ id: id('shadow-todo'), name: 'To do', position: 0 }], crewTeam, owner)
+  await makeBoard(real, `Real ${tag}`, [{ id: id('real-todo'), name: 'To do', position: 0 }], team, owner)
+  await db.insert(schema.crews).values([
+    { id: crewId, slug: id('own-crew-slug'), name: 'Own crew', teamId: crewTeam, boardId: workBoard, createdAt: at },
+    { id: otherCrew, slug: id('other-crew-slug'), name: 'Other crew', teamId: crewTeam, createdAt: at }
+  ])
+  await db.insert(schema.crewBoards).values({ id: id('crew-link'), crewId, projectId: real, shadowProjectId: shadow, createdAt: at })
+  try {
+    assert.equal(await access.isOwnCrewBoard(crewId, shadow), true, 'its shadow board')
+    assert.equal(await access.isOwnCrewBoard(crewId, workBoard), true, 'the board it was made on')
+    assert.equal(await access.isOwnCrewBoard(crewId, real), false, 'never the real board it works on')
+    assert.equal(await access.isOwnCrewBoard(otherCrew, shadow), false, 'not another crew\'s shadow board')
+    assert.equal(await access.isOwnCrewBoard(id('no-crew'), shadow), false, 'not for an unknown crew')
+  } finally {
+    await db.delete(schema.crewBoards).where(eq(schema.crewBoards.crewId, crewId))
+    await db.delete(schema.crews).where(inArray(schema.crews.id, [crewId, otherCrew]))
+  }
 })
 
 test('the import source code calls no notification, agent-event, rule, GitHub or activity module', async () => {

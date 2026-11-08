@@ -11,6 +11,7 @@ import type { ApiKeyContext } from './api-keys'
 import { audienceOf, boardFilter } from './mcpAccess'
 import { requireProject, requireStaff } from './projects'
 import { importMaxBytes, importRefusal } from './boardImport'
+import { isOwnCrewBoard } from './crewBoardAccess'
 import type { ImportCaller } from './boardImport'
 import type { ImportOptions } from './boardImportPlan'
 
@@ -22,6 +23,8 @@ export interface Caller extends ImportCaller {
   keyName: string
   /** The key, when the call came with one. */
   context: ApiKeyContext | null
+  /** The crew the caller's account belongs to, or null for a person. */
+  crewId: string | null
 }
 
 /** Who calls, and for an API key, that it carries the import permission. */
@@ -51,7 +54,9 @@ export async function whoIsCalling(event: H3Event): Promise<Caller> {
     keyId,
     keyName,
     context,
+    crewId: owner?.crewId ?? null,
     isCrew: Boolean(owner?.crewId),
+    crewOwnsBoard: false,
     isInstanceAdmin: Boolean(owner?.isInstanceAdmin),
     teamRole: null,
     personalOwner: false
@@ -85,7 +90,8 @@ export async function callerForBoard(event: H3Event, projectId: string): Promise
   const caller: Caller = {
     ...who,
     teamRole: project.teamId ? await roleIn(project.teamId, who.userId) : null,
-    personalOwner: !project.teamId && project.userId === who.userId
+    personalOwner: !project.teamId && project.userId === who.userId,
+    crewOwnsBoard: who.crewId ? await isOwnCrewBoard(who.crewId, project.id) : false
   }
   const refusal = importRefusal(caller)
   if (refusal) throw createError({ statusCode: 403, message: refusal })

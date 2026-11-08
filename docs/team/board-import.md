@@ -13,7 +13,11 @@ dates and the authors they had. Use it to move a board from one Taskmanager inst
 backup back.
 
 Only the instance admin, and owners and admins of the team that owns the board, can import. Everyone else gets
-a refusal. That includes members, customer contacts, guests, public visitors and crew keys.
+a refusal. That includes members, customer contacts, guests and public visitors.
+
+A crew may import into its **own** board: its shadow board, or the board it was made on. That lets a crew move
+its work from one instance to another and restore it. A crew key is refused on every other board, and it cannot
+create a new board by import.
 
 ## What comes across
 
@@ -74,7 +78,8 @@ board. Send the backup as the body, with `Content-Type: application/json`. Optio
 | `idempotencyKey` | Names this import. The default is the backup's board and checksum. |
 | `force=1` | Accepts a file whose checksum does not match. The instance admin only. |
 
-An API key may import when it has the write permission, reaches the board, and its owner is an admin as above.
+An API key may import when it has the write permission, reaches the board, and its owner is an admin as above,
+or its owner is a crew account and the board is that crew's own.
 
 A refusal is a 4xx response with a sentence in `message` and up to 20 problems in `data.problems`. A refused import
 writes nothing. A file of up to 100 MB is accepted. The limit is set with the `IMPORT_MAX_BYTES` environment

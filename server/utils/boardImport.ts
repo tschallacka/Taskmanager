@@ -40,17 +40,25 @@ export interface ImportCaller {
   teamRole: string | null
   /** The board has no team and the caller owns it: a personal workspace. */
   personalOwner: boolean
-  /** The caller is a crew account, or acts through a crew's key. Crews never import. */
+  /** The caller is a crew account, or acts through a crew's key. A crew imports only into its own board. */
   isCrew: boolean
+  /** The board is the caller's crew's own (its shadow board, or the board the crew was made on). */
+  crewOwnsBoard: boolean
 }
 
 /**
  * The admin rule for imports (owner's decision): the instance admin, or an owner or admin of the team that
- * owns the board. A personal board (no team) may be imported by its owner. A crew never may. Returns the
- * sentence to refuse with, or null when the caller may import.
+ * owns the board. A personal board (no team) may be imported by its owner. A crew may import into its own
+ * board only (its shadow board, or the board it was made on), so it can move and restore its own work; never
+ * into any other board, whatever role it holds. Returns the sentence to refuse with, or null when the caller
+ * may import.
  */
 export function importRefusal(caller: ImportCaller): string | null {
-  if (caller.isCrew) return 'A crew cannot import a board backup. Ask a team owner or admin.'
+  if (caller.isCrew) {
+    return caller.crewOwnsBoard
+      ? null
+      : 'A crew can import a board backup only into its own board. Ask a team owner or admin.'
+  }
   if (caller.isInstanceAdmin) return null
   if (caller.teamRole && isTeamManagerRole(caller.teamRole)) return null
   if (caller.personalOwner) return null
