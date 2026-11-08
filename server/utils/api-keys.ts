@@ -249,3 +249,13 @@ export function isNarrowedReach(customerId: string | null, reach: KeyReach): boo
 export function hasScope(context: ApiKeyContext, scope: ApiKeyScope): boolean {
   return context.scopes.includes(scope)
 }
+
+/**
+ * The key's context for one call that needs `scope`. A token with per-board grants reaches only the boards
+ * that grant the permission of the call being made, and the MCP dispatch sets that permission per tool. A
+ * route that takes a key over plain HTTP must set it too, before it looks a board up: without it such a
+ * token reaches no board at all and every board answers "not found".
+ */
+export function forCall(context: ApiKeyContext, scope: ApiKeyScope): ApiKeyContext {
+  return { ...context, callScope: scope }
+}

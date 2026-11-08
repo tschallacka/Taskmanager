@@ -6,7 +6,7 @@ import { createError, getHeader, getQuery, readRawBody } from 'h3'
 import type { H3Event } from 'h3'
 import { db } from '../db'
 import { member, projects, user } from '../db/schema'
-import { authenticateApiKey, hasScope } from './api-keys'
+import { authenticateApiKey, forCall, hasScope } from './api-keys'
 import type { ApiKeyContext } from './api-keys'
 import { audienceOf, boardFilter } from './mcpAccess'
 import { requireProject, requireStaff } from './projects'
@@ -32,7 +32,8 @@ export async function whoIsCalling(event: H3Event): Promise<Caller> {
   let keyId: string | null = null
   let keyName = 'Board settings'
   if (/^Bearer\s/i.test(header)) {
-    context = await authenticateApiKey(event)
+    // An import is a write: a token with per-board grants reaches the boards that grant it the write permission.
+    context = forCall(await authenticateApiKey(event), 'boards:write')
     // A key imports with the ordinary write permission on the board it reaches; the admin rule below then decides.
     if (!hasScope(context, 'boards:write')) {
       throw createError({ statusCode: 403, message: 'This key may not change boards, so it cannot import a board backup.' })
