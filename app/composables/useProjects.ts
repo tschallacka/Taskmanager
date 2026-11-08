@@ -196,7 +196,9 @@ const _subtasks = ref<ProjectTask[]>([])
 // Who the open board's tasks can be assigned to.
 const _people = ref<ProjectPerson[]>([])
 const _boardLoading = ref(false)
+// _ready: the project list is in. _tasksReady: the task index is in (it loads after the list).
 const _ready = ref(false)
+const _tasksReady = ref(false)
 const _comments = ref<TaskComment[]>([])
 const _commentsTaskId = ref<string | null>(null)
 const _activity = ref<TaskActivityItem[]>([])
@@ -455,16 +457,19 @@ export function boardLabelColor(tag: string): string | null {
 
 // ─── init (called from plugin) ──────────────────────────────
 
-export function initProjectsStore(
-  projects: Project[],
-  tasks: TaskSearchRow[],
-  search: MiniSearch<ProjectSearchDoc>
-) {
+// The sidebar's list comes first and alone: nothing waits for the task index.
+export function initProjectsList(projects: Project[], search: MiniSearch<ProjectSearchDoc>) {
   _search = search
   _projects.value = projects
-  _allTasks.value = tasks
   reindexSearch()
   _ready.value = true
+}
+
+// The flat task index, read after the list is on screen. Search and the sidebar counts use it.
+export function initTaskIndex(tasks: TaskSearchRow[]) {
+  _allTasks.value = tasks
+  reindexSearch()
+  _tasksReady.value = true
 }
 
 // ─── composable ─────────────────────────────────────────────
@@ -488,6 +493,7 @@ export function useProjects() {
     _allTasks.value = tasks
     reindexSearch()
     _ready.value = true
+    _tasksReady.value = true
   }
 
   // Refreshes the board list and the flat task index without dropping the
@@ -655,8 +661,9 @@ export function useProjects() {
         _trashedCount.value = 0
       }
       _activeProjectId.value = id
-      await refreshArchivedActive(id)
-      const [board, people] = await Promise.all([
+      // Started together: none of the three needs another's answer, and the archived check never throws.
+      const [, board, people] = await Promise.all([
+        refreshArchivedActive(id),
         $fetch<BoardPayload>(boardUrl(id)),
         // The picker is not worth failing the board over.
         $fetch<ProjectPerson[]>(`/api/projects/${id}/people`).catch(() => _people.value)
@@ -1072,6 +1079,7 @@ export function useProjects() {
 
   return {
     ready: _ready,
+    tasksReady: _tasksReady,
     projects: _projects,
     allTasks: _allTasks,
     activeProject,
