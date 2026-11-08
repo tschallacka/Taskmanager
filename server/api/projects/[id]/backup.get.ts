@@ -5,6 +5,7 @@ import { authenticateApiKey, forCall, hasScope } from '../../../utils/api-keys'
 import type { ApiKeyContext } from '../../../utils/api-keys'
 import type { Audience } from '../../../utils/auth-helpers'
 import { isBoardAdmin } from '../../../utils/boardAdmin'
+import { isOwnCrewBoard } from '../../../utils/crewBoardAccess'
 import { audienceOf, boardFilter } from '../../../utils/mcpAccess'
 import { requireProject } from '../../../utils/projects'
 import {
@@ -16,7 +17,7 @@ import type { BackupRequest } from '../../../utils/boardBackup'
 // GET /api/projects/:id/backup: the board as one JSON file (format "taskmanager-board-backup", version 1,
 // see shared/backup/schema.ts). Anyone who can read the board may download it; the file holds what that
 // caller can see, decided by the same audience the board routes use. Someone with no access gets the same
-// 404 as the board route. A crew key reads like a customer's contact.
+// 404 as the board route. A crew key reads like a customer's contact, except on the crew's own board.
 //
 // The ETag is the file's checksum. A caller who sends the same ETag back in If-None-Match gets 304 and no
 // body, and that does not count against the hourly limit. Each board takes one download at a time per
@@ -128,8 +129,11 @@ async function backupCaller(event: Parameters<typeof requireProject>[0], project
   const [project] = await db.select().from(projects).where(and(eq(projects.id, projectId), await boardFilter(context)))
   if (!project) throw createError({ statusCode: 404, message: 'Project not found' })
 
-  // A crew key reads like a customer's contact: the crew's internal notes stay inside the crew.
-  const audience: Audience = owner?.crewId ? 'customer' : audienceOf(context, project)
+  // A crew key reads another board like a customer's contact: the crew's internal notes stay inside the crew.
+  // Its own board (its shadow board, or the board it was made on) it backs up in full, as that board's admin,
+  // so it can move and restore its own work; addresses still follow each person's visibility setting.
+  const ownCrewBoard = owner?.crewId ? await isOwnCrewBoard(owner.crewId, project.id) : false
+  const audience: Audience = owner?.crewId && !ownCrewBoard ? 'customer' : audienceOf(context, project)
   return {
     project,
     viewerId: context.userId,
@@ -137,8 +141,8 @@ async function backupCaller(event: Parameters<typeof requireProject>[0], project
     keyId: context.keyId,
     keyName: context.keyName,
     audience,
-    // A crew key is never an admin here: its audience is the customer view, and the admin flag only counts on a staff read.
-    admin: !owner?.crewId && audience === 'staff' && await isBoardAdmin(context.userId, project),
+    // The admin flag only counts on a staff read.
+    admin: audience === 'staff' && (ownCrewBoard || (!owner?.crewId && await isBoardAdmin(context.userId, project))),
     instanceAdmin: !!owner?.isInstanceAdmin
   }
 }

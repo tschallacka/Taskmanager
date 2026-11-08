@@ -7,7 +7,7 @@
 import { and, eq, inArray } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { db } from '../db'
-import { crewBoards, member, projects, user } from '../db/schema'
+import { crewBoards, crews, member, projects, user } from '../db/schema'
 import type { Project } from '../db/schema'
 import type { ApiKeyContext } from './api-keys'
 
@@ -101,6 +101,22 @@ export async function shadowBoardForStaff(teamId: string | null, projectId: stri
     .innerJoin(real, eq(real.id, crewBoards.projectId))
     .where(and(eq(crewBoards.shadowProjectId, projectId), eq(real.teamId, teamId)))
   return row?.shadow
+}
+
+/**
+ * Whether `projectId` is one of the crew's own boards: a shadow board linked to the crew, or the board the
+ * crew was made on. Either must sit in the crew's own team. A crew may back up and restore its own boards in
+ * full (owner's decision), and never a real board.
+ */
+export async function isOwnCrewBoard(crewId: string, projectId: string): Promise<boolean> {
+  const [crew] = await db.select({ teamId: crews.teamId, boardId: crews.boardId }).from(crews).where(eq(crews.id, crewId))
+  if (!crew) return false
+  const [board] = await db.select({ teamId: projects.teamId }).from(projects).where(eq(projects.id, projectId))
+  if (!board || board.teamId !== crew.teamId) return false
+  if (crew.boardId === projectId) return true
+  const [link] = await db.select({ id: crewBoards.id }).from(crewBoards)
+    .where(and(eq(crewBoards.crewId, crewId), eq(crewBoards.shadowProjectId, projectId)))
+  return Boolean(link)
 }
 
 /** Whether `userId` belongs to a team whose board `projectId` is the shadow of: for serving files. */
