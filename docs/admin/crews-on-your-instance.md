@@ -92,8 +92,19 @@ chmod 600 crew-keys.env
 
 The first line is a comment that says the file is secret. Each further line is `export TASKMANAGER_CREW_<SLUG>_<PERSON>_API_KEY=...` or `export TASKMANAGER_CREW_<SLUG>_<PERSON>_PASSWORD=...`, with the slug and the person's key upper-cased and dashes turned into underscores. `?format=json` answers the JSON shape the create answer had (the crew, its people with `password` and `apiKey`, the team and the board), for tools that want it. Both answers are `Cache-Control: no-store`. The secrets are never written to the log or to the agent audit.
 
-## Behind a reverse proxy
+## Adding the people a crew lacks
 
+A crew made before a role existed has no account for the roles added since. `POST /api/crews/:slug/people` makes those accounts, each with its seat in the crew's team (a contact joins the customer instead), and gives a key and a password for each new person only. It is the same as the people a create makes, and it never rotates anyone: the keys and sessions of the people who are there keep working.
+
+- With no body, it adds every person the kit has that the crew lacks. A body `{"people": ["susy", "janet"]}` or the query `?people=susy,janet` names who to add. A key the kit does not know is a 400 that names it.
+- Asked again when nobody is missing, it answers 200 with an empty `people` map.
+- The answer has the crew, the team and the board, and `people` with the `password` and `apiKey` of the new people, in the shape of `?format=json` on the keys route. Save them the same way: they are shown once.
+- It takes the same key as the other crew calls, and one line goes to the agent audit per call.
+
+`GET /api/crews/:slug` shows the crew's `cast`: every person the kit has, each with `status` `present` or `missing`. Blaze and the Crews page use it to show the roles a crew can still take.
+
+For each new person the call does what crew create does: the account, the seat in the crew's team (or the customer login for a contact) and the key. It sets no board tags, and it does not fork anyone onto a board: a forked member is made with its own fork call.
+## Behind a reverse proxy
 The gate decides "local" from the connection, and treats any `X-Forwarded-For`, `X-Real-IP` or `Forwarded` header as proof of a proxy. Every proxy location that reaches the app should therefore set `X-Real-IP` and `X-Forwarded-For` to the address of the socket it accepted (`$remote_addr` in nginx), not `$proxy_add_x_forwarded_for`. The repository's README has the full deploy note and a one-line check to run once after installing.
 
 A management token works through the proxy: the gate reads the key from the request, not from the connection, so a proxied call with a management token is accepted and every other proxied call is still a 404.
