@@ -866,7 +866,9 @@ export const apiKeySecrets = pgTable(
     id: text('id').primaryKey(),
     tokenId: text('token_id').notNull(),
     keyHash: text('key_hash').notNull().unique(),
-    state: text('state').$type<'replaced' | 'revoked'>().notNull(),
+    // 'revoked_management' marks a revoked secret of a management token: the key row goes with the revoke, so the
+    // state is the only place its kind survives. A text column, so no migration is needed.
+    state: text('state').$type<'replaced' | 'revoked' | 'revoked_management'>().notNull(),
     changedAt: bigint('changed_at', { mode: 'number' }).notNull()
   },
   table => [index('api_key_secrets_token_idx').on(table.tokenId)]

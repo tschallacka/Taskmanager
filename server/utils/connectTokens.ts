@@ -46,9 +46,10 @@ export async function revokeKey(userId: string, keyId: string): Promise<boolean>
   return db.transaction(async (tx) => {
     const [deleted] = await tx.delete(apiKeys)
       .where(and(eq(apiKeys.id, keyId), eq(apiKeys.userId, userId)))
-      .returning({ id: apiKeys.id, keyHash: apiKeys.keyHash })
+      .returning({ id: apiKeys.id, keyHash: apiKeys.keyHash, kind: apiKeys.kind })
     if (!deleted) return false
-    await tx.insert(apiKeySecrets).values({ id: genId(), tokenId: deleted.id, keyHash: deleted.keyHash, state: 'revoked', changedAt: Date.now() })
+    const state = deleted.kind === 'management' ? 'revoked_management' : 'revoked'
+    await tx.insert(apiKeySecrets).values({ id: genId(), tokenId: deleted.id, keyHash: deleted.keyHash, state, changedAt: Date.now() })
     return true
   })
 }

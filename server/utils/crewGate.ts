@@ -7,6 +7,7 @@ import { closingWriter, recordAudit, type AuditRoute } from './auditRouting'
 import { boardOfCrewKey, crewPermissionRefusal } from './crewPermission'
 import { throttledTask } from './periodicTask'
 import { BoundedQueue } from './boundedQueue'
+import { TOKEN_REFUSAL_MESSAGES } from './connectTokenRules'
 import { CREW_KEY_SCOPE, type KeyVerdict } from './crewGatePolicy'
 import { MAX_TTL_MS, readThrough, TtlCache } from './ttlCache'
 
@@ -148,28 +149,45 @@ export async function checkCrewKey(event: H3Event): Promise<KeyVerdict> {
 
 /**
  * Whether the presented bearer token is a management token, live or once one: a key of kind 'management', or a
- * secret of such a key that was regenerated (its row still exists). A revoked token's row is gone, so it no longer
- * tells its kind and reads as an unknown key. Reads only; it touches no key. Never throws.
+ * secret of such a key that was regenerated (its row still exists), or revoked (its secret row says so in its state,
+ * since the key row is gone). Reads only; it touches no key. Never throws.
  */
 export async function isManagementToken(event: H3Event): Promise<boolean> {
-  const header = getRequestHeader(event, 'authorization')
-  const token = header?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim()
-  if (!token) return false
-  const hash = hashApiKey(token)
+  const hash = presentedHash(event)
+  if (!hash) return false
   const [live] = await db.select({ kind: apiKeys.kind }).from(apiKeys).where(eq(apiKeys.keyHash, hash))
   if (live) return live.kind === 'management'
-  const [secret] = await db.select({ tokenId: apiKeySecrets.tokenId }).from(apiKeySecrets).where(eq(apiKeySecrets.keyHash, hash))
+  const [secret] = await db.select({ tokenId: apiKeySecrets.tokenId, state: apiKeySecrets.state }).from(apiKeySecrets).where(eq(apiKeySecrets.keyHash, hash))
   if (!secret) return false
+  // A revoked management secret keeps its kind in its state, since the key row is gone (see revokeKey).
+  if (secret.state === 'revoked_management') return true
   const [owner] = await db.select({ kind: apiKeys.kind }).from(apiKeys).where(eq(apiKeys.id, secret.tokenId))
   return owner?.kind === 'management'
 }
 
+function presentedHash(event: H3Event): string | null {
+  const header = getRequestHeader(event, 'authorization')
+  const token = header?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim()
+  return token ? hashApiKey(token) : null
+}
+
+/** Whether the presented bearer token is a secret of a management token that was revoked. Reads only. Never throws. */
+async function isRevokedManagementSecret(event: H3Event): Promise<boolean> {
+  const hash = presentedHash(event)
+  if (!hash) return false
+  const [secret] = await db.select({ state: apiKeySecrets.state }).from(apiKeySecrets).where(eq(apiKeySecrets.keyHash, hash))
+  return secret?.state === 'revoked_management'
+}
+
 /**
  * The verdict for a remote caller's presented key while the window is shut: a management token's own verdict
- * (passing, expired, regenerated, or refused by its owner's rights), or null for any other key, which the gate
- * answers with the plain 404 without checking it.
+ * (passing, expired, regenerated, revoked, or refused by its owner's rights), or null for any other key, which the
+ * gate answers with the plain 404 without checking it.
  */
 export async function remoteManagementVerdict(event: H3Event): Promise<KeyVerdict | null> {
+  if (await isRevokedManagementSecret(event)) {
+    return { ok: false, reason: 'bad key', message: TOKEN_REFUSAL_MESSAGES.token_revoked, management: true }
+  }
   if (!(await isManagementToken(event))) return null
   const verdict = await checkCrewKey(event)
   return verdict.ok ? verdict : { ...verdict, management: true }

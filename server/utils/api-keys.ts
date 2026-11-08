@@ -223,7 +223,7 @@ export async function refusalForSecret(token: string) {
     .from(apiKeySecrets)
     .where(eq(apiKeySecrets.keyHash, hashApiKey(token)))
   if (!row) return null
-  return tokenRefusal(row.state === 'revoked' ? 'token_revoked' : 'token_regenerated')
+  return tokenRefusal(row.state.startsWith('revoked') ? 'token_revoked' : 'token_regenerated')
 }
 
 /** The permissions a key has on each board, or null when none were set per board (its own scopes then apply everywhere). */
