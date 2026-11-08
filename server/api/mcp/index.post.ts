@@ -15,10 +15,11 @@ import { API_KEY_SCOPES } from '../../db/schema'
 import type { ApiKeyScope } from '../../db/schema'
 import { publish, workspaceTopic } from '../../utils/realtime'
 import { workspaceOfBoard, workspaceTopicOfWrite } from '../../utils/keyReach'
+import { APP_VERSION } from '../../utils/appVersion'
 import type { ProjectResource, RealtimeEvent, WorkspaceCollection } from '../../utils/realtime'
 
 const SERVER_NAME = 'taskmanager'
-const SERVER_VERSION = '0.1.0'
+const SERVER_VERSION = APP_VERSION
 
 // Newest first. The client's requested version is echoed when we speak it,
 // otherwise we answer with the newest one we do speak and let it decide.
