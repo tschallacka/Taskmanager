@@ -26,6 +26,10 @@ const PROTECTED_PREFIXES = [
   '/api/people'
 ]
 
+// The routes that take an API key as well as a session: POST /api/projects/:id/import, POST /api/projects/import
+// and GET /api/projects/:id/backup. Each one authenticates the key and applies its own permission rule.
+const BOARD_IMPORT_PATH = /^\/api\/projects(\/[^/]+\/(import|backup)|\/import)$/
+
 // GitHub calls this itself, so it carries no session. It proves who it is with the
 // X-Hub-Signature-256 header, checked in the route.
 const WEBHOOK_PATHS = ['/api/github/webhook']
@@ -33,6 +37,8 @@ const WEBHOOK_PATHS = ['/api/github/webhook']
 export default defineEventHandler(async (event) => {
   const path = event.path
   if (WEBHOOK_PATHS.includes(path)) return
+  // A board import may come with an API key: the route authenticates the key and applies the admin rule itself.
+  if (BOARD_IMPORT_PATH.test(path.split('?')[0]!) && /^Bearer\s/i.test(event.headers.get('authorization') ?? '')) return
   if (!PROTECTED_PREFIXES.some(prefix => path.startsWith(prefix))) return
 
   const session = await auth.api.getSession({ headers: event.headers })

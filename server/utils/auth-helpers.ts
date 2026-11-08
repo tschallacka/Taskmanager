@@ -23,7 +23,7 @@ export async function getUserActiveTeamId(event: H3Event): Promise<string | null
   return activeOrgId
 }
 
-const TEAM_ADMIN_ROLES = ['owner', 'admin']
+export const TEAM_ADMIN_ROLES = ['owner', 'admin']
 
 export async function requireTeamRole(event: H3Event, organizationId: string, allowedRoles: string[] = TEAM_ADMIN_ROLES) {
   const session = event.context.session

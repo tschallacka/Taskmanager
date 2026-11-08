@@ -343,6 +343,10 @@ async function confirmDelete() {
     </div>
 
     <div class="border-t border-default pt-6">
+      <KanbanBoardImport :project-id="projectId" />
+    </div>
+
+    <div class="border-t border-default pt-6">
       <h3 class="text-sm font-semibold text-default">
         Archive
       </h3>
