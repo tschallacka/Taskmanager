@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm'
 import { db } from '../../../db'
 import { projects, user } from '../../../db/schema'
-import { authenticateApiKey, hasScope } from '../../../utils/api-keys'
+import { authenticateApiKey, forCall, hasScope } from '../../../utils/api-keys'
 import type { ApiKeyContext } from '../../../utils/api-keys'
 import type { Audience } from '../../../utils/auth-helpers'
 import { isBoardAdmin } from '../../../utils/boardAdmin'
@@ -119,7 +119,8 @@ async function backupCaller(event: Parameters<typeof requireProject>[0], project
     }
   }
 
-  const context: ApiKeyContext = await authenticateApiKey(event)
+  // A backup is a read: a token with per-board grants reaches the boards that grant it the read permission.
+  const context: ApiKeyContext = forCall(await authenticateApiKey(event), 'boards:read')
   if (!hasScope(context, 'boards:read')) {
     throw createError({ statusCode: 403, message: 'This key cannot read boards, so it cannot download a backup.' })
   }
