@@ -41,12 +41,12 @@ function layout(dir: string, version: string) {
 }
 
 // Runs the script with a clean git environment, as the bump tests do.
-function run(dir: string, args: string[]) {
+function run(dir: string, args: string[], input?: string) {
   const env = { ...process.env }
   delete env.GIT_DIR
   delete env.GIT_WORK_TREE
   delete env.GIT_INDEX_FILE
-  const result = spawnSync(process.execPath, [join(dir, 'scripts', 'bump-version.mjs'), ...args], { cwd: dir, env, encoding: 'utf8' })
+  const result = spawnSync(process.execPath, [join(dir, 'scripts', 'bump-version.mjs'), ...args], { cwd: dir, env, encoding: 'utf8', input })
   return { status: result.status, out: result.stdout, err: result.stderr }
 }
 
@@ -138,6 +138,46 @@ test('a fragment that does not start with a bullet is refused, and nothing is wr
     assert.match(read(dir, 'package.json'), /"version": "0\.1\.0"/)
     assert.equal(read(dir, 'CHANGELOG.md'), changelog)
     assert.deepEqual(fragments(dir), ['card1-prose.md'])
+  })
+})
+
+// The CI rule (`changelog-check`), fed the name-status lines of a pull request as git prints them.
+test('the CI rule passes a worker branch with a fragment, and says which rule passed', () => {
+  withFolder((dir) => {
+    layout(dir, '0.1.1')
+    const result = run(dir, ['changelog-check'], 'A\tchangelog.d/card1-first.md\nM\tsrc/a.ts\n')
+    assert.equal(result.status, 0, result.err)
+    assert.match(result.out, /^rule: fragment added \(changelog\.d\/card1-first\.md\)/)
+  })
+})
+
+test('the CI rule passes the publish pull request that folded the fragments, and says so', () => {
+  withFolder((dir) => {
+    layout(dir, '0.1.1')
+    // The folded PR: CHANGELOG.md gained the version heading, the fragments were deleted, package.json was raised.
+    const result = run(dir, ['changelog-check'], 'M\tCHANGELOG.md\nD\tchangelog.d/card1-first.md\nD\tchangelog.d/card2-second.md\nM\tpackage.json\nM\tnix/arnotes.nix\n')
+    assert.equal(result.status, 0, result.err)
+    assert.match(result.out, /^rule: folded changelog \(CHANGELOG\.md changed, 2 fragments deleted\)/)
+  })
+})
+
+test('the CI rule refuses a hand edit of CHANGELOG.md, and a code change with no fragment', () => {
+  withFolder((dir) => {
+    layout(dir, '0.1.1')
+    const handEdit = run(dir, ['changelog-check'], 'M\tCHANGELOG.md\nM\tsrc/a.ts\n')
+    assert.equal(handEdit.status, 1)
+    assert.match(handEdit.err, /adds no changelog fragment/)
+    const codeOnly = run(dir, ['changelog-check'], 'M\tserver/api/x.ts\n')
+    assert.equal(codeOnly.status, 1)
+  })
+})
+
+test('the CI rule passes a change of documentation or dependency hashes only, and says so', () => {
+  withFolder((dir) => {
+    layout(dir, '0.1.1')
+    const result = run(dir, ['changelog-check'], 'M\tCONTRIBUTING.md\nM\tdocs/admin/x.txt\nM\tnix/hashes.json\nM\tflake.lock\n')
+    assert.equal(result.status, 0, result.err)
+    assert.match(result.out, /^rule: not needed/)
   })
 })
 

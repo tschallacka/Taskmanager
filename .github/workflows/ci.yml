@@ -67,7 +67,8 @@ jobs:
           ' "$mine" "$master"
 
   # A push to any branch other than master: the change adds a changelog fragment (changelog.d/<card-id>-<slug>.md),
-  # unless every changed file is Markdown, under docs/, or a nix hash or lock refresh (no code, no user-visible change).
+  # or is the merger's publish pull request that folded them into CHANGELOG.md. The rule is in bump-version.mjs,
+  # which prints the rule that passed (CONTRIBUTING.md, Changelog).
   changelog-fragment:
     if: github.ref != 'refs/heads/master'
     runs-on: ubuntu-latest
@@ -78,20 +79,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Require a changelog fragment
+      - name: Require a changelog fragment or the folded changelog
         run: |
           git fetch --quiet origin "+refs/heads/master:refs/remotes/origin/master"
-          if git diff --name-only --diff-filter=A origin/master...HEAD | grep -qE '^changelog\.d/.+\.md$'; then
-            echo "changelog fragment: added"
-            exit 0
-          fi
-          changed=$(git diff --name-only origin/master...HEAD)
-          if ! echo "$changed" | grep -qvE '(\.md$|^docs/|^nix/hashes\.json$|^flake\.lock$)'; then
-            echo "changelog fragment: not needed (only documentation or dependency hashes changed)"
-            exit 0
-          fi
-          echo "This change adds no changelog fragment. Add changelog.d/<card-id>-<slug>.md with one bullet (CONTRIBUTING.md, Changelog)."
-          exit 1
+          git diff --name-status origin/master...HEAD | node scripts/bump-version.mjs changelog-check
 
   # Only a green master is tagged: this job runs after ci and only for a push to master.
   tag:
