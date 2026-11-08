@@ -35,8 +35,11 @@ const KINDS = {
 }
 const DEFAULTS = { remote: 'origin', base: 'main', dir: '', link: [], lint: '', lintFiles: '', schemaFiles: [], lockFiles: [], attribution: [], timeout: 600, version: null }
 
-// The version bumps: patch, minor, major, or none (the version is left alone; say why in the pull request).
-export const BUMPS = ['patch', 'minor', 'major', 'none']
+// The version bumps: patch (a bugfix), feature (a new feature), breaking (compatibility breaks), or none (the version is
+// left alone; say why in the pull request). minor and major are accepted as the older names of feature and breaking.
+export const BUMPS = ['patch', 'feature', 'breaking', 'none']
+const LEGACY_BUMPS = { minor: 'feature', major: 'breaking' }
+const ACCEPTED_BUMPS = [...BUMPS, ...Object.keys(LEGACY_BUMPS)]
 const SEMVER = /^\d+\.\d+\.\d+$/
 
 /**
@@ -53,7 +56,9 @@ export function versionProblems(value) {
   if (typeof file !== 'string' || !/\.json$/.test(file) || isAbsolute(file) || file.split(/[\\/]/).includes('..')) {
     problems.push('publish.version.file must be a .json file inside the repository, such as package.json')
   }
-  if (value.bump !== undefined && !BUMPS.includes(value.bump)) problems.push(`publish.version.bump must be one of ${BUMPS.join(', ')}`)
+  if (value.bump !== undefined && !ACCEPTED_BUMPS.includes(value.bump)) {
+    problems.push(`publish.version.bump must be one of ${BUMPS.join(', ')} (minor and major are accepted as the older names of feature and breaking)`)
+  }
   return problems
 }
 
@@ -66,12 +71,28 @@ export function versionOf(text) {
   }
 }
 
-/** x.y.z moved by one step: patch, minor or major. The caller has checked the version is plain semver. */
-export function bumpVersion(version, bump) {
+/** The kind a bump name means: the legacy names minor and major map to feature and breaking. */
+export function canonicalBump(bump) {
+  return LEGACY_BUMPS[bump] ?? bump
+}
+
+/**
+ * The next x.y.z for a bump kind, and the label the summary and the commit line carry. While the major version is 0 the
+ * number is held at 0: a breaking change bumps the minor, like a feature, and the label says so. From major 1 on,
+ * breaking is a real major bump. The caller has checked the version is plain semver.
+ */
+export function planVersion(version, bump) {
+  const kind = canonicalBump(bump)
   const [major, minor, patch] = version.split('.').map(Number)
-  if (bump === 'major') return `${major + 1}.0.0`
-  if (bump === 'minor') return `${major}.${minor + 1}.0`
-  return `${major}.${minor}.${patch + 1}`
+  if (kind === 'breaking' && major === 0) return { next: `0.${minor + 1}.0`, label: 'breaking, held at 0.x: beta' }
+  if (kind === 'breaking') return { next: `${major + 1}.0.0`, label: 'breaking' }
+  if (kind === 'feature') return { next: `${major}.${minor + 1}.0`, label: 'feature' }
+  return { next: `${major}.${minor}.${patch + 1}`, label: 'patch' }
+}
+
+/** The next x.y.z for a bump kind (see planVersion). */
+export function bumpVersion(version, bump) {
+  return planVersion(version, bump).next
 }
 
 /**
@@ -224,7 +245,7 @@ function versionStep(ctx, baseRef, override) {
     say(override ? `version: skipped, publish.version is empty (BUMP=${override} ignored)` : 'version: skipped, publish.version is empty, so the version was not bumped')
     return null
   }
-  const bump = override || version.bump
+  const bump = canonicalBump(override || version.bump)
   if (bump === 'none') {
     say('version: not bumped (none)')
     return null
@@ -242,14 +263,14 @@ function versionStep(ctx, baseRef, override) {
     say(`version: already bumped by the branch (${before} -> ${current}), left as is`)
     return null
   }
-  const next = bumpVersion(current, bump)
+  const { next, label } = planVersion(current, bump)
   const rewritten = rewriteVersion(text, current, next)
   if (rewritten === null || versionOf(rewritten) !== next) stop(ctx, 4, `could not rewrite the top-level "version" of ${version.file}: nothing pushed`)
   writeFileSync(path, rewritten)
   const staged = git(ctx.wt, ['add', version.file])
   if (!staged.ok) stop(ctx, 1, `git add ${version.file} failed:\n${staged.output}`)
-  say(`version: ${current} -> ${next} (${bump})`)
-  return `Version ${current} -> ${next}.`
+  say(`version: ${current} -> ${next} (${label})`)
+  return `Version ${current} -> ${next} (${label}).`
 }
 
 function usage() {
@@ -265,8 +286,8 @@ async function main(argv) {
     process.exit(2)
   }
   const override = process.env.BUMP ?? ''
-  if (override && !BUMPS.includes(override)) {
-    console.error(`BUMP=${override} is not one of ${BUMPS.join(', ')}`)
+  if (override && !ACCEPTED_BUMPS.includes(override)) {
+    console.error(`BUMP=${override} is not one of ${BUMPS.join(', ')} (minor and major also work)`)
     process.exit(2)
   }
   const { config } = await import('./config.mjs')

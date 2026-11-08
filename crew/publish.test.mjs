@@ -11,7 +11,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { dirname, join } from 'node:path'
 import { after, describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { bumpVersion, expandPlaceholders, parseSettings, placeVersionLine, rewriteVersion, shellQuote, versionProblems } from './publish.mjs'
+import { bumpVersion, expandPlaceholders, parseSettings, placeVersionLine, planVersion, rewriteVersion, shellQuote, versionProblems } from './publish.mjs'
 
 const KIT = dirname(fileURLToPath(import.meta.url))
 const PUBLISH = join(KIT, 'publish.mjs')
@@ -261,15 +261,17 @@ describe('the version bump: publish.version and BUMP', () => {
     assert.equal(run.status, 0, out(run))
     assert.match(out(run), /^version: 1\.0\.0 -> 1\.0\.1 \(patch\)$/m)
     assert.equal(pkgOn(fx).version, '1.0.1')
-    assert.match(messageOn(fx), /Version 1\.0\.0 -> 1\.0\.1\./)
+    assert.match(messageOn(fx), /Version 1\.0\.0 -> 1\.0\.1 \(patch\)\./)
   })
 
-  test('minor and major move the version the semver way; none leaves it alone and says so', () => {
-    for (const [bump, next] of [['minor', '1.1.0'], ['major', '2.0.0']]) {
+  test('feature and breaking move the version the semver way; the legacy minor and major mean the same; none leaves it alone', () => {
+    for (const [bump, next, label] of [['feature', '1.1.0', 'feature'], ['breaking', '2.0.0', 'breaking'], ['minor', '1.1.0', 'feature'], ['major', '2.0.0', 'breaking']]) {
       const fx = withPackage(pkgText('1.0.3'))
       const run = bumpRun(fx, { version: { bump } })
       assert.equal(run.status, 0, out(run))
       assert.equal(pkgOn(fx).version, next)
+      assert.match(out(run), new RegExp(`^version: 1\\.0\\.3 -> ${next.replace(/\./g, '\\.')} \\(${label}\\)$`, 'm'))
+      assert.match(messageOn(fx), new RegExp(`Version 1\\.0\\.3 -> ${next.replace(/\./g, '\\.')} \\(${label}\\)\\.`))
     }
     const fx = withPackage(pkgText('1.0.0'))
     const run = bumpRun(fx, { version: { bump: 'none' } })
@@ -279,11 +281,15 @@ describe('the version bump: publish.version and BUMP', () => {
     assert.doesNotMatch(messageOn(fx), /Version /)
   })
 
-  test('BUMP for one run overrides publish.version.bump; a value other than the four is refused', () => {
+  test('BUMP for one run overrides publish.version.bump; a value that is not a kind is refused', () => {
     const minor = withPackage(pkgText('1.0.0'))
     const run = bumpRun(minor, { version: { bump: 'patch' } }, { BUMP: 'minor' })
     assert.equal(run.status, 0, out(run))
     assert.equal(pkgOn(minor).version, '1.1.0')
+
+    const feature = withPackage(pkgText('1.0.0'))
+    assert.equal(bumpRun(feature, { version: { bump: 'patch' } }, { BUMP: 'feature' }).status, 0)
+    assert.equal(pkgOn(feature).version, '1.1.0')
 
     const none = withPackage(pkgText('1.0.0'))
     assert.match(out(bumpRun(none, { version: { bump: 'patch' } }, { BUMP: 'none' })), /version: not bumped \(none\)/)
@@ -291,7 +297,21 @@ describe('the version bump: publish.version and BUMP', () => {
 
     const bad = bumpRun(withPackage(pkgText('1.0.0')), {}, { BUMP: 'huge' })
     assert.equal(bad.status, 2, out(bad))
-    assert.match(bad.stderr, /BUMP=huge is not one of patch, minor, major, none/)
+    assert.match(bad.stderr, /BUMP=huge is not one of patch, feature, breaking, none/)
+  })
+
+  test('breaking is held at 0.x while the major version is 0, and a real major bump from 1 on', () => {
+    const held = withPackage(pkgText('0.3.1'))
+    const run = bumpRun(held, { version: { bump: 'breaking' } })
+    assert.equal(run.status, 0, out(run))
+    assert.match(out(run), /^version: 0\.3\.1 -> 0\.4\.0 \(breaking, held at 0\.x: beta\)$/m)
+    assert.equal(pkgOn(held).version, '0.4.0')
+    assert.equal(messageOn(held), 'Add the feature\n\nBody line.\n\nVersion 0.3.1 -> 0.4.0 (breaking, held at 0.x: beta).')
+
+    const real = withPackage(pkgText('1.2.3'))
+    assert.equal(bumpRun(real, { version: { bump: 'breaking' } }).status, 0)
+    assert.equal(pkgOn(real).version, '2.0.0')
+    assert.match(messageOn(real), /Version 1\.2\.3 -> 2\.0\.0 \(breaking\)\./)
   })
 
   test('without publish.version nothing is bumped: the skip is printed, and a BUMP for the run is named as ignored', () => {
@@ -325,7 +345,7 @@ describe('the version bump: publish.version and BUMP', () => {
     write(fx.msg, 'Add the feature\n\nBody line.\n\nClaude-Session: https://example.test/s\n')
     const run = bumpRun(fx, { attribution: ['Co-Authored-By: Test <test@example.test>'] })
     assert.equal(run.status, 0, out(run))
-    assert.equal(messageOn(fx), 'Add the feature\n\nBody line.\n\nVersion 1.0.0 -> 1.0.1.\n\nClaude-Session: https://example.test/s\n\nCo-Authored-By: Test <test@example.test>')
+    assert.equal(messageOn(fx), 'Add the feature\n\nBody line.\n\nVersion 1.0.0 -> 1.0.1 (patch).\n\nClaude-Session: https://example.test/s\n\nCo-Authored-By: Test <test@example.test>')
   })
 
   test('the rest of package.json stays as it was: indentation, key order, line ends; a nested "version" is left alone', () => {
@@ -348,11 +368,16 @@ describe('the version bump: publish.version and BUMP', () => {
 })
 
 describe('the version helpers and settings', () => {
-  test('bumpVersion moves one step: patch, minor or major', () => {
+  test('bumpVersion moves one step: patch, feature or breaking; minor and major are the legacy names', () => {
     assert.equal(bumpVersion('1.2.3', 'patch'), '1.2.4')
+    assert.equal(bumpVersion('1.2.3', 'feature'), '1.3.0')
+    assert.equal(bumpVersion('1.2.3', 'breaking'), '2.0.0')
     assert.equal(bumpVersion('1.2.3', 'minor'), '1.3.0')
     assert.equal(bumpVersion('1.2.3', 'major'), '2.0.0')
     assert.equal(bumpVersion('9.9.9', 'patch'), '9.9.10')
+    assert.deepEqual(planVersion('0.9.2', 'breaking'), { next: '0.10.0', label: 'breaking, held at 0.x: beta' })
+    assert.deepEqual(planVersion('0.9.2', 'feature'), { next: '0.10.0', label: 'feature' })
+    assert.deepEqual(planVersion('0.9.2', 'patch'), { next: '0.9.3', label: 'patch' })
   })
 
   test('rewriteVersion changes only the top-level version value, and is null without one', () => {
@@ -367,7 +392,9 @@ describe('the version helpers and settings', () => {
 
   test('versionProblems names a bad bump, an unknown key, a file that is not a .json inside the repository', () => {
     assert.deepEqual(versionProblems({ bump: 'patch', file: 'package.json' }), [])
-    assert.match(versionProblems({ bump: 'huge' }).join('\n'), /publish\.version\.bump must be one of patch, minor, major, none/)
+    assert.match(versionProblems({ bump: 'huge' }).join('\n'), /publish\.version\.bump must be one of patch, feature, breaking, none/)
+    assert.deepEqual(versionProblems({ bump: 'minor' }), [])
+    assert.deepEqual(versionProblems({ bump: 'major' }), [])
     assert.match(versionProblems({ size: 'big' }).join('\n'), /publish\.version\.size is not a setting/)
     assert.match(versionProblems({ file: 'VERSION' }).join('\n'), /publish\.version\.file must be a \.json file inside the repository/)
     assert.match(versionProblems({ file: '../package.json' }).join('\n'), /publish\.version\.file must be a \.json file inside the repository/)
