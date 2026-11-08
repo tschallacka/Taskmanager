@@ -433,7 +433,7 @@ export async function requireCrewManager(event: H3Event): Promise<CrewCaller> {
 }
 
 /** One agent audit row per crew call, read by the key's owner in the Inbox. Never throws. */
-async function recordCrewCall(caller: CrewCaller, action: string, slug: string, summary: string) {
+async function recordCrewCall(caller: CrewCaller, action: string, slug: string, summary: string, projectId: string | null) {
   try {
     await db.insert(agentAudit).values({
       id: genId(),
@@ -442,6 +442,7 @@ async function recordCrewCall(caller: CrewCaller, action: string, slug: string, 
       keyName: caller.keyName,
       tool: `crew_${action}`,
       toolTitle: 'Crew API',
+      projectId,
       summary: `${summary} (${slug})`.slice(0, 200),
       createdAt: Date.now()
     })
@@ -458,15 +459,15 @@ export async function audited<T>(
   caller: CrewCaller,
   action: string,
   slug: string,
-  run: () => Promise<{ result: T, summary: string }>
+  run: () => Promise<{ result: T, summary: string, projectId?: string | null }>
 ): Promise<T> {
   try {
-    const { result, summary } = await run()
-    await recordCrewCall(caller, action, slug, summary)
+    const { result, summary, projectId } = await run()
+    await recordCrewCall(caller, action, slug, summary, projectId ?? null)
     return result
   } catch (error) {
     const message = (error as { statusMessage?: string }).statusMessage ?? 'failed'
-    await recordCrewCall(caller, action, slug, `refused: ${message}`)
+    await recordCrewCall(caller, action, slug, `refused: ${message}`, null)
     throw error
   }
 }
