@@ -327,6 +327,23 @@ async function confirmDelete() {
 
     <div class="border-t border-default pt-6">
       <h3 class="text-sm font-semibold text-default">
+        Backup
+      </h3>
+      <p class="mt-1 text-xs text-muted">
+        Downloads the board as one file, with each item's date and author. Team members get all of it: cards, subtasks, labels, custom fields, comments, time logs, status updates, messages and rules. Customer contacts, guests and agent keys get only the cards and comments they can see, and nobody else's email address. Attachments are listed by name, not included. Passwords, keys, tokens and sign-in data are never in the file.
+      </p>
+      <a
+        :href="`/api/projects/${projectId}/backup`"
+        download
+        class="mt-3 inline-block rounded-lg border border-default px-3 py-1.5 text-xs text-default transition-colors hover:bg-elevated"
+        data-backup-download
+      >
+        Download backup
+      </a>
+    </div>
+
+    <div class="border-t border-default pt-6">
+      <h3 class="text-sm font-semibold text-default">
         Archive
       </h3>
       <p class="mt-1 text-xs text-muted">
