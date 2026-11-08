@@ -19,7 +19,7 @@ let
 in
 stdenv.mkDerivation (finalAttrs: {
   pname = "arnotes-schema";
-  version = "0.1.0";
+  version = (builtins.fromJSON (builtins.readFile ../package.json)).version;
 
   # The schema tooling stands alone, exactly like the Docker `database` stage:
   # just the Drizzle config, the schema definition, and the three pinned

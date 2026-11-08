@@ -5,6 +5,9 @@
 let
   mkNodeDeps = pkgs.callPackage ./node-deps.nix { };
 
+  # The one version of the app: package.json. Boss's publish bumps it there and nowhere else.
+  appVersion = (builtins.fromJSON (builtins.readFile ../package.json)).version;
+
   # node_modules contains platform-specific optional dependencies, so each build
   # platform has its own content hash. The known hashes live in hashes.json and
   # are kept up to date by .github/workflows/nix-hashes.yml; a platform without
@@ -17,7 +20,7 @@ let
 
   nodeDeps = mkNodeDeps {
     pname = "arnotes-node-deps";
-    version = "0.1.0";
+    version = appVersion;
     frozen = true;
     src = pkgs.lib.fileset.toSource {
       root = ../.;
@@ -31,7 +34,7 @@ let
 
   schemaDeps = mkNodeDeps {
     pname = "arnotes-schema-node-deps";
-    version = "0.1.0";
+    version = appVersion;
     src = pkgs.runCommand "arnotes-schema-manifest" { } ''
       mkdir -p "$out"
       cp ${builtins.toFile "package.json" (builtins.toJSON {
@@ -57,7 +60,7 @@ in
   # platform and writes the reported hashes into hashes.json.
   nodeDepsUpdater = mkNodeDeps {
     pname = "arnotes-node-deps-updater";
-    version = "0.1.0";
+    version = appVersion;
     frozen = true;
     src = pkgs.lib.fileset.toSource {
       root = ../.;
@@ -71,7 +74,7 @@ in
 
   schemaDepsUpdater = mkNodeDeps {
     pname = "arnotes-schema-node-deps-updater";
-    version = "0.1.0";
+    version = appVersion;
     src = pkgs.runCommand "arnotes-schema-manifest" { } ''
       mkdir -p "$out"
       cp ${builtins.toFile "package.json" (builtins.toJSON {
