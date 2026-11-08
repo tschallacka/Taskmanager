@@ -1,8 +1,8 @@
 import type { H3Event } from 'h3'
 import { desc, eq, lt } from 'drizzle-orm'
 import { db } from '../db'
-import { apiKeys, crewApiAudit, crewApiGate, user } from '../db/schema'
-import { authenticateApiKey, generateApiKey, hasScope } from './api-keys'
+import { apiKeySecrets, apiKeys, crewApiAudit, crewApiGate, user } from '../db/schema'
+import { authenticateApiKey, generateApiKey, hasScope, hashApiKey } from './api-keys'
 import { closingWriter, recordAudit, type AuditRoute } from './auditRouting'
 import { boardOfCrewKey, crewPermissionRefusal } from './crewPermission'
 import { throttledTask } from './periodicTask'
@@ -140,9 +140,39 @@ export async function checkCrewKey(event: H3Event): Promise<KeyVerdict> {
   const ownerIsAdmin = Boolean(row?.isInstanceAdmin)
   // A key of anyone but the instance admin passes only when it is bound to one board that the crew permission reaches.
   if (!ownerIsAdmin && !context.projectId) return { ok: false, reason: 'not admin' }
-  const refusal = await crewPermissionRefusal(context.userId, boardOfCrewKey(context, ownerIsAdmin))
+  const boardId = boardOfCrewKey(context, ownerIsAdmin)
+  const refusal = await crewPermissionRefusal(context.userId, boardId)
   if (refusal) return { ok: false, reason: 'not admin', message: refusal }
-  return { ok: true, keyId: context.keyId }
+  return { ok: true, keyId: context.keyId, management: context.kind === 'management', boardId }
+}
+
+/**
+ * Whether the presented bearer token is a management token, live or once one: a key of kind 'management', or a
+ * secret of such a key that was regenerated (its row still exists). A revoked token's row is gone, so it no longer
+ * tells its kind and reads as an unknown key. Reads only; it touches no key. Never throws.
+ */
+export async function isManagementToken(event: H3Event): Promise<boolean> {
+  const header = getRequestHeader(event, 'authorization')
+  const token = header?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim()
+  if (!token) return false
+  const hash = hashApiKey(token)
+  const [live] = await db.select({ kind: apiKeys.kind }).from(apiKeys).where(eq(apiKeys.keyHash, hash))
+  if (live) return live.kind === 'management'
+  const [secret] = await db.select({ tokenId: apiKeySecrets.tokenId }).from(apiKeySecrets).where(eq(apiKeySecrets.keyHash, hash))
+  if (!secret) return false
+  const [owner] = await db.select({ kind: apiKeys.kind }).from(apiKeys).where(eq(apiKeys.id, secret.tokenId))
+  return owner?.kind === 'management'
+}
+
+/**
+ * The verdict for a remote caller's presented key while the window is shut: a management token's own verdict
+ * (passing, expired, regenerated, or refused by its owner's rights), or null for any other key, which the gate
+ * answers with the plain 404 without checking it.
+ */
+export async function remoteManagementVerdict(event: H3Event): Promise<KeyVerdict | null> {
+  if (!(await isManagementToken(event))) return null
+  const verdict = await checkCrewKey(event)
+  return verdict.ok ? verdict : { ...verdict, management: true }
 }
 
 // Audit rows of ordinary refusals are queued and written in one batch a second. The queue is
