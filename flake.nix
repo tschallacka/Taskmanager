@@ -19,7 +19,11 @@
 
       nixpkgsFor = system: import nixpkgs { inherit system; };
 
-      pkgsFor = system: import ./nix/packages.nix { pkgs = nixpkgsFor system; inherit system; };
+      # The short git commit this flake was built from, for /api/version's build field. A dirty tree has no
+      # shortRev, so it takes dirtyShortRev; a flake built without git has neither, and the build is unset.
+      build = self.shortRev or (self.dirtyShortRev or null);
+
+      pkgsFor = system: import ./nix/packages.nix { pkgs = nixpkgsFor system; inherit system build; };
     in
     {
       packages = forAllSystems (system: let
@@ -36,9 +40,21 @@
         default = import ./nix/devshell.nix { pkgs = nixpkgsFor system; };
       });
 
-      nixosModules = {
-        default = import ./nix/module.nix;
-        arnotes = import ./nix/module.nix;
-      };
+      # The NixOS module, with its default package set to this flake's own build, so the service reports the
+      # commit (build in /api/version) without the deployer passing anything. The bare module keeps the
+      # package from nix/packages.nix, which has no git revision.
+      nixosModules =
+        let
+          nixosModule =
+            { lib, pkgs, ... }:
+            {
+              imports = [ (import ./nix/module.nix) ];
+              services.arnotes.package = lib.mkDefault self.packages.${pkgs.stdenv.hostPlatform.system}.default;
+            };
+        in
+        {
+          default = nixosModule;
+          arnotes = nixosModule;
+        };
     };
 }

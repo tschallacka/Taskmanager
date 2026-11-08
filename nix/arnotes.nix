@@ -4,6 +4,8 @@
   bun,
   nodeDeps,
   makeWrapper,
+  # The short git commit the app is built from, or null when there is none (see packages.nix).
+  build ? null,
 }:
 stdenv.mkDerivation (finalAttrs: {
   pname = "arnotes";
@@ -74,7 +76,7 @@ stdenv.mkDerivation (finalAttrs: {
       --set-default NODE_ENV production \
       --set-default HOST 0.0.0.0 \
       --set-default PORT 3000 \
-      --set-default CREW_KIT_DIR "$out/lib/arnotes/crew" \
+      --set-default CREW_KIT_DIR "$out/lib/arnotes/crew" ${lib.optionalString (build != null) ''--set-default TASKMANAGER_BUILD "${build}"''} \
       --add-flags "$out/lib/arnotes/.output/server/index.mjs"
 
     runHook postInstall

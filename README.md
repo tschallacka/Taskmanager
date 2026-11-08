@@ -330,6 +330,8 @@ nix build .#default   # the app  (result/bin/arnotes)
 nix build .#schema    # schema tooling (result/bin/arnotes-db-push)
 ```
 
+`/api/version` reports `build` as the short git commit the package was built from: the flake's `shortRev`, or `dirtyShortRev` for an uncommitted tree, and `null` when there is no git revision. The flake's NixOS module (`nixosModules.default`) sets the service's package to that build, so the commit reaches the service without extra input; a module imported on its own has no git revision and reports `null`. The Docker image reads it from the `TASKMANAGER_BUILD` build argument (`docker build --build-arg TASKMANAGER_BUILD=$(git rev-parse --short HEAD)`), and it stays `null` when the argument is not given. The development server never sets it.
+
 Run the app against a PostgreSQL of your choice:
 
 ```bash
