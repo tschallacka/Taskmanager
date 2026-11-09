@@ -330,7 +330,7 @@ nix build .#default   # the app  (result/bin/arnotes)
 nix build .#schema    # schema tooling (result/bin/arnotes-db-push)
 ```
 
-`/api/version` `build` is the short git commit the package was built from (`<commit>-dirty` for an uncommitted tree), and `null` when there is none.
+`/api/version` `build` is the short git commit the package was built from (`<commit>-dirty` for an uncommitted tree), and `null` when there is none. On a Blaze deploy, where the release folder has no `.git`, the build id comes from the `REVISION` file at the release root: its first 7 characters, or `null` when the file is missing or not a commit id. `TASKMANAGER_BUILD` wins over both.
 
 Run the app against a PostgreSQL of your choice:
 
