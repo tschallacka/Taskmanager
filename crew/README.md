@@ -306,6 +306,45 @@ definition says to use its own name wherever those write a member key. **New key
 keys: run `init --forks` again with the new file, which replaces the old one. **Remove the forks** deletes the
 accounts, after which their definitions and the file are yours to delete.
 
+## Claude Code limits
+
+Long crew work (a full suite, a typecheck, waiting for a board event) runs into Claude Code's default limits. The
+kit raises them for the crew's sessions only, with a profile that is passed to one session at a time.
+
+**The profile.** `claude-long-run.json` in this folder. Start a session with it:
+
+    crew claude                       the owner's wrapper: claude --settings <kit>/claude-long-run.json
+    claude --settings <kit>/claude-long-run.json [other flags]
+
+Pia's start line in PROMPTS.md ("Starting Pia") carries the same `--settings`. Agents that Pia starts run inside her
+session and inherit the profile. A session started without `--settings` keeps Claude Code's defaults. The values and
+what each one does are in `claude-long-run.comments.md`.
+
+**The limits.**
+
+| What | Default | Variable | Profile value |
+|---|---|---|---|
+| A shell command that names no timeout | 2 min | `BASH_DEFAULT_TIMEOUT_MS` | 30 min |
+| The longest a shell command may ask for | 10 min | `BASH_MAX_TIMEOUT_MS` | 2 h |
+| A foreground shell command moved to the background (main session) | off | `CLAUDE_CODE_AUTO_BACKGROUND_TIMEOUT_MS` | 30 min |
+| Shell output read back | 30,000 characters | `BASH_MAX_OUTPUT_LENGTH` | 150,000 (the most Claude Code allows) |
+| MCP server start-up | not documented | `MCP_TIMEOUT` | 60 s |
+| An MCP tool call moved to the background | 2 min | `CLAUDE_CODE_MCP_AUTO_BACKGROUND_MS` | 10 min |
+| An MCP tool call with no progress | 30 min (stdio), 5 min (remote) | `CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT` | 30 min |
+| A background agent counted as stalled | about 10 min | `CLAUDE_ASYNC_AGENT_STALL_TIMEOUT_MS` | 1 h |
+| A Monitor watch | 5 min, at most 30 min | none | cannot be raised |
+
+**What cannot be raised.** Monitor stops at 30 minutes: re-arm the watch when it expires, or use `persistent` where the
+session offers it. Shell output is capped at 150,000 characters: write long output to a file and read the part you need.
+
+**Checked against.** Claude Code 2.1.319, on 2026-11-09 (Claude Code's docs and its code). A newer or older Claude Code may
+change these. `crew claude version` prints the installed version and warns when it is older than the one the profile was
+checked against. Run it after a Claude Code update.
+
+**The PM's listener hook.** Pia's listener hook stays in her folder's own `.claude/settings.json`, which Claude Code
+reads for that session. It is not moved to a second profile: a second `--settings` file would be merged on every
+session, and the hook is needed only where Pia runs.
+
 ## Commands
 
     crew <who> <command ...>      board tools as one person (tm.mjs)

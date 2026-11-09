@@ -25,6 +25,9 @@ browser-driver.mjs
 browser.mjs
 cast.mjs
 channel.mjs
+claude-long-run.comments.md
+claude-long-run.json
+claude.mjs
 config.mjs
 crew.config.example.json
 crew.mjs
