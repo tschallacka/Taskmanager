@@ -4,7 +4,7 @@ import { db } from '../db'
 import { apiKeySecrets, apiKeys, crewApiAudit, crewApiGate, user } from '../db/schema'
 import { authenticateApiKey, generateApiKey, hasScope, hashApiKey } from './api-keys'
 import { closingWriter, recordAudit, type AuditRoute } from './auditRouting'
-import { boardOfCrewKey, crewPermissionRefusal } from './crewPermission'
+import { boardOfCrewKey, crewPermissionRefusal, isInstanceAdmin, ownsLiveCrew } from './crewPermission'
 import { throttledTask } from './periodicTask'
 import { BoundedQueue } from './boundedQueue'
 import { TOKEN_REFUSAL_MESSAGES } from './connectTokenRules'
@@ -188,9 +188,30 @@ export async function remoteManagementVerdict(event: H3Event): Promise<KeyVerdic
   if (await isRevokedManagementSecret(event)) {
     return { ok: false, reason: 'bad key', message: TOKEN_REFUSAL_MESSAGES.token_revoked, management: true }
   }
-  if (!(await isManagementToken(event))) return null
+  if (!(await isManagementToken(event))) return remoteCrewOwnerVerdict(event)
   const verdict = await checkCrewKey(event)
   return verdict.ok ? verdict : { ...verdict, management: true }
+}
+
+/**
+ * A remote caller's permanent crews:manage key, when its owner is not the instance admin. It passes the gate only
+ * when its owner created a crew that is live (not disabled): such a key may then use that person's own crews, and
+ * the crew routes check which one. An owner with no live crew gets `noCrew`, answered with a 403 sentence. Any
+ * other key (no crews:manage, the admin's own key, a management token that is not this path) gives null: the plain
+ * 404. Reads only; never throws.
+ */
+export async function remoteCrewOwnerVerdict(event: H3Event): Promise<KeyVerdict | null> {
+  let context
+  try {
+    context = await authenticateApiKey(event)
+  } catch {
+    return null
+  }
+  if (context.kind === 'management' || !hasScope(context, CREW_KEY_SCOPE)) return null
+  // A key bound to one board keeps the board rules; only the permanent unbound key of a crew owner works from outside.
+  if (context.projectId || (await isInstanceAdmin(context.userId))) return null
+  if (!(await ownsLiveCrew(context.userId))) return { ok: false, reason: 'not admin', noCrew: true }
+  return { ok: true, keyId: context.keyId, crewOwner: true, boardId: context.projectId ?? null }
 }
 
 // Audit rows of ordinary refusals are queued and written in one batch a second. The queue is
