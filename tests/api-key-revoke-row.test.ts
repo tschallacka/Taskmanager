@@ -12,7 +12,7 @@ Object.assign(globalThis, { createError })
 const { db } = await import('../server/db')
 const { apiKeys, apiKeySecrets, user } = await import('../server/db/schema')
 const { hashApiKey, refusalForSecret } = await import('../server/utils/api-keys')
-const { revokeKey } = await import('../server/utils/connectTokens')
+const { regenerateKey, revokeKey } = await import('../server/utils/connectTokens')
 
 const tag = randomBytes(4).toString('hex')
 const id = (name: string) => `krev-${tag}-${name}`
@@ -68,10 +68,40 @@ test('the owner revokes it: the key row goes, the secret is refused as revoked, 
   assert.ok(record, 'a revoked row is kept for the key')
   assert.equal(record.keyHash, hashApiKey(secret))
   assert.ok(record.changedAt > 0)
+  assert.equal(record.actorId, owner, 'the row names who revoked the key')
 })
 
 test('revoking a key that is already gone says so, and writes no second record', async () => {
   assert.equal(await revokeKey(owner, keyId), false)
   const records = await db.select().from(apiKeySecrets).where(eq(apiKeySecrets.tokenId, keyId))
   assert.equal(records.length, 1)
+})
+
+test('regenerating writes a replaced row that names who regenerated the key, and the new secret works', async () => {
+  const regenerateId = id('regen')
+  const first = `arn_${randomBytes(32).toString('base64url')}`
+  await db.insert(apiKeys).values({
+    id: regenerateId,
+    userId: owner,
+    name: 'regenerate row test',
+    keyHash: hashApiKey(first),
+    keyPrefix: first.slice(0, 10),
+    scopes: ['boards:read'],
+    createdAt: now,
+    allBoards: false,
+    boardReachSet: true
+  })
+  try {
+    const fresh = await regenerateKey(owner, regenerateId)
+    assert.equal(codeOf(await refusalForSecret(first)), 'token_regenerated')
+    assert.equal(codeOf(await refusalForSecret(fresh.token)), undefined, 'the new secret is not refused')
+    const [record] = await db.select().from(apiKeySecrets)
+      .where(and(eq(apiKeySecrets.tokenId, regenerateId), eq(apiKeySecrets.state, 'replaced')))
+    assert.ok(record, 'a replaced row is kept for the key')
+    assert.equal(record.keyHash, hashApiKey(first))
+    assert.equal(record.actorId, owner)
+  } finally {
+    await db.delete(apiKeySecrets).where(eq(apiKeySecrets.tokenId, regenerateId))
+    await db.delete(apiKeys).where(eq(apiKeys.id, regenerateId))
+  }
 })
