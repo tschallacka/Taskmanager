@@ -32,6 +32,8 @@ const forkShadow = id('fork-shadow')
 // A crew whose rules run on a shadow board that has no fork member rows: its accounts must still count.
 const shadowOnlyReal = id('shadow-only-real')
 const shadowOnly = id('shadow-only')
+// A person's ordinary board: no crew row, no crew board link. Nothing routes on it.
+const ordinaryBoard = id('ordinary-board')
 const shadowLink = id('shadow-link')
 const crewRow = id('crew')
 const forkCrew = id('fork-crew')
@@ -62,7 +64,7 @@ before(async () => {
   await db.insert(user).values({ id: people.owner, name: 'owner', email: `${people.owner}@arnotes.test`, emailVerified: true, createdAt: stamp, updatedAt: stamp })
   await db.insert(organization).values({ id: team, name: 'Own board team', slug: team, createdAt: stamp })
   const board = (pid: string, name: string) => ({ id: pid, userId: people.owner, teamId: team, name, createdAt: now, updatedAt: now })
-  await db.insert(projects).values([board(ownBoard, 'own crew board'), board(forkReal, 'fork real'), board(forkShadow, 'fork shadow'), board(shadowOnlyReal, 'shadow only real'), board(shadowOnly, 'shadow only')])
+  await db.insert(projects).values([board(ownBoard, 'own crew board'), board(forkReal, 'fork real'), board(forkShadow, 'fork shadow'), board(shadowOnlyReal, 'shadow only real'), board(shadowOnly, 'shadow only'), board(ordinaryBoard, 'ordinary board')])
   const column = (cid: string, pid: string, name: string, position: number) => ({ id: cid, projectId: pid, name, position, createdAt: now })
   const columnsFor = (pid: string, prefix: string) => [
     column(`${prefix}-todo`, pid, 'To do', 1000), column(`${prefix}-pm`, pid, 'Verify PM', 3000), column(`${prefix}-ux`, pid, 'Verify UX', 4000),
@@ -70,7 +72,9 @@ before(async () => {
   ]
   await db.insert(projectColumns).values([
     ...columnsFor(ownBoard, cols.todo!.replace(/-todo$/, '')),
-    ...columnsFor(forkShadow, id('fs'))
+    ...columnsFor(forkShadow, id('fs')),
+    ...columnsFor(shadowOnly, id('so')),
+    ...columnsFor(ordinaryBoard, id('ord'))
   ])
   await db.insert(crews).values([
     { id: crewRow, slug, name: 'Own crew', teamId: team, boardId: ownBoard, createdBy: people.owner, createdAt: now },
@@ -91,7 +95,7 @@ before(async () => {
 })
 
 after(async () => {
-  await db.delete(projects).where(inArray(projects.id, [ownBoard, forkReal, forkShadow, shadowOnlyReal, shadowOnly]))
+  await db.delete(projects).where(inArray(projects.id, [ownBoard, forkReal, forkShadow, shadowOnlyReal, shadowOnly, ordinaryBoard]))
   await db.delete(crews).where(inArray(crews.id, [crewRow, forkCrew]))
   await db.delete(organization).where(eq(organization.id, team))
   await db.delete(user).where(inArray(user.id, members))
@@ -147,6 +151,35 @@ test('gate routing on a crew\'s own board: the whole chain, Nina then Quincy, en
   await setTag(chain, 'pm approved', people.pat)
   await fireRules({ type: 'tags_changed', projectId: ownBoard, taskId: chain, actorId: people.pat, actorIsAgent: false, detail: null }, newRuleChain())
   assert.deepEqual(await columnOf(chain), { columnId: cols.verify, assigneeId: people.boss })
+})
+
+test('gate routing on a shadow board: a PM approval set by Pat moves the card to Verify CQ for Nina', async () => {
+  const shadowCard = id('card-shadow')
+  const pmColumn = `${id('so')}-pm`
+  await db.insert(projectTasks).values({ id: shadowCard, projectId: shadowOnly, columnId: pmColumn, title: 'shadow card', visibility: 'internal', position: 0, tags: [], assigneeId: people.worker, createdAt: now, updatedAt: now })
+  await setTag(shadowCard, 'pm approved', people.pat)
+  await db.update(projectTasks).set({ tags: ['pm approved'] }).where(eq(projectTasks.id, shadowCard))
+  await fireRules({ type: 'tags_changed', projectId: shadowOnly, taskId: shadowCard, actorId: people.pat, actorIsAgent: false, detail: null }, newRuleChain())
+  assert.deepEqual(await columnOf(shadowCard), { columnId: `${id('so')}-cq`, assigneeId: people.nina })
+})
+
+test('gate routing on a shadow board: a PM approval set by a worker does nothing (negative)', async () => {
+  const shadowCard = id('card-shadow-worker')
+  const pmColumn = `${id('so')}-pm`
+  await db.insert(projectTasks).values({ id: shadowCard, projectId: shadowOnly, columnId: pmColumn, title: 'shadow worker', visibility: 'internal', position: 1, tags: ['pm approved'], assigneeId: people.worker, createdAt: now, updatedAt: now })
+  await setTag(shadowCard, 'pm approved', people.worker)
+  await fireRules({ type: 'tags_changed', projectId: shadowOnly, taskId: shadowCard, actorId: people.worker, actorIsAgent: false, detail: null }, newRuleChain())
+  assert.equal((await columnOf(shadowCard)).columnId, pmColumn)
+})
+
+test('gate routing on an ordinary board: nothing routes, a PM approval set by Pat leaves the card in Verify PM (negative)', async () => {
+  const plainCard = id('card-ordinary')
+  const pmColumn = `${id('ord')}-pm`
+  await db.insert(projectTasks).values({ id: plainCard, projectId: ordinaryBoard, columnId: pmColumn, title: 'ordinary card', visibility: 'internal', position: 0, tags: [], assigneeId: people.worker, createdAt: now, updatedAt: now })
+  await setTag(plainCard, 'pm approved', people.pat)
+  await db.update(projectTasks).set({ tags: ['pm approved'] }).where(eq(projectTasks.id, plainCard))
+  await fireRules({ type: 'tags_changed', projectId: ordinaryBoard, taskId: plainCard, actorId: people.pat, actorIsAgent: false, detail: null }, newRuleChain())
+  assert.deepEqual(await columnOf(plainCard), { columnId: pmColumn, assigneeId: people.worker })
 })
 
 test('gate routing on a crew\'s own board: a PM approval set by a worker does nothing (negative)', async () => {
