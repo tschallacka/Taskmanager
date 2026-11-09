@@ -25,12 +25,16 @@ You make and end your own keys under **Settings**, in the panel **API keys & MCP
 
 ## Copy it now
 
-A box titled **Copy your key now** appears with the whole key in it. This is the only time it is shown.
+A box titled **Copy this prompt for your agent** appears. It is one prompt: paste it into a new Claude Code session with
+nothing else, and the agent connects, removes an older connection first if there is one, and lists the boards it may use.
 
-- Press **Copy** to copy the key.
-- Press **Copy command** to copy two lines that connect Claude Code with the key in place: one that puts the key in
-  `TASKMANAGER_API_KEY`, and one that adds the MCP server. See
-  [Connect Claude Code to your boards](/help/agents/connect-claude-code).
+- The prompt carries a **pairing code** by default. The agent exchanges it for its key, so the key stays out of the chat.
+  The code works once, for ten minutes.
+- Press **Put the key in the prompt instead** only for an agent that cannot call the pairing route. The key is then in
+  the prompt, so paste it only into your own agent.
+- Press **Copy prompt** to copy it.
+- Under **Set it up yourself** are the key itself (shown once, never again), and the two commands that connect Claude
+  Code by hand. See [Connect Claude Code to your boards](/help/agents/connect-claude-code).
 - Press the X to dismiss the box. Once dismissed, the key cannot be brought back.
 
 Store the key where the agent reads it from, such as an environment variable or a password manager. Never paste it into
