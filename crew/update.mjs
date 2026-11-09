@@ -326,7 +326,20 @@ async function finish(planFile) {
 async function main() {
   if (ARGS[0] === '--apply') return apply(ARGS[1])
   if (ARGS[0] === '--finish') return finish(ARGS[1])
+  await noteClaudeVersion()
   return front()
+}
+
+// The Claude Code limits in claude-long-run.json were checked against one version (claude.mjs). Say
+// which version is installed, and warn when it is older.
+async function noteClaudeVersion() {
+  const { spawnSync } = await import('node:child_process')
+  const { versionWarning } = await import('./claude.mjs')
+  const v = spawnSync('claude', ['--version'], { encoding: 'utf8' })
+  const text = (v.stdout || '').trim()
+  console.log(`Claude Code: ${text || 'not found on this machine'}`)
+  const warn = versionWarning(text)
+  if (warn) console.log(`warning: ${warn}. The long-run limits may differ; see README "Claude Code limits".`)
 }
 
 main().then((code) => {
