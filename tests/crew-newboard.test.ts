@@ -212,7 +212,7 @@ test('targets: the existing entries are unchanged, and a plain member sees only 
   assert.deepEqual(plainTeams[0], { team_id: memberEmptyTeam, team_name: 'Member team', canCreateBoard: true, userboards: [] })
 })
 
-test('the route: an instance admin makes a board and a crew in one call; the audit row names the board; no charge', async () => {
+test('the route: an instance admin makes a board and a crew in one call; the audit row names the board; the call is charged', async () => {
   const token = await keyFor(admin, null, 'admin-route')
   const reply = await postCrew(token, { slug: routeSlug, name: 'Route crew', product, teamId: routeTeam, newBoard: { name: 'Route board' } })
   assert.equal(reply.status, 201)
@@ -223,8 +223,10 @@ test('the route: an instance admin makes a board and a crew in one call; the aud
   const audit = await db.select().from(agentAudit).where(and(eq(agentAudit.userId, admin), eq(agentAudit.tool, 'crew_create'), eq(agentAudit.projectId, boardId)))
   assert.equal(audit.length, 1, 'one audit row for the call, carrying the new board id')
   assert.equal(audit[0]!.summary, `created (new board) (${routeSlug})`)
-  assert.deepEqual(await db.select().from(rateLimitHits).where(like(rateLimitHits.scope, `crews|user:${admin}%`)), [],
-    'the instance admin is not charged against the crews limit, as before')
+  // A newBoard call is charged for the instance admin too (the card's decision): one use in each crews window.
+  const charged = await db.select().from(rateLimitHits).where(like(rateLimitHits.scope, `crews|user:${admin}%`))
+  assert.ok(charged.length >= 1, 'the newBoard call is charged against the crews limit')
+  assert.ok(charged.every(hit => hit.hits === 1), 'one use counted per window')
 })
 
 test('the route: a key bound to a board, or with no board, cannot make one, and nothing is charged', async () => {
