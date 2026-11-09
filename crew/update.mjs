@@ -27,7 +27,16 @@ const SHAPE = /\.(mjs|md|tmpl|json|sh)$/
 // The list of kit files travels with a folder kit (not with the board's archive), so it is installed when present.
 const LIST = 'kit-files.txt'
 const MANIFEST = 'crew-kit.json'
+// The instance a kit folder belongs to (its host), written by the install. A dot file, so a kit never ships it.
+const INSTANCE = '.instance'
 const ARGS = process.argv.slice(2)
+const hostOf = (url) => {
+  try {
+    return new URL(url).host
+  } catch {
+    return null
+  }
+}
 
 const shipsName = name => name === LIST || (NAME.test(name) && SHAPE.test(name) && !NOT_KIT.test(name))
 const sha = path => createHash('sha256').update(readFileSync(path)).digest('hex')
@@ -115,6 +124,13 @@ async function front() {
   const check = ARGS.includes('--check')
   const from = valueOf('--from') ? resolve(valueOf('--from')) : undefined
   const target = resolve(valueOf('--kit') ?? kitDir)
+  // A kit folder belongs to one instance: refuse to update it from a board on another one.
+  const boardHost = hostOf(config.board.url)
+  const belongsTo = readJson(join(target, INSTANCE))?.host
+  if (belongsTo && boardHost && belongsTo !== boardHost) {
+    console.error(`crew update: this kit belongs to ${belongsTo}; this crew's board is ${boardHost}. Use a kit folder of its own for ${boardHost}, for example ~/crew-kit-${boardHost}.`)
+    return 3
+  }
   const stage = mkdtempSync(join(here, '.update-'))
   let moved = false
   try {
@@ -155,7 +171,7 @@ async function front() {
     renameSync(stage, join(backupDir, 'staged'))
     moved = true
     const planFile = join(backupDir, 'plan.json')
-    writeFileSync(planFile, `${JSON.stringify({ kitDir: target, backupDir, names: kit.names, changed, removed, localEdits, version: kit.version, label: kit.label }, null, 2)}\n`, { mode: 0o600 })
+    writeFileSync(planFile, `${JSON.stringify({ kitDir: target, backupDir, names: kit.names, changed, removed, localEdits, version: kit.version, label: kit.label, previousVersion: manifest?.version ?? null, instanceHost: boardHost }, null, 2)}\n`, { mode: 0o600 })
     console.log(`Installing ${kit.label} (version ${kit.version}) into ${target}: ${summary}. Backup: ${backupDir}`)
     const run = spawnSync(process.execPath, [join(backupDir, 'staged', 'update.mjs'), '--apply', planFile], { stdio: 'inherit', env: process.env })
     return run.status ?? 1
@@ -315,11 +331,21 @@ async function finish(planFile) {
   }
   const files = Object.fromEntries(plan.names.map(name => [name, sha(join(kitDir, name))]))
   writeFileSync(join(here, MANIFEST), `${JSON.stringify({ version: plan.version, source: plan.label, installedAt: new Date().toISOString(), files }, null, 2)}\n`, { mode: 0o600 })
+  if (plan.instanceHost) writeFileSync(join(kitDir, INSTANCE), `${JSON.stringify({ host: plan.instanceHost, version: plan.version }, null, 2)}\n`, { mode: 0o600 })
   console.log(`\ncrew update: the kit in ${kitDir} is version ${plan.version} (from ${plan.label}).`)
   console.log(`  ${plan.changed.length} file(s) replaced, ${plan.removed.length} removed. Backup: ${plan.backupDir}`)
   if (plan.localEdits.length) console.log(`  local edits to kit files were saved in ${join(plan.backupDir, 'local')}: ${plan.localEdits.join(', ')}`)
   for (const line of lines) console.log(`  ${line}`)
-  console.log(problems ? '\nNot finished: fix the CONFLICT and FAIL lines above.' : '\nDone. Restart Boss\'s Claude Code session if the agent definitions changed: Claude Code reads them when a session starts.')
+  // The report a model can pass on as it is: the same fixed lines every time.
+  const conflicts = lines.filter(line => line.startsWith('CONFLICT')).length
+  console.log('\ncrew update report')
+  console.log(`  kit version: ${plan.previousVersion ?? 'none'} -> ${plan.version}`)
+  console.log(`  kit folder: ${kitDir}`)
+  console.log(`  crew home: ${here}`)
+  console.log(`  conflicts: ${conflicts}`)
+  console.log(`  server side, not changed here: ${lines.filter(line => line.startsWith('server side')).length} line(s), listed above`)
+  console.log(`  result: ${problems ? 'not finished, fix the CONFLICT and FAIL lines above' : 'done'}`)
+  console.log('  next: restart your Boss session (Claude Code reads the agent definitions when a session starts)')
   return problems ? 1 : 0
 }
 

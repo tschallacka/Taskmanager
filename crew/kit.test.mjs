@@ -591,6 +591,19 @@ describe('crew update: the kit folder and the owner files', () => {
     assert.doesNotMatch(readFileSync(join(dirA, 'CHANGELOG.md'), 'utf8'), /Test line/, 'the kit is not changed by a check')
   })
 
+  test('a kit folder that belongs to another instance is refused and left alone', async () => {
+    const crew = newCrew()
+    const dirA = await installedKit(crew)
+    const dirB = newerKit(dirA, crew)
+    writeFileSync(join(dirA, '.instance'), JSON.stringify({ host: 'other.example', version: 'x' }))
+    const before = snapshot(dirA)
+    const out = await updateKit(dirA, crew, ['--from', dirB, '--kit', dirA])
+    assert.equal(out.code, 3, out.stdout + out.stderr)
+    assert.match(out.stderr, /this kit belongs to other\.example; this crew's board is 127\.0\.0\.1:9/)
+    assert.deepEqual(snapshot(dirA), before, 'the kit folder is the same')
+    assert.deepEqual(backupsOf(crew), [], 'no backup is made')
+  })
+
   test('an update installs the newer kit, merges the owner file and lists the server-side change', async () => {
     const crew = newCrew()
     const dirA = await installedKit(crew)
@@ -606,6 +619,8 @@ describe('crew update: the kit folder and the owner files', () => {
     assert.match(owner, /Replace the examples here/, 'the new template line is in')
     assert.doesNotMatch(owner, /<<<<<<</)
     assert.match(out.stdout, /server side, not changed here: Test line for the server\/ side\./)
+    assert.match(out.stdout, /crew update report\n {2}kit version: .* -> .*\n/, 'the report block is printed')
+    assert.equal(JSON.parse(readFileSync(join(dirA, '.instance'), 'utf8')).host, '127.0.0.1:9', 'the install records the instance')
     const [backup] = backupsOf(crew)
     assert.ok(backup, 'a backup folder was made')
     assert.ok(existsSync(join(crew.home, 'backups', backup, 'kit', 'watch.mjs')), 'the removed file is in the backup')
