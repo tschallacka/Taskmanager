@@ -27,6 +27,9 @@ const SHAPE = /\.(mjs|md|tmpl|json|sh)$/
 // The list of kit files travels with a folder kit (not with the board's archive), so it is installed when present.
 const LIST = 'kit-files.txt'
 const MANIFEST = 'crew-kit.json'
+// The record a kit folder keeps of the instance it belongs to. A kit serves one instance: updating it from another
+// one would put the wrong kit on a crew, so `crew update` refuses that.
+const INSTANCE = 'kit-instance.json'
 const ARGS = process.argv.slice(2)
 
 const shipsName = name => name === LIST || (NAME.test(name) && SHAPE.test(name) && !NOT_KIT.test(name))
@@ -115,6 +118,12 @@ async function front() {
   const check = ARGS.includes('--check')
   const from = valueOf('--from') ? resolve(valueOf('--from')) : undefined
   const target = resolve(valueOf('--kit') ?? kitDir)
+  const host = new URL(config.board.url).host
+  const instance = readJson(join(target, INSTANCE))
+  if (instance?.host && instance.host !== host) {
+    console.error(`crew update: this kit belongs to ${instance.host}, and this crew talks to ${host}. Use the kit folder for ${host} (for example ~/crew-kit-${host}), or make a new one.`)
+    return 3
+  }
   const stage = mkdtempSync(join(here, '.update-'))
   let moved = false
   try {
@@ -131,6 +140,7 @@ async function front() {
     const removed = [...owned].filter(name => name !== LIST && shipsName(name) && !kit.names.includes(name) && existsSync(join(target, name))).sort()
     const changed = kit.names.filter(name => !existsSync(join(target, name)) || sha(join(target, name)) !== sha(join(stage, name))).sort()
     if (!changed.length && !removed.length) {
+      recordInstance(target, host, kit.version)
       console.log(`The crew kit in ${target} is up to date: version ${kit.version} from ${kit.label}. Nothing changed.`)
       return 0
     }
@@ -155,7 +165,7 @@ async function front() {
     renameSync(stage, join(backupDir, 'staged'))
     moved = true
     const planFile = join(backupDir, 'plan.json')
-    writeFileSync(planFile, `${JSON.stringify({ kitDir: target, backupDir, names: kit.names, changed, removed, localEdits, version: kit.version, label: kit.label }, null, 2)}\n`, { mode: 0o600 })
+    writeFileSync(planFile, `${JSON.stringify({ kitDir: target, backupDir, names: kit.names, changed, removed, localEdits, version: kit.version, label: kit.label, previous: manifest?.version ?? null, host }, null, 2)}\n`, { mode: 0o600 })
     console.log(`Installing ${kit.label} (version ${kit.version}) into ${target}: ${summary}. Backup: ${backupDir}`)
     const run = spawnSync(process.execPath, [join(backupDir, 'staged', 'update.mjs'), '--apply', planFile], { stdio: 'inherit', env: process.env })
     return run.status ?? 1
@@ -218,7 +228,7 @@ function apply(planFile) {
 // records the install in CREW_HOME/crew-kit.json and reports what it could not do itself.
 async function finish(planFile) {
   const plan = JSON.parse(readFileSync(planFile, 'utf8'))
-  const { OWNER_FILES, here, renderTemplate, templateValues } = await import('./config.mjs')
+  const { OWNER_FILES, config, here, renderTemplate, templateValues } = await import('./config.mjs')
   const values = templateValues()
   const lines = []
   let problems = 0
@@ -314,8 +324,9 @@ async function finish(planFile) {
     lines.push('init rendered the documents from the new templates')
   }
   const files = Object.fromEntries(plan.names.map(name => [name, sha(join(kitDir, name))]))
-  writeFileSync(join(here, MANIFEST), `${JSON.stringify({ version: plan.version, source: plan.label, installedAt: new Date().toISOString(), files }, null, 2)}\n`, { mode: 0o600 })
-  console.log(`\ncrew update: the kit in ${kitDir} is version ${plan.version} (from ${plan.label}).`)
+  writeFileSync(join(here, MANIFEST), `${JSON.stringify({ version: plan.version, source: plan.label, kit: kitDir, installedAt: new Date().toISOString(), files }, null, 2)}\n`, { mode: 0o600 })
+  recordInstance(kitDir, new URL(config.board.url).host, plan.version)
+  console.log(`\ncrew update: the kit in ${kitDir} is version ${plan.previous ?? 'not recorded'} -> ${plan.version} (from ${plan.label}).`)
   console.log(`  ${plan.changed.length} file(s) replaced, ${plan.removed.length} removed. Backup: ${plan.backupDir}`)
   if (plan.localEdits.length) console.log(`  local edits to kit files were saved in ${join(plan.backupDir, 'local')}: ${plan.localEdits.join(', ')}`)
   for (const line of lines) console.log(`  ${line}`)
@@ -323,9 +334,52 @@ async function finish(planFile) {
   return problems ? 1 : 0
 }
 
+// Writes the record that this kit folder belongs to an instance (its host and the version it holds).
+function recordInstance(folder, host, version) {
+  writeFileSync(join(folder, INSTANCE), `${JSON.stringify({ host, version, recordedAt: new Date().toISOString() }, null, 2)}\n`, { mode: 0o600 })
+}
+
+// The crew homes that use this kit folder: CREW_HOMES (colon-separated) or every folder under ~/crew-home.
+function candidateHomes() {
+  if (process.env.CREW_HOMES) return process.env.CREW_HOMES.split(':').filter(Boolean)
+  const root = join(homedir(), 'crew-home')
+  if (!existsSync(root)) return []
+  return readdirSync(root).map(name => join(root, name)).filter(path => lstatSync(path).isDirectory())
+}
+
+// `crew update --all`: runs the kit's own update once per crew home that was installed from this kit folder. A crew
+// home that was never updated has no record of its kit, so it is named and left for a run by hand.
+function updateAll() {
+  const target = resolve(valueOf('--kit') ?? kitDir)
+  const passed = ARGS.filter(arg => arg !== '--all')
+  let worst = 0
+  for (const home of candidateHomes()) {
+    const manifest = readJson(join(home, MANIFEST))
+    if (!manifest?.kit) {
+      console.log(`${home}: no record of its kit (never updated): run crew update for this crew by hand, with CREW_HOME=${home}`)
+      continue
+    }
+    if (resolve(manifest.kit) !== target) {
+      console.log(`${home}: uses the kit in ${manifest.kit}, not this one: skipped`)
+      continue
+    }
+    const run = spawnSync(process.execPath, [join(target, 'update.mjs'), ...passed.filter(arg => arg !== '--kit' && arg !== target)], {
+      env: { ...process.env, CREW_HOME: home },
+      encoding: 'utf8'
+    })
+    const status = run.status ?? 1
+    worst = Math.max(worst, status)
+    console.log(`${home}: exit ${status}`)
+    const out = `${run.stdout ?? ''}${run.stderr ?? ''}`.trim().split('\n').slice(-2).join('\n')
+    if (out) console.log(out)
+  }
+  return worst
+}
+
 async function main() {
   if (ARGS[0] === '--apply') return apply(ARGS[1])
   if (ARGS[0] === '--finish') return finish(ARGS[1])
+  if (ARGS.includes('--all')) return updateAll()
   return front()
 }
 
