@@ -258,8 +258,9 @@ export function parseNewBoard(body: Record<string, unknown>, caller: CrewCaller)
 
 /**
  * Makes a crew with a board of its own. The board is made as the UI makes one: in `teamId`, owned by the caller,
- * with the team's default columns. Then the crew is bound to it exactly as makeBoundCrew binds one. The caller must
- * be an owner or admin of the team, and the crew permission must reach the team. A refused crew leaves no board
+ * with the team's default columns. Then the crew is bound to it exactly as makeBoundCrew binds one. The caller may
+ * make the board when the UI would let them (a member of the team, as POST /api/projects checks), and the crew
+ * permission must reach the team. A refused crew leaves no board
  * behind, and a rotate never makes one. The board's own crew switch is on: the caller asks for a crew on it.
  */
 export async function makeCrewOnNewBoard(input: CrewInput, caller: CrewCaller, board: { teamId: string, name: string }): Promise<{ made: { status: 200 | 201, body: unknown }, boardId: string }> {
@@ -279,7 +280,7 @@ export async function makeCrewOnNewBoard(input: CrewInput, caller: CrewCaller, b
 
   const [role] = await db.select({ role: member.role }).from(member)
     .where(and(eq(member.organizationId, board.teamId), eq(member.userId, caller.userId)))
-  if (!role || !['owner', 'admin'].includes(role.role)) {
+  if (!role) {
     throw createError({ statusCode: 403, message: 'Your key may not create boards in that team.' })
   }
   // The instance and team levels of the crew permission. The board's own level is set on the board made below.
