@@ -28,6 +28,7 @@ channel.mjs
 config.mjs
 crew.config.example.json
 crew.mjs
+devadmin.mjs
 fonts.conf.tmpl
 guard.sh
 home.mjs

@@ -7,6 +7,9 @@ Replace the examples below with your own facts; delete lines that do not apply.
 ## Run it
 
 - Start the dev copy: `<command>` (it must answer at {{product.appUrl}})
+- **A card in Verify UX or QA is served by its worker's dev copy on the card's branch.** The worker starts that copy, waits until `/login` answers 200 (up to 2 minutes), and posts the URL and a test account name on the card. The password goes to the tester by SendMessage, never on the card. The worker stops the copy when the gate is done.
+- **localhost is shared.** Every crew member runs on the same machine, so a copy on localhost is reachable by all of them. "localhost is yours alone" means only that nothing outside this machine can reach it. No answer means not running or still starting.
+- **Dev copy accounts.** A worker that needs an admin on its own dev database runs `crew devadmin show <key>` to see the instance admins and `crew devadmin make-admin <key> <email>` to make one. It works only on `arnotes_dev_<key>` on localhost. Nobody edits the database by hand.
 - Dev log: `<command> > {{crew_dir}}/dev.log 2>&1` (the log watcher reads it, optional)
 - Lint (run on your own files before you report): `<for example: npx eslint <files>>`
 - Typecheck / tests (Boss runs them before publishing): `<for example: npm run typecheck && npm test>`
