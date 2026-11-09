@@ -252,6 +252,30 @@ describe('boss-stop-hook.sh: the stop is blocked while a watch is down', () => {
     assert.equal(run.stdout, '')
   })
 
+  test('with only boss-mentions running, the block names only watch-crew, as valid JSON', async () => {
+    const child = fake('boss-mentions')
+    await new Promise(resolve => setTimeout(resolve, 400))
+    const run = runHook()
+    child.kill()
+    assert.equal(run.status, 0)
+    const answer = JSON.parse(run.stdout)
+    assert.equal(answer.decision, 'block')
+    assert.match(answer.reason, /Monitor\(command: "CREW_HOME=\/crew node .*\/crew\.mjs watch-crew"/)
+    assert.doesNotMatch(answer.reason, /crew\.mjs boss-mentions/)
+  })
+
+  test('with only watch-crew running, the block names only boss-mentions, as valid JSON', async () => {
+    const child = fake('watch-crew')
+    await new Promise(resolve => setTimeout(resolve, 400))
+    const run = runHook()
+    child.kill()
+    assert.equal(run.status, 0)
+    const answer = JSON.parse(run.stdout)
+    assert.equal(answer.decision, 'block')
+    assert.match(answer.reason, /Monitor\(command: "CREW_HOME=\/crew node .*\/crew\.mjs boss-mentions"/)
+    assert.doesNotMatch(answer.reason, /crew\.mjs watch-crew/)
+  })
+
   test('with both watches running, the hook prints nothing and the stop goes through', async () => {
     fake('boss-mentions')
     fake('watch-crew')
