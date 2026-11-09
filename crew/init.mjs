@@ -10,6 +10,7 @@ import { execSync } from 'node:child_process'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { CAST, OWNER_FILES, agentNames, config, forkMemberPlan, here, kitDir, loadForks, modelProblems, renderTemplate, templateValues } from './config.mjs'
+import { writePiaHooks } from './pia-session.mjs'
 
 const ok = m => console.log(`  ok   ${m}`)
 const warn = m => console.log(`  WARN ${m}`)
@@ -238,6 +239,16 @@ Your role is the one ${base} has in the crew documents in ${here} (CREW.md, PROM
 `)
     ok(`${name}  (${boardName})`)
   }
+}
+
+// Pia's own session: its Stop and SessionStart hooks keep her board listener running (pia-listener-hook.sh). Written
+// only when she runs on Claude, the provider the kit can start. Other keys in her settings file are kept.
+console.log('\nPia session')
+if (!skipsProvider('pia', config.models.pia)) {
+  try {
+    const { file, changed } = writePiaHooks(`${here}pia-session`, { crewHome: here.replace(/\/$/, ''), kitDir: kitDir.replace(/\/$/, '') })
+    ok(`${file} ${changed ? 'written: her listener hooks' : 'kept, hooks already current'}`)
+  } catch (error) { fail(error.message) }
 }
 
 const next = existsSync(`${here}creds.json`)

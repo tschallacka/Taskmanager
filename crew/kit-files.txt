@@ -37,6 +37,8 @@ keys.mjs
 listen.mjs
 mentions.mjs
 package.json
+pia-listener-hook.sh
+pia-session.mjs
 postbrief.mjs
 publish.mjs
 setup.mjs
