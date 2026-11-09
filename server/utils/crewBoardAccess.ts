@@ -132,6 +132,22 @@ export async function isStaffOfShadowedBoard(userId: string, projectId: string):
 }
 
 /**
+ * The team of the real board whose shadow board `projectId` is, when `userId` is staff of that team. That team is the
+ * workspace the shadow board opens in for them; null for anyone else (the shadow board's own team is the crew's).
+ */
+export async function staffTeamOfShadowBoard(userId: string, projectId: string): Promise<string | null> {
+  const real = alias(projects, 'real_board')
+  const [row] = await db
+    .select({ teamId: real.teamId })
+    .from(crewBoards)
+    .innerJoin(real, eq(real.id, crewBoards.projectId))
+    .innerJoin(member, and(eq(member.organizationId, real.teamId), eq(member.userId, userId)))
+    .where(eq(crewBoards.shadowProjectId, projectId))
+    .limit(1)
+  return row?.teamId ?? null
+}
+
+/**
  * The boards a key's person may READ through a crew link, beyond its own reach:
  *   - a crew account reads the real boards its crew was given. A key limited to one board (a member
  *     forked for that board) reads only the real board its own shadow board is linked to;

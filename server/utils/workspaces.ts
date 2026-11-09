@@ -3,6 +3,7 @@ import { db } from '../db'
 import { member, organization, projects } from '../db/schema'
 import { customerIdsOf } from './auth-helpers'
 import { guestProjectIdsOf } from './guests'
+import { staffTeamOfShadowBoard } from './crewBoardAccess'
 
 /**
  * Boards a person can open in one of their workspaces: every board of a team they are in,
@@ -29,6 +30,12 @@ export function workspaceTeam(teamIds: Set<string>, projectTeamId: string | null
 
 /** Where a board opens for this person, or null when they cannot open it at all. */
 export async function workspaceOf(userId: string, projectId: string): Promise<{ teamId: string | null, teamName: string | null } | null> {
+  // A crew's shadow board opens in the team of the real board its staff share, not in the crew's own team.
+  const staffTeam = await staffTeamOfShadowBoard(userId, projectId)
+  if (staffTeam) {
+    const [team] = await db.select({ name: organization.name }).from(organization).where(eq(organization.id, staffTeam))
+    return { teamId: staffTeam, teamName: team?.name ?? null }
+  }
   const { teamIds, filter } = await reachOf(userId)
   const [row] = await db
     .select({ teamId: projects.teamId, teamName: organization.name })

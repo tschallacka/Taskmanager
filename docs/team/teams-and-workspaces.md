@@ -38,6 +38,13 @@ A team has:
 Switching reloads the board list for the new workspace. If you had a board open, you are taken back to the
 board list, because that board belongs to the workspace you just left.
 
+**Opening a board from another workspace.** You do not have to switch first. Open a board by its link, from a
+bookmark, a notification or a search, and if it lives in another workspace you are in, Taskmanager switches to that
+workspace by itself and opens the board, with a short note that says so. A task link (`?task=`) still opens its task.
+This covers your personal boards, the team boards of every team you are in, boards shared with you as a guest, a
+customer's boards, and the crew boards your team's staff may read. A board you cannot open says that you do not have
+access to it, or that it was deleted, and names no workspace.
+
 The same menu has the other team entries:
 
 | Menu item | What it does |

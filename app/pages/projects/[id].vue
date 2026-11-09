@@ -91,19 +91,31 @@ onMounted(() => {
 onBeforeUnmount(() => window.removeEventListener('resize', updateTabCues))
 
 const loadFailed = ref(false)
-// The team a board that will not open here belongs to, when the caller is in that team.
-const teamHint = ref<{ teamId: string, teamName: string } | null>(null)
+const { switchWorkspace } = useWorkspace()
+
+// A board that does not open in the current workspace may live in another one this person is in. Switch to that
+// workspace by itself, say so in a toast, and open the board there. Once only: a board that still fails is gone.
+async function openInItsWorkspace(id: string): Promise<boolean> {
+  const where = await $fetch<{ teamId: string | null, teamName: string | null }>(`/api/projects/${id}/workspace`).catch(() => null)
+  if (!where || where.teamId === activeTeamId.value) return false
+  await switchWorkspace(where.teamId)
+  toast.add({ title: `Switched to ${where.teamName ?? 'your personal workspace'}`, icon: 'i-lucide-arrow-right-left', color: 'neutral' })
+  try {
+    await loadBoard(id)
+    return true
+  } catch {
+    return false
+  }
+}
 
 async function openBoard(id: string) {
   loadFailed.value = false
-  teamHint.value = null
   try {
     await loadBoard(id)
   } catch {
     // Deleted in another tab, or a board from a workspace this session no longer
     // has: an endless spinner is the one thing that must not happen.
-    loadFailed.value = true
-    teamHint.value = await $fetch<{ teamId: string, teamName: string }>(`/api/projects/${id}/team-hint`).catch(() => null)
+    if (!(await openInItsWorkspace(id))) loadFailed.value = true
   }
 }
 
@@ -111,15 +123,6 @@ watch(projectId, (id) => {
   if (!id || !/^[a-z0-9]+$/i.test(id)) return
   openBoard(id)
 }, { immediate: true })
-
-// The board's team is one click away: switch the workspace to it and open the board.
-async function switchToHintTeam() {
-  const hint = teamHint.value
-  if (!hint) return
-  await setActiveTeam(hint.teamId)
-  await refreshProjects()
-  await openBoard(projectId.value)
-}
 
 // ─── Task panel ────────────────────────────────────────────
 
@@ -220,8 +223,7 @@ const taskCountTitle = computed(() => {
 
 // Only an organisation's boards can belong to a customer; a personal board has
 // nobody to share with.
-const { activeTeamId, setActiveTeam } = useTeams()
-const { refresh: refreshProjects } = useProjects()
+const { activeTeamId } = useTeams()
 const { customers, ensureLoaded: ensureCustomers } = useCustomers()
 const toast = useToast()
 
@@ -572,16 +574,8 @@ useSeoMeta({
           class="size-6 text-dimmed"
         />
         <p class="text-sm text-muted">
-          {{ teamHint ? `This board is in the team ${teamHint.teamName}.` : "This board is not available in this workspace." }}
+          You don't have access to this board, or it was deleted.
         </p>
-        <UButton
-          v-if="teamHint"
-          :label="`Switch to ${teamHint.teamName} and open it`"
-          size="sm"
-          color="primary"
-          variant="soft"
-          @click="switchToHintTeam"
-        />
         <UButton
           label="Back to projects"
           size="sm"
