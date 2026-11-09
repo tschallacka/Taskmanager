@@ -225,19 +225,65 @@ async function copyReplaceCommand() {
   await copyWithFeedback(replaceCommand.value, replaceCopied, 'Update command copied')
 }
 
-const revoking = ref<string | null>(null)
+// Delete and regenerate ask first, inline. The confirmation names the key and its secret prefix and last use, so two
+// keys with the same name can be told apart.
+const confirming = ref<{ id: string, action: 'delete' | 'regenerate' } | null>(null)
+const deleting = ref<string | null>(null)
+const regenerating = ref<string | null>(null)
+// The setup prompt of one key. Its token is set only right after a regenerate: that secret is shown once, never again.
+const shownPrompt = ref<{ id: string, token: string | null } | null>(null)
+const promptCopied = ref(false)
 
-async function revokeKey(key: ApiKeySummary) {
-  revoking.value = key.id
+// The ready-to-paste setup: the key in the shell, then the server added to Claude Code. Without a secret the key is a placeholder.
+function setupCommandFor(token: string | null): string {
+  return `${PROFILE_STEP}\n${exportKeyCommand(token ?? '<paste the new key>')}\n${mcpAddCommand(window.location.origin)}`
+}
+
+function showPrompt(key: ApiKeySummary) {
+  shownPrompt.value = shownPrompt.value?.id === key.id ? null : { id: key.id, token: null }
+  promptCopied.value = false
+}
+
+async function copyPrompt() {
+  if (!shownPrompt.value) return
+  await copyWithFeedback(setupCommandFor(shownPrompt.value.token), promptCopied, 'Setup prompt copied')
+}
+
+async function deleteKey(key: ApiKeySummary) {
+  deleting.value = key.id
   try {
     await $fetch(`/api/settings/api-keys/${key.id}`, { method: 'DELETE' })
-    toast.add({ title: `Revoked "${key.name}"`, icon: 'i-lucide-trash', duration: 2000 })
+    toast.add({ title: `Deleted "${key.name}"`, description: 'The key stops working at once.', icon: 'i-lucide-trash', duration: 2000 })
+    confirming.value = null
+    openId.value = null
+    editing.value = null
+    if (shownPrompt.value?.id === key.id) shownPrompt.value = null
     await refresh()
   } catch (e) {
-    toast.add({ title: 'Could not revoke the key', description: errMsg(e), icon: 'i-lucide-alert-triangle', color: 'error' })
+    toast.add({ title: 'Could not delete the key', description: errMsg(e), icon: 'i-lucide-alert-triangle', color: 'error' })
   } finally {
-    revoking.value = null
+    deleting.value = null
   }
+}
+
+async function regenerateSecret(key: ApiKeySummary) {
+  regenerating.value = key.id
+  try {
+    const response = await $fetch<{ token: string }>(`/api/settings/api-keys/${key.id}/regenerate`, { method: 'POST' })
+    shownPrompt.value = { id: key.id, token: response.token }
+    promptCopied.value = false
+    confirming.value = null
+    toast.add({ title: `Regenerated "${key.name}"`, description: 'The old secret stopped working at once. Copy the new one now: it is shown once.', icon: 'i-lucide-refresh-cw', duration: 4000 })
+    await refresh()
+  } catch (e) {
+    toast.add({ title: 'Could not regenerate the key', description: errMsg(e), icon: 'i-lucide-alert-triangle', color: 'error' })
+  } finally {
+    regenerating.value = null
+  }
+}
+
+function keyUseLabel(key: ApiKeySummary): string {
+  return key.lastUsedAt ? `last used ${formatDate(key.lastUsedAt)}` : 'never used'
 }
 
 async function saveKey(key: ApiKeySummary) {
@@ -258,7 +304,7 @@ async function saveKey(key: ApiKeySummary) {
       method: 'PATCH',
       body: { name: key.name, scopes: scopeList, reach: reachBody(state.pick) }
     })
-    toast.add({ title: 'Key saved', description: 'The secret is the same. The change applies to the key\'s next call.', icon: 'i-lucide-check', duration: 3000 })
+    toast.add({ title: 'Key saved', description: 'Changing permissions keeps the secret. The change applies to the key\'s next call.', icon: 'i-lucide-check', duration: 3000 })
     openId.value = null
     editing.value = null
     await refresh()
@@ -587,7 +633,7 @@ function reachLabel(key: ApiKeySummary): string {
               Active keys
             </p>
             <p class="text-xs text-muted mt-0.5">
-              Open a key to see what it reaches, or to change its permissions and boards. The secret stays the same.
+              Open a key to see what it reaches, to change its permissions and boards, to regenerate its secret, or to delete it.
             </p>
           </div>
         </div>
@@ -662,6 +708,103 @@ function reachLabel(key: ApiKeySummary): string {
                 v-if="openId === key.id"
                 class="px-3 pb-3 space-y-4"
               >
+                <!-- Actions on a personal key. They sit outside the edit form, so they show without opening it -->
+                <div
+                  v-if="key.editable"
+                  class="space-y-3"
+                >
+                  <div class="flex flex-wrap items-center gap-2">
+                    <UButton
+                      label="Regenerate key"
+                      icon="i-lucide-refresh-cw"
+                      color="neutral"
+                      variant="soft"
+                      size="xs"
+                      data-key-regenerate
+                      :loading="regenerating === key.id"
+                      @click="confirming = { id: key.id, action: 'regenerate' }"
+                    />
+                    <UButton
+                      label="Show prompt"
+                      icon="i-lucide-terminal"
+                      color="neutral"
+                      variant="soft"
+                      size="xs"
+                      data-key-prompt
+                      @click="showPrompt(key)"
+                    />
+                    <UButton
+                      label="Delete key"
+                      icon="i-lucide-trash-2"
+                      color="error"
+                      variant="ghost"
+                      size="xs"
+                      class="ml-auto"
+                      data-key-delete
+                      :loading="deleting === key.id"
+                      @click="confirming = { id: key.id, action: 'delete' }"
+                    />
+                  </div>
+
+                  <div
+                    v-if="confirming?.id === key.id"
+                    class="rounded-lg border border-default p-3 space-y-2"
+                  >
+                    <p class="text-sm">
+                      {{ confirming.action === 'delete' ? 'Delete' : 'Regenerate the secret of' }} "{{ key.name }}"
+                      (<code class="font-mono text-xs">{{ key.keyPrefix }}…</code>, {{ keyUseLabel(key) }})?
+                    </p>
+                    <p class="text-xs text-muted">
+                      {{ confirming.action === 'delete'
+                        ? 'The key stops working at once. Any agent that holds it is refused as revoked.'
+                        : 'The old secret stops working at once. Permissions and boards stay. The new secret is shown once.' }}
+                    </p>
+                    <div class="flex flex-wrap items-center gap-2">
+                      <UButton
+                        :label="confirming.action === 'delete' ? 'Delete key' : 'Regenerate'"
+                        :color="confirming.action === 'delete' ? 'error' : 'primary'"
+                        size="sm"
+                        :loading="confirming.action === 'delete' ? deleting === key.id : regenerating === key.id"
+                        @click="confirming.action === 'delete' ? deleteKey(key) : regenerateSecret(key)"
+                      />
+                      <UButton
+                        label="Keep it"
+                        color="neutral"
+                        variant="ghost"
+                        size="sm"
+                        @click="confirming = null"
+                      />
+                    </div>
+                  </div>
+
+                  <div
+                    v-if="shownPrompt?.id === key.id"
+                    class="space-y-2"
+                  >
+                    <div v-if="shownPrompt.token">
+                      <p class="text-xs font-medium">
+                        The new secret. It is shown once: copy it now.
+                      </p>
+                      <code class="block text-xs font-mono bg-default border border-default rounded-md px-3 py-2 overflow-x-auto whitespace-nowrap">{{ shownPrompt.token }}</code>
+                    </div>
+                    <p
+                      v-else
+                      class="text-xs text-muted"
+                    >
+                      Regenerate the key to get a secret to paste. Until then the prompt shows a placeholder.
+                    </p>
+                    <pre class="text-xs font-mono bg-elevated/50 border border-default rounded-md p-3 whitespace-pre-wrap break-all">{{ setupCommandFor(shownPrompt.token) }}</pre>
+                    <UButton
+                      :label="promptCopied ? 'Copied' : 'Copy setup prompt'"
+                      :icon="promptCopied ? 'i-lucide-check' : 'i-lucide-copy'"
+                      color="neutral"
+                      variant="soft"
+                      size="xs"
+                      @click="copyPrompt"
+                    />
+                  </div>
+                </div>
+
                 <!-- Editing a personal key -->
                 <template v-if="keyPanelMode(key, editing) === 'edit' && editing">
                   <div class="space-y-2">
@@ -708,19 +851,9 @@ function reachLabel(key: ApiKeySummary): string {
                       size="sm"
                       @click="toggleKey(key)"
                     />
-                    <UButton
-                      label="Revoke"
-                      icon="i-lucide-trash-2"
-                      color="error"
-                      variant="ghost"
-                      size="sm"
-                      class="ml-auto"
-                      :loading="revoking === key.id"
-                      @click="revokeKey(key)"
-                    />
                   </div>
                   <p class="text-xs text-muted">
-                    The secret stays the same, so no agent needs reconnecting. The change applies to the key's next call.
+                    Changing permissions keeps the secret, so no agent needs reconnecting. The change applies to the key's next call.
                   </p>
                 </template>
 
