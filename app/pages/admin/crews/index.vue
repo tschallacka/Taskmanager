@@ -38,17 +38,6 @@ interface WindowState {
 const { data: crewData, refresh: refreshCrews, status: crewStatus } = useFetch<{ crews: CrewRow[] }>('/api/admin/crews', { server: false, immediate: false })
 const { data: windowData, refresh: refreshWindow } = useFetch<WindowState>('/api/settings/crew-api-window', { server: false, immediate: false })
 
-watch([sessionPending, isInstanceAdmin], ([pending, admin]) => {
-  if (pending) return
-  if (!admin) {
-    navigateTo('/settings', { replace: true })
-    return
-  }
-  refreshCrews()
-  refreshWindow()
-  refreshPermission()
-}, { immediate: true })
-
 const crews = computed(() => crewData.value?.crews ?? [])
 
 // The clock the time left and the status lines read; it ticks every 10 seconds.
@@ -125,6 +114,18 @@ async function copy(value: string) {
 
 // The instance level of the crew permission: switching it off disables every crew.
 const { data: permissionData, refresh: refreshPermission } = useFetch<{ crewsAllowed: boolean }>('/api/settings/crew-permission', { server: false, immediate: false })
+
+// Declared after refreshPermission: an immediate watch that calls it earlier throws on load.
+watch([sessionPending, isInstanceAdmin], ([pending, admin]) => {
+  if (pending) return
+  if (!admin) {
+    navigateTo('/settings', { replace: true })
+    return
+  }
+  refreshCrews()
+  refreshWindow()
+  refreshPermission()
+}, { immediate: true })
 
 async function setCrewsAllowed(allowed: boolean) {
   busy.value = 'permission'
