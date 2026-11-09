@@ -330,6 +330,8 @@ nix build .#default   # the app  (result/bin/arnotes)
 nix build .#schema    # schema tooling (result/bin/arnotes-db-push)
 ```
 
+`/api/version` `build` is the short git commit the package was built from (`<commit>-dirty` for an uncommitted tree), and `null` when there is none.
+
 Run the app against a PostgreSQL of your choice:
 
 ```bash
