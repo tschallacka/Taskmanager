@@ -132,6 +132,22 @@ async function confirmDelete() {
   if (activeId.value === target.id) navigateTo('/projects')
 }
 
+// The "…" trigger is hidden until hover on a fine pointer (a mouse). Below lg, and on any screen
+// without a hover, it stays visible on every row, so no control is tapped unseen.
+const menuTriggerClass = 'mt-0.5 shrink-0 opacity-100 transition-opacity lg:opacity-0 lg:group-hover:opacity-100 lg:focus-visible:opacity-100'
+
+// A pinned row has the same menu as a board row. A board outside the loaded list (another
+// workspace) has no project to build the menu from, so its menu carries only the pin.
+function pinMenuItems(pin: PinnedBoard) {
+  const project = projects.value.find(p => p.id === pin.projectId)
+  if (project) return menuItems(project)
+  return [[{
+    label: 'Unpin',
+    icon: 'i-lucide-pin-off',
+    onSelect: () => togglePin(pin.projectId)
+  }]]
+}
+
 // Anyone may pin a board they can open; a customer's board is the organisation's to rename or delete.
 function menuItems(project: Project) {
   const pinned = isPinned(project.id)
@@ -229,15 +245,21 @@ function menuItems(project: Project) {
             {{ pinPlace(pin) }}
           </p>
         </div>
-        <UButton
-          icon="i-lucide-pin-off"
-          size="xs"
-          color="neutral"
-          variant="ghost"
-          class="mt-0.5 shrink-0 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
-          :aria-label="`Unpin ${pinName(pin)}`"
-          @click.stop="togglePin(pin.projectId)"
-        />
+        <!-- The same "…" menu as a board row below, so a tap on the right side opens it, and Unpin is one of its items. -->
+        <UDropdownMenu
+          :items="pinMenuItems(pin)"
+          :content="{ align: 'start', collisionPadding: 12 }"
+        >
+          <UButton
+            icon="i-lucide-ellipsis"
+            size="xs"
+            color="neutral"
+            variant="ghost"
+            :class="menuTriggerClass"
+            :aria-label="`Options for ${pinName(pin)}`"
+            @click.stop
+          />
+        </UDropdownMenu>
       </div>
       <div class="mb-2 border-b border-default pb-2" />
     </template>
@@ -312,7 +334,7 @@ function menuItems(project: Project) {
             size="xs"
             color="neutral"
             variant="ghost"
-            class="mt-0.5 shrink-0 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
+            :class="menuTriggerClass"
             aria-label="Project options"
             @click.stop
           />
