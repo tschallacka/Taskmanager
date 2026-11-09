@@ -58,10 +58,11 @@ A **management token** (the sidebar link **Get AI management token** on a board)
 
 A crew can be made on a real board in the same call. The crew always works on a **shadow board**, made in the crew's own team; the real board is for people. Only the key's owner can bind, and only to a board of a team the owner runs as owner or admin.
 
-- `GET /api/crews/targets` lists the teams the key's owner runs as owner or admin, each with its boards: `{ "teams": [ { "team_id", "team_name", "userboards": [ ... ] } ] }`. The crew work boards and the shadow boards are left out of the boards.
+- `GET /api/crews/targets` lists the teams the key's owner runs as owner or admin, each with its boards: `{ "teams": [ { "team_id", "team_name", "canCreateBoard", "userboards": [ ... ] } ] }`. A team with no boards is listed with `"userboards": []`, and so is a team where the owner is only a member, as long as it has no boards yet: the owner may make the first board there. A member's team that has boards is not listed. `canCreateBoard` is `true` when the key may make a board in that team (a management token may not, so it always answers `false`). The crew work boards and the shadow boards are left out of the boards.
 - `POST /api/crews` takes an optional `projectId` (the real board) and `teamId` (that board's team, optional; `teamId` alone is a 400). Its answer has no keys or passwords: see *The keys and passwords* below. With `projectId`, the answer also adds:
   - `userboard`: the real board, with its shadow boards.
   - `real_board` and `shadow_board`: each with `board_id`, `board_name` and `url`. Give the crew the **shadow board** `url` as its work board.
+- `POST /api/crews` with `newBoard: { "name": "..." }` (1 to 120 characters) instead of `projectId`, plus `teamId`, makes a new board in that team first. The board is owned by the key's owner, starts with the team's default columns, and the crew is bound to it as above. The key's owner must be a member of the team, the same check the UI makes when it creates a board (403 `Your key may not create boards in that team.` otherwise). A management token cannot make a board (403). `projectId` together with `newBoard` is a 400, and so is `newBoard` without `teamId`. `rotate: true` with `newBoard` is a 400, because a crew that exists keeps its board. If the crew cannot be made, the board is removed again. The audit row for a made board names the new board.
 
 A userboard has this shape, with snake_case names:
 

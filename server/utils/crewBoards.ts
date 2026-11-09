@@ -11,11 +11,13 @@ import { db } from '../db'
 import { crewBoards, crews, member, organization, projectColumns, projects, user } from '../db/schema'
 import type { Crew, CrewBoard } from '../db/schema'
 import { genId } from './projects'
-import { crewPermissionRefusal } from './crewPermission'
-import { BOARD_COLUMNS, CREW_PEOPLE, accountsOf, baseUrl, createOrRotateCrew } from './crewProvisioning'
+import { CREW_SENTENCES, crewPermissionRefusal, instanceCrewsAllowed, isInstanceAdmin, teamCrewsAllowed } from './crewPermission'
+import { BOARD_COLUMNS, CREW_PEOPLE, accountsOf, baseUrl, createOrRotateCrew, purgeCrew } from './crewProvisioning'
 import type { CrewCaller, CrewInput } from './crewProvisioning'
 import { personKeyOf } from './crewAccounts'
 import { removeForks } from './crewForks'
+import { columnsForNewBoard } from './teamSettings'
+import { publish, workspaceTopic } from './realtime'
 
 export interface CrewChoice {
   id: string
@@ -216,23 +218,117 @@ async function userboardsOfTeam(teamId: string): Promise<UserboardView[]> {
 
 /**
  * The teams the key's owner runs as owner or admin, each with its userboards: what a crew can be bound to.
- * With `onlyBoardId` (a management token) only the team of that board, and only its userboard, are listed.
+ * A team where the owner is only a member is listed while it has no boards: the owner may make the first board
+ * there, as the UI lets a member do (see makeCrewOnNewBoard). With `onlyBoardId` (a management token) only the
+ * team of that board, and only its userboard, are listed, and a plain member's team is not.
  */
 export async function crewTargets(userId: string, onlyBoardId?: string) {
   const teams = await db
-    .select({ id: organization.id, name: organization.name })
+    .select({ id: organization.id, name: organization.name, role: member.role })
     .from(member)
     .innerJoin(organization, eq(organization.id, member.organizationId))
-    .where(and(eq(member.userId, userId), inArray(member.role, ['owner', 'admin'])))
+    .where(eq(member.userId, userId))
     .orderBy(asc(organization.name))
   const [only] = onlyBoardId ? await db.select({ teamId: projects.teamId }).from(projects).where(eq(projects.id, onlyBoardId)) : []
-  const shown = onlyBoardId ? teams.filter(team => team.id === only?.teamId) : teams
-  return {
-    teams: await Promise.all(shown.map(async team => ({
+  const candidates = onlyBoardId ? teams.filter(team => team.id === only?.teamId) : teams
+  const listed = await Promise.all(candidates.map(async (team) => {
+    const userboards = await userboardsOfTeam(team.id)
+    const runsTeam = team.role === 'owner' || team.role === 'admin'
+    if (!runsTeam && (onlyBoardId || userboards.length > 0)) return null
+    return {
       team_id: team.id,
       team_name: team.name,
-      userboards: (await userboardsOfTeam(team.id)).filter(board => !onlyBoardId || board.board_id === onlyBoardId)
+      // A management token makes no board (makeCrewOnNewBoard); any other key of a member may.
+      canCreateBoard: !onlyBoardId,
+      userboards: userboards.filter(board => !onlyBoardId || board.board_id === onlyBoardId)
+    }
+  }))
+  return { teams: listed.filter(team => team !== null) }
+}
+
+/** The body of a newBoard part of a crew call, checked before anything is made. Null when the call has none. */
+export function parseNewBoard(body: Record<string, unknown>, caller: CrewCaller): { teamId: string, name: string } | null {
+  if (body.newBoard === undefined) return null
+  if (caller.boardId) throw createError({ statusCode: 403, message: 'A management token cannot create a new board.' })
+  if (body.projectId !== undefined) throw createError({ statusCode: 400, message: 'Send projectId or newBoard, not both.' })
+  if (typeof body.teamId !== 'string' || body.teamId === '') throw createError({ statusCode: 400, message: 'newBoard needs a teamId.' })
+  const part = typeof body.newBoard === 'object' && body.newBoard !== null && !Array.isArray(body.newBoard)
+    ? body.newBoard as Record<string, unknown>
+    : null
+  const name = typeof part?.name === 'string' ? part.name.trim() : ''
+  if (name.length < 1 || name.length > 120) {
+    throw createError({ statusCode: 400, message: 'newBoard.name must be text of 1 to 120 characters.' })
+  }
+  return { teamId: body.teamId, name }
+}
+
+/**
+ * Makes a crew with a board of its own. The board is made as the UI makes one: in `teamId`, owned by the caller,
+ * with the team's default columns. Then the crew is bound to it exactly as makeBoundCrew binds one. The caller may
+ * make the board when the UI would let them (a member of the team, as POST /api/projects checks), and the crew
+ * permission must reach the team. A refused crew leaves no board
+ * behind, and a rotate never makes one. The board's own crew switch is on: the caller asks for a crew on it.
+ */
+export async function makeCrewOnNewBoard(input: CrewInput, caller: CrewCaller, board: { teamId: string, name: string }): Promise<{ made: { status: 200 | 201, body: unknown }, boardId: string }> {
+  const [existing] = await db.select().from(crews).where(eq(crews.slug, input.slug))
+  if (existing && existing.createdBy !== caller.userId) throw createError({ statusCode: 404, message: 'No crew of yours with that slug.' })
+  if (existing && input.rotate) {
+    throw createError({ statusCode: 400, message: 'A crew that already exists keeps its board; use projectId or no board.' })
+  }
+  if (existing) {
+    throw createError({
+      statusCode: 409,
+      message: existing.disabledAt
+        ? 'This crew is disabled. Send rotate: true to re-enable it with new keys.'
+        : 'This crew already exists. Send rotate: true for new keys.'
+    })
+  }
+
+  const [role] = await db.select({ role: member.role }).from(member)
+    .where(and(eq(member.organizationId, board.teamId), eq(member.userId, caller.userId)))
+  if (!role) {
+    throw createError({ statusCode: 403, message: 'Your key may not create boards in that team.' })
+  }
+  // The instance and team levels of the crew permission. The board's own level is set on the board made below.
+  if (!(await isInstanceAdmin(caller.userId))) {
+    const refusal = !(await instanceCrewsAllowed())
+      ? CREW_SENTENCES.instance
+      : !(await teamCrewsAllowed(board.teamId)) ? CREW_SENTENCES.team : null
+    if (refusal) throw createError({ statusCode: 403, message: refusal })
+  }
+
+  const boardId = genId()
+  const now = Date.now()
+  const columns = await columnsForNewBoard(board.teamId)
+  await db.transaction(async (tx) => {
+    await tx.insert(projects).values({
+      id: boardId,
+      userId: caller.userId,
+      teamId: board.teamId,
+      name: board.name,
+      crewsAllowed: true,
+      createdAt: now,
+      updatedAt: now
+    })
+    await tx.insert(projectColumns).values(columns.map((name, i) => ({
+      id: genId(),
+      projectId: boardId,
+      name,
+      position: i * 1000,
+      createdAt: now
     })))
+  })
+
+  try {
+    const made = await makeBoundCrew(input, caller, { projectId: boardId, teamId: board.teamId })
+    await publish(workspaceTopic(caller.userId, board.teamId), { type: 'projects', projectId: boardId })
+    return { made, boardId }
+  } catch (error) {
+    // Nothing of the attempt stays: the board goes (its columns with it), and a crew this call made goes too.
+    await db.delete(projects).where(eq(projects.id, boardId))
+    const [crew] = await db.select().from(crews).where(eq(crews.slug, input.slug))
+    if (crew && crew.createdBy === caller.userId) await purgeCrew(crew)
+    throw error
   }
 }
 
