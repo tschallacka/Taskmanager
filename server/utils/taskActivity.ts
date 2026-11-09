@@ -145,6 +145,11 @@ export interface ActivityRow {
  * "created" entry of its own, so one is drawn from the task row. A customer's
  * contact is not shown a change of audience.
  */
+/** The kinds of activity a customer's view leaves out: a change of who a task is visible to. Staff see all. */
+export function activityKindsHiddenFrom(forCustomer: boolean): TaskActivityKind[] {
+  return forCustomer ? ['visibility'] : []
+}
+
 export async function listActivity(task: ProjectTask, forCustomer: boolean): Promise<ActivityRow[]> {
   const rows = await db.select().from(taskActivity).where(eq(taskActivity.taskId, task.id)).orderBy(asc(taskActivity.createdAt))
   const actorIds = [...new Set([...rows.map(row => row.actorId), task.createdBy].filter((id): id is string => !!id))]
@@ -165,7 +170,7 @@ export async function listActivity(task: ProjectTask, forCustomer: boolean): Pro
   }
 
   const list: ActivityRow[] = rows
-    .filter(row => !(forCustomer && row.kind === 'visibility'))
+    .filter(row => !activityKindsHiddenFrom(forCustomer).includes(row.kind))
     .map(row => ({
       id: row.id,
       kind: row.kind,
