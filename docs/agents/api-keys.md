@@ -100,7 +100,7 @@ name, the permissions as badges, the start of the key (such as `arn_a1b2c3...`),
 when it was last used and when it expires.
 
 Choose a row to see its permissions and its reach. Change them there and press **Save**. The key itself does not change,
-so the agent keeps working without a new secret. You can end a key at any time with **Delete key**. See
+so the agent keeps working without a new secret. You can end a key at any time with **Revoke**. See
 [Create and revoke a key](/help/agents/create-and-revoke-a-key). To replace the key of a connection that Claude Code
 already has, see [Connect Claude Code](/help/agents/connect-claude-code), under **Replace a key that is already connected**.
 

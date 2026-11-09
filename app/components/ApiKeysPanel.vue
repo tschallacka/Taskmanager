@@ -225,10 +225,10 @@ async function copyReplaceCommand() {
   await copyWithFeedback(replaceCommand.value, replaceCopied, 'Update command copied')
 }
 
-// Delete and regenerate ask first, inline. The confirmation names the key and its secret prefix and last use, so two
-// keys with the same name can be told apart.
-const confirming = ref<{ id: string, action: 'delete' | 'regenerate' } | null>(null)
-const deleting = ref<string | null>(null)
+// Revoke and regenerate ask first, inline, under the key's row. The confirmation names the key and its secret prefix and
+// last use, so two keys with the same name can be told apart.
+const confirming = ref<{ id: string, action: 'revoke' | 'regenerate' } | null>(null)
+const revoking = ref<string | null>(null)
 const regenerating = ref<string | null>(null)
 // The setup prompt of one key. Its token is set only right after a regenerate: that secret is shown once, never again.
 const shownPrompt = ref<{ id: string, token: string | null } | null>(null)
@@ -249,20 +249,20 @@ async function copyPrompt() {
   await copyWithFeedback(setupCommandFor(shownPrompt.value.token), promptCopied, 'Setup prompt copied')
 }
 
-async function deleteKey(key: ApiKeySummary) {
-  deleting.value = key.id
+async function revokeKey(key: ApiKeySummary) {
+  revoking.value = key.id
   try {
     await $fetch(`/api/settings/api-keys/${key.id}`, { method: 'DELETE' })
-    toast.add({ title: `Deleted "${key.name}"`, description: 'The key stops working at once.', icon: 'i-lucide-trash', duration: 2000 })
+    toast.add({ title: `Revoked "${key.name}"`, description: 'The key stops working at once.', icon: 'i-lucide-trash', duration: 2000 })
     confirming.value = null
     openId.value = null
     editing.value = null
     if (shownPrompt.value?.id === key.id) shownPrompt.value = null
     await refresh()
   } catch (e) {
-    toast.add({ title: 'Could not delete the key', description: errMsg(e), icon: 'i-lucide-alert-triangle', color: 'error' })
+    toast.add({ title: 'Could not revoke the key', description: errMsg(e), icon: 'i-lucide-alert-triangle', color: 'error' })
   } finally {
-    deleting.value = null
+    revoking.value = null
   }
 }
 
@@ -633,7 +633,7 @@ function reachLabel(key: ApiKeySummary): string {
               Active keys
             </p>
             <p class="text-xs text-muted mt-0.5">
-              Open a key to see what it reaches, to change its permissions and boards, to regenerate its secret, or to delete it.
+              Open a key to see what it reaches, to change its permissions and boards, or to regenerate its secret. Revoke a key from its row.
             </p>
           </div>
         </div>
@@ -664,45 +664,91 @@ function reachLabel(key: ApiKeySummary): string {
               v-for="key in keys"
               :key="key.id"
             >
-              <button
-                type="button"
-                class="w-full px-3 py-2.5 flex items-center gap-3 text-left"
-                :aria-expanded="openId === key.id"
-                @click="toggleKey(key)"
-              >
-                <div class="flex-1 min-w-0">
-                  <div class="flex items-center gap-2 flex-wrap">
-                    <p class="text-sm font-medium truncate">
-                      {{ key.name }}
+              <div class="flex items-center gap-2 pr-3">
+                <button
+                  type="button"
+                  class="flex-1 min-w-0 px-3 py-2.5 flex items-center gap-3 text-left"
+                  :aria-expanded="openId === key.id"
+                  @click="toggleKey(key)"
+                >
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <p class="text-sm font-medium truncate">
+                        {{ key.name }}
+                      </p>
+                      <UBadge
+                        v-if="!key.editable"
+                        :label="`Team key · ${key.teamName ?? 'a team'}`"
+                        color="info"
+                        variant="subtle"
+                        size="sm"
+                      />
+                      <UBadge
+                        v-for="scope in key.scopes"
+                        :key="scope"
+                        :label="scopeLabel(scope)"
+                        :color="scopeColor(scope)"
+                        variant="subtle"
+                        size="sm"
+                      />
+                    </div>
+                    <p class="text-xs text-muted mt-0.5 truncate">
+                      <code class="font-mono">{{ key.keyPrefix }}…</code>
+                      · reaches {{ reachLabel(key) }}
+                      · {{ key.lastUsedAt ? `last used ${formatDate(key.lastUsedAt)}` : 'never used' }}
+                      · {{ expiryLabel(key) }}
                     </p>
-                    <UBadge
-                      v-if="!key.editable"
-                      :label="`Team key · ${key.teamName ?? 'a team'}`"
-                      color="info"
-                      variant="subtle"
-                      size="sm"
-                    />
-                    <UBadge
-                      v-for="scope in key.scopes"
-                      :key="scope"
-                      :label="scopeLabel(scope)"
-                      :color="scopeColor(scope)"
-                      variant="subtle"
-                      size="sm"
-                    />
                   </div>
-                  <p class="text-xs text-muted mt-0.5 truncate">
-                    <code class="font-mono">{{ key.keyPrefix }}…</code>
-                    · reaches {{ reachLabel(key) }}
-                    · {{ key.lastUsedAt ? `last used ${formatDate(key.lastUsedAt)}` : 'never used' }}
-                    · {{ expiryLabel(key) }}
-                  </p>
-                </div>
-                <UIcon
-                  :name="openId === key.id ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
-                  class="size-4 text-muted shrink-0"
+                  <UIcon
+                    :name="openId === key.id ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
+                    class="size-4 text-muted shrink-0"
+                  />
+                </button>
+                <UButton
+                  v-if="key.editable"
+                  label="Revoke"
+                  icon="i-lucide-trash-2"
+                  color="error"
+                  variant="ghost"
+                  size="xs"
+                  class="shrink-0"
+                  data-key-revoke
+                  :loading="revoking === key.id"
+                  @click="confirming = { id: key.id, action: 'revoke' }"
                 />
-              </button>
+              </div>
+
+              <!-- The confirmation for a row's action sits under the row, so it shows whether or not the key is open -->
+              <div
+                v-if="confirming?.id === key.id"
+                class="mx-3 mb-2 rounded-lg border border-default p-3 space-y-2"
+              >
+                <p class="text-sm">
+                  {{ confirming.action === 'revoke' ? 'Revoke' : 'Regenerate the secret of' }} "{{ key.name }}"
+                  (<code class="font-mono text-xs">{{ key.keyPrefix }}…</code>, {{ keyUseLabel(key) }})?
+                </p>
+                <p class="text-xs text-muted">
+                  {{ confirming.action === 'revoke'
+                    ? 'The key stops working at once. Any agent that holds it is refused as revoked.'
+                    : 'The old secret stops working at once. Permissions and boards stay. The new secret is shown once.' }}
+                </p>
+                <div class="flex flex-wrap items-center gap-2">
+                  <UButton
+                    :label="confirming.action === 'revoke' ? 'Revoke' : 'Regenerate'"
+                    :color="confirming.action === 'revoke' ? 'error' : 'primary'"
+                    size="sm"
+                    :loading="confirming.action === 'revoke' ? revoking === key.id : regenerating === key.id"
+                    @click="confirming.action === 'revoke' ? revokeKey(key) : regenerateSecret(key)"
+                  />
+                  <UButton
+                    label="Keep it"
+                    color="neutral"
+                    variant="ghost"
+                    size="sm"
+                    @click="confirming = null"
+                  />
+                </div>
+              </div>
 
               <div
                 v-if="openId === key.id"
@@ -733,48 +779,6 @@ function reachLabel(key: ApiKeySummary): string {
                       data-key-prompt
                       @click="showPrompt(key)"
                     />
-                    <UButton
-                      label="Delete key"
-                      icon="i-lucide-trash-2"
-                      color="error"
-                      variant="ghost"
-                      size="xs"
-                      class="ml-auto"
-                      data-key-delete
-                      :loading="deleting === key.id"
-                      @click="confirming = { id: key.id, action: 'delete' }"
-                    />
-                  </div>
-
-                  <div
-                    v-if="confirming?.id === key.id"
-                    class="rounded-lg border border-default p-3 space-y-2"
-                  >
-                    <p class="text-sm">
-                      {{ confirming.action === 'delete' ? 'Delete' : 'Regenerate the secret of' }} "{{ key.name }}"
-                      (<code class="font-mono text-xs">{{ key.keyPrefix }}…</code>, {{ keyUseLabel(key) }})?
-                    </p>
-                    <p class="text-xs text-muted">
-                      {{ confirming.action === 'delete'
-                        ? 'The key stops working at once. Any agent that holds it is refused as revoked.'
-                        : 'The old secret stops working at once. Permissions and boards stay. The new secret is shown once.' }}
-                    </p>
-                    <div class="flex flex-wrap items-center gap-2">
-                      <UButton
-                        :label="confirming.action === 'delete' ? 'Delete key' : 'Regenerate'"
-                        :color="confirming.action === 'delete' ? 'error' : 'primary'"
-                        size="sm"
-                        :loading="confirming.action === 'delete' ? deleting === key.id : regenerating === key.id"
-                        @click="confirming.action === 'delete' ? deleteKey(key) : regenerateSecret(key)"
-                      />
-                      <UButton
-                        label="Keep it"
-                        color="neutral"
-                        variant="ghost"
-                        size="sm"
-                        @click="confirming = null"
-                      />
-                    </div>
                   </div>
 
                   <div
@@ -850,6 +854,17 @@ function reachLabel(key: ApiKeySummary): string {
                       variant="ghost"
                       size="sm"
                       @click="toggleKey(key)"
+                    />
+                    <UButton
+                      label="Revoke"
+                      icon="i-lucide-trash-2"
+                      color="error"
+                      variant="ghost"
+                      size="sm"
+                      class="ml-auto"
+                      data-key-revoke-edit
+                      :loading="revoking === key.id"
+                      @click="confirming = { id: key.id, action: 'revoke' }"
                     />
                   </div>
                   <p class="text-xs text-muted">

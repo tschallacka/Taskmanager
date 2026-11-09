@@ -65,9 +65,9 @@ can lag a little.
 
 ## Revoke a key
 
-1. Under **Active keys**, open the key and press **Delete key**.
-2. The box names the key, its first characters and when it was last used. Press **Delete key** in the box to confirm.
-3. The key is deleted at once. Anything still using it stops working on its next request, and gets "Invalid or
+1. Under **Active keys**, press **Revoke** on the key's row. You can also open the key and press **Revoke** there.
+2. The box names the key, its first characters and when it was last used. Press **Revoke** in the box to confirm.
+3. The key is revoked at once. Anything still using it stops working on its next request, and gets "Invalid or
    missing API key".
 
 Revoking cannot be undone. If you revoked the wrong key, make a new one and give it to the agent.
