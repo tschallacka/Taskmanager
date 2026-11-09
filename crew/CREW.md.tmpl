@@ -221,11 +221,11 @@ background, as the next bullets say:
   exactly one running: before you end a turn, check that it is there (Pia: a tag from Boss or a
   worker must reach you within a minute, not at your next 20-minute check). A `quiet` exit after
   600 seconds is a reason to start it again, not to stop.
-- **Idle** (nothing assigned, nothing in To do or In progress for you): `listen.mjs <you> 600` as above, again
-  and again.
+- **Idle** (nothing assigned, nothing in To do or In progress for you): `listen.mjs <you> 60`,
+  again and again, one minute each.
 - **Active** (the PM spoke to you, someone mentioned you, you were just assigned something, a
   question is open on one of your tasks): `listen.mjs <you> 10` for the next few minutes, then
-  back to 600.
+  back to 60.
 - **While you work**: between steps run `listen.mjs <you> 0` (one quick check, no waiting), so a
   message from the PM or a new comment on your task is seen at once.
 - **Who listens to whom.** {{people.pia}} listens to everyone. {{people.boss}} listens to {{people.pia}} and
