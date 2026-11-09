@@ -50,7 +50,7 @@ To let a remote machine use it for a short time, open the window:
 
 The window closes after 10 minutes, when you press **Close now**, or at the first refused key. A refused key can be a wrong, expired or non-admin one. A refused key also revokes the temporary key, and the page says why and from where it closed. While the window is open, remote callers may use only the temporary key.
 
-To make a permanent key for crew management, press **Create a crews:manage key**. Only you can hold that permission. A key with it manages crews and reaches no board.
+To make a permanent key for crew management, press **Create a crews:manage key**. You can always hold that permission. Anyone else can hold it when they own at least one live crew: their key then reaches that owner's own crews only, and no others. Anyone else gets a key bound to one board, which reaches that board's crews and nothing else.
 
 Who may do what, and from where:
 
