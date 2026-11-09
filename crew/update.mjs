@@ -79,7 +79,9 @@ async function fetchKit(from, board, stage) {
     }
     for (const name of names) copyFileSync(plainFile(join(from, name)), join(stage, name))
     checkStaged(stage, names)
-    return { label: from, version: 'folder', names }
+    // The bootstrap writes the version the board served next to the kit; a folder without it is named "folder".
+    const version = readText(join(from, 'KIT-VERSION'))?.trim() || 'folder'
+    return { label: from, version, names }
   }
   let archive
   let label
@@ -140,9 +142,29 @@ async function front() {
     const removed = [...owned].filter(name => name !== LIST && shipsName(name) && !kit.names.includes(name) && existsSync(join(target, name))).sort()
     const changed = kit.names.filter(name => !existsSync(join(target, name)) || sha(join(target, name)) !== sha(join(stage, name))).sort()
     if (!changed.length && !removed.length) {
-      recordInstance(target, host, kit.version)
-      console.log(`The crew kit in ${target} is up to date: version ${kit.version} from ${kit.label}. Nothing changed.`)
-      return 0
+      // The kit folder already holds this kit. A crew home whose record names the same files is current; one
+      // recorded from an older kit (another crew home updated the folder first) still has to finish its own install.
+      const recorded = manifest?.files
+      const current = !recorded || kit.names.every(name => recorded[name] === sha(join(target, name)))
+      if (current) {
+        recordInstance(target, host, kit.version)
+        console.log(`The crew kit in ${target} is up to date: version ${kit.version} from ${kit.label}. Nothing changed.`)
+        return 0
+      }
+      if (check) {
+        console.log(`An update is available for ${here}: its record is behind the kit folder ${target} (${kit.label}, version ${kit.version}). Run crew update to finish it.`)
+        return 1
+      }
+      const finishDir = join(here, 'backups', `update-${stamp()}`)
+      mkdirSync(join(finishDir, 'kit'), { recursive: true, mode: 0o700 })
+      mkdirSync(join(finishDir, 'local'), { recursive: true, mode: 0o700 })
+      renameSync(stage, join(finishDir, 'staged'))
+      moved = true
+      const finishPlan = join(finishDir, 'plan.json')
+      writeFileSync(finishPlan, `${JSON.stringify({ kitDir: target, backupDir: finishDir, names: kit.names, changed: [], removed: [], localEdits: [], version: kit.version, label: kit.label, previous: manifest?.version ?? null, host }, null, 2)}\n`, { mode: 0o600 })
+      console.log(`Finishing the install of ${kit.label} (version ${kit.version}) for ${here}: the kit folder ${target} already holds it. Backup: ${finishDir}`)
+      const finish = spawnSync(process.execPath, [join(target, 'update.mjs'), '--finish', finishPlan], { stdio: 'inherit', env: process.env })
+      return finish.status ?? 1
     }
     const summary = `${changed.length} file(s) to replace, ${removed.length} to remove`
     if (check) {
@@ -203,6 +225,8 @@ function apply(planFile) {
   const plan = JSON.parse(readFileSync(planFile, 'utf8'))
   const staged = join(dirname(planFile), 'staged')
   const touched = []
+  // A kit folder that does not exist yet (the bootstrap's first install) is made here.
+  mkdirSync(plan.kitDir, { recursive: true, mode: 0o755 })
   try {
     for (const name of plan.changed) {
       const source = plainFile(join(staged, name))

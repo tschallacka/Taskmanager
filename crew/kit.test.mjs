@@ -615,6 +615,31 @@ describe('crew update: the kit folder and the owner files', () => {
     assert.equal(again.code, 0, again.stdout)
   })
 
+  test('a real crew keeps its own files through an update: rules, brief, janitor card and creds are untouched', async () => {
+    const crew = newCrew()
+    const dirA = await installedKit(crew)
+    const dirB = newerKit(dirA, crew)
+    // The crew's own filled-in files and its secrets, as a crew that has been running holds them. The secrets are fake.
+    editFile(ownerFile(crew), text => `${text}\nOwner rules kept.\n`)
+    editFile(join(crew.home, 'BRIEF.md'), text => `${text}\nOwner brief kept.\n`)
+    writeFileSync(join(crew.home, 'JANET.md'), '# Janet card\n\nOwner janitor line kept.\n')
+    writeFileSync(join(crew.home, 'creds.json'), JSON.stringify({ people: { wade: { password: 'test-only' } } }))
+    const creds = readFileSync(join(crew.home, 'creds.json'), 'utf8')
+    const config = readFileSync(join(crew.home, 'crew.json'), 'utf8')
+    const out = await updateKit(dirA, crew, ['--from', dirB, '--kit', dirA])
+    // init's FAIL line about playwright is expected in a copy with no node_modules, so the exit code is not checked.
+    assert.match(out.stdout, /crew update: the kit in/, out.stdout + out.stderr)
+    assert.doesNotMatch(out.stdout, /CONFLICT:/, out.stdout)
+    assert.equal(readFileSync(join(crew.home, 'creds.json'), 'utf8'), creds, 'creds.json is not touched')
+    assert.equal(readFileSync(join(crew.home, 'crew.json'), 'utf8'), config, 'crew.json is not touched')
+    assert.equal(readFileSync(join(crew.home, 'JANET.md'), 'utf8'), '# Janet card\n\nOwner janitor line kept.\n', 'the janitor card is the crew\'s own')
+    const rules = readFileSync(ownerFile(crew), 'utf8')
+    assert.match(rules, /Owner rules kept\./, 'the rules keep the crew\'s text')
+    assert.match(rules, /Replace the examples here/, 'the new template line is merged in')
+    assert.doesNotMatch(rules, /<<<<<<</)
+    assert.match(readFileSync(join(crew.home, 'BRIEF.md'), 'utf8'), /Owner brief kept\./, 'the brief keeps the crew\'s text')
+  })
+
   test('an owner edit on the line the template changed is a conflict: the owner file is kept', async () => {
     const crew = newCrew()
     const dirA = await installedKit(crew)

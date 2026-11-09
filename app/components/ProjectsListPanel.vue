@@ -2,6 +2,7 @@
 import { relativeTime } from '~/composables/useRelativeTime'
 import type { Project } from '~/composables/useProjects'
 import type { PinnedBoard } from '~/composables/usePins'
+import { crewUpdatePrompt } from '~/utils/crewUpdatePrompt'
 import { taskCountLabel } from '#shared/utils/board'
 
 const { ready, projects, allTasks, deleteProject, renameProject } = useProjects()
@@ -132,6 +133,16 @@ async function confirmDelete() {
   if (activeId.value === target.id) navigateTo('/projects')
 }
 
+// "Update this crew's kit": copies the fire-and-forget prompt; it needs no token, the kit is public.
+async function copyCrewUpdatePrompt() {
+  try {
+    await navigator.clipboard.writeText(crewUpdatePrompt(window.location.origin))
+    toast.add({ title: 'Update prompt copied', description: 'Paste it into the agent that runs the crew.', icon: 'i-lucide-check' })
+  } catch {
+    toast.add({ title: 'Could not copy the prompt', color: 'error' })
+  }
+}
+
 // Anyone may pin a board they can open; a customer's board is the organisation's to rename or delete.
 function menuItems(project: Project) {
   const pinned = isPinned(project.id)
@@ -151,6 +162,11 @@ function menuItems(project: Project) {
       label: 'Get AI management token',
       icon: 'i-lucide-key-round',
       onSelect: () => { managementBoard.value = { id: project.id, name: project.name } }
+    },
+    {
+      label: 'Update this crew\'s kit',
+      icon: 'i-lucide-refresh-cw',
+      onSelect: () => { void copyCrewUpdatePrompt() }
     }
   ]
   if (project.audience === 'customer') return [pin, agent]

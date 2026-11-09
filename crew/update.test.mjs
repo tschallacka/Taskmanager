@@ -3,6 +3,7 @@
 // Run from the repo root: node --test crew/update.test.mjs
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -37,7 +38,8 @@ function copyKit(name) {
 function run(args, env = {}) {
   return spawnSync(process.execPath, [UPDATE, ...args], {
     encoding: 'utf8',
-    env: { ...process.env, ...env }
+    // The agent definitions and skills init writes go to the scratch folder, never to the real ~/.claude.
+    env: { ...process.env, CLAUDE_CONFIG_DIR: join(scratch, 'claude'), XDG_CONFIG_HOME: join(scratch, 'xdg'), ...env }
   })
 }
 
@@ -65,6 +67,26 @@ describe('crew update: the kit folder belongs to one instance', () => {
   })
 })
 
+describe('crew update: the bootstrap and a home behind its kit folder', () => {
+  test('a first install makes the kit folder that does not exist yet, and records it in the crew home', () => {
+    const target = join(scratch, 'kit-first', 'crew-kit-fixture')
+    const home = makeHome('home-first')
+    run(['--from', KIT, '--kit', target], { CREW_HOME: home })
+    assert.ok(existsSync(join(target, 'update.mjs')), 'the kit folder holds the kit')
+    assert.equal(JSON.parse(readFileSync(join(home, 'crew-kit.json'), 'utf8')).kit, target, 'the crew home names its kit folder')
+  })
+
+  test('a home whose record is behind a kit folder that another home already updated finishes its own install', () => {
+    const target = copyKit('kit-behind')
+    const home = makeHome('home-behind')
+    // The folder already holds this kit (a copy of it), but this home's record names no file of it.
+    writeFileSync(join(home, 'crew-kit.json'), JSON.stringify({ version: '0', kit: target, files: {} }))
+    const result = run(['--from', KIT, '--kit', target], { CREW_HOME: home })
+    assert.match(result.stdout, /Finishing the install of/, result.stdout + result.stderr)
+    assert.ok(JSON.parse(readFileSync(join(home, 'crew-kit.json'), 'utf8')).files['update.mjs'], 'the record now names the kit files')
+  })
+})
+
 describe('crew update --all', () => {
   test('updates each crew home that was installed from this kit folder, names the others, and reports each exit code', () => {
     const target = copyKit('kit-all')
@@ -72,7 +94,11 @@ describe('crew update --all', () => {
     const other = makeHome('home-other')
     const never = makeHome('home-never')
     // The record of a crew home that was installed from this kit folder: its manifest names the folder.
-    writeFileSync(join(mine, 'crew-kit.json'), JSON.stringify({ version: '1', kit: target, files: {} }))
+    // A finished install's record: the sha of every kit file, as the update writes it. An empty record would
+    // read as a home still behind the folder, and the update would finish its install (init, in this copy, fails).
+    const shaOf = name => createHash('sha256').update(readFileSync(join(target, name))).digest('hex')
+    const files = Object.fromEntries(readdirSync(target).filter(name => /\.(mjs|md|tmpl|json|sh|txt)$/.test(name) && !/\.test\.mjs$|^(creds|crew|crew\.config|package-lock|crew-kit|kit-instance)\.json$/.test(name)).map(name => [name, shaOf(name)]))
+    writeFileSync(join(mine, 'crew-kit.json'), JSON.stringify({ version: '1', kit: target, files }))
     writeFileSync(join(other, 'crew-kit.json'), JSON.stringify({ version: '1', kit: join(scratch, 'elsewhere'), files: {} }))
     const homes = [mine, other, never].join(':')
     const result = run(['--all', '--from', KIT, '--kit', target], { CREW_HOMES: homes, CREW_HOME: mine })
