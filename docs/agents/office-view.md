@@ -23,6 +23,18 @@ the board.
 The office shows the crew of the board it is opened from. A board with no crew has no Office tab. Opening its office
 address by hand shows *No crew works on this board*. A crew that is switched off does not count.
 
+## The desk lights
+
+Each desk has a small light beside the name. It shows what the crew monitor says the person is doing:
+
+- a **red filled dot** is busy;
+- a **green ring** is idle;
+- a **grey dashed ring** is no status yet. The office never guesses busy or idle.
+
+The shape says the state as well as the colour. Hover the light (or tap it on a phone) to read the status text: "Busy: …",
+"Idle since 21:40", or "No status yet". The light changes while you watch, without a reload. Until the crew monitor
+reports, every light is grey.
+
 ## Who can see it
 
 Only the team's staff see the Office tab. A customer's contact does not see it. The office shows what the board shows: a
