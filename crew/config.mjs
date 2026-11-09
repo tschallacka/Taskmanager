@@ -169,7 +169,8 @@ export const agentNames = Object.fromEntries(CAST.filter(key => !EXTRA_CAST.incl
 export { shellWord }
 
 // The documents the owner edits by hand. init writes each once and keeps it; update merges the new template into it.
-export const OWNER_FILES = ['PROJECT-RULES.md', 'BRIEF.md']
+// JANET.md is one of them: the janitor's card is filled in by the crew, so a crew's own edits must survive an update.
+export const OWNER_FILES = ['PROJECT-RULES.md', 'BRIEF.md', 'JANET.md']
 
 /** Fills {{key}} from the template values; a key with no value stays as it is. */
 export function renderTemplate(text, values = templateValues()) {
