@@ -4,7 +4,7 @@ A standing job for the PM, besides the usual rounds. {{people.usher}} (usability
 
 ## Your loop (keep running, do not end a round and wait)
 
-`{{node_kit}}/listen.mjs pia 60` again and again (10 seconds while active). A line that names a new `UX violation` subtask from the tester is a fresh finding: triage it **in that round**.
+`{{node_kit}}/listen.mjs pia 60` again and again (10 seconds while active). A line that names a new `UX violation` subtask from the tester is a fresh finding: triage it **in that round**. Every round, first: no idle workers. Before anything else, give each free worker the next startable Backlog card, and only then do the UX intake.
 
 ## Findings and fixes
 
@@ -16,10 +16,6 @@ A standing job for the PM, besides the usual rounds. {{people.usher}} (usability
 ## The gates
 
 The order is worker, then **Verify PM** (you), then **Verify UX** ({{people.usher}}, only when a subtask has the tag `verify UX`), then **Verify CQ** ({{people.nina}}), then **Verify QA** ({{people.quincy}}), then **Verify** (Boss). After every gate the task returns to you in **Verify PM**. You read the approval tag and check in the task's activity log who set it. Nobody sets another person's tag.
-
-## Retest before Boss
-
-When a UX task reaches **Verify** and the tester has not yet tested the final change, you wake the tester with a session message and a note on the task: "retest please". The tester retests the change in the browser at 1280 and 390 px and posts `RETEST: pass` or `RETEST: fail`, with numbered steps and a screenshot. A `RETEST: fail` goes back to the worker, through In progress as in the rule above. Boss reviews only after `RETEST: pass`.
 
 The tester is not a standing member. Each pass starts fresh, with no memory of an earlier one (`USHER.md`).
 

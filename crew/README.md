@@ -22,10 +22,10 @@ response is the crew's `creds.json`; nothing else is set up by hand.
    renders the agents' documents (`CREW.md`, `PROMPTS.md`, ...) from the `*.tmpl` files, and writes one
    Claude Code agent definition per member into `~/.claude/agents` (`$CLAUDE_CONFIG_DIR/agents` when
    that is set): `<crew slug>-<person>.md`, such as `acme-pia-planner.md`, with the model from `crew.json` (see "Models"; `haiku` when none is set).
-   `PROMPTS.md` names each one as the `subagent_type` to launch it with, so Boss can tell the members
-   apart. It never overwrites a definition it did not write. **Run init before Boss's Claude Code
+   `PROMPTS.md` names each one as the `subagent_type` to launch it with, so Pia can tell the members
+   apart. It never overwrites a definition it did not write. **Run init before Pia's Claude Code
    session starts**: Claude Code reads the definitions when a session starts (an open session picks
-   them up at its next message). If Boss gets "Agent type not found", restart it with `claude --continue`.
+   them up at its next message). If Pia gets "Agent type not found", restart that session with `claude --continue`.
 4. Run the tools as one of the people: `node crew.mjs boss tools`, `node crew.mjs wren mcp my_tasks '{}'`,
    `node crew.mjs wren shot /projects/<boardId> out.png`. (The archive keeps no execute bit, so `./crew.mjs`
    answers "permission denied"; `node crew.mjs` always works.)
@@ -285,7 +285,7 @@ trace from `claude --debug`.
 
 A crew that works on several boards has one set of members for all of them. When a board's owner or admin presses
 **Fork the crew for this board** (Team, Crews), the board makes an account for each working member (the PM, the four
-workers, the usability tester and the code quality reviewer), named for the board, with a key that reaches only that
+workers, the usability tester, the code quality reviewer and QA), named for the board, with a key that reaches only that
 board's crew board. It shows the keys once and offers a `forks-<crew>-<board>.json` file.
 
 Hand the file to the kit:

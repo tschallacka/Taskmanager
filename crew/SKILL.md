@@ -1,6 +1,6 @@
 ---
 name: taskmanager-crew
-description: Run a crew of cheap agents (the model is the Owner's choice per person, the cheap tier by default) (a project manager, four workers, three reviewers for UX, code quality and QA, extra workers on request, each with its own browser profile) that build and test ANY product on a Taskmanager board, with Claude as the customer and code reviewer, an optional log watcher, and a chat line for meetings. Use when asked to "set up the crew", "have the cheap workers build X", "start a UX review", or to continue a crew run.
+description: Run a crew of cheap agents (the model is the Owner's choice per person, the cheap tier by default; a project manager, four workers, three reviewers for UX, code quality and QA, extra workers on request, each with its own browser profile) that build and test ANY product on a Taskmanager board, with Claude as the customer and code reviewer, an optional log watcher, and a chat line for meetings. Use when asked to "set up the crew", "have the cheap workers build X", "start a UX review", or to continue a crew run.
 ---
 
 # Taskmanager crew
@@ -39,8 +39,7 @@ Columns: Backlog, To do, In progress, **Verify PM**, **Verify UX**, **Verify CQ*
    update and moves it to **Verify PM**.
 2. The PM checks it in **Verify PM** (diff, lint, evidence, time log) and sends clearly wrong work back
    to In progress, assigned to its worker. Then it passes the gates, each owned by one person, and returns to **Verify PM** after
-   each: **Verify UX** (the usher, only when a subtask is tagged `verify UX`), **Verify CQ** (the
-   nitpicker) and **Verify QA** (Quincy). Each reviewer files problems as subtasks (`UX violation`,
+   each: **Verify UX** (the usher, only when a subtask is tagged `verify UX`), **Verify CQ** (Nina) and **Verify QA** (Quincy). Each reviewer files problems as subtasks (`UX violation`,
    `CQ violation`, `QA violation`) and tags the task `UX approved`, `CQ approved` or `QA approved`
    when nothing is left. Only then does the PM move it to **Verify** for you:
    worker -> PM -> usher -> nina -> Quincy -> PM -> you. The tags are listed in `CREW.md` rule 7b.
