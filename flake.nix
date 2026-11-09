@@ -48,7 +48,7 @@
           nixosModule =
             { lib, pkgs, ... }:
             {
-              imports = [ (import ./nix/module.nix) ];
+              imports = [ ./nix/module.nix ];
               services.arnotes.package = lib.mkDefault self.packages.${pkgs.stdenv.hostPlatform.system}.default;
             };
         in

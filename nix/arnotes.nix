@@ -76,7 +76,8 @@ stdenv.mkDerivation (finalAttrs: {
       --set-default NODE_ENV production \
       --set-default HOST 0.0.0.0 \
       --set-default PORT 3000 \
-      --set-default CREW_KIT_DIR "$out/lib/arnotes/crew" ${lib.optionalString (build != null) ''--set-default TASKMANAGER_BUILD "${build}"''} \
+      --set-default CREW_KIT_DIR "$out/lib/arnotes/crew" \
+      ${lib.optionalString (build != null) ''--set-default TASKMANAGER_BUILD "${build}"''} \
       --add-flags "$out/lib/arnotes/.output/server/index.mjs"
 
     runHook postInstall
