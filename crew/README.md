@@ -367,8 +367,34 @@ Limits, which the design does not remove:
 - **Dialogs are dismissed** unless asked for. A page can still hold a command for up to two minutes, the request timeout.
 - **`shot` writes PNG or JPEG files only**, never through a link, never over a folder, and never over an existing file without `--overwrite`.
 
-## Updating
+## Claude Code limits
 
+Long crew work (a full test suite, a typecheck, waiting for a board event) runs into Claude Code's default time
+limits. `claude-long-run.json` in the kit raises the ones that can be raised. Start a session with it:
+
+    crew claude [your other flags]
+
+That runs `claude --settings <kit>/claude-long-run.json`. Only that session gets the profile; every agent it starts
+inherits it. A session started without `--settings` keeps the defaults, and no user settings are written.
+
+| What | Default | Variable | Profile value |
+|---|---|---|---|
+| A shell command (when it names no timeout) | 2 min | `BASH_DEFAULT_TIMEOUT_MS` | 30 min |
+| The longest a shell command may ask for | 10 min | `BASH_MAX_TIMEOUT_MS` | 2 h |
+| A foreground shell command moved to the background (main session) | off | `CLAUDE_CODE_AUTO_BACKGROUND_TIMEOUT_MS` | 30 min |
+| Shell output read back into the conversation | 30,000 characters | `BASH_MAX_OUTPUT_LENGTH` | 150,000 (the most it accepts) |
+| MCP server start-up | not documented | `MCP_TIMEOUT` | 60 s |
+| An MCP tool call with no progress | 30 min (stdio), 5 min (remote) | `CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT` | 30 min |
+| An MCP tool call moved to the background | 2 min | `CLAUDE_CODE_MCP_AUTO_BACKGROUND_MS` | 10 min |
+| A background agent counted as stalled | 10 min or the watchdog + 5 min | `CLAUDE_ASYNC_AGENT_STALL_TIMEOUT_MS` | 1 h |
+
+What cannot be raised: a Monitor watch stops at 30 minutes (re-arm it, or use `persistent` where the session offers
+it), and shell output stops at 150,000 characters (write long output to a file and read the part you need).
+
+The values were checked against Claude Code 2.1.319 on 2026-11-09. A newer Claude Code may change them. The kit's
+`CLAUDE-LIMITS.md` has the full notes on where each setting is read from.
+
+## Updating
 `crew update` brings the kit folder up to date with the kit the board serves. `crew update --check` says whether an update is waiting and writes nothing. `crew update --from <folder or kit.tar.gz>` installs a kit you already have. Your state stays in `CREW_HOME`. The board's archive does not carry `kit-files.txt`, so a board update does not replace that list: it takes the files to remove from `crew-kit.json`, the record of the last install. A crew that was never updated has no record yet, and its removals are read from the `kit-files.txt` it came with.
 Every kit file it replaces or removes is first copied to `CREW_HOME/backups/update-<time>/kit`. The owner's files (`PROJECT-RULES.md`, `BRIEF.md`) are merged from the template they came from, kept in `CREW_HOME/kit-base`, so your edits and a template change both survive. A crew made before kit-base existed has no recorded template for these two files, so its first update keeps them as they are and prints a WARN; a later update merges any template change from there on. When both change the same line, your file is kept, the merge with markers is set aside in the backup, and the update says CONFLICT. The skill copies in the Claude skills folder are refreshed only while they still match the old kit. Then `init` renders the documents from the new templates, and the install is recorded in `CREW_HOME/crew-kit.json`.
 The kit's changes are in `CHANGELOG.md`; a line about the Taskmanager server is listed in the report, never made here. A kit from before this command has no `update.mjs`, so the old folder cannot update itself. Unpack the new kit into a folder of its own, for example `~/crew-kit-new`, and run it against the old folder with the crew's home set:

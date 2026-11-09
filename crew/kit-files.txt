@@ -6,6 +6,7 @@
 
 BRIEF.md.tmpl
 CHANGELOG.md
+CLAUDE-LIMITS.md
 CREW.md.tmpl
 JANET.md.tmpl
 NINA.md.tmpl
@@ -25,6 +26,7 @@ browser-driver.mjs
 browser.mjs
 cast.mjs
 channel.mjs
+claude-long-run.json
 config.mjs
 crew.config.example.json
 crew.mjs

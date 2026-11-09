@@ -12,6 +12,7 @@
 //   crew publish <slug> <branch> <title> <msg-file> <pr-file>   the merger's one command: squash onto a fresh base, check, push, open the PR (publish.mjs)
 //   crew totp <file>           the current authenticator code for a dev copy's two-factor secret (totp.mjs)
 //   crew setup                 make the crew by hand through the crew API (setup.mjs)
+//   crew claude [args]         Claude Code with the crew's long-run profile, this session only (CLAUDE-LIMITS.md)
 //   crew channel <who>         the Claude Code channel server for one person (channel.mjs)
 //   crew <who> browser goto|shot|eval|console|tabs|close-tab|done   the shared browser, one context per person (browser.mjs)
 //   crew browser status|shutdown                                    the shared browser for everyone
@@ -41,6 +42,14 @@ if (first === 'browser' || rest[0] === 'browser') {
 // person Susy's own board commands, as for every other person.
 if (first === 'susy' && (rest[0] === 'check' || rest[0] === 'agent')) {
   const run = spawnSync(process.execPath, [join(kit, 'susy.mjs'), ...rest], { stdio: 'inherit' })
+  process.exit(run.status ?? 1)
+}
+
+// The Claude Code profile: `crew claude [args]` starts a session with the limits raised for crew work
+// (claude-long-run.json, explained in CLAUDE-LIMITS.md). It is passed with --settings, so only this session
+// gets it; a session started another way keeps the defaults.
+if (first === 'claude') {
+  const run = spawnSync('claude', ['--settings', join(kit, 'claude-long-run.json'), ...rest], { stdio: 'inherit' })
   process.exit(run.status ?? 1)
 }
 
