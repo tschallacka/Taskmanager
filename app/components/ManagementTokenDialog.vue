@@ -145,8 +145,8 @@ function close() {
 <template>
   <UModal
     :open="open"
-    title="Get AI management token"
-    description="A token for 10 minutes that lets an AI agent manage the crew of this board."
+    title="Add a crew to this board"
+    description="A token for 10 minutes. Give the prompt to an AI agent: it makes a new crew for this board and keeps its keys."
     :ui="{ footer: 'justify-end' }"
     @update:open="(value: boolean) => emit('update:open', value)"
   >

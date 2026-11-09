@@ -8,7 +8,7 @@ const { ready, projects, allTasks, deleteProject, renameProject } = useProjects(
 const route = useRoute()
 const { unread: inboxUnread } = useNotifications()
 const { pins, pinsLoaded, loadPins, isPinned, pinBoard, unpinBoard } = usePins()
-const { activeTeamId, isTeamAdmin } = useTeams()
+const { activeTeamId } = useTeams()
 const { switchWorkspace } = useWorkspace()
 const toast = useToast()
 
@@ -140,7 +140,7 @@ function menuItems(project: Project) {
     icon: pinned ? 'i-lucide-pin-off' : 'i-lucide-pin',
     onSelect: () => togglePin(project.id)
   }]
-  // The two agent links sit next to the pin: the Connect window for this board, and a 10-minute management token.
+  // The two agent links sit next to the pin: the Connect window for this board, and the one crew action for it.
   const agent = [
     {
       label: 'Connect your Claude',
@@ -148,8 +148,8 @@ function menuItems(project: Project) {
       onSelect: () => { void navigateTo({ path: '/connect', query: { board: project.id } }) }
     },
     {
-      label: 'Get AI management token',
-      icon: 'i-lucide-key-round',
+      label: 'Add a crew to this board',
+      icon: 'i-lucide-users-round',
       onSelect: () => { managementBoard.value = { id: project.id, name: project.name } }
     }
   ]
@@ -157,14 +157,6 @@ function menuItems(project: Project) {
   const manage: { label: string, icon: string, onSelect: () => unknown }[] = [
     { label: 'Rename', icon: 'i-lucide-pencil', onSelect: () => startRename(project) }
   ]
-  // A team's owner or admin gives a board a crew; the Crews section of /team does the attaching.
-  if (isTeamAdmin.value) {
-    manage.push({
-      label: 'Give it a crew',
-      icon: 'i-lucide-users-round',
-      onSelect: () => { void navigateTo({ path: '/team', query: { section: 'crews', board: project.id, wizard: '1' } }) }
-    })
-  }
   return [pin, agent, manage, [
     {
       label: 'Delete project',
