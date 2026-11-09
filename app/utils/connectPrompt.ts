@@ -47,6 +47,10 @@ export interface ConnectPromptInput {
   boards: ConnectPromptBoard[]
   /** How the agent gets its token: the code it exchanges, the token itself, or the browser approval it asks for. */
   access: { kind: 'code', code: string, expiresAt: number } | { kind: 'token', token: string } | { kind: 'browser' }
+  /** A key that reaches every board the owner can open: said in one line, instead of a list of boards. */
+  allBoards?: { scopes: readonly string[] }
+  /** A reconnect: the prompt removes the server that is already there before it adds it again. */
+  replacing?: boolean
 }
 
 /**
@@ -78,8 +82,10 @@ function browserSteps(origin: string, tokenName: string, boards: ConnectPromptBo
  * carries the token, which the owner chose to show.
  */
 export function connectPrompt(input: ConnectPromptInput): string {
-  const boardLines = input.boards.map(board => `- ${board.name} (${board.workspace}): ${permissionList(board.scopes)}`)
-  const allScopes = new Set(input.boards.flatMap(board => board.scopes))
+  const boardLines = input.allBoards
+    ? [`- All the boards you can open, including ones the owner gives later: ${permissionList(input.allBoards.scopes)}`]
+    : input.boards.map(board => `- ${board.name} (${board.workspace}): ${permissionList(board.scopes)}`)
+  const allScopes = new Set([...input.boards.flatMap(board => board.scopes), ...(input.allBoards?.scopes ?? [])])
   const crewLine = allScopes.has('crews:manage')
     ? 'A crew works on its own shadow board and never writes to the real board.\n'
     : ''
@@ -99,6 +105,12 @@ export function connectPrompt(input: ConnectPromptInput): string {
           `  ${input.access.token}`
         ].join('\n')
 
+  // A reconnect: the server is already there, so it is removed first. The remove fails quietly when nothing is there yet,
+  // and each line is a command of its own, so the add still runs.
+  const replace = input.replacing
+    ? `If Claude Code already has a taskmanager server (this is a reconnect), remove it first, or the add below fails. The remove is quiet when there is nothing to remove:\n  claude mcp remove --scope user taskmanager 2>/dev/null\n`
+    : ''
+
   return `Connect to my Taskmanager at ${input.origin}, as the connection "${input.tokenName}".
 
 Boards you may use, and what you may do on each:
@@ -107,7 +119,7 @@ ${crewLine}
 Authentication
 ${auth}
 
-Then add the MCP server, exactly as written (the single quotes matter):
+${replace}Then add the MCP server, exactly as written (the single quotes matter):
   claude mcp add --scope user --transport http taskmanager ${endpoint} --header 'Authorization: Bearer \${TASKMANAGER_API_KEY}'
 
 Never echo, print, log or paste the key anywhere else, and never send it to another service.
@@ -154,4 +166,42 @@ export interface IssuedConnection {
   tokenName: string
   boards: ConnectPromptBoard[]
   access: ConnectPromptInput['access']
+}
+
+/** What a key's prompt needs: the key's name, what it reaches, and the access the agent gets. */
+export interface KeyPromptInput {
+  origin: string
+  /** The key's name, as the owner gave it. */
+  name: string
+  /** The boards the key reaches, or every board the owner can open. */
+  reach: { boards: ConnectPromptBoard[], allBoards?: { scopes: readonly string[] } }
+  /** The one-time pairing code for the key. Null when it could not be made; the prompt then has a placeholder. */
+  pairing: { code: string, expiresAt: number } | null
+  /** The key itself. Written in only when the owner chooses it. */
+  token: string | null
+  mode: 'code' | 'token'
+}
+
+/** Where the key goes when the prompt is shown before any key exists. It is never a real key. */
+export const KEY_PLACEHOLDER = '<paste the key here>'
+
+/**
+ * The one prompt a key gives. Pairing is the default: the prompt carries a one-time code the agent exchanges, so the
+ * key stays out of the chat. The key goes in only when the owner chooses it. The prompt always removes an existing
+ * taskmanager server first, so the same paste fits a first setup and a reconnect.
+ */
+export function keyPrompt(input: KeyPromptInput): string {
+  const access = input.mode === 'token'
+    ? { kind: 'token' as const, token: input.token ?? KEY_PLACEHOLDER }
+    : input.pairing
+      ? { kind: 'code' as const, code: input.pairing.code, expiresAt: input.pairing.expiresAt }
+      : { kind: 'token' as const, token: KEY_PLACEHOLDER }
+  return connectPrompt({
+    origin: input.origin,
+    tokenName: input.name,
+    boards: input.reach.boards,
+    allBoards: input.reach.allBoards,
+    replacing: true,
+    access
+  })
 }
