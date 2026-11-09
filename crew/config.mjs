@@ -59,6 +59,8 @@ export const config = {
   // The slug the crew API files this crew under (setup.mjs reads it).
   crew: raw.crew ?? {},
   devLog: raw.devLog ?? `${here}dev.log`,
+  // The folder Boss runs its Claude Code session in: init writes Boss's Stop hook there (boss-session.mjs). Empty: none is written.
+  bossSession: raw.bossSession ? String(raw.bossSession).replace(/\/$/, '') : '',
   // The merger's `crew publish` (publish.mjs validates it and names every problem); the repository defaults to the product's.
   publish: { repo: raw.product?.repo ?? '', ...raw.publish }
 }

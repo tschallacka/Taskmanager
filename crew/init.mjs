@@ -11,6 +11,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { CAST, OWNER_FILES, agentNames, config, forkMemberPlan, here, kitDir, loadForks, modelProblems, renderTemplate, templateValues } from './config.mjs'
 import { writePiaHooks } from './pia-session.mjs'
+import { writeBossHooks } from './boss-session.mjs'
 
 const ok = m => console.log(`  ok   ${m}`)
 const warn = m => console.log(`  WARN ${m}`)
@@ -248,6 +249,18 @@ if (!skipsProvider('pia', config.models.pia)) {
   try {
     const { file, changed } = writePiaHooks(`${here}pia-session`, { crewHome: here.replace(/\/$/, ''), kitDir: kitDir.replace(/\/$/, '') })
     ok(`${file} ${changed ? 'written: her listener hooks' : 'kept, hooks already current'}`)
+  } catch (error) { fail(error.message) }
+}
+
+// Boss's session: its Stop hook keeps the two crew watches running (boss-stop-hook.sh). Written into the folder that
+// crew.json names as "bossSession"; without one, init says so and writes nothing, because a hook in a folder Boss does
+// not run in does nothing.
+console.log('\nBoss session')
+if (!config.bossSession) warn('crew.json has no "bossSession": set it to the folder Boss runs its Claude Code session in, then run init again, or Boss\'s Stop hook is not written')
+else {
+  try {
+    const { file, changed, excluded } = writeBossHooks(config.bossSession, { crewHome: here.replace(/\/$/, ''), kitDir: kitDir.replace(/\/$/, '') })
+    ok(`${file} ${changed ? 'written: the watch hook' : 'kept, hook already current'}${excluded ? ' (kept out of git)' : ''}`)
   } catch (error) { fail(error.message) }
 }
 

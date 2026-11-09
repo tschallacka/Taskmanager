@@ -82,12 +82,16 @@ Columns: Backlog, To do, In progress, **Verify PM**, **Verify UX**, **Verify CQ*
 - **Watch for `@cato`, every minute.** Pia asks Boss things by writing `@cato` in a task update. Only Pia does: the
   workers and reviewers ask Pia, and Pia decides what goes to Boss, so a `@cato` from anyone else is ignored. Boss
   is not a board member, so no notification reaches this session. At the start of a crew session, start
-  `crew mentions --follow` as a `Monitor` (timeout 30 minutes, the most it allows). It checks the boards every 60
-  seconds and prints one line per new mention, and each line wakes you. Re-arm it every time it expires, for as long
-  as the crew runs. Without a `Monitor`, schedule `crew mentions` every minute instead: it prints only what came in
-  since its last check, so nothing is printed twice. Answer a mention before anything else except the Owner. After a
-  restart, run `crew mentions` once: it catches up from its last check (the first time, the last 24 hours). The
-  watch reads updates on main cards only, so tell Pia to put a question for you on the main card, not on a subtask.
+  `crew boss-mentions` as a `Monitor` (timeout 30 minutes, the most it allows). It checks the boards every 60 seconds
+  and prints one line per new @cato mention by Pia, Susy or Rita, and each line wakes you. Re-arm it every time it
+  expires, for as long as the crew runs. Start `crew watch-crew` as a second `Monitor` the same way: it checks Pia
+  (her session, her transcript, her own listener) and Susy every 3 minutes and prints only on trouble, and once when
+  it is fixed. Both are the Boss watches of the kit. A Stop hook in your session (`boss-stop-hook.sh`, written by
+  `init` into the folder `bossSession` in crew.json) blocks you from ending a turn while one of them is not running,
+  and names the Monitor call to make: it is the safety net, not the plan. Answer a mention before anything else except
+  the Owner. After a restart, run `crew mentions` once: it catches up from its last check (the first time, the last 24
+  hours). The watch reads updates on main cards only, so tell Pia to put a question for you on the main card, not on a
+  subtask.
 - **Chat line.** Start the chat server, join the customer channel as the customer nick, keep a
   presence tail running and arm `guard.sh` as a tracked background task; its exit is the wake for
   an `@<customer nick>` mention. Re-arm it every time. The chat line is optional (off unless `chat.client` is set): without it, meetings and steering go through the board. See `README.md`.
