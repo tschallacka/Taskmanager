@@ -162,6 +162,16 @@ function swatchStyle(color: string, selected: boolean) {
     <!-- Header -->
     <div class="sticky top-0 z-10 border-b border-default bg-default/95 backdrop-blur-sm shrink-0">
       <div class="px-4 pt-3.5 pb-3 flex items-center gap-3">
+        <!-- Phone only: the sidebar holds the boards, and this is the way back to them from Settings. -->
+        <UButton
+          to="/projects"
+          icon="i-lucide-arrow-left"
+          color="neutral"
+          variant="ghost"
+          size="xs"
+          class="lg:hidden"
+          aria-label="Back to boards"
+        />
         <h1 class="font-semibold text-sm">
           Settings
         </h1>
