@@ -695,7 +695,7 @@ function reachLabel(key: ApiKeySummary): string {
                     <p class="text-xs text-muted mt-0.5 truncate">
                       <code class="font-mono">{{ key.keyPrefix }}…</code>
                       · reaches {{ reachLabel(key) }}
-                      · {{ key.lastUsedAt ? `last used ${formatDate(key.lastUsedAt)}` : 'never used' }}
+                      · {{ keyUseLabel(key) }}
                       · {{ expiryLabel(key) }}
                     </p>
                   </div>

@@ -1,6 +1,6 @@
 // Revoke from a key's row: someone else cannot revoke a key, the owner's revoke removes the key at once, its secret is
 // refused as revoked, and the secret table keeps the record of it. Needs the dev database with the token tables. Run:
-//   TSX_TSCONFIG_PATH=.nuxt/tsconfig.server.json DATABASE_URL=postgresql://arnotes@localhost:55433/arnotes_test_wynn node --import tsx --test --test-force-exit tests/api-key-revoke-row.test.ts
+//   TSX_TSCONFIG_PATH=.nuxt/tsconfig.server.json DATABASE_URL=postgresql://arnotes@localhost:55433/arnotes_test_<your key> node --import tsx --test --test-force-exit tests/api-key-revoke-row.test.ts
 import { after, before, test } from 'node:test'
 import assert from 'node:assert/strict'
 import { randomBytes } from 'node:crypto'
