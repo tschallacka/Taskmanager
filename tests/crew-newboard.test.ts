@@ -26,6 +26,7 @@ const now = Date.now()
 const slug = `tnb-${tag}`
 const takenSlug = `tnb-${tag}-taken`
 const refusedSlug = `tnb-${tag}-no`
+const plainSlug = `tnb-${tag}-plain`
 
 const boss = id('boss')
 const plain = id('plain')
@@ -34,7 +35,7 @@ const realTeam = id('real-team')
 const emptyTeam = id('empty-team')
 const otherTeam = id('other-team')
 const board = { real: id('board-real'), foreign: id('board-foreign') }
-const names = { made: 'Fresh board', refused: 'Refused board' }
+const names = { made: 'Fresh board', refused: 'Refused board', plain: 'Plain board' }
 
 const caller = (userId: string) => ({ userId, keyId: null, keyName: 'test key' })
 const management = (userId: string, boardId: string) => ({ userId, keyId: id('mgmt'), keyName: 'management', boardId })
@@ -74,7 +75,7 @@ async function enableLevels() {
 
 after(async () => {
   await db.delete(instanceSettings).where(eq(instanceSettings.id, 'instance'))
-  const made = await db.select().from(crews).where(inArray(crews.slug, [slug, takenSlug, refusedSlug]))
+  const made = await db.select().from(crews).where(inArray(crews.slug, [slug, takenSlug, refusedSlug, plainSlug]))
   for (const crew of made) await purgeCrew(crew)
   await db.delete(organization).where(inArray(organization.id, [`crew-${takenSlug}`]))
   await db.delete(organization).where(inArray(organization.id, [realTeam, emptyTeam, otherTeam]))
@@ -123,14 +124,21 @@ test('the newBoard shape and name are checked before anything is made', () => {
     (e: { statusCode?: number, statusMessage?: string }) => e.statusCode === 403 && msgOf(e) === 'A management token cannot create a new board.')
 })
 
-test('a plain member, a key of another team, and a rotate of the crew already made are refused', async () => {
-  await rejects(makeCrewOnNewBoard({ slug: refusedSlug, name: 'Refused', product, rotate: false }, caller(plain), { teamId: realTeam, name: names.refused }), 403, 'Your key may not create boards in that team.')
+test('a key of another team, and a rotate of the crew already made, are refused', async () => {
   await rejects(makeCrewOnNewBoard({ slug: refusedSlug, name: 'Refused', product, rotate: false }, caller(outsider), { teamId: realTeam, name: names.refused }), 403, 'Your key may not create boards in that team.')
   await rejects(makeCrewOnNewBoard({ slug, name: 'New crew', product, rotate: true }, caller(boss), { teamId: realTeam, name: names.refused }), 400, 'A crew that already exists keeps its board; use projectId or no board.')
   await rejects(makeCrewOnNewBoard({ slug, name: 'New crew', product, rotate: false }, caller(boss), { teamId: realTeam, name: names.refused }), 409)
   const refusedBoards = await db.select({ id: projects.id }).from(projects).where(and(eq(projects.teamId, realTeam), eq(projects.name, names.refused)))
   assert.deepEqual(refusedBoards, [], 'a refused call leaves no board behind')
   assert.deepEqual(await db.select({ id: crews.id }).from(crews).where(eq(crews.slug, refusedSlug)), [])
+})
+
+test('a plain member of the team is refused the crew, and the board they tried to make is removed again', async () => {
+  // The member passes the UI's board-creation check; binding the crew to the board then needs owner or admin of the team.
+  await rejects(makeCrewOnNewBoard({ slug: plainSlug, name: 'Plain crew', product, rotate: false }, caller(plain), { teamId: realTeam, name: names.plain }), 403)
+  const leftover = await db.select({ id: projects.id }).from(projects).where(and(eq(projects.teamId, realTeam), eq(projects.name, names.plain)))
+  assert.deepEqual(leftover, [], 'a refused call leaves no board behind')
+  assert.deepEqual(await db.select({ id: crews.id }).from(crews).where(eq(crews.slug, plainSlug)), [])
 })
 
 test('a crew that cannot be made leaves no board behind', async () => {
