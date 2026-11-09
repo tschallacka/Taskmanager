@@ -135,6 +135,91 @@ function roleOf(key: string) {
   return CREW_PEOPLE.find(person => person.key === key)
 }
 
+type CrewPerson = (typeof CREW_PEOPLE)[number]
+
+/**
+ * Makes one person of a crew the way crew create does: the account, then the team seat, or for a contact the customer
+ * login. Crew create, rotate and the people route all make a person here, so one added later is the same as one made
+ * at creation.
+ */
+async function makePersonOf(crew: { id: string, slug: string, teamId: string, customerId: string | null }, person: CrewPerson, password: string) {
+  const made = await createCrewAccount({ email: crewAddress(crew.slug, person.key), name: person.name, password, crewId: crew.id })
+  if (person.team === 'contact') {
+    if (crew.customerId) await db.insert(customerMembers).values({ id: genId(), customerId: crew.customerId, userId: made.id, createdAt: Date.now() })
+  } else {
+    await db.insert(member).values({ id: genId(), organizationId: crew.teamId, userId: made.id, role: person.team, createdAt: new Date() })
+  }
+  return made
+}
+
+/**
+ * Makes the given people of a crew, each with a key, into `minted`. A failure part-way takes back the accounts this call
+ * created, with their keys, so no half-made person stays behind.
+ */
+async function addPeopleTo(crew: Crew, people: readonly CrewPerson[], minted: Minted): Promise<void> {
+  const madeUsers: string[] = []
+  try {
+    for (const person of people) {
+      const password = secret()
+      const made = await makePersonOf(crew, person, password).catch(() => {
+        throw createError({ statusCode: 409, message: 'An address this crew needs belongs to another account.' })
+      })
+      if (made.created) madeUsers.push(made.id)
+      const apiKey = await mintKey(made.id, person.team === 'contact' ? null : crew.teamId, `crew ${person.key}`)
+      minted.set(person.key, { password, apiKey })
+    }
+  } catch (error) {
+    if (madeUsers.length) {
+      await db.delete(apiKeys).where(inArray(apiKeys.userId, madeUsers))
+      await db.delete(user).where(inArray(user.id, madeUsers))
+    }
+    throw error
+  }
+}
+
+/**
+ * Adds the people of the kit that a crew lacks: all of them, or only the named ones (null = all). A person already there
+ * is skipped and nobody else is changed: no key is rotated and no session ends. The answer carries the keys of the new
+ * people only, in the create answer's shape; nobody missing gives an empty people map.
+ */
+export async function addCrewPeople(crew: Crew, only: string[] | null) {
+  const accounts = await accountsOf(crew.id)
+  const have = new Set(accounts.map(a => personKeyOf(crew.slug, a.email)))
+  const wanted = only === null ? CREW_PEOPLE : CREW_PEOPLE.filter(p => only.includes(p.key))
+  const missing = wanted.filter(p => !have.has(p.key))
+  const minted: Minted = new Map()
+  await addPeopleTo(crew, missing, minted)
+  const [fresh] = await db.select().from(crews).where(eq(crews.id, crew.id))
+  return { body: await secretsResponse(fresh!, minted, missing.map(p => p.key)), added: missing.map(p => p.key) }
+}
+
+/**
+ * The people a call names, from its body (people: [...]) or from ?people=a,b. Nothing named means every person of the
+ * kit (null). A key the kit does not know is refused by name.
+ */
+export function parsePeopleKeys(body: unknown, query: unknown): string[] | null {
+  const named: string[] = []
+  let given = false
+  const list = body && typeof body === 'object' ? (body as Record<string, unknown>).people : undefined
+  if (list !== undefined) {
+    if (!Array.isArray(list) || list.some(item => typeof item !== 'string')) {
+      throw createError({ statusCode: 400, message: 'people is a list of person keys.' })
+    }
+    given = true
+    named.push(...(list as string[]))
+  }
+  const text = Array.isArray(query) ? query.join(',') : query
+  if (typeof text === 'string') {
+    given = true
+    if (text.trim() !== '') named.push(...text.split(',').map(key => key.trim()))
+  }
+  if (!given) return null
+  for (const key of named) {
+    if (!roleOf(key)) throw createError({ statusCode: 400, message: `people: "${key.slice(0, 40)}" is not a person of the crew kit.` })
+  }
+  return named
+}
+
 /** Every account of the crew, the members forked for a board included. */
 async function allAccountsOf(crewId: string) {
   return db.select({ id: user.id, name: user.name, email: user.email }).from(user).where(eq(user.crewId, crewId))
@@ -184,15 +269,22 @@ export async function crewView(crew: Crew) {
     customerId: crew.customerId,
     boardUrl: crew.boardId ? `${baseUrl()}/projects/${crew.boardId}` : null,
     disabledAt: crew.disabledAt,
-    people
+    people,
+    // The crew's cast against the kit: every person the kit has, present when the crew already has the account.
+    cast: CREW_PEOPLE.map(person => ({
+      key: person.key,
+      name: person.name,
+      status: people.some(p => p.key === person.key) ? 'present' : 'missing'
+    }))
   }
 }
 
 /** The full answer to a create or rotate: the crew, its team and board, and its secrets, once. */
-async function secretsResponse(crew: Crew, minted: Minted) {
+async function secretsResponse(crew: Crew, minted: Minted, only?: string[]) {
   const view = await crewView(crew)
   const people: Record<string, unknown> = {}
   for (const person of view.people) {
+    if (only && !only.includes(person.key)) continue
     const secrets = minted.get(person.key)
     people[person.key] = {
       id: person.id,
@@ -243,31 +335,17 @@ async function makeCrew(input: CrewInput, caller: CrewCaller) {
 
     const minted: Minted = new Map()
     const accountIds = new Map<string, string>()
-    const teamMembers: { id: string, organizationId: string, userId: string, role: string, createdAt: Date }[] = [
-      { id: genId(), organizationId: teamId, userId: caller.userId, role: 'owner', createdAt: new Date() }
-    ]
-    for (const person of CREW_PEOPLE) {
-      const password = secret()
-      const { id } = await createCrewAccount({
-        email: crewAddress(input.slug, person.key),
-        name: person.name,
-        password,
-        crewId
-      })
-      madeUsers.push(id)
-      accountIds.set(person.key, id)
-      minted.set(person.key, { password, apiKey: '' })
-      if (person.team !== 'contact') {
-        teamMembers.push({ id: genId(), organizationId: teamId, userId: id, role: person.team, createdAt: new Date() })
-      }
-    }
-    await db.insert(member).values(teamMembers)
-
+    await db.insert(member).values({ id: genId(), organizationId: teamId, userId: caller.userId, role: 'owner', createdAt: new Date() })
+    // The customer exists before the people: a contact's customer login joins it as that person is made.
     const customerId = genId()
     await db.insert(customers).values({ id: customerId, organizationId: teamId, name: input.product.name, createdAt: now, updatedAt: now })
-    await db.insert(customerMembers).values(
-      ['customer', 'contact'].map(key => ({ id: genId(), customerId, userId: accountIds.get(key)!, createdAt: now }))
-    )
+    for (const person of CREW_PEOPLE) {
+      const password = secret()
+      const made = await makePersonOf({ id: crewId, slug: input.slug, teamId, customerId }, person, password)
+      madeUsers.push(made.id)
+      accountIds.set(person.key, made.id)
+      minted.set(person.key, { password, apiKey: '' })
+    }
 
     const boardId = genId()
     await db.insert(projects).values({
@@ -336,26 +414,7 @@ export async function rotateCrew(crew: Crew) {
   // A crew made before a role existed gets the missing people now: their account, team
   // seat or customer login, and keys. Nobody who exists is changed beyond the rotation.
   const have = new Set(accounts.map(a => personKeyOf(crew.slug, a.email)))
-  for (const person of CREW_PEOPLE.filter(p => !have.has(p.key))) {
-    const password = secret()
-    const { id } = await createCrewAccount({
-      email: crewAddress(crew.slug, person.key),
-      name: person.name,
-      password,
-      crewId: crew.id
-    }).catch(() => {
-      throw createError({ statusCode: 409, message: 'An address this crew needs belongs to another account.' })
-    })
-    if (person.team === 'contact') {
-      if (crew.customerId) {
-        await db.insert(customerMembers).values({ id: genId(), customerId: crew.customerId, userId: id, createdAt: Date.now() })
-      }
-    } else {
-      await db.insert(member).values({ id: genId(), organizationId: crew.teamId, userId: id, role: person.team, createdAt: new Date() })
-    }
-    const apiKey = await mintKey(id, person.team === 'contact' ? null : crew.teamId, `crew ${person.key}`)
-    minted.set(person.key, { password, apiKey })
-  }
+  await addPeopleTo(crew, CREW_PEOPLE.filter(p => !have.has(p.key)), minted)
 
   if (crew.disabledAt) await enableCrew(crew)
   const [fresh] = await db.select().from(crews).where(eq(crews.id, crew.id))
