@@ -12,11 +12,16 @@ the board.
 
 ## Where to find it
 
-1. Open a board that a crew works on. Only those have the **Office** tab, next to **Board** and **List**.
-2. Press **Office**. The room opens at the board's own address with `/office/` in front of the board's id.
+1. Open a board that a crew works on. Such a board has the **Office** tab, next to **Board** and **List**. That is a crew
+   board (the crew's own shadow board), and also the main board a crew is linked to, so the people who work on the main
+   board can watch its crew from there.
+2. Press **Office**. The room opens at the board's own address with `/office/` in front of the board's id. On a main
+   board with more than one crew, the tab opens a menu first: pick the crew to watch, and the room opens with `?crew=`
+   and that crew's id. A main board with one crew opens that crew straight away.
 3. To go back, press the arrow at the top left, or press the board's name.
 
-A board with no crew has no Office tab. Opening its office address by hand shows *No crew works on this board*.
+The office shows the crew of the board it is opened from. A board with no crew has no Office tab. Opening its office
+address by hand shows *No crew works on this board*. A crew that is switched off does not count.
 
 ## Who can see it
 
