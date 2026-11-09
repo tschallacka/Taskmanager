@@ -30,8 +30,9 @@ export default defineEventHandler(async (event) => {
     if (!newBoard) await requireCreateOnOwnBoard(caller, input.slug, body.projectId)
     // Crews made or rotated by one person are counted against the crew limits (rateLimits.ts).
     const boardId = caller.boardId ?? (typeof body.projectId === 'string' ? body.projectId : null)
-    // The instance admin's crew calls are not counted: the existing crew API gets no new refusals.
-    if (!(await isInstanceAdmin(caller.userId))) {
+    // The instance admin's crew calls are not counted: the existing crew API gets no new refusals. A newBoard call
+    // is charged for every caller, the instance admin included (the card's decision): it makes a board, not only a crew.
+    if (newBoard || !(await isInstanceAdmin(caller.userId))) {
       await chargeRateLimit('crews', `user:${caller.userId}`, await limitsFor('crews', await scopeOfBoard(boardId)), event)
     }
     if (newBoard) {
