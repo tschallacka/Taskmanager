@@ -88,7 +88,7 @@ Columns: Backlog, To do, In progress, **Verify PM**, **Verify UX**, **Verify CQ*
   (her session, her transcript, her own listener) and Susy every 3 minutes and prints only on trouble, and once when
   it is fixed. Both are the Boss watches of the kit. A Stop hook in your session (`boss-stop-hook.sh`, written by
   `init` into the folder `bossSession` in crew.json) blocks you from ending a turn while one of them is not running,
-  and names the Monitor call to make: it is the safety net, not the plan. Answer a mention before anything else except
+  and names the Monitor call to make: it is the safety net, not the plan. A crew that already has its own Boss Stop hook removes it after `init`. Answer a mention before anything else except
   the Owner. After a restart, run `crew mentions` once: it catches up from its last check (the first time, the last 24
   hours). The watch reads updates on main cards only, so tell Pia to put a question for you on the main card, not on a
   subtask.
