@@ -23,8 +23,8 @@ const now = Date.now()
 const slug = `own${tag}`
 const address = (key: string) => `${slug}-${key}@crew.invalid`
 
-const people = { owner: id('owner'), pia: id('pia'), pat: id('pat'), nina: id('nina'), worker: id('worker') }
-const keys = { pia: 'pia', pat: 'pat', nina: 'nina', worker: 'worker' } as const
+const people = { owner: id('owner'), pia: id('pia'), pat: id('pat'), nina: id('nina'), quincy: id('quincy'), boss: id('boss'), worker: id('worker') }
+const keys = { pia: 'pia', pat: 'pat', nina: 'nina', quincy: 'quincy', boss: 'boss', worker: 'worker' } as const
 const team = id('team')
 const ownBoard = id('own-board')
 const forkReal = id('fork-real')
@@ -38,7 +38,7 @@ const forkCrew = id('fork-crew')
 const link = id('link')
 const cols = Object.fromEntries(['todo', 'pm', 'ux', 'cq', 'qa', 'verify'].map(name => [name, id(`col-${name}`)]))
 const card = id('card')
-const members = [people.owner, people.pia, people.pat, people.nina, people.worker]
+const members = [people.owner, people.pia, people.pat, people.nina, people.quincy, people.boss, people.worker]
 
 const columnOf = async (taskId: string) => {
   const [row] = await db.select({ columnId: projectTasks.columnId, assigneeId: projectTasks.assigneeId }).from(projectTasks).where(eq(projectTasks.id, taskId))
@@ -55,6 +55,8 @@ before(async () => {
     { id: people.pia, email: address(keys.pia), crewId: crewRow },
     { id: people.pat, email: address(keys.pat), crewId: crewRow },
     { id: people.nina, email: address(keys.nina), crewId: crewRow },
+    { id: people.quincy, email: address(keys.quincy), crewId: crewRow },
+    { id: people.boss, email: address(keys.boss), crewId: crewRow },
     { id: people.worker, email: address(keys.worker), crewId: crewRow }
   ]
   await db.insert(user).values({ id: people.owner, name: 'owner', email: `${people.owner}@arnotes.test`, emailVerified: true, createdAt: stamp, updatedAt: stamp })
@@ -123,6 +125,28 @@ test('gate routing on a crew\'s own board: a PM approval set by Pat moves the ca
   await db.update(projectTasks).set({ tags: ['pm approved'] }).where(eq(projectTasks.id, card))
   await fireRules({ type: 'tags_changed', projectId: ownBoard, taskId: card, actorId: people.pat, actorIsAgent: false, detail: null }, newRuleChain())
   assert.deepEqual(await columnOf(card), { columnId: cols.cq, assigneeId: people.nina })
+})
+
+test('gate routing on a crew\'s own board: the whole chain, Nina then Quincy, ends in Verify for Boss', async () => {
+  const chain = id('card-chain')
+  await db.insert(projectTasks).values({ id: chain, projectId: ownBoard, columnId: cols.pm!, title: 'chain', visibility: 'internal', position: 2, tags: [], assigneeId: people.worker, createdAt: now, updatedAt: now })
+  // Pat approves the PM pre-check: the card goes to Verify CQ for Nina.
+  await setTag(chain, 'pm approved', people.pat)
+  await db.update(projectTasks).set({ tags: ['pm approved'] }).where(eq(projectTasks.id, chain))
+  await fireRules({ type: 'tags_changed', projectId: ownBoard, taskId: chain, actorId: people.pat, actorIsAgent: false, detail: null }, newRuleChain())
+  assert.deepEqual(await columnOf(chain), { columnId: cols.cq, assigneeId: people.nina })
+  // Nina approves CQ; the card is back in Verify PM, and Pat approves again: Verify QA for Quincy.
+  await setTag(chain, 'cq approved', people.nina)
+  await db.update(projectTasks).set({ tags: ['pm approved', 'cq approved'], columnId: cols.pm! }).where(eq(projectTasks.id, chain))
+  await setTag(chain, 'pm approved', people.pat)
+  await fireRules({ type: 'tags_changed', projectId: ownBoard, taskId: chain, actorId: people.pat, actorIsAgent: false, detail: null }, newRuleChain())
+  assert.deepEqual(await columnOf(chain), { columnId: cols.qa, assigneeId: people.quincy })
+  // Quincy approves QA; back in Verify PM, Pat approves again: Verify for Boss.
+  await setTag(chain, 'qa approved', people.quincy)
+  await db.update(projectTasks).set({ tags: ['pm approved', 'cq approved', 'qa approved'], columnId: cols.pm! }).where(eq(projectTasks.id, chain))
+  await setTag(chain, 'pm approved', people.pat)
+  await fireRules({ type: 'tags_changed', projectId: ownBoard, taskId: chain, actorId: people.pat, actorIsAgent: false, detail: null }, newRuleChain())
+  assert.deepEqual(await columnOf(chain), { columnId: cols.verify, assigneeId: people.boss })
 })
 
 test('gate routing on a crew\'s own board: a PM approval set by a worker does nothing (negative)', async () => {
