@@ -109,18 +109,21 @@ export async function crewRulesRunFor(project: Pick<RuleProject, 'id'>): Promise
 
 /**
  * The crew members of a board by their crew key (pia, usher, nina, quincy, boss), with their account ids.
- * A crew's own board (crews.boardId) has no fork rows, so its accounts are read from their addresses. A board
- * given to a crew is matched by its real board or its shadow board, where the crew's rules run. Fork members
- * win where both exist.
+ * A crew's own board (crews.boardId) and the shadow board of a fork (crew_boards.shadowProjectId, where the crew's
+ * rules run) have no fork rows, so the crew's accounts are read from their addresses. A board given to a crew is
+ * matched by its real board too. Fork members win where both exist.
  */
 export async function crewMemberIds(projectId: string): Promise<Map<string, string>> {
   const members = new Map<string, string>()
-  const [own] = await db.select({ id: crews.id, slug: crews.slug }).from(crews)
+  const ownCrews = await db.select({ id: crews.id, slug: crews.slug }).from(crews)
     .where(eq(crews.boardId, projectId))
-  if (own) {
+  const shadowCrews = await db.select({ id: crews.id, slug: crews.slug }).from(crews)
+    .innerJoin(crewBoards, eq(crewBoards.crewId, crews.id))
+    .where(eq(crewBoards.shadowProjectId, projectId))
+  for (const crew of [...ownCrews, ...shadowCrews]) {
     const accounts = await db.select({ id: user.id, email: user.email }).from(user)
-      .where(eq(user.crewId, own.id))
-    for (const account of accounts) members.set(personKeyOf(own.slug, account.email), account.id)
+      .where(eq(user.crewId, crew.id))
+    for (const account of accounts) members.set(personKeyOf(crew.slug, account.email), account.id)
   }
   const rows = await db.select({ personKey: crewBoardMembers.personKey, userId: crewBoardMembers.userId })
     .from(crewBoardMembers)

@@ -29,6 +29,10 @@ const team = id('team')
 const ownBoard = id('own-board')
 const forkReal = id('fork-real')
 const forkShadow = id('fork-shadow')
+// A crew whose rules run on a shadow board that has no fork member rows: its accounts must still count.
+const shadowOnlyReal = id('shadow-only-real')
+const shadowOnly = id('shadow-only')
+const shadowLink = id('shadow-link')
 const crewRow = id('crew')
 const forkCrew = id('fork-crew')
 const link = id('link')
@@ -56,7 +60,7 @@ before(async () => {
   await db.insert(user).values({ id: people.owner, name: 'owner', email: `${people.owner}@arnotes.test`, emailVerified: true, createdAt: stamp, updatedAt: stamp })
   await db.insert(organization).values({ id: team, name: 'Own board team', slug: team, createdAt: stamp })
   const board = (pid: string, name: string) => ({ id: pid, userId: people.owner, teamId: team, name, createdAt: now, updatedAt: now })
-  await db.insert(projects).values([board(ownBoard, 'own crew board'), board(forkReal, 'fork real'), board(forkShadow, 'fork shadow')])
+  await db.insert(projects).values([board(ownBoard, 'own crew board'), board(forkReal, 'fork real'), board(forkShadow, 'fork shadow'), board(shadowOnlyReal, 'shadow only real'), board(shadowOnly, 'shadow only')])
   const column = (cid: string, pid: string, name: string, position: number) => ({ id: cid, projectId: pid, name, position, createdAt: now })
   const columnsFor = (pid: string, prefix: string) => [
     column(`${prefix}-todo`, pid, 'To do', 1000), column(`${prefix}-pm`, pid, 'Verify PM', 3000), column(`${prefix}-ux`, pid, 'Verify UX', 4000),
@@ -76,6 +80,8 @@ before(async () => {
   // A fork: its members are on the real board's link row, and the crew's rules run on the shadow board.
   await db.insert(crewBoards).values({ id: link, crewId: forkCrew, projectId: forkReal, shadowProjectId: forkShadow, createdBy: people.owner, createdAt: now })
   await db.insert(crewBoardMembers).values([{ id: id('cbm-pia'), linkId: link, userId: people.pia, personKey: 'pia', agentType: 'x', createdAt: now }])
+  // The same crew's shadow board with no member rows at all: the crew's accounts are found through the crew.
+  await db.insert(crewBoards).values({ id: shadowLink, crewId: crewRow, projectId: shadowOnlyReal, shadowProjectId: shadowOnly, createdBy: people.owner, createdAt: now })
   // The gated card sits in Verify PM on the crew's own board.
   await db.insert(projectTasks).values({
     id: card, projectId: ownBoard, columnId: cols.pm!, title: 'card', visibility: 'internal', position: 0, tags: [], assigneeId: people.worker, createdAt: now, updatedAt: now
@@ -83,7 +89,7 @@ before(async () => {
 })
 
 after(async () => {
-  await db.delete(projects).where(inArray(projects.id, [ownBoard, forkReal, forkShadow]))
+  await db.delete(projects).where(inArray(projects.id, [ownBoard, forkReal, forkShadow, shadowOnlyReal, shadowOnly]))
   await db.delete(crews).where(inArray(crews.id, [crewRow, forkCrew]))
   await db.delete(organization).where(eq(organization.id, team))
   await db.delete(user).where(inArray(user.id, members))
@@ -100,6 +106,12 @@ test('members of a crew\'s own board are its accounts, keyed by the address', as
 test('members of a fork are found on its real board and on its shadow board', async () => {
   assert.equal((await crewMemberIds(forkReal)).get('pia'), people.pia)
   assert.equal((await crewMemberIds(forkShadow)).get('pia'), people.pia)
+})
+
+test('members of a shadow board with no member rows are the crew\'s accounts, keyed by the address', async () => {
+  const found = await crewMemberIds(shadowOnly)
+  assert.equal(found.get('pia'), people.pia)
+  assert.equal(found.get('nina'), people.nina)
 })
 
 test('an unrelated board has no crew members (negative)', async () => {
