@@ -151,7 +151,7 @@ async function copyToken() {
 // setup instructions copied later find it as $TASKMANAGER_API_KEY too.
 const claudeCommand = computed(() => {
   if (!issuedToken.value) return ''
-  return `${PROFILE_STEP}\n${exportKeyCommand(issuedToken.value)}\n${mcpAddCommand(window.location.origin)}`
+  return setupCommandFor(issuedToken.value)
 })
 
 // Already connected: one paste swaps the key in and the server out for a fresh one.
