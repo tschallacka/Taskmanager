@@ -8,17 +8,27 @@ import { after, before, test } from 'node:test'
 import assert from 'node:assert/strict'
 import { randomBytes } from 'node:crypto'
 import { createError } from 'h3'
-import { and, asc, eq, inArray } from 'drizzle-orm'
+import { and, asc, eq, inArray, like } from 'drizzle-orm'
 
-// Nitro provides createError as a global; the crew code expects it.
-Object.assign(globalThis, { createError })
+// Nitro provides these as globals; the crew code and the route file expect them. The route is called directly
+// further down, with the bearer token and body handed in through a fake event.
+Object.assign(globalThis, {
+  createError,
+  defineEventHandler: (handler: unknown) => handler,
+  getRequestHeader: (event: { token?: string }, name: string) => (name === 'authorization' && event.token ? `Bearer ${event.token}` : undefined),
+  readBody: async (event: { body?: unknown }) => event.body,
+  setResponseStatus: (event: { status?: number }, status: number) => { event.status = status },
+  setResponseHeader: () => undefined
+})
 
 const { db } = await import('../server/db')
-const { crews, instanceSettings, member, organization, projectColumns, projects, user } = await import('../server/db/schema')
+const { agentAudit, apiKeys, crews, instanceSettings, member, organization, projectColumns, projects, rateLimitHits, user } = await import('../server/db/schema')
 const { crewTargets, makeCrewOnNewBoard, parseNewBoard } = await import('../server/utils/crewBoards')
 const { setInstanceCrews, setTeamCrews } = await import('../server/utils/crewPermission')
 const { purgeCrew } = await import('../server/utils/crewProvisioning')
 const { DEFAULT_COLUMNS } = await import('../server/utils/teamSettings')
+const { generateApiKey } = await import('../server/utils/api-keys')
+const { default: crewsPost } = await import('../server/api/crews/index.post')
 
 const tag = randomBytes(4).toString('hex')
 const id = (name: string) => `tnb-${tag}-${name}`
@@ -27,12 +37,17 @@ const slug = `tnb-${tag}`
 const takenSlug = `tnb-${tag}-taken`
 const refusedSlug = `tnb-${tag}-no`
 const plainSlug = `tnb-${tag}-plain`
+const routeSlug = `tnb-${tag}-route`
+const routePlainSlug = `tnb-${tag}-route-plain`
 
 const boss = id('boss')
 const plain = id('plain')
 const outsider = id('outsider')
+const admin = id('admin')
 const realTeam = id('real-team')
 const emptyTeam = id('empty-team')
+const memberEmptyTeam = id('member-empty-team')
+const routeTeam = id('route-team')
 const otherTeam = id('other-team')
 const board = { real: id('board-real'), foreign: id('board-foreign') }
 const names = { made: 'Fresh board', refused: 'Refused board', plain: 'Plain board' }
@@ -46,25 +61,33 @@ const rejects = (promise: Promise<unknown>, status: number, message?: string) =>
   assert.rejects(promise, (e: { statusCode?: number, statusMessage?: string }) => e.statusCode === status && (message === undefined || msgOf(e) === message))
 
 let made: { made: { status: number, body: any }, boardId: string } | null = null
+let beforeTargets: { team_id: string, team_name: string, userboards: { board_id: string }[] }[] = []
 
 before(async () => {
   const at = new Date()
-  await db.insert(user).values([boss, plain, outsider].map(u => ({ id: u, name: u, email: `${u}@arnotes.test`, emailVerified: true, createdAt: at, updatedAt: at })))
+  await db.insert(user).values([boss, plain, outsider, admin].map(u => ({ id: u, name: u, email: `${u}@arnotes.test`, emailVerified: true, createdAt: at, updatedAt: at })))
+  await db.update(user).set({ isInstanceAdmin: true }).where(eq(user.id, admin))
   await db.insert(organization).values([
     { id: realTeam, name: 'Real team', slug: realTeam, createdAt: at },
     { id: emptyTeam, name: 'Empty team', slug: emptyTeam, createdAt: at },
+    { id: memberEmptyTeam, name: 'Member team', slug: memberEmptyTeam, createdAt: at },
+    { id: routeTeam, name: 'Route team', slug: routeTeam, createdAt: at },
     { id: otherTeam, name: 'Other team', slug: otherTeam, createdAt: at }
   ])
   await db.insert(member).values([
     { id: id('m1'), organizationId: realTeam, userId: boss, role: 'owner', createdAt: at },
     { id: id('m2'), organizationId: realTeam, userId: plain, role: 'member', createdAt: at },
     { id: id('m3'), organizationId: emptyTeam, userId: boss, role: 'owner', createdAt: at },
-    { id: id('m4'), organizationId: otherTeam, userId: outsider, role: 'owner', createdAt: at }
+    { id: id('m4'), organizationId: otherTeam, userId: outsider, role: 'owner', createdAt: at },
+    { id: id('m5'), organizationId: memberEmptyTeam, userId: plain, role: 'member', createdAt: at },
+    { id: id('m6'), organizationId: routeTeam, userId: admin, role: 'owner', createdAt: at }
   ])
   await db.insert(projects).values([
     { id: board.real, userId: boss, teamId: realTeam, name: 'Office board', createdAt: now, updatedAt: now },
     { id: board.foreign, userId: outsider, teamId: otherTeam, name: 'Foreign board', createdAt: now, updatedAt: now }
   ])
+  // The targets as they are before any new board is made: the existing entries must come back unchanged.
+  beforeTargets = (await crewTargets(boss)).teams
 })
 
 // The instance and team levels of the crew permission on, for the team these tests make boards in.
@@ -75,11 +98,13 @@ async function enableLevels() {
 
 after(async () => {
   await db.delete(instanceSettings).where(eq(instanceSettings.id, 'instance'))
-  const made = await db.select().from(crews).where(inArray(crews.slug, [slug, takenSlug, refusedSlug, plainSlug]))
+  const made = await db.select().from(crews).where(inArray(crews.slug, [slug, takenSlug, refusedSlug, plainSlug, routeSlug, routePlainSlug]))
   for (const crew of made) await purgeCrew(crew)
+  await db.delete(apiKeys).where(like(apiKeys.id, `tnb-${tag}-%`))
+  await db.delete(rateLimitHits).where(like(rateLimitHits.scope, `crews|user:tnb-${tag}-%`))
   await db.delete(organization).where(inArray(organization.id, [`crew-${takenSlug}`]))
-  await db.delete(organization).where(inArray(organization.id, [realTeam, emptyTeam, otherTeam]))
-  await db.delete(user).where(inArray(user.id, [boss, plain, outsider]))
+  await db.delete(organization).where(inArray(organization.id, [realTeam, emptyTeam, memberEmptyTeam, routeTeam, otherTeam]))
+  await db.delete(user).where(inArray(user.id, [boss, plain, outsider, admin]))
   await db.$client.end()
 })
 
@@ -173,3 +198,86 @@ test('targets list a team with no boards with canCreateBoard, and a management t
   assert.equal(token[0]!.canCreateBoard, false)
   assert.deepEqual(token[0]!.userboards.map(b => b.board_id), [board.real], 'and only its own board')
 })
+
+test('targets: the existing entries are unchanged, and a plain member sees only a team with no boards', async () => {
+  // The entries as they were before any new board: team, name and boards, in the same order (the new board aside).
+  const shape = (teams: { team_id: string, team_name: string, userboards: { board_id: string }[] }[], without?: string) =>
+    teams.map(team => ({ team_id: team.team_id, team_name: team.team_name, userboards: team.userboards.map(b => b.board_id).filter(b => b !== without) }))
+  const before = shape(beforeTargets)
+  const current = shape((await crewTargets(boss)).teams, made!.boardId).filter(team => before.some(b => b.team_id === team.team_id))
+  assert.deepEqual(current, before, 'the teams the owner had are listed as before')
+
+  const plainTeams = (await crewTargets(plain)).teams
+  assert.deepEqual(plainTeams.map(t => t.team_id), [memberEmptyTeam], 'a plain member sees only the team with no boards, not the team with boards')
+  assert.deepEqual(plainTeams[0], { team_id: memberEmptyTeam, team_name: 'Member team', canCreateBoard: true, userboards: [] })
+})
+
+test('the route: an instance admin makes a board and a crew in one call; the audit row names the board; no charge', async () => {
+  const token = await keyFor(admin, null, 'admin-route')
+  const reply = await postCrew(token, { slug: routeSlug, name: 'Route crew', product, teamId: routeTeam, newBoard: { name: 'Route board' } })
+  assert.equal(reply.status, 201)
+  const boardId = reply.body.real_board.board_id
+  assert.equal(reply.body.real_board.board_name, 'Route board')
+  const [row] = await db.select().from(projects).where(eq(projects.id, boardId))
+  assert.equal(row!.teamId, routeTeam)
+  const audit = await db.select().from(agentAudit).where(and(eq(agentAudit.userId, admin), eq(agentAudit.tool, 'crew_create'), eq(agentAudit.projectId, boardId)))
+  assert.equal(audit.length, 1, 'one audit row for the call, carrying the new board id')
+  assert.equal(audit[0]!.summary, `created (new board) (${routeSlug})`)
+  assert.deepEqual(await db.select().from(rateLimitHits).where(like(rateLimitHits.scope, `crews|user:${admin}%`)), [],
+    'the instance admin is not charged against the crews limit, as before')
+})
+
+test('the route: a key bound to a board, or with no board, cannot make one, and nothing is charged', async () => {
+  const bound = await keyFor(boss, board.real, 'bound')
+  assert.equal((await postCrew(bound, { slug: routePlainSlug, name: 'Bound crew', product, teamId: realTeam, newBoard: { name: 'Bound board' } })).status, 403)
+  const unbound = await keyFor(plain, null, 'unbound')
+  assert.equal((await postCrew(unbound, { slug: routePlainSlug, name: 'Unbound crew', product, teamId: memberEmptyTeam, newBoard: { name: 'Unbound board' } })).status, 403)
+  assert.deepEqual(await db.select({ id: projects.id }).from(projects).where(eq(projects.name, 'Bound board')), [])
+  assert.deepEqual(await db.select({ id: projects.id }).from(projects).where(eq(projects.name, 'Unbound board')), [])
+  assert.deepEqual(await db.select().from(rateLimitHits).where(like(rateLimitHits.scope, `crews|user:${boss}%`)), [],
+    'a refusal before the board is made is not charged')
+})
+
+test('the route: a crew call without newBoard answers as before, with no board and no project in its audit row', async () => {
+  const token = await keyFor(admin, null, 'admin-plain')
+  const reply = await postCrew(token, { slug: routePlainSlug, name: 'Plain route crew', product })
+  assert.equal(reply.status, 201)
+  assert.equal(reply.body.real_board, undefined)
+  assert.equal(reply.body.userboard, undefined)
+  assert.equal(reply.body.shadow_board, undefined)
+  // The answer's fields for a call without newBoard: the same set the route answered before this change, with no board fields added.
+  assert.deepEqual(Object.keys(reply.body).sort(), ['base', 'board', 'crew', 'keys_note', 'keys_url', 'people', 'team'])
+  const audit = await db.select().from(agentAudit).where(and(eq(agentAudit.userId, admin), eq(agentAudit.tool, 'crew_create'), eq(agentAudit.summary, `created (${routePlainSlug})`)))
+  assert.equal(audit.length, 1)
+  assert.equal(audit[0]!.projectId, null, 'no board in the audit row, as before')
+})
+
+/** A key of `userId`, pinned to `projectId` when given, that may manage crews. */
+async function keyFor(userId: string, projectId: string | null, name: string): Promise<string> {
+  const generated = generateApiKey()
+  await db.insert(apiKeys).values({
+    id: id(`key-${name}`),
+    userId,
+    teamId: null,
+    projectId,
+    name: `newboard ${name}`,
+    keyHash: generated.hash,
+    keyPrefix: generated.displayPrefix,
+    scopes: ['crews:manage'],
+    createdAt: now
+  })
+  return generated.token
+}
+
+/** POST /api/crews through the route file, as the server runs it: the answer and the status it set. */
+async function postCrew(token: string, body: Record<string, unknown>): Promise<{ status: number, body: any }> {
+  const event: { token?: string, body: unknown, status?: number } = { token, body }
+  try {
+    const answer = await (crewsPost as unknown as (e: unknown) => Promise<any>)(event)
+    return { status: event.status ?? 200, body: answer }
+  } catch (error) {
+    // A refusal is thrown as an h3 error: its status and sentence are the answer.
+    const e = error as { statusCode?: number, statusMessage?: string, message?: string }
+    return { status: e.statusCode ?? 500, body: { message: msgOf(e) } }
+  }
+}

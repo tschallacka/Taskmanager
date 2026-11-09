@@ -289,26 +289,32 @@ async function userboardsOfTeam(teamId: string): Promise<UserboardView[]> {
 
 /**
  * The teams the key's owner runs as owner or admin, each with its userboards: what a crew can be bound to.
- * With `onlyBoardId` (a management token) only the team of that board, and only its userboard, are listed.
+ * A team where the owner is only a member is listed while it has no boards: the owner may make the first board
+ * there, as the UI lets a member do (see makeCrewOnNewBoard). With `onlyBoardId` (a management token) only the
+ * team of that board, and only its userboard, are listed, and a plain member's team is not.
  */
 export async function crewTargets(userId: string, onlyBoardId?: string) {
   const teams = await db
     .select({ id: organization.id, name: organization.name, role: member.role })
     .from(member)
     .innerJoin(organization, eq(organization.id, member.organizationId))
-    .where(and(eq(member.userId, userId), inArray(member.role, ['owner', 'admin'])))
+    .where(eq(member.userId, userId))
     .orderBy(asc(organization.name))
   const [only] = onlyBoardId ? await db.select({ teamId: projects.teamId }).from(projects).where(eq(projects.id, onlyBoardId)) : []
-  const shown = onlyBoardId ? teams.filter(team => team.id === only?.teamId) : teams
-  return {
-    teams: await Promise.all(shown.map(async team => ({
+  const candidates = onlyBoardId ? teams.filter(team => team.id === only?.teamId) : teams
+  const listed = await Promise.all(candidates.map(async (team) => {
+    const userboards = await userboardsOfTeam(team.id)
+    const runsTeam = team.role === 'owner' || team.role === 'admin'
+    if (!runsTeam && (onlyBoardId || userboards.length > 0)) return null
+    return {
       team_id: team.id,
       team_name: team.name,
-      // A management token makes no board (makeCrewOnNewBoard); any other key of an owner or admin may.
-      canCreateBoard: !onlyBoardId && ['owner', 'admin'].includes(team.role),
-      userboards: (await userboardsOfTeam(team.id)).filter(board => !onlyBoardId || board.board_id === onlyBoardId)
-    })))
-  }
+      // A management token makes no board (makeCrewOnNewBoard); any other key of a member may.
+      canCreateBoard: !onlyBoardId,
+      userboards: userboards.filter(board => !onlyBoardId || board.board_id === onlyBoardId)
+    }
+  }))
+  return { teams: listed.filter(team => team !== null) }
 }
 
 /** The body of a newBoard part of a crew call, checked before anything is made. Null when the call has none. */

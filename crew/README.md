@@ -113,6 +113,18 @@ slug stops the command with 409 and nothing is rotated. The crew home is `~/crew
 `creds.json` (mode 600) fetched once, and `crew.json` with the crew's work board, the shadow board, named by its id.
 The command ends with three lines: the crew home, the work board's url, and what to do next.
 
+## The crews API: a crew on a new board
+
+`POST /api/crews` (a `crews:manage` key) can make the crew's board in the same call, instead of
+binding it to an existing one with `projectId`:
+
+    { "slug": "...", "name": "...", "product": { "name": "..." }, "teamId": "<team id>", "newBoard": { "name": "<board name>" } }
+
+- `newBoard` needs `teamId` and cannot be combined with `projectId`. `newBoard.name` is 1 to 120 characters.
+- The board is made in that team, owned by the key's owner, with the team's default columns, and the crew is bound to it as with `projectId`. The answer has `real_board`, `userboard` and `shadow_board`.
+- The key's owner must be a member of the team (the UI's check for making a board), and binding the crew to the board needs owner or admin of the team. A refused call leaves no board behind.
+- `GET /api/crews/targets` lists the teams where the key may make a board, with `canCreateBoard`.
+
 ## The chat line (optional)
 
 The agents can talk to the customer in an IRC channel. It is off by default. Without it,
