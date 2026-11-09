@@ -1,7 +1,7 @@
 // Susy's check, with fake board data (no dev server). Run: cd crew && node --test susy.test.mjs
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { authorKey, cardsFrom, cycleCards, findPokes, keyOfName, median, setAgent, staleRoundLine, thresholdsFrom } from './susy.mjs'
+import { absentLines, authorKey, cardsFrom, cycleCards, findPokes, keyOfName, median, setAgent, staleRoundLine, thresholdsFrom } from './susy.mjs'
 
 const MIN = 60000
 const NOW = Date.UTC(2026, 10, 7, 13, 0, 0)
@@ -287,4 +287,32 @@ test('setAgent: sets a person id, forgets it with "-", and refuses a value that 
 test('the check reads an agent id Pia wrote, and names it in the SendMessage line', () => {
   const c = card('w10', { column: 'In progress', assignee: 'Wynn Worker', updatedAt: NOW - 30 * MIN })
   assert.match(run([c], { agents: setAgent({}, 'wynn', 'ag-42') }).lines[0], /SendMessage to agent ag-42/)
+})
+
+test('absent: a person with an open card and no agent id is named once, and again only after a change on the card', () => {
+  const open = card('w11', { column: 'In progress', assignee: 'Wynn Worker', updatedAt: NOW - 30 * MIN })
+  const opts = { agents: {}, keyOf }
+  assert.deepEqual(absentLines([open], opts), ['absent wynn | not running: no agent id | on w11 "card w11" | 1 open'])
+  // Susy's marker after the last change: no repeat.
+  const marked = { ...open, updates: [{ id: 'm1', author: agent('susy'), body: 'absent wynn | not running | at x', at: at(20) }] }
+  assert.deepEqual(absentLines([marked], opts), [])
+  // A change after the marker: the line comes back.
+  const changed = { ...marked, updates: [...marked.updates, update(agent('wynn'), 'moved', 5)] }
+  assert.equal(absentLines([changed], opts).length, 1)
+})
+
+test('absent: a person with an agent id, a person with no open card, and a done card are not named', () => {
+  const opts = { keyOf }
+  const open = card('w12', { column: 'In progress', assignee: 'Wynn Worker', updatedAt: NOW - 30 * MIN })
+  assert.deepEqual(absentLines([open], { ...opts, agents: { wynn: 'ag-1' } }), [])
+  assert.deepEqual(absentLines([card('w13', { column: 'Done', assignee: 'Wynn Worker' })], { ...opts, agents: {} }), [])
+  assert.deepEqual(absentLines([card('w14', { column: 'Backlog', assignee: 'Wynn Worker' })], { ...opts, agents: {} }), [])
+})
+
+test('absent: a gate owner with a card in their gate is checked, and Pia with a card in Verify PM', () => {
+  const opts = { keyOf, agents: {} }
+  const lines = absentLines([card('g1', { column: 'Verify CQ', assignee: 'Wren Worker' })], opts)
+  assert.ok(lines.some(line => line.startsWith('absent nina |')))
+  assert.ok(lines.some(line => line.startsWith('absent wren |')))
+  assert.ok(absentLines([card('g2', { column: 'Verify PM', assignee: 'Wynn Worker' })], opts).some(line => line.startsWith('absent pia |')))
 })

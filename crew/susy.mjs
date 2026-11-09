@@ -33,6 +33,8 @@ const MIN = 60000
 const STALE_ROUND_MINUTES = 5
 const LEDGER = /^(poked|cleared) (\S+) \| (.+?) \| at (\S+)\s*$/
 const AGENT_ID = /^[\w.-]{1,80}$/
+// The people `absentLines` checks for a running agent id: Pia, the workers, Tess, Rita and the gate owners.
+const ABSENT_CHECKED = ['pia', ...WORKERS, 'tess', 'rita', 'usher', 'nina', 'quincy']
 
 /** Thresholds in minutes: the defaults, with any valid number from crew.json's "susy" block. */
 export function thresholdsFrom(crew) {
@@ -305,6 +307,34 @@ export function findPokes(cards, opts) {
   return { actions, lines: actions.map(action => action.text) }
 }
 
+/**
+ * The people who have work and no agent id, so nobody can be sent a SendMessage: "not running" in the sense Pia needs
+ * to start them. Pia, the workers, Tess and Rita, and the gate owners (Usher, Nina, Quincy) are checked when they have
+ * an open card. A person with no open card is not checked. One line per person, on their first open card; the card
+ * carries Susy's `absent <key>` marker once, and the line comes back only after a change on that card.
+ */
+export function absentLines(cards, opts) {
+  const agents = opts.agents ?? {}
+  const lines = []
+  for (const key of ABSENT_CHECKED) {
+    if (agents[key]) continue
+    const open = cards.filter(card => !RESTING.includes(card.column) && !card.completed
+      && (opts.keyOf(card.assignee) === key || GATES[card.column] === key))
+    if (!open.length) continue
+    const card = open[0]
+    if (absentMarked(card, key)) continue
+    lines.push(`absent ${key} | not running: no agent id | on ${card.id} "${card.title}" | ${open.length} open`)
+  }
+  return lines
+}
+
+/** True when Susy already put `absent <key>` on this card, and nobody has changed the card since. */
+function absentMarked(card, key) {
+  const since = lastChange(card)
+  return (card.updates ?? []).some(update => authorKey(update.author) === 'susy'
+    && String(update.body).trim().startsWith(`absent ${key} `) && Date.parse(update.at) >= since)
+}
+
 /** A line when the last round was long ago: Susy herself was not woken, which is Boss's `crew watch` finding. */
 export function staleRoundLine(lastRound, now) {
   const at = Date.parse(lastRound)
@@ -407,7 +437,9 @@ async function main() {
   const cleaner = crew.susy?.cleaner ?? DEFAULT_CLEANER
   const round = findPokes(cards, { now, thresholds: crew.susy, keyOf, cleaner, agents: state.agents })
   lines.push(...round.lines)
-  if (!round.lines.length) lines.push('susy: nothing to poke')
+  const absent = absentLines(cards, { agents: state.agents, keyOf })
+  lines.push(...absent)
+  if (!round.lines.length && !absent.length) lines.push('susy: nothing to poke')
   mkdirSync(`${home}/.listen`, { recursive: true })
   writeFileSync(statePath, `${JSON.stringify({ ...state, lastRound: new Date(now).toISOString() })}\n`, { mode: 0o600 })
   console.log(lines.join('\n'))

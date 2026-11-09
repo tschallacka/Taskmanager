@@ -136,3 +136,19 @@ test('the skill names who has each duty now', () => {
   assert.ok(skill.includes('Pat (`pat`) pre-checks it'), 'the board section names Pat')
   assert.ok(skill.includes('Tess triages'), 'the bugs and findings name Tess')
 })
+
+test('every listening prompt keeps a background listener running, and the crew text says who listens to whom', () => {
+  const prompts = readFileSync(join(KIT, 'PROMPTS.md.tmpl'), 'utf8')
+  const crew = readFileSync(join(KIT, 'CREW.md.tmpl'), 'utf8')
+  // Each prompt that runs a listener names the 600-second background command, not the 60-second loop.
+  for (const who of ['pia', 'W', 'usher', 'nina', 'quincy', 'rita']) {
+    assert.ok(prompts.includes(`listen.mjs ${who} 600\` with \`run_in_background: true\``), `the ${who} prompt starts a background listener`)
+  }
+  assert.ok(prompts.includes('Never end a turn without one running'), 'the launch prompts keep the rule')
+  assert.ok(crew.includes('**Never be without a listener, not even while you wait.**'), 'CREW.md names the rule in Listening')
+  assert.ok(crew.includes('**Who listens to whom.**'), 'CREW.md names who listens to whom')
+  assert.ok(prompts.includes('A {{people.susy}} poke is an order with one step in it.'), 'the launch prompts name the Susy poke')
+  const susy = readFileSync(join(KIT, 'SUSY.md.tmpl'), 'utf8')
+  assert.ok(susy.includes('absent <who> | not running'), 'Susy reports a person who is not running, so Pia starts them')
+  assert.ok(susy.includes('Susy never starts anybody'), 'Susy still starts nobody')
+})
