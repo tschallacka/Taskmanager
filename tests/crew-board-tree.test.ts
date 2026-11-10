@@ -200,6 +200,20 @@ test('real-board staff who are not crew owners, team admins or crew accounts do 
   assert.ok(ownerView.listed.includes(shadow.taskmanager))
 })
 
+test('an admin of the real board\'s team sees the shadow, though not a member of the crew\'s team', async () => {
+  const realAdmin = id('real-admin')
+  const at = new Date()
+  await db.insert(user).values({ id: realAdmin, name: realAdmin, email: `${realAdmin}@arnotes.test`, emailVerified: true, createdAt: at, updatedAt: at })
+  await db.insert(member).values({ id: id('m-real-admin'), organizationId: realTeam, userId: realAdmin, role: 'admin', createdAt: at })
+  try {
+    const admin = await listFor(realAdmin, realTeam)
+    assert.deepEqual([...admin.neighbours.shadowIds].sort(), [shadow.monocode, shadow.taskmanager].sort())
+    assert.deepEqual(admin.fields.get(real.taskmanager)!.shadows.map(s => s.id), [shadow.taskmanager])
+  } finally {
+    await db.delete(user).where(eq(user.id, realAdmin))
+  }
+})
+
 test('a label row for a crew member carries only id, name, role, readOnly and updatedAt', async () => {
   const source = { id: real.taskmanager, name: 'Taskmanager Maintenance', updatedAt: now, description: 'internal notes', customerName: 'Acme', isPublic: true, crewsAllowed: true }
   assert.deepEqual(Object.keys(labelRowOf(source)).sort(), ['id', 'name', 'readOnly', 'role', 'updatedAt'])

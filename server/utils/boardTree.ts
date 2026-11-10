@@ -61,17 +61,26 @@ const PLAIN: BoardTreeFields = { role: 'board', realBoard: null, shadows: [], cr
 
 /**
  * The crew shadow boards among `boardIds` that `userId` may not see. A crew's board is seen only by the crew's owner,
- * by the owners and admins of the team it lives in, and by the crew's own accounts (user.crewId). Every other board
- * is not a crew board and is never hidden here. The list and the search both use this one rule.
+ * by the owners and admins of the team it lives in (the crew's team) and of the real board's team, and by the crew's
+ * own accounts (user.crewId). Every other board is not a crew board and is never hidden here. The list and the search
+ * both use this one rule.
  */
 export async function hiddenCrewShadows(userId: string, boardIds: string[]): Promise<Set<string>> {
   const hidden = new Set<string>()
   if (!boardIds.length) return hidden
+  const realBoard = alias(projects, 'visibility_real')
   const rows = await db
-    .select({ shadowId: crewBoards.shadowProjectId, crewId: crewBoards.crewId, createdBy: crews.createdBy, shadowTeamId: projects.teamId })
+    .select({
+      shadowId: crewBoards.shadowProjectId,
+      crewId: crewBoards.crewId,
+      createdBy: crews.createdBy,
+      shadowTeamId: projects.teamId,
+      realTeamId: realBoard.teamId
+    })
     .from(crewBoards)
     .innerJoin(crews, eq(crews.id, crewBoards.crewId))
     .innerJoin(projects, eq(projects.id, crewBoards.shadowProjectId))
+    .innerJoin(realBoard, eq(realBoard.id, crewBoards.projectId))
     .where(inArray(crewBoards.shadowProjectId, boardIds))
   if (!rows.length) return hidden
   const [account] = await db.select({ crewId: user.crewId }).from(user).where(eq(user.id, userId))
@@ -82,6 +91,7 @@ export async function hiddenCrewShadows(userId: string, boardIds: string[]): Pro
   for (const row of rows) {
     const visible = row.createdBy === userId
       || (row.shadowTeamId !== null && adminTeams.has(row.shadowTeamId))
+      || (row.realTeamId !== null && adminTeams.has(row.realTeamId))
       || (Boolean(account?.crewId) && account?.crewId === row.crewId)
     if (!visible) hidden.add(row.shadowId)
   }
