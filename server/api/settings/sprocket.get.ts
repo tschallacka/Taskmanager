@@ -2,6 +2,7 @@ import { desc, eq } from 'drizzle-orm'
 import { db } from '../../db'
 import { apiKeys, organization, userSettings } from '../../db/schema'
 import { claudeBinary, claudeVersion, mayUseClaude, SPROCKET_EFFORTS, SPROCKET_MODEL_ALIASES } from '../../utils/sprocketAgent'
+import { instanceMessagesToday, sprocketInstanceView } from '../../utils/sprocketInstance'
 
 /**
  * Who answers as Sprocket, and what there is to choose from: the caller's agents (API keys,
@@ -24,8 +25,23 @@ export default defineEventHandler(async (event) => {
   const bin = allowed ? claudeBinary() : null
   const now = Date.now()
 
+  // Which one answers this person: Claude Code, their own OpenRouter key, or the instance's key (site-wide Sprocket).
+  const instance = await sprocketInstanceView()
+  const instanceOn = instance.forEveryone && instance.keySet
+  const provider = settings?.sprocketProvider ?? 'openrouter'
+  const answersWith = provider === 'agent'
+    ? 'agent'
+    : settings?.openrouterApiKey ? 'own-key' : instanceOn ? 'instance-key' : null
+
   return {
-    provider: settings?.sprocketProvider ?? 'openrouter',
+    answersWith,
+    instance: {
+      on: instanceOn,
+      model: instance.model,
+      userDailyLimit: instance.userDailyLimit,
+      usedToday: instanceOn ? await instanceMessagesToday(userId) : 0
+    },
+    provider,
     agentKeyId: settings?.sprocketAgentKeyId ?? null,
     model: settings?.sprocketModel ?? 'haiku',
     effort: settings?.sprocketEffort ?? null,

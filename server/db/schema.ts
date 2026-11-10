@@ -141,6 +141,14 @@ export const instanceSettings = pgTable('instance_settings', {
   id: text('id').primaryKey(),
   crewsAllowed: boolean('crews_allowed').notNull().default(false),
   rateLimits: json('rate_limits').$type<RateLimitSettings | null>(),
+  // Site-wide Sprocket (Instance settings): answers every signed-in user on the instance's OpenRouter key, when on.
+  // The key is stored encrypted with SECRETS_ENCRYPTION_KEY (secretCrypto.ts), never in clear.
+  sprocketForEveryone: boolean('sprocket_for_everyone').notNull().default(false),
+  sprocketModel: text('sprocket_instance_model').notNull().default('openai/gpt-4o-mini'),
+  sprocketOpenrouterKey: text('sprocket_openrouter_key'),
+  // Messages per user per day, and in all for the instance per day (counted in rate_limit_hits, see sprocketInstance.ts).
+  sprocketUserDailyLimit: integer('sprocket_user_daily_limit').notNull().default(200),
+  sprocketInstanceDailyCap: integer('sprocket_instance_daily_cap').notNull().default(2000),
   updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
   updatedBy: text('updated_by').references(() => user.id, { onDelete: 'set null' })
 })

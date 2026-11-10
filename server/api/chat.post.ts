@@ -6,6 +6,7 @@ import { trimHistory, toProviderMessages } from '../utils/chatHistory'
 import type { WireMessage, WireToolCall } from '../utils/chatHistory'
 import { DEFAULT_OPENROUTER_MODEL } from '../utils/ai'
 import { agentChatResponse } from '../utils/sprocketAgent'
+import { chooseOpenRouterAnswer } from '../utils/sprocketInstance'
 
 // Chat endpoint for the Sprocket assistant. Streams NDJSON events to the client:
 //   { type: 'delta', text }              — assistant text chunk
@@ -83,9 +84,15 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const apiKey = settings?.openrouterApiKey
-  if (!apiKey) throw createError({ statusCode: 400, statusMessage: 'OpenRouter API key not configured. Add it in Settings, or let Claude Code answer in Settings → Sprocket.' })
-  const model = settings?.openrouterModel || DEFAULT_OPENROUTER_MODEL
+  // The user's own key answers first; without one, the instance's key answers when the admin has turned Sprocket on
+  // for everyone, counted against the user's daily limit. The run is this user's own request, so it reaches what the
+  // user reaches (the tools run on the client, as the user).
+  const own = settings?.openrouterApiKey
+    ? { apiKey: settings.openrouterApiKey, model: settings.openrouterModel || DEFAULT_OPENROUTER_MODEL }
+    : null
+  const answer = await chooseOpenRouterAnswer(own, userId)
+  if (!answer) throw createError({ statusCode: 400, statusMessage: 'Sprocket has no OpenRouter key. Add one in Settings, or let Claude Code answer in Settings → Sprocket.' })
+  const { apiKey, model } = answer
 
   const buildMessages = () => [
     { role: 'system', content: `${CHAT_SYSTEM_PROMPT}\n\nToday is ${today}.` },
