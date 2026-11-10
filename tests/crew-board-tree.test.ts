@@ -13,9 +13,10 @@ import { eq, inArray } from 'drizzle-orm'
 Object.assign(globalThis, { createError })
 
 const { db } = await import('../server/db')
-const { crewBoards, crews, member, organization, projects, user } = await import('../server/db/schema')
+const { boardPins, crewBoards, crews, member, organization, projects, user } = await import('../server/db/schema')
 const { boardTreeFields, labelRowOf, markOpenableRealBoards, memberTeamsOf, realNeighbourIsOpenable, treeNeighbours } = await import('../server/utils/boardTree')
 const { requireProject } = await import('../server/utils/projects')
+const { listPins, pinBoard } = await import('../server/utils/boardPins')
 
 /** A GET from `userId` with `teamId` as the active workspace: what requireProject reads from an H3 event. */
 const asUser = (userId: string, teamId: string) => ({
@@ -276,4 +277,16 @@ test('a shadow the list hides is also not found by id, for the web routes', asyn
   // requireProject applies the same rule so a known id opens nothing.
   await assert.rejects(requireProject(asUser(realStaff, realTeam), shadow.taskmanager), (e: { statusCode?: number }) => e.statusCode === 404)
   assert.equal((await requireProject(asUser(owner, realTeam), shadow.taskmanager)).id, shadow.taskmanager)
+})
+
+test('a shadow the person may not see cannot be pinned, and a leftover pin is not listed', async () => {
+  // crewMember is in the crew's team but belongs to the taskmanager crew, so the monocode shadow is hidden from them.
+  await assert.rejects(pinBoard(crewMember, shadow.monocode), (e: { statusCode?: number }) => e.statusCode === 404)
+  await pinBoard(crewMember, shadow.taskmanager)
+  await db.insert(boardPins).values({ userId: crewMember, projectId: shadow.monocode, createdAt: Date.now() })
+  try {
+    assert.deepEqual((await listPins(crewMember)).map(pin => pin.projectId), [shadow.taskmanager])
+  } finally {
+    await db.delete(boardPins).where(eq(boardPins.userId, crewMember))
+  }
 })
