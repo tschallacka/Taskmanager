@@ -23,6 +23,7 @@ const id = (name: string) => `mbt-${tag}-${name}`
 const now = Date.now()
 
 const owner = id('owner')
+const plain = id('plain')
 const realTeam = id('real-team')
 const crewTeam = id('crew-team')
 const real = id('real-taskmanager')
@@ -136,4 +137,27 @@ test('a real board names only the shadows the key may open, and get_board carrie
   const shadowRead = await callTool('get_board', { board: shadow, detail: 'titles' }, keyFor([realTeam, crewTeam]))
   assert.equal(shadowRead.role, 'shadow')
   assert.deepEqual(shadowRead.realBoard, { id: real, name: 'Tree Taskmanager' })
+})
+
+test('a plain member of both teams, who is not the crew owner, an owner or admin, or one of the crew\'s accounts, sees no crew shadow and cannot read it', async () => {
+  // The rule is hiddenCrewShadows (boardTree.ts): only the crew's owner, the owners and admins of the team the shadow
+  // lives in, and the crew's own accounts see a crew board. The same rule decides the list and the search.
+  const at = new Date()
+  await db.insert(user).values({ id: plain, name: plain, email: `${plain}@staff.test`, emailVerified: true, createdAt: at, updatedAt: at })
+  await db.insert(member).values([
+    { id: id('m-plain-real'), organizationId: realTeam, userId: plain, role: 'member', createdAt: at },
+    { id: id('m-plain-crew'), organizationId: crewTeam, userId: plain, role: 'member', createdAt: at }
+  ])
+  try {
+    const context = { ...keyFor([realTeam, crewTeam]), userId: plain }
+    const result = await callTool('list_boards', { limit: 200 }, context)
+    const ids = result.boards.map(entry => entry.id)
+    assert.ok(ids.includes(real))
+    assert.ok(!ids.includes(shadow))
+    assert.deepEqual(result.boards.find(entry => entry.id === real)!.shadows, [])
+    await assert.rejects(callTool('get_board', { board: shadow, detail: 'titles' }, context), /No board/)
+  } finally {
+    await db.delete(member).where(inArray(member.userId, [plain]))
+    await db.delete(user).where(inArray(user.id, [plain]))
+  }
 })

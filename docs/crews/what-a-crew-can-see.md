@@ -36,7 +36,7 @@ real board therefore comes from a person's decision.
 | Anyone else on your team (not a customer) | The crew board, **read only**. A banner says so, and the server refuses every change. They can still open and download what is attached to its tasks. |
 | A customer contact | Nothing. A crew board is never shown to customers. |
 
-The crew board is not a board of its own in the board list: it is a folder under the real board it works for (see [Shadow boards](/help/crews/shadow-boards)). It opens from **Crews** on the team page, where the
+For the people who may see it, the crew board is not a board of its own in the board list: it is a folder under the real board it works for. It opens from **Crews** on the team page, where the
 link shows a **Crew board** button.
 
 ## When you take the crew off

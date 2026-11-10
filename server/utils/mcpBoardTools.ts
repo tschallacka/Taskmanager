@@ -17,7 +17,7 @@ import { McpToolError, asToolError, asToolErrorAsync, excerpt, idFromReference, 
 import type { McpToolDefinition } from './mcpToolKit'
 import { MAX_PROJECT_DESCRIPTION, PROJECT_STATUSES, parseDueOn, parseProjectStatus } from './taskFields'
 import { projectPeople } from './people'
-import { boardTreeFields, type BoardTreeFields } from './boardTree'
+import { boardTreeFields, hiddenCrewShadows, type BoardTreeFields } from './boardTree'
 import { readTaskGithubLinks } from './githubTaskLinks'
 import { notifyAssigned, notifyTaskChange } from './notifyEvents'
 import { tellUnblockedAfterBulk, tellUnblockedOnTrash, unfinishedTasksOn } from './unblockedWatch'
@@ -59,6 +59,17 @@ function agentDeletion(context: ApiKeyContext) {
     deletedBy: context.userId,
     deletedVia: 'mcp' as const
   }
+}
+
+/**
+ * The boards a key may read, with the crew shadow boards its person may not see taken out: the same rule as the board
+ * list and the search (hiddenCrewShadows in boardTree.ts). Lists and tree fields use this; a hidden board reads as
+ * not in the workspace.
+ */
+export async function visibleBoards(context: ApiKeyContext): Promise<Project[]> {
+  const boards = await accessibleBoards(context)
+  const hidden = await hiddenCrewShadows(context.userId, boards.map(board => board.id))
+  return boards.filter(board => !hidden.has(board.id))
 }
 
 // ─── lookups ──────────────────────────────────────────────────────────────────
@@ -654,7 +665,7 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
     },
     async handler(args, context) {
       const limit = optionalLimit(args, 'limit', 25, 200)
-      const boards = (await accessibleBoards(context)).sort((a, b) => b.updatedAt - a.updatedAt)
+      const boards = (await visibleBoards(context)).sort((a, b) => b.updatedAt - a.updatedAt)
       if (!boards.length) return { total: 0, boards: [] }
 
       // Only the boards that are actually returned need counting.
@@ -706,9 +717,13 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
       required: ['board']
     },
     async handler(args, context) {
-      const board = await findBoard(requireString(args, 'board'), context)
+      const reference = requireString(args, 'board')
+      const board = await findBoard(reference, context)
+      // A crew's shadow board the person may not see reads as not in the workspace, as the list draws it.
+      const visible = await visibleBoards(context)
+      if (!visible.some(item => item.id === board.id)) throw new McpToolError(`No board "${reference}" in this workspace.`)
       // The crew tree of this board, with the shadow boards the key may see (see boardTree.ts).
-      const tree = await boardTreeFields([board.id], new Set((await accessibleBoards(context)).map(item => item.id)))
+      const tree = await boardTreeFields([board.id], new Set(visible.map(item => item.id)))
       const detail = readDetail(args)
       const perColumn = optionalLimit(args, 'limit', DEFAULT_COLUMN_TASKS, MAX_COLUMN_TASKS)
       const requested = optionalStringArray(args, 'columns')
