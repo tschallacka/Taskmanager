@@ -14,7 +14,7 @@ Object.assign(globalThis, { createError })
 
 const { db } = await import('../server/db')
 const { crewBoards, crews, member, organization, projects, user } = await import('../server/db/schema')
-const { boardTreeFields, treeNeighbours } = await import('../server/utils/boardTree')
+const { boardTreeFields, labelRowOf, treeNeighbours } = await import('../server/utils/boardTree')
 const { requireProject } = await import('../server/utils/projects')
 
 /** A GET from `userId` with `teamId` as the active workspace: what requireProject reads from an H3 event. */
@@ -30,6 +30,8 @@ const now = Date.now()
 const owner = id('owner')
 const crewMember = id('crew-member')
 const outsider = id('outsider')
+// Staff of the real board's team and not in the crew's team: the shadow nests for them (the Q35a rule).
+const realStaff = id('real-staff')
 const realTeam = id('real-team')
 const crewTeam = id('crew-team')
 
@@ -49,7 +51,7 @@ const everyBoard = Object.values({ ...real, ...shadow, ...home })
 
 before(async () => {
   const at = new Date()
-  await db.insert(user).values([owner, crewMember, outsider].map(u => ({ id: u, name: u, email: `${u}@arnotes.test`, emailVerified: true, createdAt: at, updatedAt: at })))
+  await db.insert(user).values([owner, crewMember, outsider, realStaff].map(u => ({ id: u, name: u, email: `${u}@arnotes.test`, emailVerified: true, createdAt: at, updatedAt: at })))
   await db.insert(organization).values([
     { id: realTeam, name: 'Real team', slug: realTeam, createdAt: at },
     { id: crewTeam, name: 'Crew team', slug: crewTeam, createdAt: at }
@@ -58,7 +60,8 @@ before(async () => {
   await db.insert(member).values([
     { id: id('m-owner-real'), organizationId: realTeam, userId: owner, role: 'owner', createdAt: at },
     { id: id('m-owner-crew'), organizationId: crewTeam, userId: owner, role: 'admin', createdAt: at },
-    { id: id('m-crew'), organizationId: crewTeam, userId: crewMember, role: 'member', createdAt: at }
+    { id: id('m-crew'), organizationId: crewTeam, userId: crewMember, role: 'member', createdAt: at },
+    { id: id('m-real-staff'), organizationId: realTeam, userId: realStaff, role: 'member', createdAt: at }
   ])
   const board = (bid: string, teamId: string, name: string, extra: object = {}) =>
     ({ id: bid, userId: owner, teamId, name, createdAt: now, updatedAt: now, ...extra })
@@ -76,6 +79,8 @@ before(async () => {
     { id: crew.taskmanager, slug: `tm-${tag}`, name: 'taskmanager-maintenance', teamId: crewTeam, createdBy: owner, boardId: home.taskmanager, createdAt: now },
     { id: crew.monocode, slug: `mc-${tag}`, name: 'monocode', teamId: crewTeam, createdBy: owner, boardId: home.monocode, createdAt: now }
   ])
+  // The crew member is one of the crew's own accounts (user.crewId), so it sees this crew's shadow, and no other.
+  await db.update(user).set({ crewId: crew.taskmanager }).where(eq(user.id, crewMember))
   // Old-style links: one per crew and real board. The archived shadow keeps a leftover link from before the
   // detach that removed it; the stray "(crew)" board has no link at all.
   await db.insert(crewBoards).values([
@@ -89,7 +94,7 @@ after(async () => {
   await db.delete(projects).where(inArray(projects.id, everyBoard.concat(shadow.taken, shadow.stray)))
   await db.delete(crews).where(inArray(crews.id, [crew.taskmanager, crew.monocode]))
   await db.delete(organization).where(inArray(organization.id, [realTeam, crewTeam]))
-  await db.delete(user).where(inArray(user.id, [owner, crewMember, outsider]))
+  await db.delete(user).where(inArray(user.id, [owner, crewMember, outsider, realStaff]))
   await db.$client.end()
 })
 
@@ -101,8 +106,9 @@ async function ownBoards(teamId: string): Promise<string[]> {
 
 /** The list the route would answer for `userId` in `teamId`, reduced to what the tests check. */
 async function listFor(userId: string, teamId: string) {
-  const own = await ownBoards(teamId)
-  const neighbours = await treeNeighbours(userId, own)
+  const raw = await ownBoards(teamId)
+  const neighbours = await treeNeighbours(userId, raw)
+  const own = raw.filter(boardId => !neighbours.hidden.has(boardId))
   const listed = [...own, ...neighbours.shadowIds, ...neighbours.realIds]
   const fields = await boardTreeFields(listed, new Set(listed))
   const readOnly = new Set([...neighbours.shadowIds, ...neighbours.realIds])
@@ -131,14 +137,16 @@ test('the owner sees each real board with its crew shadow nested under it, and t
 
 test('a crew member sees the shadow under the real board, which is read-only for them', async () => {
   const { listed, fields, readOnly, neighbours } = await listFor(crewMember, crewTeam)
-  // The crew member is in the crew team only: the real boards come in as read-only neighbours.
-  assert.deepEqual([...neighbours.realIds].sort(), [real.monocode, real.taskmanager].sort())
+  // The crew member is one of this crew's accounts: its own crew's real board comes in as a label row, and the other
+  // crew's shadow (and so its real board) stays out of the tree.
+  assert.deepEqual([...neighbours.realIds], [real.taskmanager])
   assert.deepEqual(neighbours.shadowIds, [])
-  assert.ok(readOnly.has(real.taskmanager) && readOnly.has(real.monocode))
+  assert.ok(readOnly.has(real.taskmanager))
+  assert.ok(!readOnly.has(real.monocode))
   assert.ok(listed.includes(shadow.taskmanager))
+  assert.ok(!listed.includes(shadow.monocode), 'the other crew\'s shadow is not shown to this crew account')
 
   assert.deepEqual(fields.get(real.taskmanager)!.shadows.map(s => s.id), [shadow.taskmanager])
-  assert.equal(fields.get(shadow.monocode)!.realBoard?.id, real.monocode)
   // The crew's home board stays where it is: in the crew's own team, labelled, never nested.
   assert.equal(fields.get(home.monocode)!.role, 'crew_home')
   assert.equal(fields.get(home.monocode)!.crew?.name, 'monocode')
@@ -171,11 +179,54 @@ test('a "(crew)" board whose crew_boards row is missing stays top level, with no
 
 test('an archived shadow with a leftover link is not nested, and an outsider sees no tree', async () => {
   const outsiderNeighbours = await treeNeighbours(outsider, await ownBoards(crewTeam))
-  assert.deepEqual(outsiderNeighbours, { shadowIds: [], realIds: [] })
+  assert.deepEqual([outsiderNeighbours.shadowIds, outsiderNeighbours.realIds], [[], []])
   const outsiderOwn = await treeNeighbours(outsider, await ownBoards(realTeam))
-  assert.deepEqual(outsiderOwn, { shadowIds: [], realIds: [] })
+  assert.deepEqual([outsiderOwn.shadowIds, outsiderOwn.realIds], [[], []])
 
   // The archived shadow is named by its link, so it reads as a shadow on its own page, but no real board lists it.
   const { fields } = await listFor(owner, realTeam)
   assert.equal(fields.get(real.monocode)!.shadows.some(s => s.id === shadow.taken), false)
+})
+
+test('real-board staff who are not crew owners, team admins or crew accounts do not see the shadow', async () => {
+  // Crew boards are seen only by the crew's owner, the owners and admins of the team they live in, and the crew's own
+  // accounts. Staff of the real board's team alone get no shadow nested, and no shadow row either.
+  const staff = await listFor(realStaff, realTeam)
+  assert.deepEqual(staff.neighbours.shadowIds, [])
+  assert.deepEqual(staff.fields.get(real.taskmanager)!.shadows, [])
+  assert.ok(!staff.listed.includes(shadow.taskmanager) && !staff.listed.includes(shadow.monocode))
+  // The crew's owner, who made the crews, sees them: the owner view above.
+  const ownerView = await listFor(owner, realTeam)
+  assert.ok(ownerView.listed.includes(shadow.taskmanager))
+})
+
+test('a label row for a crew member carries only id, name, role, readOnly and updatedAt', async () => {
+  const source = { id: real.taskmanager, name: 'Taskmanager Maintenance', updatedAt: now, description: 'internal notes', customerName: 'Acme', isPublic: true, crewsAllowed: true }
+  assert.deepEqual(Object.keys(labelRowOf(source)).sort(), ['id', 'name', 'readOnly', 'role', 'updatedAt'])
+  assert.deepEqual(labelRowOf(source), { id: real.taskmanager, name: 'Taskmanager Maintenance', role: 'real', readOnly: true, updatedAt: now })
+})
+
+test('a board that is a shadow for one crew and a real board for another keeps the shadow role, whatever the row order', async () => {
+  const x = id('board-x')
+  const y = id('board-y')
+  const linkShadow = id('link-x-shadow')
+  const linkReal = id('link-x-real')
+  await db.insert(projects).values([
+    { id: x, userId: owner, teamId: crewTeam, name: 'X (crew)', createdAt: now, updatedAt: now },
+    { id: y, userId: owner, teamId: crewTeam, name: 'Y (crew)', createdAt: now, updatedAt: now }
+  ])
+  // The shadow link is the earlier row, so the real link comes second: the order that overwrote the role before.
+  await db.insert(crewBoards).values([
+    { id: linkShadow, crewId: crew.monocode, projectId: real.taskmanager, shadowProjectId: x, createdBy: owner, createdAt: now },
+    { id: linkReal, crewId: crew.taskmanager, projectId: x, shadowProjectId: y, createdBy: owner, createdAt: now + 5 }
+  ])
+  try {
+    const fields = await boardTreeFields([real.taskmanager, x, y], new Set([real.taskmanager, x, y]))
+    assert.equal(fields.get(x)!.role, 'shadow')
+    assert.equal(fields.get(x)!.realBoard?.id, real.taskmanager)
+    assert.equal(fields.get(real.taskmanager)!.role, 'real')
+  } finally {
+    await db.delete(crewBoards).where(inArray(crewBoards.id, [linkShadow, linkReal]))
+    await db.delete(projects).where(inArray(projects.id, [x, y]))
+  }
 })

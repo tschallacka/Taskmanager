@@ -25,12 +25,16 @@ const TREE_KEY = 'taskmanager.boardTree.open'
 const openTrees = ref<string[]>([])
 
 onMounted(() => {
+  // Merged with what a watcher may already have opened before mount, so neither is lost.
+  let stored: string[] = []
   try {
     const raw = localStorage.getItem(TREE_KEY)
-    openTrees.value = raw ? JSON.parse(raw) as string[] : []
+    stored = raw ? JSON.parse(raw) as string[] : []
   } catch {
-    openTrees.value = []
+    stored = []
   }
+  openTrees.value = [...new Set([...stored, ...openTrees.value])]
+  openActiveTree()
 })
 
 function saveOpenTrees() {
@@ -94,15 +98,17 @@ function rowNote(project: Project) {
   return `${kind}${customer}${relativeTime(project.updatedAt)} · ${countLabel(project)} ${countsFor(project).total === 1 ? 'task' : 'tasks'}`
 }
 
-// Opening a shadow board from the URL, or from the board header's link, opens the tree it sits in.
-watch(activeId, (id) => {
-  const project = projects.value.find(p => p.id === id)
+// Opening a shadow board from the URL, or from the board header's link, opens the tree it sits in. It runs again
+// once the list has loaded, because a board opened by its address is only in the list then.
+function openActiveTree() {
+  const project = projects.value.find(p => p.id === activeId.value)
   const realId = project?.role === 'shadow' ? project.realBoard?.id : undefined
   if (realId && !openTrees.value.includes(realId)) {
     openTrees.value = [...openTrees.value, realId]
     saveOpenTrees()
   }
-})
+}
+watch([activeId, ready], openActiveTree)
 
 // ─── Pins ──────────────────────────────────────────────────
 // Pins come from every workspace. A board in the open workspace shows its live name from
@@ -369,8 +375,12 @@ function menuItems(project: Project) {
       >
       <div
         v-else
-        class="group flex cursor-pointer items-start gap-2 rounded-lg px-2.5 py-1.5 transition-colors"
-        :class="[activeId === project.id ? 'bg-elevated' : 'hover:bg-elevated/60', depth ? 'ml-6 py-1' : '']"
+        class="group flex items-start gap-2 rounded-lg px-2.5 py-1.5 transition-colors"
+        :class="[
+          isLabelRow(project) ? '' : 'cursor-pointer',
+          activeId === project.id ? 'bg-elevated' : isLabelRow(project) ? '' : 'hover:bg-elevated/60',
+          depth ? 'ml-6 min-h-11 py-1' : ''
+        ]"
         :data-board-row="project.role ?? 'board'"
         :data-depth="depth"
         :data-label-row="isLabelRow(project) ? '' : undefined"
@@ -406,6 +416,7 @@ function menuItems(project: Project) {
         </div>
         <!-- The menu keeps its slot even when invisible, so rows never jump on hover. -->
         <UDropdownMenu
+          v-if="!isLabelRow(project)"
           :items="menuItems(project)"
           :content="{ align: 'start', collisionPadding: 12 }"
         >
@@ -414,7 +425,7 @@ function menuItems(project: Project) {
             size="xs"
             color="neutral"
             variant="ghost"
-            class="mt-0.5 shrink-0 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
+            class="mt-0.5 shrink-0 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100 max-md:min-h-11 max-md:min-w-11 max-md:opacity-100"
             aria-label="Project options"
             @click.stop
           />
