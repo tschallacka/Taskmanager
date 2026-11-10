@@ -14,7 +14,14 @@ Object.assign(globalThis, { createError })
 
 const { db } = await import('../server/db')
 const { crewBoards, crews, member, organization, projects, user } = await import('../server/db/schema')
-const { boardTreeFields, realBoardForCrewTeam, treeNeighbours } = await import('../server/utils/boardTree')
+const { boardTreeFields, treeNeighbours } = await import('../server/utils/boardTree')
+const { requireProject } = await import('../server/utils/projects')
+
+/** A GET from `userId` with `teamId` as the active workspace: what requireProject reads from an H3 event. */
+const asUser = (userId: string, teamId: string) => ({
+  method: 'GET',
+  context: { session: { user: { id: userId }, session: { activeOrganizationId: teamId } } }
+}) as unknown as Parameters<typeof requireProject>[0]
 
 const tag = randomBytes(4).toString('hex')
 const id = (name: string) => `tbt-${tag}-${name}`
@@ -140,11 +147,16 @@ test('a crew member sees the shadow under the real board, which is read-only for
   assert.deepEqual(fields.get(home.taskmanager)!.shadows, [])
 })
 
-test('the real board opens read-only for the crew team and nowhere else', async () => {
-  assert.equal((await realBoardForCrewTeam(crewTeam, real.taskmanager))?.id, real.taskmanager)
-  assert.equal(await realBoardForCrewTeam(realTeam, real.taskmanager), undefined, 'the real team reads it as staff, not as the crew')
-  assert.equal(await realBoardForCrewTeam(crewTeam, shadow.taskmanager), undefined, 'a shadow is not a real board')
-  assert.equal(await realBoardForCrewTeam(null, real.taskmanager), undefined)
+test('a crew member gets 404 on the real board, so its internal comments stay out of reach', async () => {
+  // The real board is a label row in the crew member's tree only: opening it, or any endpoint that loads it
+  // (comments, tasks, the board), goes through requireProject, which answers 404 for the crew's team.
+  await assert.rejects(requireProject(asUser(crewMember, crewTeam), real.taskmanager), (e: { statusCode?: number }) => e.statusCode === 404)
+  await assert.rejects(requireProject(asUser(crewMember, crewTeam), real.monocode), (e: { statusCode?: number }) => e.statusCode === 404)
+  // The crew's own shadow board stays open to the crew, as before.
+  assert.equal((await requireProject(asUser(crewMember, crewTeam), shadow.taskmanager)).id, shadow.taskmanager)
+  // The real board's staff still open it as staff.
+  const asStaff = await requireProject(asUser(owner, realTeam), real.taskmanager)
+  assert.equal(asStaff.readOnly, false)
 })
 
 test('a "(crew)" board whose crew_boards row is missing stays top level, with no role of its own', async () => {

@@ -9,12 +9,12 @@
 //   - a shadow board of a real board in the list, when the person is in the shadow's crew team (the real board's
 //     staff see the crew's board nested under it, read-only from this workspace);
 //   - the real board of a shadow in the list, when the person is in the shadow's team (the crew's own members see
-//     the real board nested over the shadow, read-only: the crew reads it and never writes to it).
+//     the real board nested over the shadow as a label row only: it opens nothing and its tasks are not served.
+//     Opening a real board for a crew is a separate access decision, not made here).
 import { and, asc, eq, inArray, isNull, or } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { db } from '../db'
 import { crewBoards, crews, member, projects } from '../db/schema'
-import type { Project } from '../db/schema'
 
 export type BoardRole = 'board' | 'real' | 'shadow' | 'crew_home'
 
@@ -87,22 +87,6 @@ export async function treeNeighbours(userId: string, ownIds: string[]): Promise<
     shadowIds: [...new Set(shadows.map(row => row.id))].filter(id => !own.has(id)),
     realIds: [...new Set(reals.map(row => row.id))].filter(id => !own.has(id))
   }
-}
-
-/**
- * The real board a crew reads for its team: the caller's active workspace holds the shadow of `realId`. Used to let
- * the crew's members open the real board read-only. Undefined for every other board, and for a shadow itself.
- */
-export async function realBoardForCrewTeam(teamId: string | null, realId: string): Promise<Project | undefined> {
-  if (!teamId) return undefined
-  const shadow = alias(projects, 'crew_shadow')
-  const [row] = await db
-    .select({ real: projects })
-    .from(crewBoards)
-    .innerJoin(projects, eq(projects.id, crewBoards.projectId))
-    .innerJoin(shadow, eq(shadow.id, crewBoards.shadowProjectId))
-    .where(and(eq(crewBoards.projectId, realId), eq(shadow.teamId, teamId), isNull(shadow.archivedAt), isNull(projects.archivedAt)))
-  return row?.real
 }
 
 /**

@@ -20,9 +20,10 @@ export default defineEventHandler(async (event) => {
   // boards every task is theirs to find.
   const userId = event.context.session.user.id
   const teamId = await getUserActiveTeamId(event)
-  // The crew tree's neighbours (boardTree.ts) are read by the list as staff, so their tasks count the same way.
+  // The crew shadow boards the list adds for the real board's staff are read as staff, as on the board page. The real
+  // boards the list shows beside a crew's shadow are label rows only, so their tasks are never served here.
   const found = await treeNeighbours(userId, visibleProjects.map(p => p.id))
-  const neighbourIds = new Set([...found.shadowIds, ...found.realIds])
+  const neighbourIds = new Set(found.shadowIds)
   const neighbourRows = neighbourIds.size
     ? await db.select({ id: projects.id, userId: projects.userId, teamId: projects.teamId }).from(projects).where(inArray(projects.id, [...neighbourIds]))
     : []

@@ -37,7 +37,8 @@ export default defineEventHandler(async (event) => {
       : []
     const rows = [...own, ...added].sort((a, b) => b.project.updatedAt - a.project.updatedAt)
     if (!rows.length) return []
-    const readOnlyIds = new Set(neighbourIds)
+    const shadowNeighbourIds = new Set(neighbours.shadowIds)
+    const realNeighbourIds = new Set(neighbours.realIds)
     const tree = await boardTreeFields(rows.map(r => r.project.id), new Set(rows.map(r => r.project.id)))
 
     // Which columns count as finished, so the sidebar can say how much of a
@@ -66,13 +67,15 @@ export default defineEventHandler(async (event) => {
 
     return rows.map(({ project, customerName }) => {
       const columnsOf = byProject.get(project.id) ?? []
-      // A crew board added beside the list is read-only from here, and the staff of its crew's team see it as staff.
-      const neighbour = readOnlyIds.has(project.id)
+      // A crew shadow added beside the list is read-only from here, and the staff of its crew's team see it as staff.
+      // A real board added for a crew's member is a label row: read-only, opening nothing, with no tasks.
+      const shadowNeighbour = shadowNeighbourIds.has(project.id)
+      const labelRow = realNeighbourIds.has(project.id)
       return {
         ...project,
         customerName,
-        audience: neighbour ? 'staff' as const : audienceFor(userId, teamId, project),
-        ...(neighbour && { readOnly: true }),
+        audience: shadowNeighbour ? 'staff' as const : audienceFor(userId, teamId, project),
+        ...((shadowNeighbour || labelRow) && { readOnly: true }),
         ...tree.get(project.id),
         terminalColumnIds: terminalColumnIds(columnsOf)
       }

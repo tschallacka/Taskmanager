@@ -77,11 +77,21 @@ function boardLabel(project: Project) {
   return project.name
 }
 
-// The small words before the customer and the time: whose board this is, in the crew tree.
-function treeNote(project: Project) {
-  if (project.role === 'crew_home') return 'crew home · '
-  if (project.readOnly) return 'read-only · '
-  return ''
+// A real board a crew's member sees beside the crew's shadow is a label: it opens nothing and shows no tasks here.
+function isLabelRow(project: Project) {
+  return project.role === 'real' && project.readOnly === true
+}
+
+function openRow(project: Project) {
+  if (!isLabelRow(project)) openProject(project.id)
+}
+
+// The line under a board's name: the customer, the time, and the task count (the small words say whose board it is).
+function rowNote(project: Project) {
+  const customer = project.customerName ? `${project.customerName} · ` : ''
+  if (isLabelRow(project)) return `${customer}crew's real board · read-only`
+  const kind = project.role === 'crew_home' ? 'crew home · ' : project.readOnly ? 'read-only · ' : ''
+  return `${kind}${customer}${relativeTime(project.updatedAt)} · ${countLabel(project)} ${countsFor(project).total === 1 ? 'task' : 'tasks'}`
 }
 
 // Opening a shadow board from the URL, or from the board header's link, opens the tree it sits in.
@@ -363,7 +373,8 @@ function menuItems(project: Project) {
         :class="[activeId === project.id ? 'bg-elevated' : 'hover:bg-elevated/60', depth ? 'ml-6 py-1' : '']"
         :data-board-row="project.role ?? 'board'"
         :data-depth="depth"
-        @click="openProject(project.id)"
+        :data-label-row="isLabelRow(project) ? '' : undefined"
+        @click="openRow(project)"
       >
         <UButton
           v-if="shadowCount"
@@ -390,7 +401,7 @@ function menuItems(project: Project) {
             class="truncate text-xs text-muted"
             :title="countTitle(project)"
           >
-            {{ treeNote(project) }}{{ project.customerName ? `${project.customerName} · ` : '' }}{{ relativeTime(project.updatedAt) }} · {{ countLabel(project) }} {{ countsFor(project).total === 1 ? 'task' : 'tasks' }}
+            {{ rowNote(project) }}
           </p>
         </div>
         <!-- The menu keeps its slot even when invisible, so rows never jump on hover. -->
