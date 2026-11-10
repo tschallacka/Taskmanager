@@ -3,12 +3,14 @@ import { existsSync } from 'node:fs'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { delimiter, join } from 'node:path'
-import { and, eq } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { db } from '../db'
-import { aiUsageRecords, apiKeys, user } from '../db/schema'
-import { issueRunToken } from './api-keys'
+import { aiUsageRecords, user } from '../db/schema'
+import { issueSprocketRunToken } from './api-keys'
 import { SPROCKET_CHARACTER } from './chatTools'
 import type { WireMessage } from './chatHistory'
+import { sprocketPersonOf } from './sprocketPerson'
+import { sprocketRunContext } from './sprocketRun'
 import { promptWithManner } from './sprocketManner'
 import type { SprocketManner } from './sprocketManner'
 
@@ -119,21 +121,6 @@ export interface AgentSettings {
   effort: string | null
 }
 
-/** Checks the picked agent before anything starts, so a bad setting is a plain 400. */
-async function requireAgentKey(userId: string, keyId: string | null) {
-  const missing = () => createError({ statusCode: 400, statusMessage: 'Pick the agent Sprocket works as, in Settings → Sprocket.' })
-  if (!keyId) throw missing()
-  const [key] = await db.select().from(apiKeys).where(and(eq(apiKeys.id, keyId), eq(apiKeys.userId, userId)))
-  if (!key) throw missing()
-  if (key.expiresAt && key.expiresAt <= Date.now()) {
-    throw createError({ statusCode: 400, statusMessage: `The agent "${key.name}" has expired. Pick another in Settings → Sprocket.` })
-  }
-  if (!key.scopes.includes('boards:read')) {
-    throw createError({ statusCode: 400, statusMessage: `The agent "${key.name}" cannot read boards. Give it boards:read, or pick another.` })
-  }
-  return key
-}
-
 interface StreamEvent {
   type?: string
   subtype?: string
@@ -172,12 +159,13 @@ export async function agentChatResponse(opts: {
   }
   const bin = claudeBinary()
   if (!bin) throw createError({ statusCode: 503, statusMessage: 'Claude Code is not installed where this server runs. Set SPROCKET_CLAUDE_BIN, or switch Sprocket to OpenRouter.' })
-  const key = await requireAgentKey(opts.userId, opts.settings.agentKeyId)
+  // Claude Code runs as the person through a Sprocket run key (sprocketRun.ts), the same as the OpenRouter answer. The
+  // agent key picked in Settings no longer decides what it may reach.
   const prompt = promptOf(opts.history)
   const model = isSprocketModel(opts.settings.model) ? opts.settings.model : 'haiku'
   const effort = isSprocketEffort(opts.settings.effort) ? opts.settings.effort : null
 
-  const run = issueRunToken(key.id)
+  const run = issueSprocketRunToken(await sprocketRunContext(await sprocketPersonOf(opts.userId)))
   // A private folder per run: the working directory (no project instructions to find) and
   // the MCP config. The run token travels in the child's environment only; Claude Code fills
   // `${TASKMANAGER_API_KEY}` in when it reads the config, so the token never touches disk.
