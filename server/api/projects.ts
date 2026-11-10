@@ -8,6 +8,7 @@ import { publishFromEvent } from '../utils/realtime'
 import { terminalColumnIds } from '#shared/utils/board'
 import { columnsForNewBoard } from '../utils/teamSettings'
 import { boardTreeFields, hiddenCrewShadows, labelRowOf, markOpenableRealBoards, memberTeamsOf, realNeighbourIsOpenable, treeNeighbours } from '../utils/boardTree'
+import { crewBoardOf, mayDeleteCrewBoard } from '../utils/crewBoards'
 
 export default defineEventHandler(async (event) => {
   const userId = event.context.session.user.id
@@ -71,6 +72,13 @@ export default defineEventHandler(async (event) => {
       else byProject.set(column.projectId, [column])
     }
 
+    // Whether the person may delete each crew shadow board in the list: the rule crew-board.delete.ts applies.
+    const deletable = new Map<string, boolean>()
+    for (const { project } of rows) {
+      const link = tree.get(project.id)?.role === 'shadow' ? await crewBoardOf(project.id) : undefined
+      if (link) deletable.set(project.id, await mayDeleteCrewBoard(userId, link))
+    }
+
     return rows.map(({ project, customerName }) => {
       const columnsOf = byProject.get(project.id) ?? []
       // A crew shadow added beside the list is read-only from here, and the staff of its crew's team see it as staff.
@@ -85,6 +93,7 @@ export default defineEventHandler(async (event) => {
         customerName,
         audience: shadowNeighbour || realNeighbour ? 'staff' as const : audienceFor(userId, teamId, project),
         ...(shadowNeighbour && { readOnly: true }),
+        ...(deletable.has(project.id) && { crewDeletable: deletable.get(project.id) }),
         ...tree.get(project.id),
         terminalColumnIds: terminalColumnIds(columnsOf)
       }

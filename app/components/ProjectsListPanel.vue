@@ -203,7 +203,7 @@ const WORKSPACE_LINKS = [
   { to: '/projects/profile', label: 'Profile', icon: 'i-lucide-user-round' }
 ]
 
-const deleteTarget = ref<{ id: string, name: string } | null>(null)
+const deleteTarget = ref<{ id: string, name: string, crewBoard?: boolean } | null>(null)
 // The board whose management token dialog is open ("Get AI management token").
 const managementBoard = ref<{ id: string, name: string } | null>(null)
 
@@ -211,9 +211,19 @@ async function confirmDelete() {
   const target = deleteTarget.value
   deleteTarget.value = null
   if (!target) return
-  await deleteProject(target.id)
+  await deleteProject(target.id, target.crewBoard)
   if (isPinned(target.id)) loadPins().catch(() => {})
   if (activeId.value === target.id) navigateTo('/projects')
+}
+
+// The delete of a crew's shadow board that the server says this person may make: confirmed first, then the crew route.
+function crewDeleteItem(project: Project) {
+  return {
+    label: 'Delete board',
+    icon: 'i-lucide-trash-2',
+    color: 'error' as const,
+    onSelect: () => { deleteTarget.value = { id: project.id, name: project.name, crewBoard: true } }
+  }
 }
 
 // Anyone may pin a board they can open; a customer's board is the organisation's to rename or delete.
@@ -237,8 +247,9 @@ function menuItems(project: Project) {
       onSelect: () => { managementBoard.value = { id: project.id, name: project.name } }
     }
   ]
-  // A crew board seen from the other side of the tree is read-only here, so it gets no rename or delete.
-  if (project.audience === 'customer' || project.readOnly) return [pin, agent]
+  // A crew board seen from the other side of the tree is read-only here, so it gets no rename or delete: only the
+  // crew's delete, when the server says this person may make it.
+  if (project.audience === 'customer' || project.readOnly) return project.crewDeletable ? [pin, agent, [crewDeleteItem(project)]] : [pin, agent]
   const manage: { label: string, icon: string, onSelect: () => unknown }[] = [
     { label: 'Rename', icon: 'i-lucide-pencil', onSelect: () => startRename(project) }
   ]
@@ -250,14 +261,16 @@ function menuItems(project: Project) {
       onSelect: () => { void navigateTo({ path: '/team', query: { section: 'crews', board: project.id, wizard: '1' } }) }
     })
   }
-  return [pin, agent, manage, [
-    {
-      label: 'Delete project',
-      icon: 'i-lucide-trash-2',
-      color: 'error' as const,
-      onSelect: () => { deleteTarget.value = project }
-    }
-  ]]
+  // A crew's shadow board this person may delete gets Delete board instead: the ordinary route refuses a shadow board.
+  const remove = project.crewDeletable
+    ? crewDeleteItem(project)
+    : {
+        label: 'Delete project',
+        icon: 'i-lucide-trash-2',
+        color: 'error' as const,
+        onSelect: () => { deleteTarget.value = project }
+      }
+  return [pin, agent, manage, [remove]]
 }
 </script>
 
@@ -433,8 +446,8 @@ function menuItems(project: Project) {
 
     <UModal
       :open="deleteTarget !== null"
-      title="Delete project?"
-      description="Columns, tasks and updates are deleted with it. This cannot be undone."
+      :title="deleteTarget?.crewBoard ? 'Delete crew board?' : 'Delete project?'"
+      :description="deleteTarget?.crewBoard ? 'Its tasks, comments and files are deleted for good, and the crew stops working on its real board. This cannot be undone.' : 'Columns, tasks and updates are deleted with it. This cannot be undone.'"
       :ui="{ footer: 'justify-end' }"
       @update:open="(v: boolean) => { if (!v) deleteTarget = null }"
     >
@@ -446,7 +459,7 @@ function menuItems(project: Project) {
           @click="deleteTarget = null"
         />
         <UButton
-          label="Delete project"
+          :label="deleteTarget?.crewBoard ? 'Delete board' : 'Delete project'"
           color="error"
           @click="confirmDelete"
         />
