@@ -46,11 +46,21 @@ export interface CrewShadowRef {
   crewSlug: string
 }
 
+/**
+ * The real board of a shadow, as the breadcrumb needs it. `openable` says whether this person belongs to the real
+ * board's workspace and can open it there (after a workspace switch); a crew's member who is not in that workspace
+ * gets the name only.
+ */
+export interface RealBoardRef extends BoardRef {
+  teamId: string | null
+  openable: boolean
+}
+
 /** What a board is in the crew tree, as the list answers it. */
 export interface BoardTreeFields {
   role: BoardRole
   /** On a shadow board: the real board it works for. */
-  realBoard: BoardRef | null
+  realBoard: RealBoardRef | null
   /** On a real board: the shadow boards of the crews that work on it, among the boards the list shows. */
   shadows: CrewShadowRef[]
   /** On a shadow board: its crew. On a crew's home board: the crew whose home it is. */
@@ -149,6 +159,7 @@ export async function boardTreeFields(boardIds: string[], shown: Set<string>): P
     .select({
       projectId: crewBoards.projectId,
       realName: real.name,
+      realTeamId: real.teamId,
       shadowId: crewBoards.shadowProjectId,
       shadowName: shadow.name,
       crewId: crews.id,
@@ -170,7 +181,7 @@ export async function boardTreeFields(boardIds: string[], shown: Set<string>): P
     if (result.has(link.shadowId)) {
       const entry = result.get(link.shadowId)!
       entry.role = 'shadow'
-      entry.realBoard = { id: link.projectId, name: link.realName }
+      entry.realBoard = { id: link.projectId, name: link.realName, teamId: link.realTeamId, openable: false }
       entry.crew = crew(link)
     }
     if (result.has(link.projectId) && shown.has(link.shadowId)) {
@@ -194,4 +205,20 @@ export async function boardTreeFields(boardIds: string[], shown: Set<string>): P
     }
   }
   return result
+}
+
+/** The workspaces a person belongs to: the ones they can open a board of after a switch. */
+export async function memberTeamsOf(userId: string): Promise<Set<string>> {
+  const rows = await db.select({ teamId: member.organizationId }).from(member).where(eq(member.userId, userId))
+  return new Set(rows.map(row => row.teamId))
+}
+
+/**
+ * Marks which real boards in the tree the person can open: those in a workspace they belong to. Set on the shadow's
+ * breadcrumb only; a real board they cannot open keeps `openable: false` and reads as a name, not a link.
+ */
+export function markOpenableRealBoards(fields: Map<string, BoardTreeFields>, teams: Set<string>): void {
+  for (const entry of fields.values()) {
+    if (entry.realBoard) entry.realBoard.openable = entry.realBoard.teamId !== null && teams.has(entry.realBoard.teamId)
+  }
 }

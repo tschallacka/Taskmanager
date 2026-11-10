@@ -289,7 +289,9 @@ function taskSchedule(task: ProjectTask, people?: Map<string, string>) {
 // boardTree.ts), so an agent and the sidebar read one shape. A board outside any crew tree is a plain board.
 function treeSummary(fields: BoardTreeFields | undefined) {
   const tree: BoardTreeFields = fields ?? { role: 'board', realBoard: null, shadows: [], crew: null }
-  return { role: tree.role, realBoard: tree.realBoard, shadows: tree.shadows, crew: tree.crew }
+  // A crew key reads the real board's id and name only; the workspace fields stay in the web list.
+  const realBoard = tree.realBoard ? { id: tree.realBoard.id, name: tree.realBoard.name } : null
+  return { role: tree.role, realBoard, shadows: tree.shadows, crew: tree.crew }
 }
 
 function boardSummary(board: Project, columns: number, tasks: number) {

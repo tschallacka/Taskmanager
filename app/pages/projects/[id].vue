@@ -13,7 +13,6 @@ const {
   activeProject,
   isCustomerView,
   isReadOnlyBoard,
-  projects,
   loadBoard,
   board,
   boardColumns,
@@ -222,6 +221,7 @@ const taskCountTitle = computed(() => {
 // Only an organisation's boards can belong to a customer; a personal board has
 // nobody to share with.
 const { activeTeamId, setActiveTeam } = useTeams()
+const { switchWorkspace } = useWorkspace()
 const { refresh: refreshProjects } = useProjects()
 const { customers, ensureLoaded: ensureCustomers } = useCustomers()
 const toast = useToast()
@@ -257,15 +257,17 @@ const customerMenu = computed(() => [
 
 // ─── Crew tree ─────────────────────────────────────────────
 
-// The real board of a shadow is a link only when this person can open it. The list holds it as a read-only label
-// row for a crew's member (boardTree.ts, crew members never open the real board), and it is missing when they may not
-// see it at all: then the breadcrumb names it without a link.
-const realBoardOpenable = computed(() => {
-  const realId = activeProject.value?.realBoard?.id
-  if (!realId) return false
-  const row = projects.value.find(p => p.id === realId)
-  return Boolean(row) && row?.readOnly !== true
-})
+// The real board of a shadow is a link only when this person belongs to its workspace (the server sets `openable`).
+// Otherwise, a crew's member, the breadcrumb names it without a link.
+const realBoardOpenable = computed(() => activeProject.value?.realBoard?.openable === true)
+
+// Opening the real board: a board in another workspace switches to it first, as the team switcher does.
+async function openRealBoard() {
+  const real = activeProject.value?.realBoard
+  if (!real) return
+  if (real.teamId && real.teamId !== activeTeamId.value) await switchWorkspace(real.teamId)
+  await navigateTo(`/projects/${real.id}`)
+}
 
 // The shadow boards of a real board, one menu entry each. The list brings them (only the ones this person sees).
 const shadowMenu = computed(() => [
@@ -309,14 +311,15 @@ useSeoMeta({
       aria-label="Breadcrumb"
       data-shadow-breadcrumb
     >
-      <NuxtLink
+      <button
         v-if="realBoardOpenable"
-        :to="`/projects/${activeProject.realBoard.id}`"
+        type="button"
         class="inline-flex min-h-11 min-w-0 items-center rounded px-1 transition-colors hover:text-default hover:underline"
         data-real-board-link
+        @click="openRealBoard"
       >
         <span class="truncate">{{ activeProject.realBoard.name }}</span>
-      </NuxtLink>
+      </button>
       <span
         v-else
         class="inline-flex min-h-11 min-w-0 items-center px-1"

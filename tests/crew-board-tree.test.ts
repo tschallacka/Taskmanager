@@ -14,7 +14,7 @@ Object.assign(globalThis, { createError })
 
 const { db } = await import('../server/db')
 const { crewBoards, crews, member, organization, projects, user } = await import('../server/db/schema')
-const { boardTreeFields, labelRowOf, treeNeighbours } = await import('../server/utils/boardTree')
+const { boardTreeFields, labelRowOf, markOpenableRealBoards, memberTeamsOf, treeNeighbours } = await import('../server/utils/boardTree')
 const { requireProject } = await import('../server/utils/projects')
 
 /** A GET from `userId` with `teamId` as the active workspace: what requireProject reads from an H3 event. */
@@ -130,7 +130,7 @@ test('the owner sees each real board with its crew shadow nested under it, and t
 
   const shadowRow = fields.get(shadow.taskmanager)!
   assert.equal(shadowRow.role, 'shadow')
-  assert.deepEqual(shadowRow.realBoard, { id: real.taskmanager, name: 'Taskmanager Maintenance' })
+  assert.deepEqual(shadowRow.realBoard, { id: real.taskmanager, name: 'Taskmanager Maintenance', teamId: realTeam, openable: false })
   assert.equal(shadowRow.crew?.id, crew.taskmanager)
   assert.equal(fields.get(real.monocode)!.shadows[0]?.id, shadow.monocode)
 })
@@ -212,6 +212,18 @@ test('an admin of the real board\'s team sees the shadow, though not a member of
   } finally {
     await db.delete(user).where(eq(user.id, realAdmin))
   }
+})
+
+test('the breadcrumb links to the real board for a person of its workspace, and only names it for a crew member', async () => {
+  // The owner belongs to the real board's workspace: the real board is openable (a link, with a workspace switch).
+  const ownerView = await listFor(owner, realTeam)
+  markOpenableRealBoards(ownerView.fields, await memberTeamsOf(owner))
+  assert.equal(ownerView.fields.get(shadow.taskmanager)!.realBoard?.openable, true)
+  // The crew member is in the crew's workspace only: the real board is not openable, so it reads as a name.
+  const crewView = await listFor(crewMember, crewTeam)
+  markOpenableRealBoards(crewView.fields, await memberTeamsOf(crewMember))
+  assert.equal(crewView.fields.get(shadow.taskmanager)!.realBoard?.openable, false)
+  assert.equal(crewView.fields.get(shadow.taskmanager)!.realBoard?.name, 'Taskmanager Maintenance')
 })
 
 test('a label row for a crew member carries only id, name, role, readOnly and updatedAt', async () => {

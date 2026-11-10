@@ -7,7 +7,7 @@ import { requireOrgCustomer } from '../utils/customers'
 import { publishFromEvent } from '../utils/realtime'
 import { terminalColumnIds } from '#shared/utils/board'
 import { columnsForNewBoard } from '../utils/teamSettings'
-import { boardTreeFields, hiddenCrewShadows, labelRowOf, treeNeighbours } from '../utils/boardTree'
+import { boardTreeFields, hiddenCrewShadows, labelRowOf, markOpenableRealBoards, memberTeamsOf, treeNeighbours } from '../utils/boardTree'
 
 export default defineEventHandler(async (event) => {
   const userId = event.context.session.user.id
@@ -43,6 +43,8 @@ export default defineEventHandler(async (event) => {
     const shadowNeighbourIds = new Set(neighbours.shadowIds)
     const realNeighbourIds = new Set(neighbours.realIds)
     const tree = await boardTreeFields(rows.map(r => r.project.id), new Set(rows.map(r => r.project.id)))
+    // A real board is openable here when this person belongs to its workspace (the breadcrumb links to it).
+    markOpenableRealBoards(tree, await memberTeamsOf(userId))
 
     // Which columns count as finished, so the sidebar can say how much of a
     // board is still open without loading the board. The tasks themselves are
