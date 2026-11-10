@@ -270,3 +270,10 @@ test('a board that is a shadow for one crew and a real board for another keeps t
     await db.delete(projects).where(inArray(projects.id, [x, y]))
   }
 })
+
+test('a shadow the list hides is also not found by id, for the web routes', async () => {
+  // Staff of the real board's team may read a shadow by id (shadowBoardForStaff), but the list hides it from them;
+  // requireProject applies the same rule so a known id opens nothing.
+  await assert.rejects(requireProject(asUser(realStaff, realTeam), shadow.taskmanager), (e: { statusCode?: number }) => e.statusCode === 404)
+  assert.equal((await requireProject(asUser(owner, realTeam), shadow.taskmanager)).id, shadow.taskmanager)
+})

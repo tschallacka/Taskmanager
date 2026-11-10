@@ -61,23 +61,16 @@ function agentDeletion(context: ApiKeyContext) {
   }
 }
 
-/**
- * The boards a key may read, with the crew shadow boards its person may not see taken out: the same rule as the board
- * list and the search (hiddenCrewShadows in boardTree.ts). Lists and tree fields use this; a hidden board reads as
- * not in the workspace.
- */
-export async function visibleBoards(context: ApiKeyContext): Promise<Project[]> {
-  const boards = await accessibleBoards(context)
-  const hidden = await hiddenCrewShadows(context.userId, boards.map(board => board.id))
-  return boards.filter(board => !hidden.has(board.id))
-}
-
 // ─── lookups ──────────────────────────────────────────────────────────────────
 
 // The boards a key can reach are the ones its person can open in the browser;
 // see mcpAccess.ts for the rule and for what each audience may do on them.
+// A crew shadow its person may not see is left out here, so every tool that resolves a board reads it as not in the
+// workspace, as the list does (hiddenCrewShadows in boardTree.ts).
 export async function accessibleBoards(context: ApiKeyContext): Promise<Project[]> {
-  return db.select().from(projects).where(await boardFilter(context))
+  const boards = await db.select().from(projects).where(await boardFilter(context))
+  const hidden = await hiddenCrewShadows(context.userId, boards.map(board => board.id))
+  return boards.filter(board => !hidden.has(board.id))
 }
 
 /**
@@ -667,7 +660,7 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
     },
     async handler(args, context) {
       const limit = optionalLimit(args, 'limit', 25, 200)
-      const boards = (await visibleBoards(context)).sort((a, b) => b.updatedAt - a.updatedAt)
+      const boards = (await accessibleBoards(context)).sort((a, b) => b.updatedAt - a.updatedAt)
       if (!boards.length) return { total: 0, boards: [] }
 
       // Only the boards that are actually returned need counting.
@@ -721,10 +714,8 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
     async handler(args, context) {
       const reference = requireString(args, 'board')
       const board = await findBoard(reference, context)
-      // A crew's shadow board the person may not see reads as not in the workspace, as the list draws it.
-      const visible = await visibleBoards(context)
-      if (!visible.some(item => item.id === board.id)) throw new McpToolError(`No board "${reference}" in this workspace.`)
       // The crew tree of this board, with the shadow boards the key may see (see boardTree.ts).
+      const visible = await accessibleBoards(context)
       const tree = await boardTreeFields([board.id], new Set(visible.map(item => item.id)))
       const detail = readDetail(args)
       const perColumn = optionalLimit(args, 'limit', DEFAULT_COLUMN_TASKS, MAX_COLUMN_TASKS)
