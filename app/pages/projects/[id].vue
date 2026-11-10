@@ -13,6 +13,7 @@ const {
   activeProject,
   isCustomerView,
   isReadOnlyBoard,
+  projects,
   loadBoard,
   board,
   boardColumns,
@@ -256,6 +257,16 @@ const customerMenu = computed(() => [
 
 // ─── Crew tree ─────────────────────────────────────────────
 
+// The real board of a shadow is a link only when this person can open it. The list holds it as a read-only label
+// row for a crew's member (boardTree.ts, crew members never open the real board), and it is missing when they may not
+// see it at all: then the breadcrumb names it without a link.
+const realBoardOpenable = computed(() => {
+  const realId = activeProject.value?.realBoard?.id
+  if (!realId) return false
+  const row = projects.value.find(p => p.id === realId)
+  return Boolean(row) && row?.readOnly !== true
+})
+
 // The shadow boards of a real board, one menu entry each. The list brings them (only the ones this person sees).
 const shadowMenu = computed(() => [
   (activeProject.value?.shadows ?? []).map(shadow => ({
@@ -299,11 +310,20 @@ useSeoMeta({
       data-shadow-breadcrumb
     >
       <NuxtLink
+        v-if="realBoardOpenable"
         :to="`/projects/${activeProject.realBoard.id}`"
         class="inline-flex min-h-11 min-w-0 items-center rounded px-1 transition-colors hover:text-default hover:underline"
+        data-real-board-link
       >
         <span class="truncate">{{ activeProject.realBoard.name }}</span>
       </NuxtLink>
+      <span
+        v-else
+        class="inline-flex min-h-11 min-w-0 items-center px-1"
+        data-real-board-name
+      >
+        <span class="truncate">{{ activeProject.realBoard.name }}</span>
+      </span>
       <span aria-hidden="true">›</span>
       <span class="px-1">(shadow)</span>
     </nav>
