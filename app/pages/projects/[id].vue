@@ -221,6 +221,7 @@ const taskCountTitle = computed(() => {
 // Only an organisation's boards can belong to a customer; a personal board has
 // nobody to share with.
 const { activeTeamId, setActiveTeam } = useTeams()
+const { switchWorkspace } = useWorkspace()
 const { refresh: refreshProjects } = useProjects()
 const { customers, ensureLoaded: ensureCustomers } = useCustomers()
 const toast = useToast()
@@ -254,6 +255,29 @@ const customerMenu = computed(() => [
   }))
 ])
 
+// ─── Crew tree ─────────────────────────────────────────────
+
+// The real board of a shadow is a link only when this person belongs to its workspace (the server sets `openable`).
+// Otherwise, a crew's member, the breadcrumb names it without a link.
+const realBoardOpenable = computed(() => activeProject.value?.realBoard?.openable === true)
+
+// Opening the real board: a board in another workspace switches to it first, as the team switcher does.
+async function openRealBoard() {
+  const real = activeProject.value?.realBoard
+  if (!real) return
+  if (real.teamId && real.teamId !== activeTeamId.value) await switchWorkspace(real.teamId)
+  await navigateTo(`/projects/${real.id}`)
+}
+
+// The shadow boards of a real board, one menu entry each. The list brings them (only the ones this person sees).
+const shadowMenu = computed(() => [
+  (activeProject.value?.shadows ?? []).map(shadow => ({
+    label: `crew: ${shadow.crewName}`,
+    icon: 'i-lucide-users-round',
+    onSelect: () => navigateTo(`/projects/${shadow.id}`)
+  }))
+])
+
 // ─── Sharing ───────────────────────────────────────────────
 
 const publicLink = computed(() =>
@@ -280,6 +304,32 @@ useSeoMeta({
     >
       This is a crew's board. You can read it here; only the crew's team changes it.
     </p>
+    <!-- The crew tree: a shadow board links back to the real board it works for -->
+    <nav
+      v-if="activeProject?.realBoard"
+      class="flex min-w-0 shrink-0 flex-wrap items-center gap-x-1 px-4 pt-2 text-xs text-muted lg:px-6"
+      aria-label="Breadcrumb"
+      data-shadow-breadcrumb
+    >
+      <button
+        v-if="realBoardOpenable"
+        type="button"
+        class="inline-flex min-h-11 min-w-0 items-center rounded px-1 transition-colors hover:text-default hover:underline"
+        data-real-board-link
+        @click="openRealBoard"
+      >
+        <span class="truncate">{{ activeProject.realBoard.name }}</span>
+      </button>
+      <span
+        v-else
+        class="inline-flex min-h-11 min-w-0 items-center px-1"
+        data-real-board-name
+      >
+        <span class="truncate">{{ activeProject.realBoard.name }}</span>
+      </span>
+      <span aria-hidden="true">›</span>
+      <span class="px-1">(shadow)</span>
+    </nav>
     <!-- Board header -->
     <header class="flex shrink-0 items-center gap-2 border-b border-default px-4 py-3 lg:px-6">
       <UButton
@@ -310,6 +360,23 @@ useSeoMeta({
       >
         {{ activeProject?.name ?? 'Board' }}
       </button>
+
+      <UDropdownMenu
+        v-if="activeProject?.shadows?.length"
+        :items="shadowMenu"
+        :content="{ align: 'start' }"
+      >
+        <UButton
+          size="sm"
+          color="neutral"
+          variant="soft"
+          icon="i-lucide-users-round"
+          class="min-h-11 shrink-0"
+          data-shadow-entry
+        >
+          Shadow boards ({{ activeProject.shadows.length }})
+        </UButton>
+      </UDropdownMenu>
 
       <UDropdownMenu
         v-if="canPickCustomer"

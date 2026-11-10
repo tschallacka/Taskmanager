@@ -1,6 +1,7 @@
 import { and, asc, eq, isNull } from 'drizzle-orm'
 import { db } from '../db'
 import { boardPins, customers, organization, projects } from '../db/schema'
+import { hiddenCrewShadows } from './boardTree'
 import { reachOf, workspaceTeam } from './workspaces'
 
 /** A pinned board, with the workspace it opens in: a team, or the personal workspace (null). */
@@ -30,7 +31,8 @@ export async function listPins(userId: string): Promise<PinnedBoard[]> {
     .where(and(eq(boardPins.userId, userId), isNull(projects.archivedAt), filter))
     .orderBy(asc(boardPins.createdAt))
 
-  return rows.map((row) => {
+  const hidden = await hiddenCrewShadows(userId, rows.map(row => row.projectId))
+  return rows.filter(row => !hidden.has(row.projectId)).map((row) => {
     const teamId = workspaceTeam(teamIds, row.teamId)
     return { ...row, teamId, teamName: teamId ? row.teamName : null }
   })
@@ -40,7 +42,9 @@ export async function listPins(userId: string): Promise<PinnedBoard[]> {
 export async function pinBoard(userId: string, projectId: string) {
   const { filter } = await reachOf(userId)
   const [project] = await db.select({ id: projects.id }).from(projects).where(and(eq(projects.id, projectId), filter))
-  if (!project) throw createError({ statusCode: 404, message: 'Project not found' })
+  if (!project || (await hiddenCrewShadows(userId, [projectId])).has(projectId)) {
+    throw createError({ statusCode: 404, message: 'Project not found' })
+  }
   await db.insert(boardPins).values({ userId, projectId, createdAt: Date.now() }).onConflictDoNothing()
 }
 

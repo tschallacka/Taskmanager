@@ -6,6 +6,7 @@ import { audienceFor, customerIdsOf, getUserActiveTeamId, sessionProjectFilter }
 import type { Audience } from './auth-helpers'
 import { guestProjectIdsOf } from './guests'
 import { shadowBoardForStaff } from './crewBoardAccess'
+import { hiddenCrewShadows } from './boardTree'
 
 export function genId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2)
@@ -45,9 +46,11 @@ export async function requireProject(event: H3Event, projectId: string) {
     .from(projects)
     .where(and(eq(projects.id, projectId), filter))
 
-  if (project) return { ...project, audience: await audienceOf(event, project), readOnly: false }
+  // A crew shadow the person may not see is not found by id either, as in the list (hiddenCrewShadows).
+  const hidden = await hiddenCrewShadows(event.context.session.user.id, [projectId])
+  if (project && !hidden.has(project.id)) return { ...project, audience: await audienceOf(event, project), readOnly: false }
 
-  const shadow = await shadowBoardForStaff(await getUserActiveTeamId(event), projectId)
+  const shadow = hidden.has(projectId) ? null : await shadowBoardForStaff(await getUserActiveTeamId(event), projectId)
   if (!shadow) throw createError({ statusCode: 404, message: 'Project not found' })
   if (!['GET', 'HEAD'].includes(event.method)) {
     throw createError({ statusCode: 403, message: 'This is a crew board. You can read it, not change it.' })

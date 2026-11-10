@@ -17,6 +17,7 @@ import { McpToolError, asToolError, asToolErrorAsync, excerpt, idFromReference, 
 import type { McpToolDefinition } from './mcpToolKit'
 import { MAX_PROJECT_DESCRIPTION, PROJECT_STATUSES, parseDueOn, parseProjectStatus } from './taskFields'
 import { projectPeople } from './people'
+import { boardTreeFields, hiddenCrewShadows, type BoardTreeFields } from './boardTree'
 import { readTaskGithubLinks } from './githubTaskLinks'
 import { notifyAssigned, notifyTaskChange } from './notifyEvents'
 import { tellUnblockedAfterBulk, tellUnblockedOnTrash, unfinishedTasksOn } from './unblockedWatch'
@@ -64,8 +65,12 @@ function agentDeletion(context: ApiKeyContext) {
 
 // The boards a key can reach are the ones its person can open in the browser;
 // see mcpAccess.ts for the rule and for what each audience may do on them.
+// A crew shadow its person may not see is left out here, so every tool that resolves a board reads it as not in the
+// workspace, as the list does (hiddenCrewShadows in boardTree.ts).
 export async function accessibleBoards(context: ApiKeyContext): Promise<Project[]> {
-  return db.select().from(projects).where(await boardFilter(context))
+  const boards = await db.select().from(projects).where(await boardFilter(context))
+  const hidden = await hiddenCrewShadows(context.userId, boards.map(board => board.id))
+  return boards.filter(board => !hidden.has(board.id))
 }
 
 /**
@@ -271,6 +276,15 @@ function taskSchedule(task: ProjectTask, people?: Map<string, string>) {
     ...(task.assigneeId ? { assignee: people?.get(task.assigneeId) ?? task.assigneeId } : {}),
     ...(task.completedAt ? { completed: true, completedAt: new Date(task.completedAt).toISOString() } : {})
   }
+}
+
+// The crew tree of a board, as list_boards and get_board answer it: the same fields the board list carries (see
+// boardTree.ts), so an agent and the sidebar read one shape. A board outside any crew tree is a plain board.
+function treeSummary(fields: BoardTreeFields | undefined) {
+  const tree: BoardTreeFields = fields ?? { role: 'board', realBoard: null, shadows: [], crew: null }
+  // A crew key reads the real board's id and name only; the workspace fields stay in the web list.
+  const realBoard = tree.realBoard ? { id: tree.realBoard.id, name: tree.realBoard.name } : null
+  return { role: tree.role, realBoard, shadows: tree.shadows, crew: tree.crew }
 }
 
 function boardSummary(board: Project, columns: number, tasks: number) {
@@ -668,12 +682,16 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
         new Map(rows.map(row => [row.projectId, Number(row.total)]))
       const columnCounts = countBy(columns)
       const taskCounts = countBy(tasks)
+      // The crew tree of each board returned: a shadow names its real board, a real board names its shadows the
+      // key may see. Only boards the key can open are named in it.
+      const tree = await boardTreeFields(ids, new Set(boards.map(board => board.id)))
 
       return {
         total: boards.length,
-        boards: boards.slice(0, limit).map(board =>
-          boardSummary(board, columnCounts.get(board.id) ?? 0, taskCounts.get(board.id) ?? 0)
-        )
+        boards: boards.slice(0, limit).map(board => ({
+          ...boardSummary(board, columnCounts.get(board.id) ?? 0, taskCounts.get(board.id) ?? 0),
+          ...treeSummary(tree.get(board.id))
+        }))
       }
     }
   },
@@ -694,7 +712,11 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
       required: ['board']
     },
     async handler(args, context) {
-      const board = await findBoard(requireString(args, 'board'), context)
+      const reference = requireString(args, 'board')
+      const board = await findBoard(reference, context)
+      // The crew tree of this board, with the shadow boards the key may see (see boardTree.ts).
+      const visible = await accessibleBoards(context)
+      const tree = await boardTreeFields([board.id], new Set(visible.map(item => item.id)))
       const detail = readDetail(args)
       const perColumn = optionalLimit(args, 'limit', DEFAULT_COLUMN_TASKS, MAX_COLUMN_TASKS)
       const requested = optionalStringArray(args, 'columns')
@@ -753,6 +775,7 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
         name: board.name,
         ...(board.status ? { status: board.status } : {}),
         ...(board.description ? { description: board.description } : {}),
+        ...treeSummary(tree.get(board.id)),
         updatedAt: new Date(board.updatedAt).toISOString(),
         taskCount: Number(total?.tasks ?? 0),
         // Say which columns were left out, so a narrowed read does not look like

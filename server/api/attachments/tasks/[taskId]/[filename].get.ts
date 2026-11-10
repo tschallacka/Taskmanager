@@ -6,6 +6,7 @@ import { and, eq } from 'drizzle-orm'
 import { auth } from '#server/lib/auth'
 import { isTeamMember } from '#server/utils/auth-helpers'
 import { isStaffOfShadowedBoard } from '#server/utils/crewBoardAccess'
+import { hiddenCrewShadows } from '#server/utils/boardTree'
 import { guestRowOf } from '#server/utils/guests'
 import { ATTACHMENT_MIME, SAFE_FILENAME, SAFE_ID, taskAttachmentDir } from '#server/utils/attachments'
 
@@ -42,7 +43,9 @@ export default defineEventHandler(async (event) => {
   if (!isPublic) {
     const session = await auth.api.getSession({ headers: event.headers })
     const userId = session?.user.id
-    const allowed = userId !== undefined && (
+    // A crew shadow the person may not see (hiddenCrewShadows) serves no files, as it opens no board.
+    const hiddenShadow = userId !== undefined && (await hiddenCrewShadows(userId, [row.projectId])).has(row.projectId)
+    const allowed = userId !== undefined && !hiddenShadow && (
       userId === row.userId
       || (row.teamId ? await isTeamMember(userId, row.teamId) : false)
       || (sharedWithCustomers && row.customerId ? await isCustomerContact(userId, row.customerId) : false)

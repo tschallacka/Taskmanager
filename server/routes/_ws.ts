@@ -87,7 +87,7 @@ export default defineWebSocketHandler({
     // And the boards they were let onto as a guest.
     const guestTopics = teamId ? [] : (await guestProjectIdsOf(session.user.id)).map(guestTopic)
     // Their own channel as well, for what is addressed to them and no one else.
-    subscribePeer(peer, [workspaceTopic(session.user.id, teamId), userTopic(session.user.id), ...customerTopics, ...guestTopics], clientId)
+    subscribePeer(peer, [workspaceTopic(session.user.id, teamId), userTopic(session.user.id), ...customerTopics, ...guestTopics], clientId, session.user.id)
     peer.send(JSON.stringify({ type: 'ready' }))
   },
 
