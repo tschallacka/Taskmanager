@@ -9,6 +9,8 @@ import { aiUsageRecords, apiKeys, user } from '../db/schema'
 import { issueRunToken } from './api-keys'
 import { SPROCKET_CHARACTER } from './chatTools'
 import type { WireMessage } from './chatHistory'
+import { promptWithManner } from './sprocketManner'
+import type { SprocketManner } from './sprocketManner'
 
 // Sprocket answered by Claude Code: the server runs `claude -p` for each message, with the
 // model and effort the person chose, and gives it Taskmanager's MCP endpoint as its only
@@ -162,6 +164,8 @@ export async function agentChatResponse(opts: {
   history: WireMessage[]
   today: string
   thinking: boolean
+  /** The manner of this person's answers (sprocketManner.ts). */
+  manner: SprocketManner
 }): Promise<Response> {
   if (!(await mayUseClaude(opts.userId))) {
     throw createError({ statusCode: 403, statusMessage: 'Claude Code answers for the instance admin only on this server. Switch Sprocket to OpenRouter in Settings → Sprocket.' })
@@ -197,7 +201,7 @@ export async function agentChatResponse(opts: {
     '--output-format', 'stream-json',
     '--include-partial-messages',
     '--verbose',
-    '--system-prompt', systemPrompt(opts.today)
+    '--system-prompt', promptWithManner(systemPrompt(opts.today), opts.manner)
   ]
   const child = spawn(bin, args, { cwd: dir, env: { ...childEnv(bin), [KEY_VARIABLE]: run.token }, stdio: ['pipe', 'pipe', 'pipe'] })
   child.stdin.end(prompt)

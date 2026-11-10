@@ -3,6 +3,7 @@ import { db } from '../../db'
 import { apiKeys, organization, userSettings } from '../../db/schema'
 import { claudeBinary, claudeVersion, mayUseClaude, SPROCKET_EFFORTS, SPROCKET_MODEL_ALIASES } from '../../utils/sprocketAgent'
 import { instanceMessagesToday, sprocketInstanceView } from '../../utils/sprocketInstance'
+import { MANNER_TABLE, resolveManner } from '../../utils/sprocketManner'
 
 /**
  * Who answers as Sprocket, and what there is to choose from: the caller's agents (API keys,
@@ -35,6 +36,13 @@ export default defineEventHandler(async (event) => {
 
   return {
     answersWith,
+    // Sprocket's manner: the person's pick, the site default, and the one that answers (sprocketManner.ts).
+    manner: {
+      pick: settings?.sprocketManner ?? null,
+      siteDefault: instance.defaultManner,
+      effective: resolveManner(settings?.sprocketManner, instance.defaultManner),
+      options: Object.values(MANNER_TABLE).map(({ id, label, sample }) => ({ id, label, sample }))
+    },
     instance: {
       on: instanceOn,
       model: instance.model,

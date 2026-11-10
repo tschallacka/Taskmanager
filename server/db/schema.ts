@@ -149,6 +149,8 @@ export const instanceSettings = pgTable('instance_settings', {
   // Messages per user per day, and in all for the instance per day (counted in rate_limit_hits, see sprocketInstance.ts).
   sprocketUserDailyLimit: integer('sprocket_user_daily_limit').notNull().default(200),
   sprocketInstanceDailyCap: integer('sprocket_instance_daily_cap').notNull().default(2000),
+  // The site default manner, used when a person has picked none (see sprocketManner.ts).
+  sprocketDefaultManner: text('sprocket_default_manner').notNull().default('professional'),
   updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
   updatedBy: text('updated_by').references(() => user.id, { onDelete: 'set null' })
 })
@@ -741,6 +743,8 @@ export const userSettings = pgTable('user_settings', {
   sprocketModel: text('sprocket_model').notNull().default('haiku'),
   // null leaves the effort to Claude Code's own default
   sprocketEffort: text('sprocket_effort'),
+  // Sprocket's manner (tone) this person picked; null takes the instance's default. See sprocketManner.ts.
+  sprocketManner: text('sprocket_manner'),
   updatedAt: timestamp('updated_at').notNull()
 })
 

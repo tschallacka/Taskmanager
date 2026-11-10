@@ -63,6 +63,11 @@ export interface ApiKeyContext {
   /** 'management' for the 10-minute crew token of one board; 'access' for every other key. */
   kind?: 'access' | 'management'
   /**
+   * Set on a Sprocket run's own key (the server's Sprocket, or a person's own Sprocket). Such a run is never given a
+   * sensitive tool (mcpToolKit.ts `sensitive`): not in its list, and refused by name.
+   */
+  sprocketRun?: boolean
+  /**
    * Real boards a crew may READ through a crew link, set by the MCP server for a plain read tool only
    * (see crewBoardAccess.ts). Never set on a write call, so those boards do not resolve for it.
    */

@@ -4,7 +4,7 @@
 // connect, and every request is authorised on its own.
 import { authenticateApiKey, hasScope } from '../../utils/api-keys'
 import type { ApiKeyContext } from '../../utils/api-keys'
-import { toolsForKey, toolsForScopes } from '../../utils/mcpRegistry'
+import { sprocketRefusal, toolsForKey, toolsForScopes, toolsForSprocket } from '../../utils/mcpRegistry'
 import { mayUseReadGrant, readGrantedBoardIds } from '../../utils/crewBoardAccess'
 import { recordAgentAction } from '../../utils/agentAudit'
 import { bossInstructions } from '../../utils/crewBossSkill'
@@ -146,7 +146,8 @@ async function handleMessage(message: JsonRpcMessage, context: ApiKeyContext) {
 
     case 'tools/list':
       return result(id, {
-        tools: toolsForKey(context).map(tool => ({
+        // A Sprocket run gets the same list as the key, less the sensitive tools (mcpRegistry.ts toolsForSprocket).
+        tools: (context.sprocketRun ? toolsForSprocket(context) : toolsForKey(context)).map(tool => ({
           name: tool.name,
           title: tool.title,
           description: tool.description,
@@ -167,6 +168,9 @@ async function handleMessage(message: JsonRpcMessage, context: ApiKeyContext) {
       }
 
       const tool = toolsForKey(context).find(candidate => candidate.name === name)
+      // A Sprocket run is refused a sensitive tool by name, even though the list it was given never shows one.
+      const refusal = tool ? sprocketRefusal(tool, context) : null
+      if (tool && refusal) return toolFailure(id, refusal)
       if (!tool) {
         // A tool that exists but is out of scope gets a message the model can act
         // on, rather than one that reads like a client bug.

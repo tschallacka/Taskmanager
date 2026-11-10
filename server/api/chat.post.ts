@@ -6,7 +6,8 @@ import { trimHistory, toProviderMessages } from '../utils/chatHistory'
 import type { WireMessage, WireToolCall } from '../utils/chatHistory'
 import { DEFAULT_OPENROUTER_MODEL } from '../utils/ai'
 import { agentChatResponse } from '../utils/sprocketAgent'
-import { chooseOpenRouterAnswer } from '../utils/sprocketInstance'
+import { chooseOpenRouterAnswer, siteDefaultManner } from '../utils/sprocketInstance'
+import { promptWithManner, resolveManner } from '../utils/sprocketManner'
 
 // Chat endpoint for the Sprocket assistant. Streams NDJSON events to the client:
 //   { type: 'delta', text }              — assistant text chunk
@@ -74,13 +75,17 @@ export default defineEventHandler(async (event) => {
     ? body.today
     : new Date().toISOString().slice(0, 10)
 
+  // The manner of this person's answers: their own pick, else the site default (the tone only, see sprocketManner.ts).
+  const manner = resolveManner(settings?.sprocketManner, await siteDefaultManner())
+
   if (settings?.sprocketProvider === 'agent') {
     return agentChatResponse({
       userId,
       settings: { agentKeyId: settings.sprocketAgentKeyId, model: settings.sprocketModel, effort: settings.sprocketEffort },
       history,
       today,
-      thinking
+      thinking,
+      manner
     })
   }
 
@@ -95,7 +100,7 @@ export default defineEventHandler(async (event) => {
   const { apiKey, model } = answer
 
   const buildMessages = () => [
-    { role: 'system', content: `${CHAT_SYSTEM_PROMPT}\n\nToday is ${today}.` },
+    { role: 'system', content: `${promptWithManner(CHAT_SYSTEM_PROMPT, manner)}\n\nToday is ${today}.` },
     ...toProviderMessages(history)
   ]
 

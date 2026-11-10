@@ -17,6 +17,7 @@ export default defineEventHandler(async (event) => {
   if ('apiKey' in body) patch.apiKey = typeof body.apiKey === 'string' || body.apiKey === null ? body.apiKey : undefined
   if ('userDailyLimit' in body) patch.userDailyLimit = Number(body.userDailyLimit)
   if ('instanceDailyCap' in body) patch.instanceDailyCap = Number(body.instanceDailyCap)
+  if ('defaultManner' in body) patch.defaultManner = String(body.defaultManner ?? '')
 
   await saveSprocketInstance(patch, event.context.session.user.id)
   return sprocketInstanceView()

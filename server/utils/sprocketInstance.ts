@@ -9,6 +9,8 @@ import { db } from '../db'
 import { instanceSettings, rateLimitHits } from '../db/schema'
 import { genId } from './projects'
 import { decryptSecret, encryptSecret, secretsUnavailableReason } from './secretCrypto'
+import { isSprocketManner, resolveManner, SPROCKET_MANNERS } from './sprocketManner'
+import type { SprocketManner } from './sprocketManner'
 
 export const SPROCKET_INSTANCE_ROW_ID = 'instance'
 export const SPROCKET_DEFAULT_MODEL = 'openai/gpt-4o-mini'
@@ -24,6 +26,8 @@ export interface SprocketInstanceView {
   keyMasked: string | null
   userDailyLimit: number
   instanceDailyCap: number
+  /** The site default manner, used by everyone who has picked none (sprocketManner.ts). */
+  defaultManner: SprocketManner
   /** Why the key cannot be stored or read on this install (SECRETS_ENCRYPTION_KEY), or null. */
   keyProblem: string | null
 }
@@ -35,6 +39,13 @@ export interface SprocketInstancePatch {
   apiKey?: string | null
   userDailyLimit?: number
   instanceDailyCap?: number
+  defaultManner?: string
+}
+
+/** The site default manner as stored (Professional before the admin saves one). */
+export async function siteDefaultManner(): Promise<SprocketManner> {
+  const row = await storedRow()
+  return resolveManner(row?.sprocketDefaultManner, null)
 }
 
 /** The stored settings, or the defaults before the admin has saved any. */
@@ -56,6 +67,7 @@ export async function sprocketInstanceView(): Promise<SprocketInstanceView> {
     keyMasked: row?.sprocketOpenrouterKey ? maskKey(decryptForMask(row.sprocketOpenrouterKey)) : null,
     userDailyLimit: row?.sprocketUserDailyLimit ?? 200,
     instanceDailyCap: row?.sprocketInstanceDailyCap ?? 2000,
+    defaultManner: resolveManner(row?.sprocketDefaultManner, null),
     keyProblem: secretsUnavailableReason()
   }
 }
@@ -92,6 +104,12 @@ export async function saveSprocketInstance(patch: SprocketInstancePatch, userId:
   }
   if (patch.userDailyLimit !== undefined) update.sprocketUserDailyLimit = readCount(patch.userDailyLimit, 'The per-user daily limit', MAX_DAILY)
   if (patch.instanceDailyCap !== undefined) update.sprocketInstanceDailyCap = readCount(patch.instanceDailyCap, 'The instance daily cap', MAX_DAILY)
+  if (patch.defaultManner !== undefined) {
+    if (!isSprocketManner(patch.defaultManner)) {
+      throw createError({ statusCode: 400, message: `The manner is one of ${SPROCKET_MANNERS.join(', ')}.` })
+    }
+    update.sprocketDefaultManner = patch.defaultManner
+  }
 
   if (patch.apiKey !== undefined) {
     const trimmed = typeof patch.apiKey === 'string' ? patch.apiKey.trim() : ''
