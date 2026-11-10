@@ -120,6 +120,12 @@ export default defineNuxtConfig({
       start_url: '/',
       icons: [
         {
+          src: 'logo.svg',
+          sizes: 'any',
+          type: 'image/svg+xml',
+          purpose: 'any'
+        },
+        {
           src: 'pwa-64x64.png',
           sizes: '64x64',
           type: 'image/png'
