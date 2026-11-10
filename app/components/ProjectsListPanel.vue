@@ -3,6 +3,7 @@ import { relativeTime } from '~/composables/useRelativeTime'
 import type { Project } from '~/composables/useProjects'
 import type { PinnedBoard } from '~/composables/usePins'
 import { taskCountLabel } from '#shared/utils/board'
+import { crewTreeRows } from '~/utils/crewTreeRows'
 
 const { ready, projects, allTasks, deleteProject, renameProject } = useProjects()
 const route = useRoute()
@@ -17,6 +18,89 @@ const activeId = computed(() => (route.params.id as string | undefined) ?? null)
 function openProject(id: string) {
   if (route.path !== `/projects/${id}`) navigateTo(`/projects/${id}`)
 }
+
+// ─── Crew tree ─────────────────────────────────────────────
+// A real board lists the shadow boards its crews work on, nested under it. Collapsed by default; the open
+// boards are remembered in this browser (a per-person convenience, so a lost copy only means they close again).
+const TREE_KEY = 'taskmanager.boardTree.open'
+const openTrees = ref<string[]>([])
+
+onMounted(() => {
+  // Merged with what a watcher may already have opened before mount, so neither is lost.
+  let stored: string[] = []
+  try {
+    const raw = localStorage.getItem(TREE_KEY)
+    stored = raw ? JSON.parse(raw) as string[] : []
+  } catch {
+    stored = []
+  }
+  openTrees.value = [...new Set([...stored, ...openTrees.value])]
+  openActiveTree()
+})
+
+function saveOpenTrees() {
+  try {
+    localStorage.setItem(TREE_KEY, JSON.stringify(openTrees.value))
+  } catch {
+    // Storage can be off (a private window): the toggle still works for this visit.
+  }
+}
+
+function toggleTree(id: string) {
+  openTrees.value = openTrees.value.includes(id)
+    ? openTrees.value.filter(x => x !== id)
+    : [...openTrees.value, id]
+  saveOpenTrees()
+}
+
+// A shadow board nests under its real board when that board is in the list; otherwise it stays a top-level row.
+// The arrow and the nested rows come from the same computation (app/utils/crewTreeRows.ts).
+const treeRows = computed(() => crewTreeRows(projects.value, openTrees.value))
+
+// A shadow board nested under its real board reads "Real board › crew: Crew name"; the crew's home board is named as is.
+function boardLabel(project: Project) {
+  if (project.role === 'shadow' && project.realBoard && project.crew) {
+    return `${project.realBoard.name} › crew: ${project.crew.name}`
+  }
+  return project.name
+}
+
+// A real board a crew's member sees beside the crew's shadow is a label: it opens nothing and shows no tasks here.
+function isLabelRow(project: Project) {
+  return project.role === 'real' && project.readOnly === true
+}
+
+// A real board the list shows as an ordinary row (the person belongs to its workspace) opens after a workspace switch
+// when it sits in another workspace; a label row opens nothing.
+async function openRow(project: Project) {
+  if (isLabelRow(project)) return
+  if (project.role === 'real' && project.teamId && project.teamId !== activeTeamId.value) {
+    await switchWorkspace(project.teamId)
+    await navigateTo(`/projects/${project.id}`)
+    return
+  }
+  openProject(project.id)
+}
+
+// The line under a board's name: the customer, the time, and the task count (the small words say whose board it is).
+function rowNote(project: Project) {
+  const customer = project.customerName ? `${project.customerName} · ` : ''
+  if (isLabelRow(project)) return `${customer}crew's real board · read-only`
+  const kind = project.role === 'crew_home' ? 'crew home · ' : project.readOnly ? 'read-only · ' : ''
+  return `${kind}${customer}${relativeTime(project.updatedAt)} · ${countLabel(project)} ${countsFor(project).total === 1 ? 'task' : 'tasks'}`
+}
+
+// Opening a shadow board from the URL, or from the board header's link, opens the tree it sits in. It runs again
+// once the list has loaded, because a board opened by its address is only in the list then.
+function openActiveTree() {
+  const project = projects.value.find(p => p.id === activeId.value)
+  const realId = project?.role === 'shadow' ? project.realBoard?.id : undefined
+  if (realId && !openTrees.value.includes(realId)) {
+    openTrees.value = [...openTrees.value, realId]
+    saveOpenTrees()
+  }
+}
+watch([activeId, ready], openActiveTree)
 
 // ─── Pins ──────────────────────────────────────────────────
 // Pins come from every workspace. A board in the open workspace shows its live name from
@@ -153,7 +237,8 @@ function menuItems(project: Project) {
       onSelect: () => { managementBoard.value = { id: project.id, name: project.name } }
     }
   ]
-  if (project.audience === 'customer') return [pin, agent]
+  // A crew board seen from the other side of the tree is read-only here, so it gets no rename or delete.
+  if (project.audience === 'customer' || project.readOnly) return [pin, agent]
   const manage: { label: string, icon: string, onSelect: () => unknown }[] = [
     { label: 'Rename', icon: 'i-lucide-pencil', onSelect: () => startRename(project) }
   ]
@@ -268,8 +353,8 @@ function menuItems(project: Project) {
     </p>
 
     <template
-      v-for="project in projects"
-      :key="project.id"
+      v-for="{ key, project, depth, shadowCount, open } in treeRows"
+      :key="key"
     >
       <input
         v-if="renamingId === project.id"
@@ -282,28 +367,48 @@ function menuItems(project: Project) {
       >
       <div
         v-else
-        class="group flex cursor-pointer items-start gap-2 rounded-lg px-2.5 py-1.5 transition-colors"
-        :class="activeId === project.id ? 'bg-elevated' : 'hover:bg-elevated/60'"
-        @click="openProject(project.id)"
+        class="group flex items-start gap-2 rounded-lg px-2.5 py-1.5 transition-colors"
+        :class="[
+          isLabelRow(project) ? '' : 'cursor-pointer',
+          activeId === project.id ? 'bg-elevated' : isLabelRow(project) ? '' : 'hover:bg-elevated/60',
+          depth ? 'ml-6 min-h-11 py-1' : ''
+        ]"
+        :data-board-row="project.role ?? 'board'"
+        :data-depth="depth"
+        :data-label-row="isLabelRow(project) ? '' : undefined"
+        @click="openRow(project)"
       >
+        <UButton
+          v-if="shadowCount"
+          :icon="open ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
+          size="sm"
+          color="neutral"
+          variant="ghost"
+          class="-my-2 -ml-2 min-h-11 min-w-11 shrink-0 justify-center"
+          :aria-expanded="open"
+          :aria-label="`${open ? 'Hide' : 'Show'} the crew boards of ${project.name}`"
+          data-tree-toggle
+          @click.stop="toggleTree(project.id)"
+        />
         <UIcon
-          :name="project.customerId ? 'i-lucide-building-2' : 'i-lucide-kanban'"
+          :name="project.role === 'shadow' ? 'i-lucide-users-round' : project.role === 'crew_home' ? 'i-lucide-house' : project.customerId ? 'i-lucide-building-2' : 'i-lucide-kanban'"
           class="mt-0.5 size-4 shrink-0"
           :class="activeId === project.id ? 'text-primary' : 'text-dimmed group-hover:text-muted'"
         />
         <div class="min-w-0 flex-1">
           <p class="truncate text-sm font-medium leading-snug text-default">
-            {{ project.name }}
+            {{ boardLabel(project) }}
           </p>
           <p
             class="truncate text-xs text-muted"
             :title="countTitle(project)"
           >
-            {{ project.customerName ? `${project.customerName} · ` : '' }}{{ relativeTime(project.updatedAt) }} · {{ countLabel(project) }} {{ countsFor(project).total === 1 ? 'task' : 'tasks' }}
+            {{ rowNote(project) }}
           </p>
         </div>
         <!-- The menu keeps its slot even when invisible, so rows never jump on hover. -->
         <UDropdownMenu
+          v-if="!isLabelRow(project)"
           :items="menuItems(project)"
           :content="{ align: 'start', collisionPadding: 12 }"
         >
@@ -312,7 +417,7 @@ function menuItems(project: Project) {
             size="xs"
             color="neutral"
             variant="ghost"
-            class="mt-0.5 shrink-0 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
+            class="mt-0.5 shrink-0 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100 max-md:min-h-11 max-md:min-w-11 max-md:opacity-100"
             aria-label="Project options"
             @click.stop
           />
