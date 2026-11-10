@@ -5,6 +5,7 @@
 import { authenticateApiKey, hasScope } from '../../utils/api-keys'
 import type { ApiKeyContext } from '../../utils/api-keys'
 import { sprocketRefusal, toolsForKey, toolsForScopes, toolsForSprocket } from '../../utils/mcpRegistry'
+import { hideForSprocket } from '../../utils/sprocketRun'
 import { mayUseReadGrant, readGrantedBoardIds } from '../../utils/crewBoardAccess'
 import { recordAgentAction } from '../../utils/agentAudit'
 import { bossInstructions } from '../../utils/crewBossSkill'
@@ -194,7 +195,9 @@ async function handleMessage(message: JsonRpcMessage, context: ApiKeyContext) {
         const callContext = mayUseReadGrant(tool)
           ? { ...scoped, readGrantedBoardIds: await readGrantedBoardIds(context) }
           : scoped
-        const value = await tool.handler(asRecord(params.arguments), callContext)
+        // A Sprocket run's answer has no address its person may not see (sprocketRun.ts hideForSprocket).
+        const raw = await tool.handler(asRecord(params.arguments), callContext)
+        const value = context.sprocketRun ? await hideForSprocket(raw, context.userId) : raw
         if (!tool.readOnly) void announceWrite(tool, value, context)
         // Only what succeeded is recorded; the recording never fails or slows the call.
         if (tool.audit ?? !tool.readOnly) void recordAgentAction(tool, asRecord(params.arguments), value, context)

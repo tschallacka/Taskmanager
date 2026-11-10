@@ -5,6 +5,7 @@
 // and a call by name to a sensitive tool is refused (mcpRegistry.ts). The audit names the person and "Sprocket".
 import { teamIdsOf } from './api-keys'
 import type { ApiKeyContext } from './api-keys'
+import { maskEmails } from './emailPrivacy'
 import { McpToolError } from './mcpToolKit'
 import { MCP_TOOLS, sprocketRefusal, toolsForSprocket } from './mcpRegistry'
 import type { McpToolDefinition } from './mcpToolKit'
@@ -67,5 +68,37 @@ export async function runSprocketTool(name: string, args: Record<string, unknown
   if (!sprocketRunTools(context).some(candidate => candidate.name === name)) {
     throw new McpToolError(`Sprocket is not given "${name}" for this person.`)
   }
-  return tool.handler(args, { ...context, callScope: tool.scope })
+  return hideForSprocket(await tool.handler(args, { ...context, callScope: tool.scope }), context.userId)
+}
+
+/**
+ * Takes out of a tool's answer every address the person may not see (the email privacy rules, as the members lists
+ * apply them). An address with no id beside it is removed. Run on every answer a Sprocket run gets, from either path.
+ */
+export async function hideForSprocket<T>(value: T, userId: string): Promise<T> {
+  const holders: Array<Record<string, unknown>> = []
+  const visit = (node: unknown) => {
+    if (Array.isArray(node)) {
+      node.forEach(visit)
+      return
+    }
+    if (node && typeof node === 'object') {
+      const record = node as Record<string, unknown>
+      if (typeof record.email === 'string') holders.push(record)
+      Object.values(record).forEach(visit)
+    }
+  }
+  visit(value)
+
+  const withId = holders.filter(holder => typeof holder.id === 'string')
+  const shown = withId.length
+    ? await maskEmails(userId, withId.map(holder => ({ id: holder.id as string, email: holder.email as string })))
+    : []
+  withId.forEach((holder, index) => {
+    holder.email = shown[index]?.email ?? null
+  })
+  holders.filter(holder => typeof holder.id !== 'string').forEach((holder) => {
+    delete holder.email
+  })
+  return value
 }
