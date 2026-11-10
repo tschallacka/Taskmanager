@@ -186,9 +186,13 @@ async function changeBlockers(tx: Tx, board: Project, taskId: string, actor: Act
 
 // ─── people and schedule ──────────────────────────────────────────────────────
 
+// A person with no name is never shown by email here: these strings carry no email field, so the email privacy rule
+// (and a Sprocket run's hideForSprocket) could not take the address out.
+const UNNAMED_PERSON = 'Unnamed person'
+
 /** Who can be named on a board's tasks, by id, so cards can say who has them. */
 export async function peopleNames(board: Project): Promise<Map<string, string>> {
-  return new Map((await projectPeople(board)).map(person => [person.id, person.name || person.email]))
+  return new Map((await projectPeople(board)).map(person => [person.id, person.name || UNNAMED_PERSON]))
 }
 
 /** A person on the board, found by id, email or name as the app shows it. */
@@ -200,7 +204,7 @@ async function findPerson(board: Project, reference: string): Promise<string> {
     ?? people.find(person => (person.name || '').toLowerCase() === needle)
   if (!match) {
     throw new McpToolError(
-      `"${reference}" is not on board "${board.name}". People who can be assigned: ${people.map(person => person.name || person.email).join(', ')}.`
+      `"${reference}" is not on board "${board.name}". People who can be assigned: ${people.map(person => person.name || UNNAMED_PERSON).join(', ')}.`
     )
   }
   return match.id
