@@ -17,6 +17,7 @@ Object.assign(globalThis, { createError })
 const { db } = await import('../server/db')
 const { crewBoards, crews, member, organization, projects, user } = await import('../server/db/schema')
 const { MCP_BOARD_TOOLS } = await import('../server/utils/mcpBoardTools')
+const { hiddenCrewShadows } = await import('../server/utils/boardTree')
 
 const tag = randomBytes(4).toString('hex')
 const id = (name: string) => `mbt-${tag}-${name}`
@@ -159,5 +160,21 @@ test('a plain member of both teams, who is not the crew owner, an owner or admin
   } finally {
     await db.delete(member).where(inArray(member.userId, [plain]))
     await db.delete(user).where(inArray(user.id, [plain]))
+  }
+})
+
+test('an admin of the real board\'s team is not hidden the crew shadow by the shared rule', async () => {
+  // hiddenCrewShadows lets the owners and admins of the real board's team in, so the MCP list follows the same rule.
+  // The key reach is separate: a board in a workspace the person is not in is not reachable through the key at all.
+  const admin = id('real-admin')
+  const at = new Date()
+  await db.insert(user).values({ id: admin, name: admin, email: `${admin}@staff.test`, emailVerified: true, createdAt: at, updatedAt: at })
+  await db.insert(member).values({ id: id('m-real-admin'), organizationId: realTeam, userId: admin, role: 'admin', createdAt: at })
+  try {
+    const hidden = await hiddenCrewShadows(admin, [shadow])
+    assert.equal(hidden.has(shadow), false)
+  } finally {
+    await db.delete(member).where(inArray(member.userId, [admin]))
+    await db.delete(user).where(inArray(user.id, [admin]))
   }
 })
