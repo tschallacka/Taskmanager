@@ -4,23 +4,71 @@
 // handlers out of the SVG it produces.
 //
 // The diagrams are drawn in the app's own palette rather than Mermaid's
-// purple: zinc surfaces and ink, amber for the primary fill, in both modes.
+// purple: zinc surfaces and ink, and the user's accent colour for the primary
+// fill, in both modes. Mermaid does its own colour maths on these values, so
+// they must be plain hex; the accent's shades are mixed from its base hex.
 
 import type { MermaidConfig } from 'mermaid'
+import { colorHex } from '#shared/utils/colors'
 
 type MermaidModule = typeof import('mermaid').default
 
 let loading: Promise<MermaidModule> | null = null
-let configuredDark: boolean | null = null
+let configuredKey: string | null = null
 let counter = 0
 
 const FONT = 'system-ui, -apple-system, "Segoe UI", sans-serif'
 
-const LIGHT = {
+interface Shades {
+  s50: string
+  s100: string
+  s200: string
+  s300: string
+  s400: string
+  s500: string
+  s600: string
+  ink: string
+  d800: string
+  d900: string
+  onDark: string
+}
+
+function channels(hex: string): [number, number, number] {
+  const n = Number.parseInt(hex.slice(1), 16)
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+}
+
+/** `share` of `other` mixed into `hex`, as a hex colour. */
+function mix(hex: string, other: string, share: number): string {
+  const a = channels(hex)
+  const b = channels(other)
+  return '#' + a.map((c, i) => Math.round(c + (b[i]! - c) * share).toString(16).padStart(2, '0')).join('')
+}
+
+export function accentShades(accent: string): Shades {
+  const base = colorHex(accent)
+  const white = '#ffffff'
+  const black = '#000000'
+  return {
+    s50: mix(base, white, 0.92),
+    s100: mix(base, white, 0.82),
+    s200: mix(base, white, 0.64),
+    s300: mix(base, white, 0.45),
+    s400: mix(base, white, 0.25),
+    s500: base,
+    s600: mix(base, black, 0.18),
+    ink: mix(base, black, 0.8),
+    d800: mix(base, black, 0.5),
+    d900: mix(base, black, 0.65),
+    onDark: mix(base, white, 0.94)
+  }
+}
+
+const light = (a: Shades) => ({
   background: '#ffffff',
-  primaryColor: '#fffbeb',
+  primaryColor: a.s50,
   primaryTextColor: '#18181b',
-  primaryBorderColor: '#fbbf24',
+  primaryBorderColor: a.s400,
   secondaryColor: '#f4f4f5',
   secondaryTextColor: '#18181b',
   secondaryBorderColor: '#d4d4d8',
@@ -29,8 +77,8 @@ const LIGHT = {
   tertiaryBorderColor: '#e4e4e7',
   lineColor: '#71717a',
   textColor: '#3f3f46',
-  mainBkg: '#fffbeb',
-  nodeBorder: '#fbbf24',
+  mainBkg: a.s50,
+  nodeBorder: a.s400,
   clusterBkg: '#fafafa',
   clusterBorder: '#d4d4d8',
   edgeLabelBackground: '#f4f4f5',
@@ -38,8 +86,8 @@ const LIGHT = {
   noteBkgColor: '#fef9c3',
   noteTextColor: '#713f12',
   noteBorderColor: '#fde047',
-  actorBkg: '#fffbeb',
-  actorBorder: '#fbbf24',
+  actorBkg: a.s50,
+  actorBorder: a.s400,
   actorTextColor: '#18181b',
   actorLineColor: '#a1a1aa',
   signalColor: '#3f3f46',
@@ -48,18 +96,18 @@ const LIGHT = {
   labelBoxBorderColor: '#d4d4d8',
   labelTextColor: '#18181b',
   loopTextColor: '#18181b',
-  activationBkgColor: '#fef3c7',
-  activationBorderColor: '#fbbf24',
+  activationBkgColor: a.s100,
+  activationBorderColor: a.s400,
   sectionBkgColor: '#f4f4f5',
   altSectionBkgColor: '#ffffff',
-  sectionBkgColor2: '#fffbeb',
-  taskBkgColor: '#fbbf24',
-  taskBorderColor: '#d97706',
-  taskTextColor: '#451a03',
-  taskTextLightColor: '#451a03',
-  taskTextDarkColor: '#451a03',
-  activeTaskBkgColor: '#fde68a',
-  activeTaskBorderColor: '#d97706',
+  sectionBkgColor2: a.s50,
+  taskBkgColor: a.s400,
+  taskBorderColor: a.s600,
+  taskTextColor: a.ink,
+  taskTextLightColor: a.ink,
+  taskTextDarkColor: a.ink,
+  activeTaskBkgColor: a.s200,
+  activeTaskBorderColor: a.s600,
   doneTaskBkgColor: '#e4e4e7',
   doneTaskBorderColor: '#a1a1aa',
   gridColor: '#e4e4e7',
@@ -84,14 +132,14 @@ const LIGHT = {
   pieLegendTextColor: '#3f3f46',
   fontFamily: FONT,
   fontSize: '14px'
-}
+})
 
-const DARK = {
+const dark = (a: Shades) => ({
   darkMode: true,
   background: '#171717',
-  primaryColor: '#78350f',
+  primaryColor: a.d900,
   primaryTextColor: '#e4e4e7',
-  primaryBorderColor: '#f59e0b',
+  primaryBorderColor: a.s500,
   secondaryColor: '#27272a',
   secondaryTextColor: '#e4e4e7',
   secondaryBorderColor: '#3f3f46',
@@ -100,8 +148,8 @@ const DARK = {
   tertiaryBorderColor: '#3f3f46',
   lineColor: '#a1a1aa',
   textColor: '#e4e4e7',
-  mainBkg: '#78350f',
-  nodeBorder: '#f59e0b',
+  mainBkg: a.d900,
+  nodeBorder: a.s500,
   clusterBkg: '#1f1f22',
   clusterBorder: '#3f3f46',
   edgeLabelBackground: '#27272a',
@@ -109,8 +157,8 @@ const DARK = {
   noteBkgColor: '#713f12',
   noteTextColor: '#fef9c3',
   noteBorderColor: '#a16207',
-  actorBkg: '#78350f',
-  actorBorder: '#f59e0b',
+  actorBkg: a.d900,
+  actorBorder: a.s500,
   actorTextColor: '#e4e4e7',
   actorLineColor: '#52525b',
   signalColor: '#d4d4d8',
@@ -119,18 +167,18 @@ const DARK = {
   labelBoxBorderColor: '#3f3f46',
   labelTextColor: '#e4e4e7',
   loopTextColor: '#e4e4e7',
-  activationBkgColor: '#92400e',
-  activationBorderColor: '#f59e0b',
+  activationBkgColor: a.d800,
+  activationBorderColor: a.s500,
   sectionBkgColor: '#27272a',
   altSectionBkgColor: '#171717',
   sectionBkgColor2: '#1f1f22',
-  taskBkgColor: '#d97706',
-  taskBorderColor: '#fbbf24',
-  taskTextColor: '#fffbeb',
-  taskTextLightColor: '#fffbeb',
-  taskTextDarkColor: '#fffbeb',
-  activeTaskBkgColor: '#f59e0b',
-  activeTaskBorderColor: '#fcd34d',
+  taskBkgColor: a.s600,
+  taskBorderColor: a.s400,
+  taskTextColor: a.onDark,
+  taskTextLightColor: a.onDark,
+  taskTextDarkColor: a.onDark,
+  activeTaskBkgColor: a.s500,
+  activeTaskBorderColor: a.s300,
   doneTaskBkgColor: '#3f3f46',
   doneTaskBorderColor: '#71717a',
   gridColor: '#3f3f46',
@@ -154,15 +202,16 @@ const DARK = {
   pieLegendTextColor: '#e4e4e7',
   fontFamily: FONT,
   fontSize: '14px'
-}
+})
 
-/** The Mermaid configuration for one colour mode. */
-export function mermaidConfig(dark: boolean): MermaidConfig {
+/** The Mermaid configuration for one colour mode and accent colour. */
+export function mermaidConfig(isDark: boolean, accent = 'amber'): MermaidConfig {
+  const shades = accentShades(accent)
   return {
     startOnLoad: false,
     securityLevel: 'strict' as const,
     theme: 'base' as const,
-    themeVariables: dark ? DARK : LIGHT,
+    themeVariables: isDark ? dark(shades) : light(shades),
     fontFamily: FONT,
     flowchart: { curve: 'basis', padding: 12, htmlLabels: false },
     sequence: { actorMargin: 40 },
@@ -176,11 +225,12 @@ async function load(): Promise<MermaidModule> {
   return loading
 }
 
-export async function renderMermaid(code: string, dark: boolean): Promise<string> {
+export async function renderMermaid(code: string, isDark: boolean, accent = 'amber'): Promise<string> {
   const mermaid = await load()
-  if (configuredDark !== dark) {
-    mermaid.initialize(mermaidConfig(dark))
-    configuredDark = dark
+  const key = `${isDark ? 'dark' : 'light'}:${accent}`
+  if (configuredKey !== key) {
+    mermaid.initialize(mermaidConfig(isDark, accent))
+    configuredKey = key
   }
   const id = `mermaid-${counter++}-${Date.now().toString(36)}`
   try {
