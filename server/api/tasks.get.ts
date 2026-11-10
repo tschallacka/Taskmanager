@@ -22,12 +22,15 @@ export default defineEventHandler(async (event) => {
   const teamId = await getUserActiveTeamId(event)
   // The crew shadow boards the list adds for the real board's staff are read as staff, as on the board page. The real
   // boards the list shows beside a crew's shadow are label rows only, so their tasks are never served here.
+  // A crew's shadow board the person may not see (hiddenCrewShadows) is not searched either: the same rule as the list.
   const found = await treeNeighbours(userId, visibleProjects.map(p => p.id))
+  const listed = visibleProjects.filter(p => !found.hidden.has(p.id))
   const neighbourIds = new Set(found.shadowIds)
   const neighbourRows = neighbourIds.size
     ? await db.select({ id: projects.id, userId: projects.userId, teamId: projects.teamId }).from(projects).where(inArray(projects.id, [...neighbourIds]))
     : []
-  const allProjects = [...visibleProjects, ...neighbourRows]
+  const allProjects = [...listed, ...neighbourRows]
+  if (!allProjects.length) return []
   const staffProjectIds = allProjects
     .filter(p => neighbourIds.has(p.id) || audienceFor(userId, teamId, p) === 'staff')
     .map(p => p.id)

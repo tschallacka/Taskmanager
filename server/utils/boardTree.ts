@@ -4,17 +4,25 @@
 // board that already exists folds in by itself. The crew's home board (crews.board_id) is not a shadow; it stays
 // where it is and is only labelled as the crew's home.
 //
-// Two kinds of board join a person's list beside the boards of their active workspace, both only for a person who
-// belongs to the team the board lives in (the same rule as the rest of the list, see crewBoardAccess.ts):
-//   - a shadow board of a real board in the list, when the person is in the shadow's crew team (the real board's
-//     staff see the crew's board nested under it, read-only from this workspace);
+// A crew's shadow board is seen only by the crew's owner, by the owners and admins of the team it lives in, and by the
+// crew's own accounts (hiddenCrewShadows). The list and the search both drop the shadows a person may not see.
+// Two kinds of board join a person's list beside the boards of their active workspace:
+//   - a shadow board of a real board in the list, when the person may see it (the rule above);
 //   - the real board of a shadow in the list, when the person is in the shadow's team (the crew's own members see
 //     the real board nested over the shadow as a label row only: it opens nothing and its tasks are not served.
 //     Opening a real board for a crew is a separate access decision, not made here).
 import { and, asc, eq, inArray, isNull, or } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { db } from '../db'
-import { crewBoards, crews, member, projects } from '../db/schema'
+import { crewBoards, crews, member, projects, user } from '../db/schema'
+
+/**
+ * A real board as a crew's member sees it beside the crew's shadow: only the keys the tree needs. Nothing about the
+ * board itself (description, customer, settings) reaches a crew, since the crew cannot open the board.
+ */
+export function labelRowOf(project: { id: string, name: string, updatedAt: number }) {
+  return { id: project.id, name: project.name, role: 'real' as const, readOnly: true as const, updatedAt: project.updatedAt }
+}
 
 export type BoardRole = 'board' | 'real' | 'shadow' | 'crew_home'
 
@@ -51,40 +59,67 @@ export interface BoardTreeFields {
 
 const PLAIN: BoardTreeFields = { role: 'board', realBoard: null, shadows: [], crew: null }
 
-/** The teams a person is a member of. */
-async function teamsOf(userId: string): Promise<string[]> {
-  const rows = await db.select({ teamId: member.organizationId }).from(member).where(eq(member.userId, userId))
-  return rows.map(row => row.teamId)
+/**
+ * The crew shadow boards among `boardIds` that `userId` may not see. A crew's board is seen only by the crew's owner,
+ * by the owners and admins of the team it lives in, and by the crew's own accounts (user.crewId). Every other board
+ * is not a crew board and is never hidden here. The list and the search both use this one rule.
+ */
+export async function hiddenCrewShadows(userId: string, boardIds: string[]): Promise<Set<string>> {
+  const hidden = new Set<string>()
+  if (!boardIds.length) return hidden
+  const rows = await db
+    .select({ shadowId: crewBoards.shadowProjectId, crewId: crewBoards.crewId, createdBy: crews.createdBy, shadowTeamId: projects.teamId })
+    .from(crewBoards)
+    .innerJoin(crews, eq(crews.id, crewBoards.crewId))
+    .innerJoin(projects, eq(projects.id, crewBoards.shadowProjectId))
+    .where(inArray(crewBoards.shadowProjectId, boardIds))
+  if (!rows.length) return hidden
+  const [account] = await db.select({ crewId: user.crewId }).from(user).where(eq(user.id, userId))
+  const adminTeams = new Set((await db
+    .select({ teamId: member.organizationId })
+    .from(member)
+    .where(and(eq(member.userId, userId), inArray(member.role, ['owner', 'admin'])))).map(row => row.teamId))
+  for (const row of rows) {
+    const visible = row.createdBy === userId
+      || (row.shadowTeamId !== null && adminTeams.has(row.shadowTeamId))
+      || (Boolean(account?.crewId) && account?.crewId === row.crewId)
+    if (!visible) hidden.add(row.shadowId)
+  }
+  return hidden
 }
 
 /**
- * The boards a person sees beside the boards of `own` (their list, before the tree): the shadow boards of the real
- * boards in `own` that sit in a team they belong to, and the real boards of the shadows in `own` that sit in a team
- * they belong to. Archived boards are never added.
+ * The boards a person sees beside the boards of `ownIds` (their list, before the tree), with the crew shadows they may
+ * not see taken out of `ownIds` first: `hidden` lists them, and the caller drops them from its own list and search.
+ * shadowIds: the shadow boards of the real boards in the list, visible to the person. realIds: the real board of a
+ * shadow in the list, as a label row. Archived boards are never added.
  */
-export async function treeNeighbours(userId: string, ownIds: string[]): Promise<{ shadowIds: string[], realIds: string[] }> {
-  if (!ownIds.length) return { shadowIds: [], realIds: [] }
-  const teams = await teamsOf(userId)
-  if (!teams.length) return { shadowIds: [], realIds: [] }
+// The list and /api/tasks both call this, so the same rule decides what each shows: keep them in step.
+export async function treeNeighbours(userId: string, ownIds: string[]): Promise<{ hidden: Set<string>, shadowIds: string[], realIds: string[] }> {
+  const hidden = await hiddenCrewShadows(userId, ownIds)
+  const visible = ownIds.filter(id => !hidden.has(id))
+  if (!visible.length) return { hidden, shadowIds: [], realIds: [] }
   const shadow = alias(projects, 'tree_shadow')
   const real = alias(projects, 'tree_real')
+  const own = new Set(visible)
 
   const shadows = await db
     .select({ id: crewBoards.shadowProjectId })
     .from(crewBoards)
     .innerJoin(shadow, eq(shadow.id, crewBoards.shadowProjectId))
-    .where(and(inArray(crewBoards.projectId, ownIds), inArray(shadow.teamId, teams), isNull(shadow.archivedAt)))
+    .where(and(inArray(crewBoards.projectId, visible), isNull(shadow.archivedAt)))
 
   const reals = await db
     .select({ id: crewBoards.projectId })
     .from(crewBoards)
-    .innerJoin(shadow, eq(shadow.id, crewBoards.shadowProjectId))
     .innerJoin(real, eq(real.id, crewBoards.projectId))
-    .where(and(inArray(crewBoards.shadowProjectId, ownIds), inArray(shadow.teamId, teams), isNull(real.archivedAt)))
+    .where(and(inArray(crewBoards.shadowProjectId, visible), isNull(real.archivedAt)))
 
-  const own = new Set(ownIds)
+  // The shadows the person may see are hidden from nothing here; a shadow they may not see never reached `visible`.
+  const hiddenNow = await hiddenCrewShadows(userId, shadows.map(row => row.id))
   return {
-    shadowIds: [...new Set(shadows.map(row => row.id))].filter(id => !own.has(id)),
+    hidden,
+    shadowIds: [...new Set(shadows.map(row => row.id))].filter(id => !own.has(id) && !hiddenNow.has(id)),
     realIds: [...new Set(reals.map(row => row.id))].filter(id => !own.has(id))
   }
 }
@@ -119,18 +154,18 @@ export async function boardTreeFields(boardIds: string[], shown: Set<string>): P
 
   const crew = (row: { crewId: string, crewName: string, crewSlug: string }): CrewRef => ({ id: row.crewId, name: row.crewName, slug: row.crewSlug })
 
+  // A board can be a shadow for one crew and a real board for another. A shadow keeps its role whatever the row
+  // order: the shadow branch sets it, and the real branch never overwrites it.
   for (const link of links) {
     if (result.has(link.shadowId)) {
-      result.set(link.shadowId, {
-        role: 'shadow',
-        realBoard: { id: link.projectId, name: link.realName },
-        shadows: [],
-        crew: crew(link)
-      })
+      const entry = result.get(link.shadowId)!
+      entry.role = 'shadow'
+      entry.realBoard = { id: link.projectId, name: link.realName }
+      entry.crew = crew(link)
     }
     if (result.has(link.projectId) && shown.has(link.shadowId)) {
       const entry = result.get(link.projectId)!
-      entry.role = 'real'
+      if (entry.role !== 'shadow') entry.role = 'real'
       entry.shadows.push({ id: link.shadowId, name: link.shadowName, crewId: link.crewId, crewName: link.crewName, crewSlug: link.crewSlug })
     }
   }

@@ -7,7 +7,7 @@ import { requireOrgCustomer } from '../utils/customers'
 import { publishFromEvent } from '../utils/realtime'
 import { terminalColumnIds } from '#shared/utils/board'
 import { columnsForNewBoard } from '../utils/teamSettings'
-import { boardTreeFields, treeNeighbours } from '../utils/boardTree'
+import { boardTreeFields, hiddenCrewShadows, labelRowOf, treeNeighbours } from '../utils/boardTree'
 
 export default defineEventHandler(async (event) => {
   const userId = event.context.session.user.id
@@ -24,9 +24,12 @@ export default defineEventHandler(async (event) => {
       .orderBy(desc(projects.updatedAt))
     // The crew tree adds the shadow and real boards a person sees beside their own (see boardTree.ts). The archived
     // view adds nothing, so it answers as it did before.
+    // A crew's shadow board that this person may not see (hiddenCrewShadows) is dropped from the list in both views.
+    const hidden = await hiddenCrewShadows(userId, own.map(r => r.project.id))
+    const visibleOwn = own.filter(r => !hidden.has(r.project.id))
     const neighbours = archivedView
       ? { shadowIds: [], realIds: [] }
-      : await treeNeighbours(userId, own.map(r => r.project.id))
+      : await treeNeighbours(userId, visibleOwn.map(r => r.project.id))
     const neighbourIds = [...neighbours.shadowIds, ...neighbours.realIds]
     const added = neighbourIds.length
       ? await db
@@ -35,7 +38,7 @@ export default defineEventHandler(async (event) => {
           .leftJoin(customers, eq(customers.id, projects.customerId))
           .where(inArray(projects.id, neighbourIds))
       : []
-    const rows = [...own, ...added].sort((a, b) => b.project.updatedAt - a.project.updatedAt)
+    const rows = [...visibleOwn, ...added].sort((a, b) => b.project.updatedAt - a.project.updatedAt)
     if (!rows.length) return []
     const shadowNeighbourIds = new Set(neighbours.shadowIds)
     const realNeighbourIds = new Set(neighbours.realIds)
@@ -69,13 +72,14 @@ export default defineEventHandler(async (event) => {
       const columnsOf = byProject.get(project.id) ?? []
       // A crew shadow added beside the list is read-only from here, and the staff of its crew's team see it as staff.
       // A real board added for a crew's member is a label row: read-only, opening nothing, with no tasks.
+      // A real board a crew's member sees is a label row: its id, name, role, read-only flag and sort time, nothing more.
+      if (realNeighbourIds.has(project.id)) return labelRowOf(project)
       const shadowNeighbour = shadowNeighbourIds.has(project.id)
-      const labelRow = realNeighbourIds.has(project.id)
       return {
         ...project,
         customerName,
         audience: shadowNeighbour ? 'staff' as const : audienceFor(userId, teamId, project),
-        ...((shadowNeighbour || labelRow) && { readOnly: true }),
+        ...(shadowNeighbour && { readOnly: true }),
         ...tree.get(project.id),
         terminalColumnIds: terminalColumnIds(columnsOf)
       }
