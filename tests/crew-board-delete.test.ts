@@ -27,6 +27,7 @@ const { auth } = await import('../server/lib/auth')
 const { taskAttachmentDir } = await import('../server/utils/attachments')
 const route = (await import('../server/api/projects/[id]/crew-board.delete')).default as unknown as (event: unknown) => Promise<{ ok: boolean }>
 const requireAuth = (await import('../server/middleware/requireAuth')).default as unknown as (event: unknown) => Promise<void>
+const generic = (await import('../server/api/projects/[id]')).default as unknown as (event: unknown) => Promise<{ ok: boolean }>
 
 // The auth middleware asks the session store who is signed in; no session means a key or nothing was presented.
 let sessionUser = ''
@@ -44,6 +45,7 @@ const crewMember = id('crew-member') // a plain member of the crew's team
 const realAdmin = id('real-admin') // an admin of the real board's team only: sees the shadow, may not delete it
 const realMember = id('real-member') // a plain member of the real board's team
 const instanceAdmin = id('instance-admin') // the instance admin, and an owner of the real board's team only
+const island = id('island') // the instance admin, linked to no board of these tests
 const outsider = id('outsider')
 const contact = id('contact') // a customer contact of the crew team's customer
 const realTeam = id('real-team')
@@ -92,6 +94,14 @@ const del = (userId: string, boardId: string) => route({
   context: { session: { user: { id: userId }, session: { activeOrganizationId: crewTeam } } }
 })
 
+/** The ordinary delete route, as `userId`: a crew board is handed to the crew rule there. */
+const delGeneric = (userId: string, boardId: string) => generic({
+  method: 'DELETE',
+  params: { id: boardId },
+  headers: new Headers(),
+  context: { session: { user: { id: userId }, session: { activeOrganizationId: crewTeam } } }
+})
+
 const refused = (promise: Promise<unknown>, statusCode: number) =>
   assert.rejects(promise, (e: { statusCode?: number }) => e.statusCode === statusCode)
 
@@ -113,8 +123,8 @@ async function assertGone(b: Awaited<ReturnType<typeof crewBoardFor>>) {
 }
 
 before(async () => {
-  await db.insert(user).values([owner, attacher, teamAdmin, crewMember, realAdmin, realMember, instanceAdmin, outsider, contact].map(u => ({
-    id: u, name: u, email: `${u}@arnotes.test`, emailVerified: true, createdAt: at, updatedAt: at, isInstanceAdmin: u === instanceAdmin
+  await db.insert(user).values([owner, attacher, teamAdmin, crewMember, realAdmin, realMember, instanceAdmin, island, outsider, contact].map(u => ({
+    id: u, name: u, email: `${u}@arnotes.test`, emailVerified: true, createdAt: at, updatedAt: at, isInstanceAdmin: u === instanceAdmin || u === island
   })))
   await db.insert(organization).values([
     { id: realTeam, name: 'Real team', slug: realTeam, createdAt: at },
@@ -203,6 +213,35 @@ test('a board that is not a crew\'s shadow is not found by this route', async ()
   const b = await crewBoardFor(owner, owner)
   await refused(del(owner, b.real), 404)
   assert.equal(await present('projects', b.real), true)
+})
+
+test('the generic DELETE route applies the crew rule: the owner deletes the crew board and its forked accounts go', async () => {
+  const b = await crewBoardFor(owner, owner)
+  assert.deepEqual(await delGeneric(owner, b.shadow), { ok: true })
+  await assertGone(b)
+})
+
+test('the generic DELETE route refuses a crew account and a plain crew-team member, and keeps the board', async () => {
+  const b = await crewBoardFor(owner, owner)
+  const account = id(`crew-account-g-${seq}`)
+  await db.insert(user).values({ id: account, name: account, email: `${account}@arnotes.test`, emailVerified: true, createdAt: at, updatedAt: at, crewId: b.crew })
+  await refused(delGeneric(account, b.shadow), 403)
+  await refused(delGeneric(crewMember, b.shadow), 404) // hidden by hiddenCrewShadows
+  assert.equal(await present('projects', b.shadow), true)
+  assert.equal(await present('links', b.shadow), true)
+})
+
+test('an instance admin with no link to a crew board deletes it, though it is hidden from them', async () => {
+  const b = await crewBoardFor(owner, owner)
+  assert.deepEqual(await del(island, b.shadow), { ok: true })
+  await assertGone(b)
+})
+
+test('a plain person with no link still gets 404 for a hidden crew board, on both routes', async () => {
+  const b = await crewBoardFor(owner, owner)
+  await refused(del(outsider, b.shadow), 404)
+  await refused(delGeneric(outsider, b.shadow), 404)
+  assert.equal(await present('projects', b.shadow), true)
 })
 
 test('the crew board rule answers the same for the list flag as for the route', async () => {

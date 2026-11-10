@@ -611,7 +611,7 @@ export function useProjects() {
     return updated
   }
 
-  // A crew's shadow board goes through its own route: the ordinary one refuses a shadow board.
+  // A crew's shadow board goes through the crew route, which applies the crew rule (crew-board.delete.ts).
   async function deleteProject(id: string, crewBoard = false) {
     await $fetch(crewBoard ? `/api/projects/${id}/crew-board` : `/api/projects/${id}`, { method: 'DELETE', headers: realtimeHeaders() })
     _projects.value = _projects.value.filter(p => p.id !== id)

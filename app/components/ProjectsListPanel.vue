@@ -261,7 +261,7 @@ function menuItems(project: Project) {
       onSelect: () => { void navigateTo({ path: '/team', query: { section: 'crews', board: project.id, wizard: '1' } }) }
     })
   }
-  // A crew's shadow board this person may delete gets Delete board instead: the ordinary route refuses a shadow board.
+  // A crew's shadow board this person may delete gets Delete board instead, which confirms and runs the crew route.
   const remove = project.crewDeletable
     ? crewDeleteItem(project)
     : {

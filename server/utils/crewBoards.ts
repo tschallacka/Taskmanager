@@ -18,6 +18,7 @@ import { isCrewUser, personKeyOf } from './crewAccounts'
 import { removeForks } from './crewForks'
 import { TEAM_ADMIN_ROLES } from './auth-helpers'
 import { removeTaskAttachments } from './attachments'
+import { hiddenCrewShadows } from './boardTree'
 
 export interface CrewChoice {
   id: string
@@ -132,6 +133,23 @@ export async function detachCrew(link: CrewBoard): Promise<void> {
     await tx.delete(crewBoards).where(eq(crewBoards.id, link.id))
     await tx.update(projects).set({ archivedAt: Date.now(), name: sql`${projects.name} || ' (taken off)'` }).where(eq(projects.id, link.shadowProjectId))
   })
+}
+
+/**
+ * The crew shadow board `shadowId` as `userId` may delete it. 404 when it is not a crew's shadow, or is hidden from the
+ * person (the instance admin sees every crew board, so hidden does not stop them); 403 when they may not delete it.
+ */
+export async function crewShadowToDelete(userId: string, shadowId: string) {
+  const board = await crewBoardOf(shadowId)
+  if (!board) throw createError({ statusCode: 404, message: 'Project not found' })
+  const instanceAdmin = await isInstanceAdmin(userId)
+  if (!instanceAdmin && (await hiddenCrewShadows(userId, [shadowId])).has(shadowId)) {
+    throw createError({ statusCode: 404, message: 'Project not found' })
+  }
+  if (!(await mayDeleteCrewBoard(userId, board))) {
+    throw createError({ statusCode: 403, message: 'Only the board\'s owner, its crew\'s owner, an owner or admin of its team, or the instance admin can delete a crew board' })
+  }
+  return board
 }
 
 /** A crew's shadow board with the crew it is coupled to: the team member who made the crew, and the crew's team. */
