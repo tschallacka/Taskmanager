@@ -65,7 +65,7 @@ says exactly who each step covers and where addresses appear.
 - **Accent color**: the colour of buttons, highlights and other interactive parts. Click a swatch.
 - **Neutral color**: the colour of backgrounds, borders and text. Click a swatch.
 
-The two colours are saved to your account through the server. The light or dark choice is kept by your browser.
+The two colours are saved to your account through the server. The light or dark choice is kept by your browser. A new account starts with the amber accent and in dark mode, until you choose otherwise.
 
 ## API keys and MCP
 

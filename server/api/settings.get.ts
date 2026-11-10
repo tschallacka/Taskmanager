@@ -15,7 +15,7 @@ export default defineEventHandler(async (event) => {
 
   if (!settings) {
     return {
-      primaryColor: 'emerald',
+      primaryColor: 'amber',
       neutralColor: 'zinc',
       openrouterApiKey: null,
       openrouterApiKeyMasked: null,
