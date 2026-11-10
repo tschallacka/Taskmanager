@@ -32,8 +32,8 @@ Each desk has a small light beside the name. It shows what the crew monitor says
 - a **grey dashed ring** is no status yet. The office never guesses busy or idle.
 
 The shape says the state as well as the colour. Hover the light (or tap it on a phone) to read the status text: "Busy: …",
-"Idle since 21:40", or "No status yet". The light changes while you watch, without a reload. Until the crew monitor
-reports, every light is grey.
+"Idle since 21:40", or "No status yet". The light changes while you watch, without a reload. The status comes from the crew monitor, which reads the board (see
+[The crew monitor](/help/agents/crew-monitor)).
 
 ## Who can see it
 

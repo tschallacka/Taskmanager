@@ -5,6 +5,7 @@ import { requireProject } from '../../../utils/projects'
 import { commentVisibilityFilter, taskVisibilityFilter } from '../../../utils/auth-helpers'
 import { crewsOfRealBoard, officeCastOf } from '../../../utils/officeCast'
 import { withDeskStatus } from '../../../utils/deskStatus'
+import { boardStatusSource } from '../../../utils/crewMonitor'
 import { stageOf } from '../../../../shared/office/model'
 import type { OfficeSnapshot, OfficeTask } from '../../../../shared/office/model'
 
@@ -75,6 +76,6 @@ export default defineEventHandler(async (event): Promise<OfficeSnapshot> => {
   const { crewName, cast } = await officeCastOf(project.id, assignees, crewId)
   // The office is a crew's. A board nobody works on has no room to show; the reason lets the page say so.
   if (!crewName) throw createError({ statusCode: 404, statusMessage: 'No crew works on this board', data: { reason: 'no-crew' } })
-  // Each desk's light: the monitor's status for that person, or unknown until it reports one.
-  return { boardId: project.id, boardName: project.name, crewName, cast: await withDeskStatus(cast), tasks }
+  // Each desk's light: the crew monitor's busy or idle for that person, read from this board's tasks.
+  return { boardId: project.id, boardName: project.name, crewName, cast: await withDeskStatus(cast, await boardStatusSource(project.id)), tasks }
 })
