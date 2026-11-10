@@ -28,7 +28,8 @@ const {
   trashedCount,
   toggleShowTrashed,
   isTrashed,
-  crewBoard
+  crewBoard,
+  linkedCrews
 } = useProjects()
 
 const projectId = computed(() => route.params.id as string)
@@ -49,8 +50,8 @@ const VIEWS = [
 
 // Time, messages and settings are the team's own: a customer's contact has no tab for them.
 const STAFF_ONLY_VIEWS: string[] = ['messages', 'time', 'settings']
-// The office is a crew board's: it shows only on one, and only to the team's staff.
-const visibleViews = computed(() => VIEWS.filter(v => (v.key !== 'office' || crewBoard.value) && (!STAFF_ONLY_VIEWS.includes(v.key) || !isCustomerView.value)))
+// The office is a crew's: it shows on a crew board, and on a real board a crew is linked to. Only the team's staff see it.
+const visibleViews = computed(() => VIEWS.filter(v => (v.key !== 'office' || crewBoard.value || linkedCrews.value.length > 0) && (!STAFF_ONLY_VIEWS.includes(v.key) || !isCustomerView.value)))
 
 const tabViews = computed(() => visibleViews.value.filter(v => v.key !== 'settings'))
 // The office is no panel of this page, so ?view=office falls back to the board instead of showing files.
@@ -60,10 +61,16 @@ function setView(key: string) {
   navigateTo({ path: route.path, query: queryForView(route.query, key) }, { replace: true })
 }
 
-// The office is a page of its own, not a view of the board: the tab leads there.
-function openOffice() {
-  navigateTo(`/office/${projectId.value}`)
+// The office is a page of its own, not a view of the board: the tab leads there. On a real board with more than one
+// crew, the tab opens a menu of them instead (see officeCrewItems), and each item leads to that crew's office.
+function openOffice(crewId?: string) {
+  navigateTo(crewId ? `/office/${projectId.value}?crew=${crewId}` : `/office/${projectId.value}`)
 }
+const officeCrewItems = computed(() => linkedCrews.value.map(crew => ({
+  label: crew.name,
+  icon: 'i-lucide-building-2',
+  onSelect: () => openOffice(crew.id)
+})))
 
 // The tab row scrolls sideways on a phone. Its edges fade where tabs are cut off,
 // so it is clear that the row goes on.
@@ -554,7 +561,23 @@ useSeoMeta({
         v-for="v in tabViews"
         :key="v.key"
       >
+        <UDropdownMenu
+          v-if="v.key === 'office' && linkedCrews.length > 1"
+          :items="officeCrewItems"
+        >
+          <button
+            class="relative flex shrink-0 items-center gap-1.5 px-2.5 py-2 text-sm text-muted transition-colors hover:text-default"
+          >
+            <UIcon
+              :name="v.icon"
+              class="size-4"
+            />
+            {{ v.label }}
+            <span class="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-primary opacity-0" />
+          </button>
+        </UDropdownMenu>
         <button
+          v-else
           class="relative flex shrink-0 items-center gap-1.5 px-2.5 py-2 text-sm transition-colors"
           :class="view === v.key ? 'font-medium text-default' : 'text-muted hover:text-default'"
           :aria-current="view === v.key ? 'page' : undefined"
@@ -575,7 +598,7 @@ useSeoMeta({
           page="agents/office-view"
           label="About the Office view"
         >
-          The office shows this board's crew at work: every task is a folder that moves between the desks as the board changes.
+          The office shows the crew of this board at work: every task is a folder that moves between the desks as the board changes. On a board with more than one crew, the menu picks which crew to watch.
         </HelpHint>
       </template>
     </nav>
