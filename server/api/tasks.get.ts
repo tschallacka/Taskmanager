@@ -3,7 +3,7 @@ import { projects, projectTasks } from '../db/schema'
 import { and, eq, asc, desc, inArray, isNull, or } from 'drizzle-orm'
 import { getProjectAccessFilter } from '../utils/projects'
 import { audienceFor, getUserActiveTeamId } from '../utils/auth-helpers'
-import { treeNeighbours } from '../utils/boardTree'
+import { memberTeamsOf, realNeighbourIsOpenable, treeNeighbours } from '../utils/boardTree'
 
 // Flat task list across every accessible project — powers global search and
 // deep links into boards without loading each board first.
@@ -25,10 +25,14 @@ export default defineEventHandler(async (event) => {
   // A crew's shadow board the person may not see (hiddenCrewShadows) is not searched either: the same rule as the list.
   const found = await treeNeighbours(userId, visibleProjects.map(p => p.id))
   const listed = visibleProjects.filter(p => !found.hidden.has(p.id))
-  const neighbourIds = new Set(found.shadowIds)
-  const neighbourRows = neighbourIds.size
-    ? await db.select({ id: projects.id, userId: projects.userId, teamId: projects.teamId }).from(projects).where(inArray(projects.id, [...neighbourIds]))
+  // A real board the list shows as an ordinary row (the person belongs to its workspace) is searched too; a label row is not.
+  const memberTeams = await memberTeamsOf(userId)
+  const candidateIds = [...found.shadowIds, ...found.realIds]
+  const candidateRows = candidateIds.length
+    ? await db.select({ id: projects.id, userId: projects.userId, teamId: projects.teamId }).from(projects).where(inArray(projects.id, candidateIds))
     : []
+  const neighbourRows = candidateRows.filter(row => found.shadowIds.includes(row.id) || realNeighbourIsOpenable(row.teamId, memberTeams))
+  const neighbourIds = new Set(neighbourRows.map(row => row.id))
   const allProjects = [...listed, ...neighbourRows]
   if (!allProjects.length) return []
   const staffProjectIds = allProjects

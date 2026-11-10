@@ -86,8 +86,16 @@ function isLabelRow(project: Project) {
   return project.role === 'real' && project.readOnly === true
 }
 
-function openRow(project: Project) {
-  if (!isLabelRow(project)) openProject(project.id)
+// A real board the list shows as an ordinary row (the person belongs to its workspace) opens after a workspace switch
+// when it sits in another workspace; a label row opens nothing.
+async function openRow(project: Project) {
+  if (isLabelRow(project)) return
+  if (project.role === 'real' && project.teamId && project.teamId !== activeTeamId.value) {
+    await switchWorkspace(project.teamId)
+    await navigateTo(`/projects/${project.id}`)
+    return
+  }
+  openProject(project.id)
 }
 
 // The line under a board's name: the customer, the time, and the task count (the small words say whose board it is).

@@ -14,7 +14,7 @@ Object.assign(globalThis, { createError })
 
 const { db } = await import('../server/db')
 const { crewBoards, crews, member, organization, projects, user } = await import('../server/db/schema')
-const { boardTreeFields, labelRowOf, markOpenableRealBoards, memberTeamsOf, treeNeighbours } = await import('../server/utils/boardTree')
+const { boardTreeFields, labelRowOf, markOpenableRealBoards, memberTeamsOf, realNeighbourIsOpenable, treeNeighbours } = await import('../server/utils/boardTree')
 const { requireProject } = await import('../server/utils/projects')
 
 /** A GET from `userId` with `teamId` as the active workspace: what requireProject reads from an H3 event. */
@@ -212,6 +212,20 @@ test('an admin of the real board\'s team sees the shadow, though not a member of
   } finally {
     await db.delete(user).where(eq(user.id, realAdmin))
   }
+})
+
+test('the real board is an ordinary row for a person of its workspace, and a label row for a crew member', async () => {
+  // The crew's shadows are on the list; the real boards they lead to come in as neighbours.
+  const crewBoardsOfCrewTeam = await ownBoards(crewTeam)
+  const ownerNeighbours = await treeNeighbours(owner, crewBoardsOfCrewTeam)
+  const ownerTeams = await memberTeamsOf(owner)
+  assert.ok(ownerNeighbours.realIds.includes(real.taskmanager))
+  assert.equal(realNeighbourIsOpenable(realTeam, ownerTeams), true, 'the owner belongs to the real board\'s workspace: an ordinary row, opened after a switch')
+  const crewNeighbours = await treeNeighbours(crewMember, crewBoardsOfCrewTeam)
+  const crewTeams = await memberTeamsOf(crewMember)
+  assert.ok(crewNeighbours.realIds.includes(real.taskmanager))
+  assert.equal(realNeighbourIsOpenable(realTeam, crewTeams), false, 'a crew member is not in the real workspace: a label row')
+  assert.equal(realNeighbourIsOpenable(null, ownerTeams), false, 'a board with no workspace is never opened from a row')
 })
 
 test('the breadcrumb links to the real board for a person of its workspace, and only names it for a crew member', async () => {

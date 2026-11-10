@@ -207,6 +207,14 @@ export async function boardTreeFields(boardIds: string[], shown: Set<string>): P
   return result
 }
 
+/**
+ * Whether a real board that a crew's shadow leads to is an ordinary row in the list (the person belongs to its
+ * workspace, so the row opens it after a switch) or a read-only label row (anyone else: a crew member).
+ */
+export function realNeighbourIsOpenable(teamId: string | null, memberTeams: Set<string>): boolean {
+  return teamId !== null && memberTeams.has(teamId)
+}
+
 /** The workspaces a person belongs to: the ones they can open a board of after a switch. */
 export async function memberTeamsOf(userId: string): Promise<Set<string>> {
   const rows = await db.select({ teamId: member.organizationId }).from(member).where(eq(member.userId, userId))

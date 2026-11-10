@@ -7,7 +7,7 @@ import { requireOrgCustomer } from '../utils/customers'
 import { publishFromEvent } from '../utils/realtime'
 import { terminalColumnIds } from '#shared/utils/board'
 import { columnsForNewBoard } from '../utils/teamSettings'
-import { boardTreeFields, hiddenCrewShadows, labelRowOf, markOpenableRealBoards, memberTeamsOf, treeNeighbours } from '../utils/boardTree'
+import { boardTreeFields, hiddenCrewShadows, labelRowOf, markOpenableRealBoards, memberTeamsOf, realNeighbourIsOpenable, treeNeighbours } from '../utils/boardTree'
 
 export default defineEventHandler(async (event) => {
   const userId = event.context.session.user.id
@@ -43,8 +43,9 @@ export default defineEventHandler(async (event) => {
     const shadowNeighbourIds = new Set(neighbours.shadowIds)
     const realNeighbourIds = new Set(neighbours.realIds)
     const tree = await boardTreeFields(rows.map(r => r.project.id), new Set(rows.map(r => r.project.id)))
-    // A real board is openable here when this person belongs to its workspace (the breadcrumb links to it).
-    markOpenableRealBoards(tree, await memberTeamsOf(userId))
+    // A real board is openable here when this person belongs to its workspace (the row and the breadcrumb open it).
+    const memberTeams = await memberTeamsOf(userId)
+    markOpenableRealBoards(tree, memberTeams)
 
     // Which columns count as finished, so the sidebar can say how much of a
     // board is still open without loading the board. The tasks themselves are
@@ -74,13 +75,15 @@ export default defineEventHandler(async (event) => {
       const columnsOf = byProject.get(project.id) ?? []
       // A crew shadow added beside the list is read-only from here, and the staff of its crew's team see it as staff.
       // A real board added for a crew's member is a label row: read-only, opening nothing, with no tasks.
-      // A real board a crew's member sees is a label row: its id, name, role, read-only flag and sort time, nothing more.
-      if (realNeighbourIds.has(project.id)) return labelRowOf(project)
+      // A real board that a crew's shadow leads to is an ordinary row for a person of its workspace (it opens after a
+      // switch); for anyone else it is a label row: its id, name, role, read-only flag and sort time, nothing more.
+      const realNeighbour = realNeighbourIds.has(project.id)
+      if (realNeighbour && !realNeighbourIsOpenable(project.teamId, memberTeams)) return labelRowOf(project)
       const shadowNeighbour = shadowNeighbourIds.has(project.id)
       return {
         ...project,
         customerName,
-        audience: shadowNeighbour ? 'staff' as const : audienceFor(userId, teamId, project),
+        audience: shadowNeighbour || realNeighbour ? 'staff' as const : audienceFor(userId, teamId, project),
         ...(shadowNeighbour && { readOnly: true }),
         ...tree.get(project.id),
         terminalColumnIds: terminalColumnIds(columnsOf)

@@ -23,6 +23,8 @@ export interface Project {
   archivedAt?: number | null
   // The dashboard widgets this project shows, in order; null is the default set.
   dashboardWidgets?: string[] | null
+  // The workspace the board lives in: a real board the list shows beside a crew's shadow opens after a switch to it.
+  teamId?: string | null
   customerId?: string | null
   customerName?: string | null
   audience?: Audience
