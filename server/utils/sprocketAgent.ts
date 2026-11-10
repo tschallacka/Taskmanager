@@ -3,9 +3,9 @@ import { existsSync } from 'node:fs'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { delimiter, join } from 'node:path'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { db } from '../db'
-import { aiUsageRecords, user } from '../db/schema'
+import { aiUsageRecords, apiKeys, user } from '../db/schema'
 import { issueSprocketRunToken } from './api-keys'
 import { SPROCKET_CHARACTER } from './chatTools'
 import type { WireMessage } from './chatHistory'
@@ -159,8 +159,14 @@ export async function agentChatResponse(opts: {
   }
   const bin = claudeBinary()
   if (!bin) throw createError({ statusCode: 503, statusMessage: 'Claude Code is not installed where this server runs. Set SPROCKET_CLAUDE_BIN, or switch Sprocket to OpenRouter.' })
-  // Claude Code runs as the person through a Sprocket run key (sprocketRun.ts), the same as the OpenRouter answer. The
-  // agent key picked in Settings no longer decides what it may reach.
+  // A picked agent key must be the person's own: another person's key is refused before anything runs. The run itself
+  // goes out as a Sprocket run key for this person (sprocketRun.ts), the same as the OpenRouter answer, so the agent key
+  // no longer decides what it may reach.
+  if (opts.settings.agentKeyId) {
+    const [picked] = await db.select({ id: apiKeys.id }).from(apiKeys)
+      .where(and(eq(apiKeys.id, opts.settings.agentKeyId), eq(apiKeys.userId, opts.userId)))
+    if (!picked) throw createError({ statusCode: 400, statusMessage: 'Pick the agent Sprocket works as, in Settings → Sprocket.' })
+  }
   const prompt = promptOf(opts.history)
   const model = isSprocketModel(opts.settings.model) ? opts.settings.model : 'haiku'
   const effort = isSprocketEffort(opts.settings.effort) ? opts.settings.effort : null
