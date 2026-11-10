@@ -30,6 +30,8 @@ export interface Project {
   audience?: Audience
   // Set by the server on a crew's shadow board opened by the staff of the real board.
   readOnly?: boolean
+  // On a crew's shadow board: whether this person may delete it (the server's rule, crew-board.delete.ts).
+  crewDeletable?: boolean
   // The crew tree (server/utils/boardTree.ts): what the board is, and which boards it nests with. Only the list
   // answers with these; a board opened on its own has none, and the board header reads them from the list.
   role?: 'board' | 'real' | 'shadow' | 'crew_home'
@@ -609,8 +611,9 @@ export function useProjects() {
     return updated
   }
 
-  async function deleteProject(id: string) {
-    await $fetch(`/api/projects/${id}`, { method: 'DELETE', headers: realtimeHeaders() })
+  // A crew's shadow board goes through the crew route, which applies the crew rule (crew-board.delete.ts).
+  async function deleteProject(id: string, crewBoard = false) {
+    await $fetch(crewBoard ? `/api/projects/${id}/crew-board` : `/api/projects/${id}`, { method: 'DELETE', headers: realtimeHeaders() })
     _projects.value = _projects.value.filter(p => p.id !== id)
     _allTasks.value = _allTasks.value.filter(t => t.projectId !== id)
     reindexSearch()

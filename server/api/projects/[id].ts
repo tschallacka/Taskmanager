@@ -7,10 +7,20 @@ import { projectPeople } from '../../utils/people'
 import { isAccentColor } from '#shared/utils/colors'
 import { closeTopic, publicProjectTopic, publishFromEvent } from '../../utils/realtime'
 import { removeTaskAttachments } from '../../utils/attachments'
+import { crewBoardOf, crewShadowToDelete, deleteCrewBoard } from '../../utils/crewBoards'
 import { MAX_PROJECT_DESCRIPTION, parseDashboardWidgets, parseProjectStatus } from '../../utils/taskFields'
 
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')!
+  // A crew's shadow board goes by the crew rule alone (crew-board.delete.ts), never by the ordinary one: its forked
+  // accounts and its files go with it. The owner, the coupled member, a team admin or the instance admin may.
+  if (event.method === 'DELETE' && await crewBoardOf(id)) {
+    await crewShadowToDelete(event.context.session.user.id, id)
+    await deleteCrewBoard(id)
+    await publishFromEvent(event, { type: 'projects', projectId: id })
+    closeTopic(publicProjectTopic(id))
+    return { ok: true }
+  }
   const project = await requireProject(event, id)
   // Anyone on the project may read it, so a contact can still open an archived board.
   if (event.method === 'GET') return project
