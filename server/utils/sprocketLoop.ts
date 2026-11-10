@@ -173,6 +173,8 @@ export function sprocketAnswerStream(opts: {
   messages: ProviderMessage[]
   context: ApiKeyContext
   thinking: boolean
+  /** Gives back the message counted against the daily limit; called when no answer came of it. */
+  refund?: () => Promise<void>
 }): Response {
   const encoder = new TextEncoder()
   const stream = new ReadableStream<Uint8Array>({
@@ -200,6 +202,7 @@ export function sprocketAnswerStream(opts: {
         send({ type: 'done' })
       } catch (error) {
         console.error('[AI Chat] Answer failed', { model: opts.model, error })
+        await opts.refund?.().catch(refundError => console.error('[AI Chat] Failed to refund the message count', { refundError }))
         send({ type: 'error', message: error instanceof Error ? error.message : 'Sprocket could not answer' })
       } finally {
         clearInterval(heartbeat)

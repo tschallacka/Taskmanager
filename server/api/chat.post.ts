@@ -65,7 +65,13 @@ export default defineEventHandler(async (event) => {
   const answer = await chooseOpenRouterAnswer(own, userId)
   if (!answer) throw createError({ statusCode: 400, statusMessage: 'Sprocket has no OpenRouter key. Add one in Settings, or let Claude Code answer in Settings → Sprocket.' })
 
-  const context = await sprocketRunContext(await sprocketPersonOf(userId))
+  let context
+  try {
+    context = await sprocketRunContext(await sprocketPersonOf(userId))
+  } catch (error) {
+    await answer.refund?.().catch(() => {})
+    throw error
+  }
   const messages: ProviderMessage[] = [
     { role: 'system', content: `${promptWithManner(CHAT_SYSTEM_PROMPT, manner)}\n\nToday is ${today}.` },
     ...(toProviderMessages(history) as unknown as ProviderMessage[])
@@ -77,6 +83,7 @@ export default defineEventHandler(async (event) => {
     model: answer.model,
     messages,
     context,
-    thinking
+    thinking,
+    refund: answer.refund
   })
 })

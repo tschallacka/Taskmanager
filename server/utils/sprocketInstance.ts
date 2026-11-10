@@ -138,7 +138,12 @@ export async function saveSprocketInstance(patch: SprocketInstancePatch, userId:
 export async function instanceSprocketKey(): Promise<{ apiKey: string, model: string } | null> {
   const row = await storedRow()
   if (!row?.sprocketForEveryone || !row.sprocketOpenrouterKey) return null
-  return { apiKey: decryptSecret(row.sprocketOpenrouterKey, KEY_CONTEXT), model: row.sprocketModel }
+  try {
+    return { apiKey: decryptSecret(row.sprocketOpenrouterKey, KEY_CONTEXT), model: row.sprocketModel }
+  } catch (error) {
+    console.error('[Sprocket] The instance key could not be decrypted (SECRETS_ENCRYPTION_KEY changed?)', { error })
+    throw createError({ statusCode: 503, statusMessage: 'Sprocket is not configured. Ask an admin to re-enter the OpenRouter key on Instance settings.' })
+  }
 }
 
 /** The UTC day a count belongs to, as its first millisecond. */
@@ -168,7 +173,16 @@ async function bump(scope: string, limit: number, day: number): Promise<boolean>
 async function unbump(scope: string, day: number): Promise<void> {
   await db.update(rateLimitHits)
     .set({ hits: sql`${rateLimitHits.hits} - 1` })
-    .where(sql`${rateLimitHits.scope} = ${scope} and ${rateLimitHits.windowStart} = ${day}`)
+    .where(sql`${rateLimitHits.scope} = ${scope} and ${rateLimitHits.windowStart} = ${day} and ${rateLimitHits.hits} > 0`)
+}
+
+/**
+ * Gives back a message counted by reserveInstanceMessage when no answer came of it (the model could not be reached, the
+ * run failed). `day` is the day it was counted on, so a refund after UTC midnight does not touch the new day.
+ */
+export async function releaseInstanceMessage(userId: string, day: number): Promise<void> {
+  await unbump(INSTANCE_SCOPE, day)
+  await unbump(`sprocket:user:${userId}`, day)
 }
 
 /**
@@ -206,10 +220,11 @@ export async function instanceMessagesToday(userId: string): Promise<number> {
 export async function chooseOpenRouterAnswer(
   own: { apiKey: string, model: string } | null,
   userId: string
-): Promise<{ apiKey: string, model: string, by: 'own-key' | 'instance-key' } | null> {
+): Promise<{ apiKey: string, model: string, by: 'own-key' | 'instance-key', refund?: () => Promise<void> } | null> {
   if (own) return { ...own, by: 'own-key' }
   const instance = await instanceSprocketKey()
   if (!instance) return null
+  const day = utcDayStart()
   await reserveInstanceMessage(userId)
-  return { ...instance, by: 'instance-key' }
+  return { ...instance, by: 'instance-key', refund: () => releaseInstanceMessage(userId, day) }
 }

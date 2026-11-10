@@ -140,3 +140,32 @@ test('the instance daily cap stops everyone and leaves the user count as it was'
   await assert.rejects(chooseOpenRouterAnswer(null, plain), (e: { statusCode?: number }) => e.statusCode === 429)
   assert.equal(await instanceMessagesToday(plain), 1)
 })
+
+test('a refund gives the counted message back to the user and the instance, and never goes below zero', async () => {
+  await saveSprocketInstance({ forEveryone: true, userDailyLimit: 200, instanceDailyCap: 1000 }, admin)
+  await db.delete(rateLimitHits).where(eq(rateLimitHits.scope, 'sprocket:instance'))
+  const before = await instanceMessagesToday(plain)
+  const answer = await chooseOpenRouterAnswer(null, plain)
+  assert.ok(answer?.refund)
+  assert.equal(await instanceMessagesToday(plain), before + 1)
+  await answer.refund()
+  assert.equal(await instanceMessagesToday(plain), before)
+  await answer.refund()
+  await answer.refund()
+  assert.ok((await instanceMessagesToday(plain)) >= 0)
+  assert.equal((await chooseOpenRouterAnswer({ apiKey: 'sk-own', model: 'm' }, owner))?.refund, undefined)
+})
+
+test('an instance key that no longer decrypts answers 503 with no key detail, not a crash', async () => {
+  await db.update(instanceSettings).set({ sprocketOpenrouterKey: 'not-a-valid-ciphertext' }).where(eq(instanceSettings.id, SPROCKET_INSTANCE_ROW_ID))
+  try {
+    await assert.rejects(chooseOpenRouterAnswer(null, plain), (e: { statusCode?: number, statusMessage?: string }) => {
+      assert.equal(e.statusCode, 503)
+      assert.match(e.statusMessage ?? '', /Ask an admin to re-enter/)
+      assert.ok(!(e.statusMessage ?? '').includes('not-a-valid-ciphertext'))
+      return true
+    })
+  } finally {
+    await saveSprocketInstance({ apiKey: SECRET }, admin)
+  }
+})
