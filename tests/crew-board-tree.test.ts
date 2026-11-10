@@ -8,15 +8,20 @@ import assert from 'node:assert/strict'
 import { randomBytes } from 'node:crypto'
 import { createError } from 'h3'
 import { eq, inArray } from 'drizzle-orm'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 // Nitro provides createError as a global; the crew code expects it.
 Object.assign(globalThis, { createError })
 
 const { db } = await import('../server/db')
-const { boardPins, crewBoards, crews, member, organization, projects, user } = await import('../server/db/schema')
+const { boardPins, crewBoards, crews, member, organization, projectColumns, projects, projectTasks, user } = await import('../server/db/schema')
 const { boardTreeFields, labelRowOf, markOpenableRealBoards, memberTeamsOf, realNeighbourIsOpenable, treeNeighbours } = await import('../server/utils/boardTree')
 const { requireProject } = await import('../server/utils/projects')
 const { listPins, pinBoard } = await import('../server/utils/boardPins')
+const { publish, subscribePeer, unsubscribePeer } = await import('../server/utils/realtime')
+const { auth } = await import('../server/lib/auth')
+const { taskAttachmentDir } = await import('../server/utils/attachments')
 
 /** A GET from `userId` with `teamId` as the active workspace: what requireProject reads from an H3 event. */
 const asUser = (userId: string, teamId: string) => ({
@@ -288,5 +293,81 @@ test('a shadow the person may not see cannot be pinned, and a leftover pin is no
     assert.deepEqual((await listPins(crewMember)).map(pin => pin.projectId), [shadow.taskmanager])
   } finally {
     await db.delete(boardPins).where(eq(boardPins.userId, crewMember))
+  }
+})
+
+test('a hidden shadow\'s realtime events reach only the people who may see it', async () => {
+  const heard = new Map<string, number>()
+  // Every peer listens on the shadow's team topic, as a member of that team would; the person decides who hears it.
+  const peers = [
+    { name: 'owner', userId: owner },
+    { name: 'crewMember', userId: crewMember },
+    { name: 'realStaff', userId: realStaff },
+    { name: 'link', userId: null }
+  ].map(({ name, userId }) => {
+    const peer = { send: () => heard.set(name, (heard.get(name) ?? 0) + 1), close: () => {} } as unknown as Parameters<typeof subscribePeer>[0]
+    subscribePeer(peer, [`team:${crewTeam}`], null, userId)
+    return peer
+  })
+  const heardBy = () => Object.fromEntries(['owner', 'crewMember', 'realStaff', 'link'].map(name => [name, heard.get(name) ?? 0]))
+  try {
+    // crewMember belongs to the taskmanager crew, so the monocode shadow is hidden from them.
+    await publish(`team:${crewTeam}`, { type: 'board', projectId: shadow.monocode })
+    assert.deepEqual(heardBy(), { owner: 1, crewMember: 0, realStaff: 0, link: 0 })
+
+    heard.clear()
+    await publish(`team:${crewTeam}`, { type: 'board', projectId: shadow.taskmanager })
+    assert.deepEqual(heardBy(), { owner: 1, crewMember: 1, realStaff: 0, link: 0 })
+
+    // A board that is not a crew shadow is announced to everyone on the topic, as before.
+    heard.clear()
+    await publish(`team:${crewTeam}`, { type: 'board', projectId: home.monocode })
+    assert.deepEqual(heardBy(), { owner: 1, crewMember: 1, realStaff: 1, link: 1 })
+  } finally {
+    for (const peer of peers) unsubscribePeer(peer)
+  }
+})
+
+test('the attachment route serves a hidden shadow\'s files to no one who may not see the board', async () => {
+  // The route only asks who the session is; stand in for that and for the Nitro globals it is written against.
+  let sessionUser: string | null = null
+  ;(auth.api as unknown as { getSession: () => Promise<unknown> }).getSession = async () => (sessionUser ? { user: { id: sessionUser } } : null)
+  Object.assign(globalThis, {
+    defineEventHandler: (handler: unknown) => handler,
+    getRouterParam: (event: { params: Record<string, string> }, key: string) => event.params[key],
+    setHeader: () => {}
+  })
+  const route = (await import('../server/api/attachments/tasks/[taskId]/[filename].get')).default as unknown as (event: unknown) => Promise<Buffer>
+  const read = (userId: string, taskId: string) => {
+    sessionUser = userId
+    return route({ params: { taskId, filename: 'pic.png' }, headers: new Headers() })
+  }
+
+  // Task ids are alphanumeric only (SAFE_ID); one task on each shadow board.
+  const column = id('attach-column')
+  const tasks = { taskmanager: `tbtattach${tag}tm`, monocode: `tbtattach${tag}mc` }
+  const bytes = Buffer.from('not really a png')
+  await db.insert(projectColumns).values({ id: column, projectId: shadow.taskmanager, name: 'To do', position: 0, createdAt: now })
+  await db.insert(projectColumns).values({ id: `${column}-mc`, projectId: shadow.monocode, name: 'To do', position: 0, createdAt: now })
+  await db.insert(projectTasks).values([
+    { id: tasks.taskmanager, projectId: shadow.taskmanager, columnId: column, title: 'tm', visibility: 'internal', position: 0, createdAt: now, updatedAt: now },
+    { id: tasks.monocode, projectId: shadow.monocode, columnId: `${column}-mc`, title: 'mc', visibility: 'internal', position: 0, createdAt: now, updatedAt: now }
+  ])
+  for (const taskId of Object.values(tasks)) {
+    mkdirSync(taskAttachmentDir(taskId), { recursive: true })
+    writeFileSync(join(taskAttachmentDir(taskId), 'pic.png'), bytes)
+  }
+  try {
+    // Staff of the real board's team alone are not let in, though isStaffOfShadowedBoard would pass them.
+    await assert.rejects(read(realStaff, tasks.taskmanager), (e: { statusCode?: number }) => e.statusCode === 403)
+    // A member of the crew's team who belongs to another crew is not let in either.
+    await assert.rejects(read(crewMember, tasks.monocode), (e: { statusCode?: number }) => e.statusCode === 403)
+    // Those who may see the board still read its files.
+    assert.deepEqual(await read(crewMember, tasks.taskmanager), bytes)
+    assert.deepEqual(await read(owner, tasks.monocode), bytes)
+  } finally {
+    for (const taskId of Object.values(tasks)) rmSync(taskAttachmentDir(taskId), { recursive: true, force: true })
+    await db.delete(projectTasks).where(inArray(projectTasks.id, Object.values(tasks)))
+    await db.delete(projectColumns).where(inArray(projectColumns.id, [column, `${column}-mc`]))
   }
 })
