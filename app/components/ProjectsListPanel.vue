@@ -3,6 +3,7 @@ import { relativeTime } from '~/composables/useRelativeTime'
 import type { Project } from '~/composables/useProjects'
 import type { PinnedBoard } from '~/composables/usePins'
 import { taskCountLabel } from '#shared/utils/board'
+import { crewTreeRows } from '~/utils/crewTreeRows'
 
 const { ready, projects, allTasks, deleteProject, renameProject } = useProjects()
 const route = useRoute()
@@ -52,26 +53,9 @@ function toggleTree(id: string) {
   saveOpenTrees()
 }
 
-// The shadow boards of a real board, as the list holds them (the same rows, so their counts and menus are theirs).
-function shadowsOf(realId: string): Project[] {
-  return projects.value.filter(p => p.role === 'shadow' && p.realBoard?.id === realId)
-}
-
 // A shadow board nests under its real board when that board is in the list; otherwise it stays a top-level row.
-const treeRows = computed(() => {
-  const listed = new Set(projects.value.map(p => p.id))
-  const rows: { project: Project, depth: number, shadowCount: number, open: boolean }[] = []
-  for (const project of projects.value) {
-    if (project.role === 'shadow' && project.realBoard && listed.has(project.realBoard.id)) continue
-    const children = shadowsOf(project.id)
-    const open = children.length > 0 && openTrees.value.includes(project.id)
-    rows.push({ project, depth: 0, shadowCount: children.length, open })
-    if (open) {
-      for (const child of children) rows.push({ project: child, depth: 1, shadowCount: 0, open: false })
-    }
-  }
-  return rows
-})
+// The arrow and the nested rows come from the same computation (app/utils/crewTreeRows.ts).
+const treeRows = computed(() => crewTreeRows(projects.value, openTrees.value))
 
 // A shadow board nested under its real board reads "Real board › crew: Crew name"; the crew's home board is named as is.
 function boardLabel(project: Project) {
@@ -369,8 +353,8 @@ function menuItems(project: Project) {
     </p>
 
     <template
-      v-for="{ project, depth, shadowCount, open } in treeRows"
-      :key="project.id"
+      v-for="{ key, project, depth, shadowCount, open } in treeRows"
+      :key="key"
     >
       <input
         v-if="renamingId === project.id"
