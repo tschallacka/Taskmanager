@@ -15,6 +15,7 @@ const props = defineProps<{
 
 const colorMode = useColorMode()
 const dark = computed(() => colorMode.value === 'dark')
+const { primaryColor } = useUserSettings()
 
 const svg = ref('')
 const legend = ref<ChartLegendEntry[]>([])
@@ -40,7 +41,7 @@ async function drawMermaid() {
   const id = ++run
   pending.value = true
   try {
-    const out = await renderMermaid(props.code, dark.value)
+    const out = await renderMermaid(props.code, dark.value, primaryColor.value)
     if (id !== run) return
     svg.value = out
     error.value = ''
@@ -68,7 +69,7 @@ function schedule(immediate = false) {
 }
 
 watch(() => [props.code, props.language], () => schedule(), { immediate: true })
-watch(dark, () => schedule(true))
+watch([dark, primaryColor], () => schedule(true))
 
 onBeforeUnmount(() => {
   if (timer) clearTimeout(timer)
