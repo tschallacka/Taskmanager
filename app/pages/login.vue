@@ -288,7 +288,7 @@ onMounted(async () => {
           <button
             v-if="codeSent"
             type="button"
-            class="text-emerald-400 hover:text-emerald-300"
+            class="text-primary hover:underline"
             :disabled="isPending"
             @click="sendEmailCode"
           >
@@ -346,7 +346,7 @@ onMounted(async () => {
           </button>
           <button
             type="button"
-            class="text-emerald-400 hover:text-emerald-300"
+            class="text-primary hover:underline"
             @click="useBackupCode = !useBackupCode; code = ''; error = ''"
           >
             {{ useBackupCode ? 'Use authenticator code' : 'Use a backup code' }}
@@ -362,7 +362,7 @@ onMounted(async () => {
           {{ mode === 'sign-in' ? 'New here?' : 'Already have an account?' }}
           <button
             type="button"
-            class="text-emerald-400 hover:text-emerald-300"
+            class="text-primary hover:underline"
             @click="switchMode"
           >
             {{ mode === 'sign-in' ? 'Create an account' : 'Sign in' }}
