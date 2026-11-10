@@ -7,6 +7,7 @@ import { requireOrgCustomer } from '../utils/customers'
 import { publishFromEvent } from '../utils/realtime'
 import { terminalColumnIds } from '#shared/utils/board'
 import { columnsForNewBoard } from '../utils/teamSettings'
+import { boardTreeFields, treeNeighbours } from '../utils/boardTree'
 
 export default defineEventHandler(async (event) => {
   const userId = event.context.session.user.id
@@ -14,13 +15,30 @@ export default defineEventHandler(async (event) => {
   if (event.method === 'GET') {
     const filter = await getProjectAccessFilter(event)
     const teamId = await getUserActiveTeamId(event)
-    const rows = await db
+    const archivedView = getQuery(event).archived === '1'
+    const own = await db
       .select({ project: projects, customerName: customers.name })
       .from(projects)
       .leftJoin(customers, eq(customers.id, projects.customerId))
-      .where(getQuery(event).archived === '1' ? filter : and(filter, isNull(projects.archivedAt)))
+      .where(archivedView ? filter : and(filter, isNull(projects.archivedAt)))
       .orderBy(desc(projects.updatedAt))
+    // The crew tree adds the shadow and real boards a person sees beside their own (see boardTree.ts). The archived
+    // view adds nothing, so it answers as it did before.
+    const neighbours = archivedView
+      ? { shadowIds: [], realIds: [] }
+      : await treeNeighbours(userId, own.map(r => r.project.id))
+    const neighbourIds = [...neighbours.shadowIds, ...neighbours.realIds]
+    const added = neighbourIds.length
+      ? await db
+          .select({ project: projects, customerName: customers.name })
+          .from(projects)
+          .leftJoin(customers, eq(customers.id, projects.customerId))
+          .where(inArray(projects.id, neighbourIds))
+      : []
+    const rows = [...own, ...added].sort((a, b) => b.project.updatedAt - a.project.updatedAt)
     if (!rows.length) return []
+    const readOnlyIds = new Set(neighbourIds)
+    const tree = await boardTreeFields(rows.map(r => r.project.id), new Set(rows.map(r => r.project.id)))
 
     // Which columns count as finished, so the sidebar can say how much of a
     // board is still open without loading the board. The tasks themselves are
@@ -47,12 +65,16 @@ export default defineEventHandler(async (event) => {
     }
 
     return rows.map(({ project, customerName }) => {
-      const own = byProject.get(project.id) ?? []
+      const columnsOf = byProject.get(project.id) ?? []
+      // A crew board added beside the list is read-only from here, and the staff of its crew's team see it as staff.
+      const neighbour = readOnlyIds.has(project.id)
       return {
         ...project,
         customerName,
-        audience: audienceFor(userId, teamId, project),
-        terminalColumnIds: terminalColumnIds(own)
+        audience: neighbour ? 'staff' as const : audienceFor(userId, teamId, project),
+        ...(neighbour && { readOnly: true }),
+        ...tree.get(project.id),
+        terminalColumnIds: terminalColumnIds(columnsOf)
       }
     })
   }

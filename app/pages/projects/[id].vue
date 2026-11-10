@@ -254,6 +254,17 @@ const customerMenu = computed(() => [
   }))
 ])
 
+// ─── Crew tree ─────────────────────────────────────────────
+
+// The shadow boards of a real board, one menu entry each. The list brings them (only the ones this person sees).
+const shadowMenu = computed(() => [
+  (activeProject.value?.shadows ?? []).map(shadow => ({
+    label: `crew: ${shadow.crewName}`,
+    icon: 'i-lucide-users-round',
+    onSelect: () => navigateTo(`/projects/${shadow.id}`)
+  }))
+])
+
 // ─── Sharing ───────────────────────────────────────────────
 
 const publicLink = computed(() =>
@@ -280,6 +291,22 @@ useSeoMeta({
     >
       This is a crew's board. You can read it here; only the crew's team changes it.
     </p>
+    <!-- The crew tree: a shadow board links back to the real board it works for -->
+    <nav
+      v-if="activeProject?.realBoard"
+      class="flex min-w-0 shrink-0 flex-wrap items-center gap-x-1 px-4 pt-2 text-xs text-muted lg:px-6"
+      aria-label="Breadcrumb"
+      data-shadow-breadcrumb
+    >
+      <NuxtLink
+        :to="`/projects/${activeProject.realBoard.id}`"
+        class="inline-flex min-h-11 min-w-0 items-center rounded px-1 transition-colors hover:text-default hover:underline"
+      >
+        <span class="truncate">{{ activeProject.realBoard.name }}</span>
+      </NuxtLink>
+      <span aria-hidden="true">›</span>
+      <span class="px-1">(shadow)</span>
+    </nav>
     <!-- Board header -->
     <header class="flex shrink-0 items-center gap-2 border-b border-default px-4 py-3 lg:px-6">
       <UButton
@@ -310,6 +337,23 @@ useSeoMeta({
       >
         {{ activeProject?.name ?? 'Board' }}
       </button>
+
+      <UDropdownMenu
+        v-if="activeProject?.shadows?.length"
+        :items="shadowMenu"
+        :content="{ align: 'start' }"
+      >
+        <UButton
+          size="sm"
+          color="neutral"
+          variant="soft"
+          icon="i-lucide-users-round"
+          class="min-h-11 shrink-0"
+          data-shadow-entry
+        >
+          Shadow boards ({{ activeProject.shadows.length }})
+        </UButton>
+      </UDropdownMenu>
 
       <UDropdownMenu
         v-if="canPickCustomer"

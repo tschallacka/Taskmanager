@@ -28,6 +28,15 @@ export interface Project {
   audience?: Audience
   // Set by the server on a crew's shadow board opened by the staff of the real board.
   readOnly?: boolean
+  // The crew tree (server/utils/boardTree.ts): what the board is, and which boards it nests with. Only the list
+  // answers with these; a board opened on its own has none, and the board header reads them from the list.
+  role?: 'board' | 'real' | 'shadow' | 'crew_home'
+  // On a shadow board: the real board it works for.
+  realBoard?: { id: string, name: string } | null
+  // On a real board: its crews' shadow boards that the list shows, each with its crew.
+  shadows?: { id: string, name: string, crewId: string, crewName: string, crewSlug: string }[]
+  // On a shadow board: its crew. On a crew's home board: the crew it is the home of.
+  crew?: { id: string, name: string, slug: string } | null
   // Colours pinned to this board's task labels, keyed by the label. A label
   // with no entry falls back to the colour derived from its own text.
   labelColors?: Record<string, string>

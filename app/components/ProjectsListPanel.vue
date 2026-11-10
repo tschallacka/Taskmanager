@@ -18,6 +18,82 @@ function openProject(id: string) {
   if (route.path !== `/projects/${id}`) navigateTo(`/projects/${id}`)
 }
 
+// ─── Crew tree ─────────────────────────────────────────────
+// A real board lists the shadow boards its crews work on, nested under it. Collapsed by default; the open
+// boards are remembered in this browser (a per-person convenience, so a lost copy only means they close again).
+const TREE_KEY = 'taskmanager.boardTree.open'
+const openTrees = ref<string[]>([])
+
+onMounted(() => {
+  try {
+    const raw = localStorage.getItem(TREE_KEY)
+    openTrees.value = raw ? JSON.parse(raw) as string[] : []
+  } catch {
+    openTrees.value = []
+  }
+})
+
+function saveOpenTrees() {
+  try {
+    localStorage.setItem(TREE_KEY, JSON.stringify(openTrees.value))
+  } catch {
+    // Storage can be off (a private window): the toggle still works for this visit.
+  }
+}
+
+function toggleTree(id: string) {
+  openTrees.value = openTrees.value.includes(id)
+    ? openTrees.value.filter(x => x !== id)
+    : [...openTrees.value, id]
+  saveOpenTrees()
+}
+
+// The shadow boards of a real board, as the list holds them (the same rows, so their counts and menus are theirs).
+function shadowsOf(realId: string): Project[] {
+  return projects.value.filter(p => p.role === 'shadow' && p.realBoard?.id === realId)
+}
+
+// A shadow board nests under its real board when that board is in the list; otherwise it stays a top-level row.
+const treeRows = computed(() => {
+  const listed = new Set(projects.value.map(p => p.id))
+  const rows: { project: Project, depth: number, shadowCount: number, open: boolean }[] = []
+  for (const project of projects.value) {
+    if (project.role === 'shadow' && project.realBoard && listed.has(project.realBoard.id)) continue
+    const children = shadowsOf(project.id)
+    const open = children.length > 0 && openTrees.value.includes(project.id)
+    rows.push({ project, depth: 0, shadowCount: children.length, open })
+    if (open) {
+      for (const child of children) rows.push({ project: child, depth: 1, shadowCount: 0, open: false })
+    }
+  }
+  return rows
+})
+
+// A shadow board nested under its real board reads "Real board › crew: Crew name"; the crew's home board is named as is.
+function boardLabel(project: Project) {
+  if (project.role === 'shadow' && project.realBoard && project.crew) {
+    return `${project.realBoard.name} › crew: ${project.crew.name}`
+  }
+  return project.name
+}
+
+// The small words before the customer and the time: whose board this is, in the crew tree.
+function treeNote(project: Project) {
+  if (project.role === 'crew_home') return 'crew home · '
+  if (project.readOnly) return 'read-only · '
+  return ''
+}
+
+// Opening a shadow board from the URL, or from the board header's link, opens the tree it sits in.
+watch(activeId, (id) => {
+  const project = projects.value.find(p => p.id === id)
+  const realId = project?.role === 'shadow' ? project.realBoard?.id : undefined
+  if (realId && !openTrees.value.includes(realId)) {
+    openTrees.value = [...openTrees.value, realId]
+    saveOpenTrees()
+  }
+})
+
 // ─── Pins ──────────────────────────────────────────────────
 // Pins come from every workspace. A board in the open workspace shows its live name from
 // the project list; one elsewhere shows the name it had when the list was last loaded.
@@ -153,7 +229,8 @@ function menuItems(project: Project) {
       onSelect: () => { managementBoard.value = { id: project.id, name: project.name } }
     }
   ]
-  if (project.audience === 'customer') return [pin, agent]
+  // A crew board seen from the other side of the tree is read-only here, so it gets no rename or delete.
+  if (project.audience === 'customer' || project.readOnly) return [pin, agent]
   const manage: { label: string, icon: string, onSelect: () => unknown }[] = [
     { label: 'Rename', icon: 'i-lucide-pencil', onSelect: () => startRename(project) }
   ]
@@ -268,7 +345,7 @@ function menuItems(project: Project) {
     </p>
 
     <template
-      v-for="project in projects"
+      v-for="{ project, depth, shadowCount, open } in treeRows"
       :key="project.id"
     >
       <input
@@ -283,23 +360,37 @@ function menuItems(project: Project) {
       <div
         v-else
         class="group flex cursor-pointer items-start gap-2 rounded-lg px-2.5 py-1.5 transition-colors"
-        :class="activeId === project.id ? 'bg-elevated' : 'hover:bg-elevated/60'"
+        :class="[activeId === project.id ? 'bg-elevated' : 'hover:bg-elevated/60', depth ? 'ml-6 py-1' : '']"
+        :data-board-row="project.role ?? 'board'"
+        :data-depth="depth"
         @click="openProject(project.id)"
       >
+        <UButton
+          v-if="shadowCount"
+          :icon="open ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
+          size="sm"
+          color="neutral"
+          variant="ghost"
+          class="-my-2 -ml-2 min-h-11 min-w-11 shrink-0 justify-center"
+          :aria-expanded="open"
+          :aria-label="`${open ? 'Hide' : 'Show'} the crew boards of ${project.name}`"
+          data-tree-toggle
+          @click.stop="toggleTree(project.id)"
+        />
         <UIcon
-          :name="project.customerId ? 'i-lucide-building-2' : 'i-lucide-kanban'"
+          :name="project.role === 'shadow' ? 'i-lucide-users-round' : project.role === 'crew_home' ? 'i-lucide-house' : project.customerId ? 'i-lucide-building-2' : 'i-lucide-kanban'"
           class="mt-0.5 size-4 shrink-0"
           :class="activeId === project.id ? 'text-primary' : 'text-dimmed group-hover:text-muted'"
         />
         <div class="min-w-0 flex-1">
           <p class="truncate text-sm font-medium leading-snug text-default">
-            {{ project.name }}
+            {{ boardLabel(project) }}
           </p>
           <p
             class="truncate text-xs text-muted"
             :title="countTitle(project)"
           >
-            {{ project.customerName ? `${project.customerName} · ` : '' }}{{ relativeTime(project.updatedAt) }} · {{ countLabel(project) }} {{ countsFor(project).total === 1 ? 'task' : 'tasks' }}
+            {{ treeNote(project) }}{{ project.customerName ? `${project.customerName} · ` : '' }}{{ relativeTime(project.updatedAt) }} · {{ countLabel(project) }} {{ countsFor(project).total === 1 ? 'task' : 'tasks' }}
           </p>
         </div>
         <!-- The menu keeps its slot even when invisible, so rows never jump on hover. -->

@@ -6,6 +6,7 @@ import { audienceFor, customerIdsOf, getUserActiveTeamId, sessionProjectFilter }
 import type { Audience } from './auth-helpers'
 import { guestProjectIdsOf } from './guests'
 import { shadowBoardForStaff } from './crewBoardAccess'
+import { realBoardForCrewTeam } from './boardTree'
 
 export function genId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2)
@@ -47,12 +48,16 @@ export async function requireProject(event: H3Event, projectId: string) {
 
   if (project) return { ...project, audience: await audienceOf(event, project), readOnly: false }
 
-  const shadow = await shadowBoardForStaff(await getUserActiveTeamId(event), projectId)
-  if (!shadow) throw createError({ statusCode: 404, message: 'Project not found' })
+  const teamId = await getUserActiveTeamId(event)
+  const shadow = await shadowBoardForStaff(teamId, projectId)
+  // The real board a crew works on, for the crew's own members: read-only, like the shadow for the real board's staff.
+  const real = shadow ? undefined : await realBoardForCrewTeam(teamId, projectId)
+  const board = shadow ?? real
+  if (!board) throw createError({ statusCode: 404, message: 'Project not found' })
   if (!['GET', 'HEAD'].includes(event.method)) {
     throw createError({ statusCode: 403, message: 'This is a crew board. You can read it, not change it.' })
   }
-  return { ...shadow, audience: 'staff' as Audience, readOnly: true }
+  return { ...board, audience: 'staff' as Audience, readOnly: true }
 }
 /**
  * Stops a customer contact at a change only staff may make. Contacts can read

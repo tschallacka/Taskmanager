@@ -3,6 +3,7 @@ import { projects, projectTasks } from '../db/schema'
 import { and, eq, asc, desc, inArray, isNull, or } from 'drizzle-orm'
 import { getProjectAccessFilter } from '../utils/projects'
 import { audienceFor, getUserActiveTeamId } from '../utils/auth-helpers'
+import { treeNeighbours } from '../utils/boardTree'
 
 // Flat task list across every accessible project — powers global search and
 // deep links into boards without loading each board first.
@@ -19,8 +20,15 @@ export default defineEventHandler(async (event) => {
   // boards every task is theirs to find.
   const userId = event.context.session.user.id
   const teamId = await getUserActiveTeamId(event)
-  const staffProjectIds = visibleProjects
-    .filter(p => audienceFor(userId, teamId, p) === 'staff')
+  // The crew tree's neighbours (boardTree.ts) are read by the list as staff, so their tasks count the same way.
+  const found = await treeNeighbours(userId, visibleProjects.map(p => p.id))
+  const neighbourIds = new Set([...found.shadowIds, ...found.realIds])
+  const neighbourRows = neighbourIds.size
+    ? await db.select({ id: projects.id, userId: projects.userId, teamId: projects.teamId }).from(projects).where(inArray(projects.id, [...neighbourIds]))
+    : []
+  const allProjects = [...visibleProjects, ...neighbourRows]
+  const staffProjectIds = allProjects
+    .filter(p => neighbourIds.has(p.id) || audienceFor(userId, teamId, p) === 'staff')
     .map(p => p.id)
 
   return db
@@ -41,8 +49,8 @@ export default defineEventHandler(async (event) => {
     .from(projectTasks)
     .innerJoin(projects, eq(projects.id, projectTasks.projectId))
     .where(and(
-      inArray(projectTasks.projectId, visibleProjects.map(p => p.id)),
-      staffProjectIds.length === visibleProjects.length
+      inArray(projectTasks.projectId, allProjects.map(p => p.id)),
+      staffProjectIds.length === allProjects.length
         ? undefined
         : or(
             staffProjectIds.length ? inArray(projectTasks.projectId, staffProjectIds) : undefined,
