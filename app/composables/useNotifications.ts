@@ -220,6 +220,12 @@ export function useNotifications() {
     await load()
   }
 
+  /** The Read box: the archived notifications, newest first. Read from the server each time it is opened. */
+  async function loadReadBox(): Promise<NotificationItem[]> {
+    const res = await request<{ unread: number, items: NotificationItem[] }>('/api/notifications?box=read')
+    return res?.items ?? []
+  }
+
   /** Turns a way of being told on or off; a desktop notification needs the browser's permission first. */
   async function setPreference(key: 'email' | 'browser', value: boolean): Promise<string | null> {
     if (key === 'browser' && value) {
@@ -251,5 +257,5 @@ export function useNotifications() {
     })
   }
 
-  return { items: _items, unread: _unread, prefs: _prefs, push: _push, loaded: _loaded, load, markRead, markAllRead, archive, archiveAll, unarchive, decideGuestRequest, setPreference, setPush, testPush, init }
+  return { items: _items, unread: _unread, prefs: _prefs, push: _push, loaded: _loaded, load, markRead, markAllRead, archive, archiveAll, unarchive, loadReadBox, decideGuestRequest, setPreference, setPush, testPush, init }
 }

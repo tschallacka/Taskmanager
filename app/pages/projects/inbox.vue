@@ -4,13 +4,14 @@ import { relativeTime } from '~/composables/useRelativeTime'
 import { dueDayToMs } from '~/utils/dueDate'
 import { agentAuditLink } from '~/composables/useAgentAudit'
 import type { AgentAuditItem } from '~/composables/useAgentAudit'
+import type { NotificationItem } from '~/composables/useNotifications'
 
 definePageMeta({ layout: 'app' })
 
 const { sidebarOpen } = useSidebar()
 useSeoMeta({ title: 'Inbox' })
 
-const { items, unread, prefs, push, loaded, load, markRead, markAllRead, archive, archiveAll, decideGuestRequest, setPreference, setPush, testPush } = useNotifications()
+const { items, unread, prefs, push, loaded, load, markRead, markAllRead, archive, archiveAll, unarchive, loadReadBox, decideGuestRequest, setPreference, setPush, testPush } = useNotifications()
 onMounted(load)
 
 // A guest manager's request for a person outside their domain is decided here, by a project admin.
@@ -59,8 +60,21 @@ const route = useRoute()
 const router = useRouter()
 const onAgentTab = computed(() => hasAgents.value && route.query.tab === 'agent')
 
-const filter = ref<'all' | 'unread'>('all')
-const shown = computed(() => filter.value === 'unread' ? items.value.filter(item => !item.readAt) : items.value)
+// 'readbox' is the archived notifications, read from the server each time the option is picked.
+const filter = ref<'all' | 'unread' | 'readbox'>('all')
+const readBox = ref<NotificationItem[]>([])
+const shown = computed(() => {
+  if (filter.value === 'readbox') return readBox.value
+  return filter.value === 'unread' ? items.value.filter(item => !item.readAt) : items.value
+})
+watch(filter, async (value) => {
+  if (value !== 'readbox') return
+  readBox.value = await loadReadBox()
+})
+async function moveBack(item: NotificationItem) {
+  readBox.value = readBox.value.filter(other => other.id !== item.id)
+  await unarchive([item.id])
+}
 
 // Grouped by the day they arrived, newest day first.
 function groupByDay<T extends { createdAt: number }>(list: T[]) {
@@ -195,7 +209,7 @@ async function sendTest() {
           @click="markAllRead"
         />
         <UButton
-          v-if="!onAgentTab && items.length"
+          v-if="!onAgentTab && items.length && filter !== 'readbox'"
           label="Archive all"
           icon="i-lucide-archive"
           size="xs"
@@ -350,7 +364,7 @@ async function sendTest() {
 
         <div class="mb-3 flex gap-1">
           <button
-            v-for="option in (['all', 'unread'] as const)"
+            v-for="option in (onAgentTab ? ['all', 'unread'] : ['all', 'unread', 'readbox'] as const)"
             :key="option"
             class="rounded-md px-2.5 py-1 text-xs capitalize transition-colors"
             :class="filter === option ? 'bg-elevated font-medium text-default' : 'text-muted hover:text-default'"
@@ -358,7 +372,7 @@ async function sendTest() {
             :data-agent-filter="option"
             @click="filter = option"
           >
-            {{ option }}
+            {{ option === 'readbox' ? 'Read box' : option }}
           </button>
         </div>
 
@@ -368,7 +382,7 @@ async function sendTest() {
             class="rounded-xl border border-dashed border-default px-4 py-12 text-center text-sm text-muted"
             data-inbox-empty
           >
-            {{ filter === 'unread' ? 'You are all caught up.' : 'Nothing yet. Assignments, comments and messages for you will land here.' }}
+            {{ filter === 'readbox' ? 'The Read box is empty. Archived notifications wait here.' : filter === 'unread' ? 'You are all caught up.' : 'Nothing yet. Assignments, comments and messages for you will land here.' }}
           </p>
 
           <section
@@ -416,6 +430,7 @@ async function sendTest() {
                     {{ item.projectName }}
                   </p>
                   <div
+                    v-if="filter !== 'readbox'"
                     class="mt-2 flex flex-wrap gap-2"
                     @click.stop
                   >
@@ -427,6 +442,21 @@ async function sendTest() {
                       variant="ghost"
                       data-notification-archive
                       @click="archive([item.id])"
+                    />
+                  </div>
+                  <div
+                    v-else
+                    class="mt-2 flex flex-wrap gap-2"
+                    @click.stop
+                  >
+                    <UButton
+                      label="Move to inbox"
+                      icon="i-lucide-undo-2"
+                      size="xs"
+                      color="neutral"
+                      variant="ghost"
+                      data-notification-move-back
+                      @click="moveBack(item)"
                     />
                   </div>
                   <div
