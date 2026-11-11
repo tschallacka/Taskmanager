@@ -194,11 +194,11 @@ export async function remoteManagementVerdict(event: H3Event): Promise<KeyVerdic
 }
 
 /**
- * A remote caller's permanent crews:manage key, when its owner is not the instance admin. It passes the gate only
- * when its owner created a crew that is live (not disabled): such a key may then use that person's own crews, and
- * the crew routes check which one. An owner with no live crew gets `noCrew`, answered with a 403 sentence. Any
- * other key (no crews:manage, the admin's own key, a management token that is not this path) gives null: the plain
- * 404. Reads only; never throws.
+ * A remote caller's permanent crews:manage key. It passes the gate when its owner is the instance admin, or when its
+ * owner created a crew that is live (not disabled): such a key may then use that person's own crews, and the crew
+ * routes check which one. An owner with no live crew gets `noCrew`, answered with a 403 sentence. Any other key (no
+ * crews:manage, a key bound to one board, a management token that is not this path) gives null: the plain 404.
+ * Reads only; never throws.
  */
 export async function remoteCrewOwnerVerdict(event: H3Event): Promise<KeyVerdict | null> {
   let context
@@ -209,7 +209,8 @@ export async function remoteCrewOwnerVerdict(event: H3Event): Promise<KeyVerdict
   }
   if (context.kind === 'management' || !hasScope(context, CREW_KEY_SCOPE)) return null
   // A key bound to one board keeps the board rules; only the permanent unbound key of a crew owner works from outside.
-  if (context.projectId || (await isInstanceAdmin(context.userId))) return null
+  if (context.projectId) return null
+  if (await isInstanceAdmin(context.userId)) return { ok: true, keyId: context.keyId, crewOwner: true, boardId: null }
   if (!(await ownsLiveCrew(context.userId))) return { ok: false, reason: 'not admin', noCrew: true }
   return { ok: true, keyId: context.keyId, crewOwner: true, boardId: context.projectId ?? null }
 }
