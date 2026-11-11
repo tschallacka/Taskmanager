@@ -21,6 +21,9 @@ export const MENTION = /(?<![\w.+-])@(cato|boss)(?![\w-]|\.\w)/i
 // The PM's author name on the board, whole: "fork <board>-pia (agent)" for a fork, "Pia Planner (agent)" for the crew's
 // own. Only an agent author counts, so a person who happens to be called Pia (Maria Pia) never wakes Boss.
 export const PM_AUTHOR = /^(fork \S+-pia|Pia Planner) \(agent\)$/i
+// Boss's watch (`crew boss-mentions`): the same check for the agents that report to Boss, Pia, Susy and Rita. Their
+// author label is "crew pia (agent)" on the board, or the name of the crew's own, or "fork <board>-<key>" for a fork.
+export const BOSS_AUTHOR = /^(crew (pia|susy|rita)|fork \S+-(pia|susy|rita)|Pia Planner|Susy Secretary|Rita Reporter) \(agent\)$/i
 const SEEN_KEEP = 500
 
 /** The text of a tools/call answer, or an error: a JSON-RPC error and a tool error are never an empty board. */
@@ -33,10 +36,10 @@ export function rpcResult(name, body) {
 }
 
 /** One line per update by the PM that mentions Boss and is not in `seen`. Does not change `seen`. */
-export function mentionLines(task, updates, seen) {
+export function mentionLines(task, updates, seen, author = PM_AUTHOR) {
   const found = []
   for (const update of updates ?? []) {
-    if (!update?.id || seen.has(update.id) || !PM_AUTHOR.test(String(update.author)) || !MENTION.test(String(update.body))) continue
+    if (!update?.id || seen.has(update.id) || !author.test(String(update.author)) || !MENTION.test(String(update.body))) continue
     const text = String(update.body).replace(/\s+/g, ' ').trim()
     found.push({ id: update.id, line: `@cato on ${task.id} "${task.title}" by ${update.author}: ${text.length > 240 ? `${text.slice(0, 240)}…` : text}` })
   }
@@ -48,7 +51,7 @@ export function mentionLines(task, updates, seen) {
  * { since, counts, seen } and is changed only by a pass that completes, so a failed pass loses nothing.
  * Posting an update does not change a card's updatedAt, so a card is read again when its update count changed.
  */
-export function createWatcher({ call, boards, state, now = () => new Date().toISOString(), note = () => {} }) {
+export function createWatcher({ call, boards, state, now = () => new Date().toISOString(), note = () => {}, author = PM_AUTHOR }) {
   const open = new Set(boards)
   const warned = new Set()
   async function pass() {
@@ -84,7 +87,7 @@ export function createWatcher({ call, boards, state, now = () => new Date().toIS
           // `since` returns every update after it, not only the newest five, so a burst of updates loses none.
           const full = await call('get_task', { id: task.id, since })
           const seen = new Set([...state.seen, ...found.map(f => f.id)])
-          found.push(...mentionLines(task, full?.updates, seen))
+          found.push(...mentionLines(task, full?.updates, seen, author))
         }
       }
     }
@@ -146,14 +149,16 @@ async function main() {
   }
 
   mkdirSync(`${here}.listen`, { recursive: true })
-  const statePath = `${here}.listen/boss-mentions.json`
+  const boss = process.argv.includes('--boss')
+  const author = boss ? BOSS_AUTHOR : PM_AUTHOR
+  const statePath = `${here}.listen/${boss ? 'boss-mentions-crew' : 'boss-mentions'}.json`
   let saved = null
   try {
     saved = existsSync(statePath) ? JSON.parse(readFileSync(statePath, 'utf8')) : null
   } catch {
     saved = null
   }
-  const arg = process.argv[2]
+  const arg = process.argv.slice(2).find(a => a !== '--boss')
   const minutes = arg && arg !== '--follow' ? Number(arg) : null
   if (minutes !== null && !(minutes > 0)) {
     console.error('usage: crew mentions [minutes | --follow]')
@@ -166,7 +171,7 @@ async function main() {
     seen: saved?.seen ?? []
   }
   const save = () => writeFileSync(statePath, `${JSON.stringify(state)}\n`, { mode: 0o600 })
-  const watcher = createWatcher({ call, boards: [...boards], state, note: line => console.log(line) })
+  const watcher = createWatcher({ call, boards: [...boards], state, author, note: line => console.log(line) })
 
   if (arg !== '--follow') {
     const lines = await watcher.pass()
