@@ -2,6 +2,8 @@
 import type { ProjectTask } from '~/composables/useProjects'
 import { taskCountLabel, terminalColumnIds } from '#shared/utils/board'
 import { queryForView } from '~/utils/projectViewQuery'
+import { tagChipAttrs } from '~/utils/tagColors'
+import { boardLabelColor } from '~/composables/useProjects'
 
 definePageMeta({ layout: 'app' })
 
@@ -432,15 +434,19 @@ useSeoMeta({
           >
             <span class="hidden sm:inline">Labels</span>
             <!-- Active filters show as chips inside the button: the first two by name, then a count. -->
+            <!-- The chip takes the label's own colour, as LabelChip draws it everywhere else. -->
             <span
               v-for="tag in activeTags.slice(0, 2)"
               :key="tag"
-              class="tm-chip tm-tone-info max-w-28 truncate"
+              class="max-w-28 truncate rounded-full px-2 py-0.5 text-[length:var(--tm-font-size-label)] font-medium"
+              :class="tagChipAttrs(tag, boardLabelColor(tag)).class"
+              :style="tagChipAttrs(tag, boardLabelColor(tag)).style"
               data-filter-chip
             >{{ tag }}</span>
             <span
               v-if="activeTags.length > 2"
-              class="tm-chip tm-tone-info"
+              class="tm-chip"
+              data-filter-more
             >+{{ activeTags.length - 2 }}</span>
           </UButton>
 

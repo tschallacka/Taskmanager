@@ -2,7 +2,7 @@
 import Sortable from 'sortablejs'
 import type { DropdownMenuItem } from '@nuxt/ui'
 import type { ProjectColumn, ProjectTask } from '~/composables/useProjects'
-import { columnDotAttrs } from '~/utils/tagColors'
+import { columnDotAttrs, isDoneColumnName } from '~/utils/tagColors'
 import { ACCENT_COLORS, colorHex } from '#shared/utils/colors'
 import { relativeTime } from '~/composables/useRelativeTime'
 import { deletionSourceLabel } from '#shared/utils/board'
@@ -489,7 +489,7 @@ async function submitColumn() {
 const isFiltering = computed(() => activeTags.value.length > 0)
 
 // The Done column gets the dashed drop slot when it is empty: finished work lands here.
-const isDoneColumn = (column: { name: string }) => /^done$/i.test(column.name.trim())
+const isDoneColumn = (column: { name: string }) => isDoneColumnName(column.name)
 
 // Filtered once per render instead of three times per column (header count,
 // list and empty state each asked for the same list).
