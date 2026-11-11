@@ -43,9 +43,10 @@ export default defineEventHandler(async (event) => {
   if (!isPublic) {
     const session = await auth.api.getSession({ headers: event.headers })
     const userId = session?.user.id
-    // A crew shadow the person may not see (hiddenCrewShadows) serves no files, as it opens no board.
+    // A crew shadow the person may not see (hiddenCrewShadows) serves no files, and answers as if it did not exist.
     const hiddenShadow = userId !== undefined && (await hiddenCrewShadows(userId, [row.projectId])).has(row.projectId)
-    const allowed = userId !== undefined && !hiddenShadow && (
+    if (hiddenShadow) throw createError({ statusCode: 404, message: 'Not found' })
+    const allowed = userId !== undefined && (
       userId === row.userId
       || (row.teamId ? await isTeamMember(userId, row.teamId) : false)
       || (sharedWithCustomers && row.customerId ? await isCustomerContact(userId, row.customerId) : false)
