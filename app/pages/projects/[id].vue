@@ -229,7 +229,12 @@ const taskCountTitle = computed(() => {
 
 // Only an organisation's boards can belong to a customer; a personal board has
 // nobody to share with.
-const { activeTeamId, setActiveTeam } = useTeams()
+const { activeTeamId, setActiveTeam, teams } = useTeams()
+// The team a board belongs to, for the top-bar crumb "Team › Project". Empty for a board with no team.
+const teamName = computed(() => {
+  const id = activeProject.value?.teamId
+  return id ? (teams.value.find(team => team.id === id)?.name ?? null) : null
+})
 const { switchWorkspace } = useWorkspace()
 const { refresh: refreshProjects } = useProjects()
 const { customers, ensureLoaded: ensureCustomers } = useCustomers()
@@ -338,6 +343,17 @@ useSeoMeta({
       </span>
       <span aria-hidden="true">›</span>
       <span class="px-1">(shadow)</span>
+    </nav>
+    <!-- Team › Project: the crumb above the board header. A shadow board has its own crumb (above), so it is left out here. -->
+    <nav
+      v-if="activeProject && !activeProject.realBoard && teamName"
+      class="flex min-w-0 shrink-0 flex-wrap items-center gap-x-1 px-4 pt-2 text-xs text-muted lg:px-6"
+      aria-label="Breadcrumb"
+      data-team-crumb
+    >
+      <span class="truncate">{{ teamName }}</span>
+      <span aria-hidden="true">›</span>
+      <span class="truncate text-default">{{ activeProject.name }}</span>
     </nav>
     <!-- Board header -->
     <header class="flex shrink-0 items-center gap-2 border-b border-default px-4 py-3 lg:px-6">
