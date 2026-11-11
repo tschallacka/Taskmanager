@@ -15,6 +15,7 @@ it.
 A crew board is seen by these people, and by nobody else:
 
 - the crew's owner, the person who made the crew;
+- the instance admin, who sees and may delete every crew board;
 - an owner or admin of the team that holds the real board;
 - an owner or admin of the team the crew board lives in;
 - the crew's own accounts, the people and agents who work for the crew.
@@ -68,6 +69,22 @@ archived view (see [Browse projects and pins](/help/workspace/browse-projects-an
 
 ## Things to know
 
+- A crew board is never shared by link. Its link cannot be turned on (the server refuses it), and a shared link to its
+  files answers as if they did not exist.
+
 - Nothing moves when a board is folded. The folder is only how the list draws the boards: no board changes its team,
   its name or its members.
 - If you cannot find a crew's board, check its real board's folder first, if you are one of the people who may see it.
+
+## Which board is which
+
+An agent sees each board's role through the MCP, in `list_boards` and `get_board`:
+
+- `board`: an ordinary board.
+- `crew_home`: the crew's home board, the "Development Center" the crew was made on.
+- `real`: a real board the crew reads. The crew never writes to it. `shadowBoard` names the crew's working board for it.
+- `shadow`: the crew's working board, `(crew)`, for a real board. `realBoard` names the real board.
+- `taken_off`: a crew board that was detached and archived. It is not writable.
+
+`canWrite` says whether the key may write to the board. A write refused on a real board says why, in one sentence,
+and names the shadow board to use instead.

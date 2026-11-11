@@ -1,7 +1,7 @@
 <script setup lang="ts">
 const emit = defineEmits<{ close: [] }>()
 const searchOpen = useSearchModal()
-const { session, signOut } = useAuth()
+const { session, signOut, isInstanceAdmin } = useAuth()
 const colorMode = useColorMode()
 const userInitials = computed(() => {
   const name = session.value?.user?.name
@@ -54,6 +54,18 @@ watch(() => route.path, () => emit('close'))
   <div class="flex h-full min-h-0 flex-col overflow-hidden bg-default">
     <div class="flex shrink-0 items-center gap-3 px-4 pb-3 pt-4">
       <AppLogo class="min-w-0 flex-1 text-xl" />
+      <!-- Instance settings: the instance admin only. Everyone else sees no gear. -->
+      <UButton
+        v-if="isInstanceAdmin"
+        to="/admin/settings"
+        icon="i-lucide-settings"
+        size="sm"
+        color="neutral"
+        variant="ghost"
+        aria-label="Instance settings"
+        title="Instance settings"
+        class="shrink-0 rounded-lg"
+      />
       <UButton
         icon="i-lucide-kanban"
         size="sm"

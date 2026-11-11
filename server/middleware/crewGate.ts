@@ -1,11 +1,12 @@
 import { auditRefusal, checkCrewKey, closeWindow, expireWindowIfDue, readGate, remoteManagementVerdict, windowIsOpen } from '../utils/crewGate'
-import { auditPeer, bucketOf, decide, isCrewApiPath, isLocalRequest, limitedStatus, noteDenial, overDenialLimit, peerOf, rateKey, trustSocket } from '../utils/crewGatePolicy'
+import { auditPeer, bucketOf, decide, isCrewApiPath, isLocalRequest, limitedStatus, noteDenial, NO_LIVE_CREW_SENTENCE, overDenialLimit, peerOf, rateKey, trustSocket } from '../utils/crewGatePolicy'
 import { chargeRateLimit, limitsFor, requestAddress, scopeOfBoard } from '../utils/rateLimits'
 
 // Every call on /api/crews and /api/crews/* passes here first (BRIEF-crew-feature 2b).
 // A remote caller, or any caller while the window is shut and it is not local, gets a plain
 // 404 that gives nothing away. Everything else must present a crews:manage key. The one remote
-// key that passes is a live management token (kind 'management', bound to one board); the
+// keys that pass are a live management token (kind 'management', bound to one board), and the permanent
+// unbound key of a crew owner (its own crews only, see remoteCrewOwnerVerdict); the
 // instance admin's unbound key stays local-only.
 // Refused calls are counted per caller in its own bucket (local or remote), see crewGatePolicy.
 export default defineEventHandler(async (event) => {
@@ -31,7 +32,17 @@ export default defineEventHandler(async (event) => {
   const gate = await expireWindowIfDue(await readGate(), now)
   const windowOpen = windowIsOpen(gate, now)
 
-  const verdict = local || windowOpen ? await checkCrewKey(event) : await remoteManagementVerdict(event)
+  // A remote call takes its verdict from its management token or its owner's crews:manage key; while the window is
+  // open, any other key is checked the way the window always checked it.
+  const verdict = local
+    ? await checkCrewKey(event)
+    : (await remoteManagementVerdict(event)) ?? (windowOpen ? await checkCrewKey(event) : null)
+  // A crews:manage key whose owner has no live crew of their own is told so in one sentence, not with the plain 404.
+  if (!local && !windowOpen && verdict && !verdict.ok && verdict.noCrew) {
+    noteDenial(bucket, key, now)
+    await auditRefusal({ from, method: event.method, path: event.path, outcome: 'no live crew', keyPresented, now }, false)
+    throw createError({ statusCode: 403, statusMessage: 'Forbidden', message: NO_LIVE_CREW_SENTENCE })
+  }
   const step = decide({ local, windowOpen, tempKeyId: gate.tempKeyId, verdict })
   if (step.pass) {
     // A remote management token is charged per token and per address, with the limits of its board, like the other agent calls.

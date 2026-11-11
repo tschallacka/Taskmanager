@@ -8,7 +8,7 @@ import type { ApiKeyScope } from '../db/schema'
 import { generateApiKey, isApiKeyScope } from './api-keys'
 import { storeReach, teamReachOf } from './keyReach'
 import type { ReachRequest } from './keyReach'
-import { CREW_SENTENCES, crewPermissionRefusal } from './crewPermission'
+import { CREW_SENTENCES, crewPermissionRefusal, ownsLiveCrew } from './crewPermission'
 
 export const MAX_KEY_NAME_LENGTH = 60
 const MAX_EXPIRY_DAYS = 3650
@@ -23,13 +23,21 @@ export interface KeyRequest {
 /**
  * Whether the signed-in person may hold a crews:manage key limited to this board (or none, for the instance admin).
  * The crew permission decides it: the three levels of crewPermission.ts. A person who is not the instance admin
- * may only hold one bound to a board, so it reaches that board's crews and nothing else.
+ * may hold one bound to a board, so it reaches that board's crews and nothing else. Without a board (an unbound key)
+ * only a person who owns at least one live crew may hold it; it then reaches only the crews that person created
+ * (see remoteCrewOwnerVerdict). Any other non-admin gets the one-board sentence.
  */
 export async function requireCrewKeyRights(event: H3Event, boardId: string | null): Promise<void> {
   const userId = event.context.session.user.id
   const [row] = await db.select({ isInstanceAdmin: user.isInstanceAdmin }).from(user).where(eq(user.id, userId))
   const ownerIsAdmin = Boolean(row?.isInstanceAdmin)
-  if (!ownerIsAdmin && !boardId) throw createError({ statusCode: 403, message: CREW_SENTENCES.noBoard })
+  if (!ownerIsAdmin && !boardId) {
+    // The instance switch first: switching it off disables the owner's crew too, and the sentence should say why.
+    const ownRefusal = await crewPermissionRefusal(userId, null)
+    if (ownRefusal) throw createError({ statusCode: 403, message: ownRefusal })
+    if (!(await ownsLiveCrew(userId))) throw createError({ statusCode: 403, message: CREW_SENTENCES.noBoard })
+    return
+  }
   const refusal = await crewPermissionRefusal(userId, ownerIsAdmin ? null : boardId)
   if (refusal) throw createError({ statusCode: 403, message: refusal })
 }
