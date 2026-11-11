@@ -1,12 +1,11 @@
 // The instance's app name and logo (Instance settings). Public, so the login page gets the same branding as the app.
-// The admin page changes it and calls refreshBrand() so the logo next to it follows at once.
-export interface BrandPublic {
-  name: string
-  /** A data: URL of the uploaded logo, or null for the logo that ships with the app. */
-  logoSrc: string | null
-}
+// The admin page changes it and calls refreshBrand() so the logo next to it follows at once. The shape and the
+// defaults come from shared/utils/brand.ts, the same module the server uses.
+import { DEFAULT_BRAND } from '../../shared/utils/brand'
+import type { BrandPublic } from '../../shared/utils/brand'
 
-export const DEFAULT_BRAND: BrandPublic = { name: 'Taskmanager', logoSrc: null }
+export { DEFAULT_BRAND }
+export type { BrandPublic }
 
 export function useBrand() {
   return useFetch<BrandPublic>('/api/brand', { key: 'instance-brand', default: () => DEFAULT_BRAND })

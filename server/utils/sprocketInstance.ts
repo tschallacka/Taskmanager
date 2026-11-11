@@ -9,10 +9,11 @@ import { db } from '../db'
 import { instanceSettings, rateLimitHits } from '../db/schema'
 import { genId } from './projects'
 import { decryptSecret, encryptSecret, secretsUnavailableReason } from './secretCrypto'
+import { INSTANCE_ROW_ID, writeInstanceRow } from './instanceRow'
 import { isSprocketManner, resolveManner, SPROCKET_MANNERS } from './sprocketManner'
 import type { SprocketManner } from './sprocketManner'
 
-export const SPROCKET_INSTANCE_ROW_ID = 'instance'
+export const SPROCKET_INSTANCE_ROW_ID = INSTANCE_ROW_ID
 export const SPROCKET_DEFAULT_MODEL = 'openai/gpt-4o-mini'
 const KEY_CONTEXT = 'instance-settings:sprocket-openrouter-key'
 const INSTANCE_SCOPE = 'sprocket:instance'
@@ -117,8 +118,7 @@ function readCount(value: unknown, name: string, max: number): number {
 
 /** Saves the admin's changes. Only the fields sent change. */
 export async function saveSprocketInstance(patch: SprocketInstancePatch, userId: string): Promise<void> {
-  const existing = await storedRow()
-  const update: Partial<typeof instanceSettings.$inferInsert> = { updatedAt: Date.now(), updatedBy: userId }
+  const update: Partial<typeof instanceSettings.$inferInsert> = {}
 
   if (patch.forEveryone !== undefined) update.sprocketForEveryone = Boolean(patch.forEveryone)
   if (patch.claudeForEveryone !== undefined) update.sprocketClaudeForAll = Boolean(patch.claudeForEveryone)
@@ -147,16 +147,7 @@ export async function saveSprocketInstance(patch: SprocketInstancePatch, userId:
     }
   }
 
-  const base = {
-    id: SPROCKET_INSTANCE_ROW_ID,
-    crewsAllowed: existing?.crewsAllowed ?? false,
-    rateLimits: existing?.rateLimits ?? null,
-    updatedAt: Date.now(),
-    updatedBy: userId
-  }
-  await db.insert(instanceSettings)
-    .values({ ...base, ...update })
-    .onConflictDoUpdate({ target: instanceSettings.id, set: update })
+  await writeInstanceRow(update, userId)
 }
 
 /** The instance's OpenRouter key and model when Sprocket for everyone is on and a key is stored, else null. */

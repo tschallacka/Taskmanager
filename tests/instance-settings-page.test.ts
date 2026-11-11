@@ -17,12 +17,12 @@ const { instanceSettings, user } = await import('../server/db/schema')
 const {
   brandAdminView,
   brandPublic,
-  DEFAULT_BRAND_NAME,
   logoDataUrl,
   readBrandName,
   sanitizeLogoSvg,
   saveBrand
 } = await import('../server/utils/brand')
+const { DEFAULT_BRAND_NAME } = await import('../shared/utils/brand')
 const {
   claudeEnvSetting,
   claudeForEveryoneOn,

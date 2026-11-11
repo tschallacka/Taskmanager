@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { refreshBrand, useBrand } from '~/composables/useBrand'
+import { BRAND_LOGO_MAX_BYTES, BRAND_NAME_MAX_LENGTH } from '../../../shared/utils/brand'
 
 definePageMeta({ layout: 'app', middleware: 'instance-admin' })
 
@@ -116,7 +117,6 @@ async function saveDefaultManner(value: string) {
 }
 
 // Branding. An empty name, or a reset, puts the default back.
-const LOGO_LIMIT = 100_000
 
 async function saveName() {
   const name = nameDraft.value.trim()
@@ -150,8 +150,8 @@ async function onLogoPicked(event: Event) {
   const file = input.files?.[0]
   input.value = ''
   if (!file) return
-  if (file.size > LOGO_LIMIT || !(file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg'))) {
-    toast.add({ title: 'The logo is an SVG file of at most 100 KB', icon: 'i-lucide-alert-triangle', color: 'error' })
+  if (file.size > BRAND_LOGO_MAX_BYTES || !(file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg'))) {
+    toast.add({ title: `The logo is an SVG file of at most ${BRAND_LOGO_MAX_BYTES / 1000} KB`, icon: 'i-lucide-alert-triangle', color: 'error' })
     return
   }
   await saveLogo(await file.text(), 'Logo saved')
@@ -442,7 +442,7 @@ const accountsOpen = ref(false)
                 id="brand-name"
                 v-model="nameDraft"
                 placeholder="Taskmanager"
-                maxlength="40"
+                :maxlength="BRAND_NAME_MAX_LENGTH"
                 class="flex-1 min-w-[12rem]"
               />
               <UButton

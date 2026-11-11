@@ -5,18 +5,9 @@ import { eq } from 'drizzle-orm'
 import { createError } from 'h3'
 import { db } from '../db'
 import { instanceSettings } from '../db/schema'
-import { SPROCKET_INSTANCE_ROW_ID } from './sprocketInstance'
-
-export const DEFAULT_BRAND_NAME = 'Taskmanager'
-const MAX_NAME_LENGTH = 40
-// An uploaded logo is a small icon. A larger file is refused rather than stored.
-const MAX_LOGO_BYTES = 100_000
-
-export interface BrandPublic {
-  name: string
-  /** A data: URL of the uploaded logo, or null for the logo that ships with the app. */
-  logoSrc: string | null
-}
+import { BRAND_LOGO_MAX_BYTES, BRAND_NAME_MAX_LENGTH, DEFAULT_BRAND_NAME } from '../../shared/utils/brand'
+import type { BrandPublic } from '../../shared/utils/brand'
+import { INSTANCE_ROW_ID, writeInstanceRow } from './instanceRow'
 
 export interface BrandAdminView {
   /** The name as it is shown (the default when none is set). */
@@ -28,7 +19,7 @@ export interface BrandAdminView {
 }
 
 async function storedRow() {
-  const [row] = await db.select().from(instanceSettings).where(eq(instanceSettings.id, SPROCKET_INSTANCE_ROW_ID))
+  const [row] = await db.select().from(instanceSettings).where(eq(instanceSettings.id, INSTANCE_ROW_ID))
   return row ?? null
 }
 
@@ -60,8 +51,8 @@ export function readBrandName(value: unknown): string {
     const code = char.charCodeAt(0)
     return code >= 32 && code !== 127
   })
-  if (!name || name.length > MAX_NAME_LENGTH || !oneLine) {
-    throw createError({ statusCode: 400, message: `The app name is one line of 1 to ${MAX_NAME_LENGTH} characters.` })
+  if (!name || name.length > BRAND_NAME_MAX_LENGTH || !oneLine) {
+    throw createError({ statusCode: 400, message: `The app name is one line of 1 to ${BRAND_NAME_MAX_LENGTH} characters.` })
   }
   return name
 }
@@ -73,8 +64,8 @@ export function readBrandName(value: unknown): string {
  */
 export function sanitizeLogoSvg(value: unknown): string {
   const svg = typeof value === 'string' ? value.trim() : ''
-  if (!svg || Buffer.byteLength(svg, 'utf8') > MAX_LOGO_BYTES) {
-    throw createError({ statusCode: 400, message: `The logo is an SVG file of at most ${MAX_LOGO_BYTES / 1000} KB.` })
+  if (!svg || Buffer.byteLength(svg, 'utf8') > BRAND_LOGO_MAX_BYTES) {
+    throw createError({ statusCode: 400, message: `The logo is an SVG file of at most ${BRAND_LOGO_MAX_BYTES / 1000} KB.` })
   }
   const looksLikeSvg = /^(<\?xml[^>]*>\s*)?(<!--[\s\S]*?-->\s*)*<svg[\s>]/i.test(svg) && /<\/svg>\s*$/i.test(svg)
   const refused = [
@@ -97,19 +88,8 @@ export function sanitizeLogoSvg(value: unknown): string {
 
 /** Saves the admin's branding. Only the fields sent change; null resets a field to its default. */
 export async function saveBrand(patch: { name?: unknown, logoSvg?: unknown }, userId: string): Promise<void> {
-  const existing = await storedRow()
-  const update: Partial<typeof instanceSettings.$inferInsert> = { updatedAt: Date.now(), updatedBy: userId }
+  const update: Partial<typeof instanceSettings.$inferInsert> = {}
   if (patch.name !== undefined) update.brandName = patch.name === null ? null : readBrandName(patch.name)
   if (patch.logoSvg !== undefined) update.brandLogoSvg = patch.logoSvg === null ? null : sanitizeLogoSvg(patch.logoSvg)
-
-  const base = {
-    id: SPROCKET_INSTANCE_ROW_ID,
-    crewsAllowed: existing?.crewsAllowed ?? false,
-    rateLimits: existing?.rateLimits ?? null,
-    updatedAt: Date.now(),
-    updatedBy: userId
-  }
-  await db.insert(instanceSettings)
-    .values({ ...base, ...update })
-    .onConflictDoUpdate({ target: instanceSettings.id, set: update })
+  await writeInstanceRow(update, userId)
 }
