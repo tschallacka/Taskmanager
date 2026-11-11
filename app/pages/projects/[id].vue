@@ -438,7 +438,7 @@ useSeoMeta({
             <span
               v-for="tag in activeTags.slice(0, 2)"
               :key="tag"
-              class="max-w-28 truncate rounded-full px-2 py-0.5 text-[length:var(--tm-font-size-label)] font-medium"
+              class="max-w-28 truncate rounded-full px-2 py-0.5 text-[length:var(--tm-font-size-label)] font-medium ring-1 ring-inset"
               :class="tagChipAttrs(tag, boardLabelColor(tag)).class"
               :style="tagChipAttrs(tag, boardLabelColor(tag)).style"
               data-filter-chip

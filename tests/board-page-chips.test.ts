@@ -40,8 +40,12 @@ test('the filter chips take the label colour through tagChipAttrs, as LabelChip 
   assert.match(page, /v-for="tag in activeTags\.slice\(0, 2\)"/)
   assert.match(page, /:class="tagChipAttrs\(tag, boardLabelColor\(tag\)\)\.class"/)
   assert.match(page, /:style="tagChipAttrs\(tag, boardLabelColor\(tag\)\)\.style"/)
-  assert.match(page, /data-filter-chip/)
-  assert.ok(!/data-filter-chip[\s\S]{0,80}tm-tone-info/.test(page), 'no fixed info tone on a filter chip')
+  // The whole opening tag of the chip: its class list must carry the ring and no fixed tone.
+  const opening = page.match(/<span\s[^>]*data-filter-chip[^>]*>/)
+  assert.ok(opening, 'the filter chip has an opening tag')
+  assert.match(opening[0], /ring-1 ring-inset/, 'the chip has the ring, as LabelChip does')
+  assert.doesNotMatch(opening[0], /tm-tone-/, 'no fixed tone class on a filter chip')
+  assert.doesNotMatch(opening[0], /text-(warning|error|success|primary|info)/, 'no fixed semantic colour on a filter chip')
 })
 
 test('the +N count shows past two labels and is a neutral chip', () => {
