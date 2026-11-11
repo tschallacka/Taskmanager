@@ -39,6 +39,11 @@ export interface ConnectPromptBoard {
   scopes: readonly string[]
 }
 
+// The pipe that reads the exchange's reply. On success it writes the token, and only the token, into the variable. On a
+// refusal it prints the server's message to stderr (the message never holds a key) and exits non-zero, so the variable
+// stays empty and the agent sees why, instead of an "undefined" key.
+const EXCHANGE_READER = `node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{let r={};try{r=JSON.parse(s)}catch{}if(r.token){process.stdout.write(r.token);return}console.error("the exchange was refused: "+(r.message||r.statusMessage||"the server gave no message")+". No key was made. Report this message to your main agent and do not retry with this code.");process.exit(1)})'`
+
 export interface ConnectPromptInput {
   /** The base URL of this Taskmanager, with no trailing slash. */
   origin: string
@@ -97,7 +102,7 @@ export function connectPrompt(input: ConnectPromptInput): string {
       ? [
           `Your key is a one-time pairing code: ${input.access.code}`,
           `It works once and until ${new Date(input.access.expiresAt).toISOString()}. Exchange it on this machine, and do not print the result:`,
-          `  export TASKMANAGER_API_KEY=$(curl -s -X POST ${input.origin}/api/pair -H 'Content-Type: application/json' -d '{"code":"${input.access.code}"}' | node -pe 'JSON.parse(require("fs").readFileSync(0,"utf8")).token')`,
+          `  export TASKMANAGER_API_KEY=$(curl -s -X POST ${input.origin}/api/pair -H 'Content-Type: application/json' -d '{"code":"${input.access.code}"}' | ${EXCHANGE_READER})`,
           'If that does not give you a key that starts with arn_, stop: the exchange was refused. Report the message the server sent to your main agent, and do not retry with this code.'
         ].join('\n')
       : [
