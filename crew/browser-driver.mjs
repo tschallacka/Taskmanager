@@ -1309,7 +1309,28 @@ function exchange(conn, message) {
  * Sends one command. Resolves { result, note }, or null when nothing is running and start is false.
  * Starts the driver when none is running and start is true. Throws when the command fails.
  */
-export async function request({ dir = defaultDir(), who = null, cmd, args = {}, start = true, chromium = '', seam = true }) {
+// A driver that is shutting down closes its socket under a call that has just connected. The call then gets a dropped
+// connection and no reply. Such a call is retried: with start false, a dropped connection means nothing is running, so
+// the answer is null; with start true, the next try starts a fresh driver. A command that drops before its reply may
+// have run already, so it can run twice. The browser commands the crew sends are ones a second run is harmless for.
+const DROPPED = /connection failed|closed the connection/
+const DROP_RETRIES = 5
+const DROP_RETRY_MS = 300
+
+export async function request(options) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await requestOnce(options)
+    } catch (error) {
+      if (!(error instanceof BrowserError) || !DROPPED.test(error.message)) throw error
+      if ((options.start ?? true) === false) return null
+      if (attempt >= DROP_RETRIES) throw error
+      await sleep(DROP_RETRY_MS)
+    }
+  }
+}
+
+async function requestOnce({ dir = defaultDir(), who = null, cmd, args = {}, start = true, chromium = '', seam = true }) {
   const sock = join(dir, SOCKET_NAME)
   let conn = await connectTo(sock, 500)
   if (!conn) {
