@@ -166,7 +166,7 @@ export const modelProblems = resolvedModels.problems
 export const agentNames = Object.fromEntries(CAST.filter(key => !EXTRA_CAST.includes(key)).map(key => [key, `${slugify(config.crew.slug || config.team)}-${slugify(config.people[key])}`]))
 
 // A path as one shell word, quoted only when it has to be.
-const shellWord = text => (/^[\w@%+=:,./-]+$/.test(text) ? text : `'${text.replace(/'/g, `'\\''`)}'`)
+export const shellWord = text => (/^[\w@%+=:,./-]+$/.test(text) ? text : `'${text.replace(/'/g, `'\\''`)}'`)
 
 // The documents the owner edits by hand. init writes each once and keeps it; update merges the new template into it.
 export const OWNER_FILES = ['PROJECT-RULES.md', 'BRIEF.md']

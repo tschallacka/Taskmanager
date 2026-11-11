@@ -2,12 +2,11 @@
 // this kit's script (its file name, the marker) are replaced; every other key and every other hook in the file is kept,
 // so a file edited by hand keeps its own settings. Used for Pia's session (pia-session.mjs) and Boss's (boss-session).
 import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
+// The one shell-word rule of the kit lives in config.mjs; importing it here keeps the two from drifting apart.
+import { shellWord } from './config.mjs'
 
-/** Single-quotes a path for the shell, unless it is plain already. */
-export function shellWord(text) {
-  return /^[A-Za-z0-9_/.,:@+-]+$/.test(text) ? text : `'${text.replace(/'/g, `'\\''`)}'`
-}
+export { shellWord }
 
 const isOurs = (entry, marker) => (entry?.hooks ?? []).some(hook => String(hook?.command ?? '').includes(marker))
 
@@ -43,12 +42,28 @@ export function writeHookSettings({ dir, file: name = 'settings.json', hooks, ma
  * this crew's paths is never committed. Returns true when it added the line.
  */
 export function excludeFromGit(dir, entry) {
-  const gitDir = join(dir, '.git')
-  if (!existsSync(gitDir) || !statSync(gitDir).isDirectory()) return false
-  const exclude = join(gitDir, 'info', 'exclude')
+  const exclude = gitExcludeFile(dir)
+  if (!exclude) return false
   mkdirSync(dirname(exclude), { recursive: true })
   const text = existsSync(exclude) ? readFileSync(exclude, 'utf8') : ''
   if (text.split('\n').includes(entry)) return false
   appendFileSync(exclude, `${text && !text.endsWith('\n') ? '\n' : ''}${entry}\n`)
   return true
+}
+
+/**
+ * The exclude file git reads for the checkout at `dir`, or null when `dir` is not a checkout. A normal checkout keeps
+ * it in .git/info/exclude. A worktree has a .git FILE ("gitdir: <path>"): its exclude is the shared git directory's
+ * info/exclude, which that gitdir names in its "commondir" file.
+ */
+export function gitExcludeFile(dir) {
+  const dotGit = join(dir, '.git')
+  if (!existsSync(dotGit)) return null
+  if (statSync(dotGit).isDirectory()) return join(dotGit, 'info', 'exclude')
+  const pointer = readFileSync(dotGit, 'utf8').match(/^gitdir:\s*(.+)$/m)
+  if (!pointer) return null
+  const gitDir = resolve(dir, pointer[1].trim())
+  const common = join(gitDir, 'commondir')
+  const commonDir = existsSync(common) ? resolve(gitDir, readFileSync(common, 'utf8').trim()) : gitDir
+  return join(commonDir, 'info', 'exclude')
 }
