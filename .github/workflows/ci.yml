@@ -1,14 +1,10 @@
 name: ci
 
 on:
-  # Pull requests run the checks; a branch push on its own runs nothing (owner, 2026-11-11).
-  pull_request:
-    branches:
-      - master
-  # Master runs them again after a merge, because the tag and release job below needs a green master.
   push:
+    # With only tags-ignore given, GitHub runs nothing for branch pushes: the branches are named too.
     branches:
-      - master
+      - '**'
     # The release tags this workflow creates are pushes too; they must not run it again.
     tags-ignore:
       - 'v*'
