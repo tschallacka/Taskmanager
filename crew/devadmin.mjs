@@ -7,8 +7,12 @@
 // table (is_instance_admin) and nothing else.
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { CAST } from './cast.mjs'
 
-export const CREW_KEYS = ['wren', 'wick', 'wynn', 'wade', 'nina', 'quincy', 'usher', 'pat', 'pia']
+// The keys that may have a dev database of their own (arnotes_dev_<key>): every member of CAST except the ones who
+// never run a dev copy or a test database. A new member of CAST gets devadmin access unless it is listed here.
+const NO_DEV_DATABASE = ['susy', 'janet', 'tess', 'rita', 'watcher', 'wes', 'wilma', 'walt']
+export const CREW_KEYS = CAST.filter(key => !NO_DEV_DATABASE.includes(key))
 const PORT = 55433
 
 // The database for one key, from the key alone: arnotes_dev_<key> on localhost.
@@ -73,7 +77,7 @@ function main(argv) {
     console.error('psql failed (the dev database may not be up)')
     return r.status || 1
   }
-  const lines = r.stdout.split('\n').map((s) => s.trim()).filter(Boolean)
+  const lines = r.stdout.split('\n').map(s => s.trim()).filter(Boolean)
   console.log(action === 'show' ? `instance admins on arnotes_dev_${key}:` : `admin set on arnotes_dev_${key}:`)
   for (const l of lines) console.log(`  ${l}`)
   if (action === 'make-admin' && lines.length === 0) console.log('  no account with that email')
