@@ -2,7 +2,7 @@
 const props = withDefaults(defineProps<{ collapsed?: boolean }>(), { collapsed: false })
 const emit = defineEmits<{ 'close': [], 'toggle-rail': [] }>()
 const searchOpen = useSearchModal()
-const { session, signOut } = useAuth()
+const { session, signOut, isInstanceAdmin } = useAuth()
 const colorMode = useColorMode()
 const userInitials = computed(() => {
   const name = session.value?.user?.name
@@ -31,10 +31,11 @@ const planningLinks = [
   { label: 'Portfolios', icon: 'i-lucide-briefcase', to: '/projects/portfolios' },
   { label: 'Timesheet', icon: 'i-lucide-clock', to: '/projects/timesheet' }
 ]
-const teamLinks = [
+// Crews and agents is the instance admin's page: nobody else sees the link.
+const teamLinks = computed(() => [
   { label: 'Members and customers', icon: 'i-lucide-users', to: '/team' },
-  { label: 'Crews and agents', icon: 'i-lucide-bot', to: '/admin/crews' }
-]
+  ...(isInstanceAdmin.value ? [{ label: 'Crews and agents', icon: 'i-lucide-bot', to: '/admin/crews' }] : [])
+])
 
 const accountItems = computed(() => [[
   {
@@ -112,13 +113,22 @@ watch(() => route.path, () => emit('close'))
         aria-label="Search tasks and boards"
         @click="searchOpen = true"
       />
-      <div class="mt-auto pb-1">
-        <UAvatar
-          :alt="userInitials"
-          size="xs"
-          class="shrink-0"
-        />
-      </div>
+      <!-- On the rail the avatar opens the same account menu as the wide sidebar's account row. -->
+      <UDropdownMenu
+        :items="accountItems"
+        :content="{ align: 'start', side: 'right', collisionPadding: 12 }"
+      >
+        <button
+          class="mt-auto mb-1 rounded-full"
+          aria-label="Account menu"
+        >
+          <UAvatar
+            :alt="userInitials"
+            size="xs"
+            class="shrink-0"
+          />
+        </button>
+      </UDropdownMenu>
     </div>
 
     <template v-else>
