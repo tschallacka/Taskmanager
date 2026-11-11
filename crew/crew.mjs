@@ -24,7 +24,7 @@ import { fileURLToPath } from 'node:url'
 
 const kit = dirname(fileURLToPath(import.meta.url))
 const [first, ...rest] = process.argv.slice(2)
-const scripts = { listen: 'listen.mjs', watch: 'watch.mjs', init: 'init.mjs', setup: 'setup.mjs', channel: 'channel.mjs', update: 'update.mjs', mentions: 'mentions.mjs', totp: 'totp.mjs', janet: 'janet.mjs', publish: 'publish.mjs', up: 'up.mjs' }
+const scripts = { listen: 'listen.mjs', watch: 'watch.mjs', init: 'init.mjs', setup: 'setup.mjs', channel: 'channel.mjs', update: 'update.mjs', mentions: 'mentions.mjs', totp: 'totp.mjs', janet: 'janet.mjs', publish: 'publish.mjs', up: 'up.mjs', 'restart-brief': 'restart-brief.mjs' }
 
 if (!first || first === '-h' || first === '--help') {
   console.log('usage: crew <who> <command ...> | crew <who> browser <command> | crew browser status|shutdown | crew listen <who> [sec] | crew watch | crew init | crew setup | crew channel <who> | crew mentions [minutes|--follow] | crew publish <slug> <branch> <title> <msg-file> <pr-file> | crew update [--check] [--from <kit folder|kit.tar.gz>] [--kit <folder>]')
