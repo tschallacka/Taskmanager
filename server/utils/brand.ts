@@ -5,8 +5,8 @@ import { eq } from 'drizzle-orm'
 import { createError } from 'h3'
 import { db } from '../db'
 import { instanceSettings } from '../db/schema'
-import { BRAND_LOGO_MAX_BYTES, BRAND_NAME_MAX_LENGTH, DEFAULT_BRAND_NAME } from '../../shared/utils/brand'
-import type { BrandPublic } from '../../shared/utils/brand'
+import { BRAND_LOGO_MAX_BYTES, BRAND_NAME_MAX_LENGTH, DEFAULT_BRAND_NAME } from '#shared/utils/brand'
+import type { BrandPublic } from '#shared/utils/brand'
 import { INSTANCE_ROW_ID, writeInstanceRow } from './instanceRow'
 
 export interface BrandAdminView {

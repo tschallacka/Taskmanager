@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { refreshBrand, useBrand } from '~/composables/useBrand'
-import { BRAND_LOGO_MAX_BYTES, BRAND_NAME_MAX_LENGTH } from '../../../shared/utils/brand'
+import { BRAND_LOGO_MAX_BYTES, BRAND_NAME_MAX_LENGTH } from '#shared/utils/brand'
 
 definePageMeta({ layout: 'app', middleware: 'instance-admin' })
 
