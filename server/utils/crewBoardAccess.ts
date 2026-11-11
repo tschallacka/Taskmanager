@@ -144,6 +144,12 @@ export async function isStaffOfShadowedBoard(userId: string, projectId: string):
   return Boolean(row)
 }
 
+/** The crew a person is an account of, or null for a person who is no crew account. */
+export async function crewIdOfUser(userId: string): Promise<string | null> {
+  const [account] = await db.select({ crewId: user.crewId }).from(user).where(eq(user.id, userId))
+  return account?.crewId ?? null
+}
+
 /**
  * The boards a key's person may READ through a crew link, beyond its own reach:
  *   - a crew account reads the real boards its crew was given. A key limited to one board (a member

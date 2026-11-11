@@ -4,15 +4,15 @@
 // the reason and the board to use instead.
 import { and, eq, inArray } from 'drizzle-orm'
 import { db } from '../db'
-import { projects, user } from '../db/schema'
+import { projects } from '../db/schema'
 import type { Project } from '../db/schema'
-import type { ApiKeyContext } from './api-keys'
+import { forCall, type ApiKeyContext } from './api-keys'
 import { boardFilter } from './mcpAccess'
-import { crewLinksOf } from './crewBoardAccess'
-import type { BoardTreeFields } from './boardTree'
+import { crewIdOfUser, crewLinksOf } from './crewBoardAccess'
+import { TAKEN_OFF_SUFFIX, plainBoardTreeFields, type BoardRole, type BoardTreeFields } from './boardTree'
 
 /** The roles an agent sees: an ordinary board, the crew's home, a real board a crew reads, a crew's shadow, a board taken off. */
-export type McpBoardRole = 'board' | 'crew_home' | 'real' | 'shadow' | 'taken_off'
+export type McpBoardRole = BoardRole | 'taken_off'
 
 export interface BoardRoleFields {
   role: McpBoardRole
@@ -24,21 +24,16 @@ export interface BoardRoleFields {
   note?: string
 }
 
-/** A detached shadow board: archived, renamed "... (taken off)", and no link to a real board any more. */
+/** A detached shadow board: archived, renamed with the taken-off suffix, and no link to a real board any more. */
 export function isTakenOff(board: Pick<Project, 'archivedAt' | 'name'>): boolean {
-  return board.archivedAt != null && /\(taken off\)$/.test(board.name)
-}
-
-/** The caller's crew, when the key's person is a crew account. */
-async function crewIdOf(userId: string): Promise<string | null> {
-  const [account] = await db.select({ crewId: user.crewId }).from(user).where(eq(user.id, userId))
-  return account?.crewId ?? null
+  return board.archivedAt != null && board.name.endsWith(TAKEN_OFF_SUFFIX)
 }
 
 /** The boards in `ids` this key may write to. A key without the write scope writes to none. */
 async function writableIds(context: ApiKeyContext, ids: string[]): Promise<Set<string>> {
   if (!ids.length || !context.scopes.includes('boards:write')) return new Set()
-  const scoped = { ...context, callScope: 'boards:write', readGrantedBoardIds: [] } as ApiKeyContext
+  // The write call's own scope, with no read grant: a crew's read reach never makes a board writable.
+  const scoped: ApiKeyContext = { ...forCall(context, 'boards:write'), readGrantedBoardIds: [] }
   const rows = await db.select({ id: projects.id }).from(projects).where(and(inArray(projects.id, ids), await boardFilter(scoped)))
   return new Set(rows.map(row => row.id))
 }
@@ -52,10 +47,10 @@ export async function boardRoleFields(
   const result = new Map<string, BoardRoleFields>()
   if (!boards.length) return result
   const writable = await writableIds(context, boards.map(board => board.id))
-  const crewId = await crewIdOf(context.userId)
+  const crewId = await crewIdOfUser(context.userId)
 
   for (const board of boards) {
-    const fields = tree.get(board.id) ?? { role: 'board', realBoard: null, shadows: [], crew: null }
+    const fields = tree.get(board.id) ?? plainBoardTreeFields()
     let role: McpBoardRole = fields.role
     if (role === 'board' && isTakenOff(board)) role = 'taken_off'
 
@@ -93,7 +88,7 @@ export async function boardRoleFields(
  * the reason, in one sentence, and the crew's shadow board to use instead. Null when the name is not such a board.
  */
 export async function crewRealBoardRefusal(reference: string, context: ApiKeyContext): Promise<string | null> {
-  const crewId = await crewIdOf(context.userId)
+  const crewId = await crewIdOfUser(context.userId)
   if (!crewId) return null
   const links = await crewLinksOf(crewId)
   if (!links.length) return null

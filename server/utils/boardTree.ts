@@ -26,6 +26,10 @@ export function labelRowOf(project: { id: string, name: string, updatedAt: numbe
 
 export type BoardRole = 'board' | 'real' | 'shadow' | 'crew_home'
 
+/** The suffix a crew's shadow board carries in its name, and the suffix of one detached from its crew. */
+export const CREW_SHADOW_SUFFIX = ' (crew)'
+export const TAKEN_OFF_SUFFIX = ' (taken off)'
+
 export interface BoardRef {
   id: string
   name: string
@@ -68,6 +72,11 @@ export interface BoardTreeFields {
 }
 
 const PLAIN: BoardTreeFields = { role: 'board', realBoard: null, shadows: [], crew: null }
+
+/** The tree fields of a board outside any crew tree: an ordinary board. */
+export function plainBoardTreeFields(): BoardTreeFields {
+  return { ...PLAIN, shadows: [] }
+}
 
 /**
  * The crew shadow boards among `boardIds` that `userId` may not see. A crew's board is seen only by the crew's owner,
