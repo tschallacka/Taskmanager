@@ -845,6 +845,23 @@ const menuItems = computed(() => [[
             :task-id="shownTask.id"
           />
 
+          <!-- Description (before the subtasks, redesign card 5/9): the rich-text editor, bounded so it keeps its own scroll -->
+          <div class="flex min-h-72 flex-col border-t border-default">
+            <div
+              v-if="readonly"
+              class="min-h-0 flex-1 overflow-y-auto"
+            >
+              <ReadOnlyRichText :content="shownTask.description" />
+            </div>
+            <RichEditor
+              v-else
+              v-model="editorContent"
+              :upload-image="uploadImage"
+              placeholder="Add a description… (@ for dates, / for commands)"
+              class="min-h-0 flex-1"
+            />
+          </div>
+
           <!-- Subtasks: an Asana-style checklist, nestable and drag-reorderable. -->
           <div
             v-if="subtasks.length || !readonly"
@@ -870,22 +887,6 @@ const menuItems = computed(() => [[
             :readonly="readonly"
           />
 
-          <!-- Description: the rich-text editor, bounded so it keeps its own scroll -->
-          <div class="flex min-h-72 flex-col border-t border-default">
-            <div
-              v-if="readonly"
-              class="min-h-0 flex-1 overflow-y-auto"
-            >
-              <ReadOnlyRichText :content="shownTask.description" />
-            </div>
-            <RichEditor
-              v-else
-              v-model="editorContent"
-              :upload-image="uploadImage"
-              placeholder="Add a description… (@ for dates, / for commands)"
-              class="min-h-0 flex-1"
-            />
-          </div>
           <!-- Under the description, in the same scroll body: the conversation and its box. -->
           <KanbanTaskComments
             v-if="shownTask"
