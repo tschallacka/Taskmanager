@@ -97,6 +97,9 @@ const storedWidth = useCookie<number | null>('kanban-drawer-width', { default: (
 
 const width = ref(DEFAULT_WIDTH)
 const maxWidth = ref(DEFAULT_WIDTH)
+// "Open as page" (the design's header button): the panel takes the whole content width. It is the same address, since the
+// app has no task-only page; the width the person picked is kept for when they collapse it again.
+const expanded = ref(false)
 
 function measure() {
   maxWidth.value = Math.max(MIN_WIDTH, window.innerWidth - 24)
@@ -503,7 +506,7 @@ const menuItems = computed(() => [[
       <div
         v-if="shownTask"
         class="relative flex h-full flex-col bg-default focus:outline-none"
-        :style="{ width: `${width}px`, maxWidth: '100%' }"
+        :style="{ width: expanded ? '100%' : `${width}px`, maxWidth: '100%' }"
       >
         <!-- Resize edge -->
         <div
@@ -630,6 +633,18 @@ const menuItems = computed(() => [[
               ? 'Team only. Click to share with the customer.'
               : 'Shared with the customer. Click to make it team only.'"
             @click="toggleTaskVisibility"
+          />
+
+          <UButton
+            :icon="expanded ? 'i-lucide-minimize-2' : 'i-lucide-maximize-2'"
+            size="xs"
+            color="neutral"
+            variant="ghost"
+            aria-label="Open as page"
+            :title="expanded ? 'Back to panel width' : 'Open as page'"
+            :aria-pressed="expanded ? 'true' : 'false'"
+            class="shrink-0"
+            @click="expanded = !expanded"
           />
 
           <UDropdownMenu
