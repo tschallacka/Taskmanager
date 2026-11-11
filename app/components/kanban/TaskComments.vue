@@ -63,6 +63,10 @@ const stream = computed<StreamEntry[]>(() => [
   ...activity.value.map(item => ({ key: `a-${item.id}`, at: item.createdAt, activity: item }))
 ].sort((a, b) => a.at - b.at))
 
+// The Activity tabs: Comments shows the conversation, History shows the changes to the task. Both read the same stream.
+const activityTab = ref<'comments' | 'history'>('comments')
+const shownStream = computed(() => stream.value.filter(entry => activityTab.value === 'history' ? entry.activity : entry.comment))
+
 // An update posted by an agent is signed with the key it came in on, not with
 // the account that owns the key — otherwise a night of agent work reads back as
 // the user's own writing.
@@ -422,31 +426,56 @@ defineExpose({ handleEscape })
   <section
     ref="root"
     class="shrink-0 border-t border-default px-5 pb-4 pt-3"
-    aria-labelledby="task-comments-heading"
+    aria-label="Activity"
   >
-    <div class="mb-3 flex items-baseline gap-2">
-      <h3
-        id="task-comments-heading"
-        class="text-xs font-medium text-muted"
+    <!-- Two tabs over one list: the comments first, then the history of changes to the task. -->
+    <div
+      role="tablist"
+      aria-label="Activity"
+      class="mb-3 flex items-center gap-3"
+    >
+      <button
+        id="activity-tab-comments"
+        type="button"
+        role="tab"
+        :aria-selected="activityTab === 'comments'"
+        class="flex items-baseline gap-1.5 text-xs font-medium"
+        :class="activityTab === 'comments' ? 'text-default' : 'text-muted hover:text-default'"
+        @click="activityTab = 'comments'"
       >
         Comments
-      </h3>
-      <span
-        v-if="count"
-        class="text-xs tabular-nums text-dimmed"
-      >{{ count }}</span>
+        <span
+          v-if="count"
+          class="tabular-nums text-dimmed"
+        >{{ count }}</span>
+      </button>
+      <button
+        id="activity-tab-history"
+        type="button"
+        role="tab"
+        :aria-selected="activityTab === 'history'"
+        class="flex items-baseline gap-1.5 text-xs font-medium"
+        :class="activityTab === 'history' ? 'text-default' : 'text-muted hover:text-default'"
+        @click="activityTab = 'history'"
+      >
+        History
+        <span
+          v-if="activity.length"
+          class="tabular-nums text-dimmed"
+        >{{ activity.length }}</span>
+      </button>
     </div>
 
     <div class="space-y-4">
       <p
-        v-if="count === 0"
+        v-if="count === 0 && activityTab === 'comments'"
         class="text-xs text-dimmed"
       >
         No comments yet. Note where this stands: on staging, waiting on feedback, needs more work.
       </p>
 
       <template
-        v-for="entry in stream"
+        v-for="entry in shownStream"
         :key="entry.key"
       >
         <template v-if="entry.comment">
