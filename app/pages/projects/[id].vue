@@ -2,8 +2,10 @@
 import type { ProjectTask } from '~/composables/useProjects'
 import { taskCountLabel, terminalColumnIds } from '#shared/utils/board'
 import { queryForView } from '~/utils/projectViewQuery'
+import { queryWithoutTask, taskPanelPath } from '~/utils/taskPanelUrl'
 
-definePageMeta({ layout: 'app' })
+// One page for the board and for its task panel addresses: the same key keeps the board mounted while the panel opens.
+definePageMeta({ layout: 'app', key: route => `projects/${route.params.id}` })
 
 const route = useRoute()
 const { sidebarOpen } = useSidebar()
@@ -130,17 +132,26 @@ async function switchToHintTeam() {
 
 // ─── Task panel ────────────────────────────────────────────
 
-const drawerTaskId = ref<string | null>(null)
+// The open task is in the path: /projects/<id>/<task>. Opening one pushes an entry, so Back and Forward open and close the
+// panel; closing goes back to the plain board address.
+const drawerTaskId = computed<string | null>(() => {
+  const id = route.params.task
+  return typeof id === 'string' && id ? id : null
+})
 
-// Deep link ?task=<id> (global search) opens the panel.
-watch(() => route.query.task, (taskId) => {
-  drawerTaskId.value = typeof taskId === 'string' && taskId ? taskId : null
-}, { immediate: true })
+function openDrawerTask(taskId: string) {
+  navigateTo({ path: taskPanelPath(String(route.params.id), taskId), query: queryWithoutTask(route.query) })
+}
 
 function closeDrawer() {
-  drawerTaskId.value = null
-  if (route.query.task) navigateTo({ path: route.path, replace: true })
+  navigateTo({ path: taskPanelPath(String(route.params.id)), query: queryWithoutTask(route.query) }, { replace: true })
 }
+
+// The old deep link ?task=<id> (global search and the home list) is rewritten to the path form.
+watch(() => route.query.task, (taskId) => {
+  if (typeof taskId !== 'string' || !taskId) return
+  navigateTo({ path: taskPanelPath(String(route.params.id), taskId), query: queryWithoutTask(route.query) }, { replace: true })
+}, { immediate: true })
 
 const drawerTask = computed<ProjectTask | null>(() =>
   drawerTaskId.value ? board.value?.tasks.find(t => t.id === drawerTaskId.value) ?? null : null
@@ -688,19 +699,19 @@ useSeoMeta({
         <KanbanBoard
           v-else-if="view === 'board'"
           :project-id="projectId"
-          @open-task="drawerTaskId = $event"
+          @open-task="openDrawerTask($event)"
         />
         <KanbanProjectListView
           v-else-if="view === 'list'"
-          @open-task="drawerTaskId = $event"
+          @open-task="openDrawerTask($event)"
         />
         <KanbanProjectTimelineView
           v-else-if="view === 'timeline'"
-          @open-task="drawerTaskId = $event"
+          @open-task="openDrawerTask($event)"
         />
         <KanbanProjectCalendarView
           v-else-if="view === 'calendar'"
-          @open-task="drawerTaskId = $event"
+          @open-task="openDrawerTask($event)"
         />
         <KanbanProjectDashboardView v-else-if="view === 'dashboard'" />
         <KanbanProjectMessagesView
@@ -719,7 +730,7 @@ useSeoMeta({
         />
         <KanbanProjectFilesView
           v-else
-          @open-task="drawerTaskId = $event"
+          @open-task="openDrawerTask($event)"
         />
       </template>
     </div>
