@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="40 8 600 690" role="img" aria-label="Taskmanager">
+  <defs>
+    <linearGradient id="orange" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffc24a"/>
+      <stop offset="1" stop-color="#f39418"/>
+    </linearGradient>
+    <linearGradient id="shaftL" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5fb4ea"/>
+      <stop offset="1" stop-color="#3f7fd0"/>
+    </linearGradient>
+    <linearGradient id="shaftR" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2e78c4"/>
+      <stop offset="1" stop-color="#4a4fb0"/>
+    </linearGradient>
+    <linearGradient id="faceL" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6cc0f0"/><stop offset="1" stop-color="#2f78c8"/></linearGradient>
+    <linearGradient id="faceR" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2d63b8"/><stop offset="1" stop-color="#3a3f9e"/></linearGradient>
+    <linearGradient id="faceT" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#c4ecfc"/><stop offset="1" stop-color="#6fbdec"/></linearGradient>
+  </defs>
+
+  <!-- Orange arms: a darker side drawn first and shifted, then the lit face. -->
+  <g fill="none" stroke-linejoin="miter" stroke-linecap="butt">
+    <g>
+      <g stroke="#c8650c" stroke-width="38" transform="translate(4 5)">
+        <polyline points="62,156 244,282 244,512 300,544"/>
+        <polyline points="62,266 207,350 207,586 300,632"/>
+        <line x1="190" y1="140" x2="254" y2="184"/>
+      </g>
+      <g stroke="url(#orange)" stroke-width="32">
+        <polyline points="62,156 244,282 244,512 300,544"/>
+        <polyline points="62,266 207,350 207,586 300,632"/>
+        <line x1="190" y1="140" x2="254" y2="184"/>
+      </g>
+    </g>
+    <g transform="translate(680 0) scale(-1 1)">
+      <g stroke="#c8650c" stroke-width="38" transform="translate(-4 5)">
+        <polyline points="62,156 244,282 244,512 300,544"/>
+        <polyline points="62,266 207,350 207,586 300,632"/>
+        <line x1="190" y1="140" x2="254" y2="184"/>
+      </g>
+      <g stroke="url(#orange)" stroke-width="32">
+        <polyline points="62,156 244,282 244,512 300,544"/>
+        <polyline points="62,266 207,350 207,586 300,632"/>
+        <line x1="190" y1="140" x2="254" y2="184"/>
+      </g>
+    </g>
+  </g>
+
+  <!-- Blue foot cube first, then the pillar standing on its top face, then the hexagonal top. -->
+  <g stroke-linejoin="round">
+    <polygon points="262,522 340,486 418,522 418,622 340,688 262,622" fill="#2b66b3" stroke="#173a6b" stroke-width="10"/>
+    <polygon points="268,523 340,491 412,523 340,557" fill="#a6dcf7"/>
+    <polygon points="268,525 340,559 340,680 268,618" fill="#4a9ae0"/>
+    <polygon points="412,525 340,559 340,680 412,618" fill="#3550b0"/>
+  </g>
+  <polygon points="290,168 390,168 390,506 340,528 290,506" fill="#2f6fbf" stroke="#173a6b" stroke-width="10" stroke-linejoin="round"/>
+  <polygon points="295,173 340,173 340,522 295,502" fill="url(#shaftL)"/>
+  <polygon points="340,173 385,173 385,502 340,522" fill="url(#shaftR)"/>
+  <polyline points="292,510 340,532 388,510" fill="none" stroke="#173a6b" stroke-width="5" opacity=".45"/>
+  <polygon points="300,175 310,175 310,504.5 300,500" fill="#9bd6f7" opacity=".55"/>
+
+  <g stroke-linejoin="round" transform="translate(0 16)">
+    <polygon points="340,22 413,62 413,148 340,188 267,148 267,62" fill="#2b66b3" stroke="#173a6b" stroke-width="10"/>
+    <polygon points="340,30 406,66 340,104 274,66" fill="#7cc8f2"/>
+    <polygon points="274,66 340,104 340,180 274,144" fill="#3d8ad6"/>
+    <polygon points="406,66 340,104 340,180 406,144" fill="#2a5fae"/>
+    <line x1="340" y1="104" x2="340" y2="180" stroke="#bfe6fb" stroke-width="3" opacity=".8"/>
+  </g>
+</svg>

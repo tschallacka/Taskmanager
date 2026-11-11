@@ -56,7 +56,9 @@ async function pollLive() {
   if (mode.value !== 'live' || unseen.value) return
   if (!document.hidden) {
     try {
-      show(await $fetch<OfficeSnapshot>(`/api/projects/${boardId.value}/office`))
+      // A real board with more than one crew names the one it shows in ?crew=.
+      const crew = typeof route.query.crew === 'string' ? route.query.crew : ''
+      show(await $fetch<OfficeSnapshot>(`/api/projects/${boardId.value}/office`, { query: crew ? { crew } : undefined }))
       error.value = ''
       unseenStrikes.value = 0
     } catch (e) {

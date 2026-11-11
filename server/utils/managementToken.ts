@@ -19,6 +19,8 @@ import { genId } from './projects'
 
 export const MANAGEMENT_TOKEN_MS = 10 * 60_000
 export const MANAGEMENT_SCOPE = 'crews:manage'
+export const CREATE_NEEDS_TOKEN = 'Making a crew, or binding one to a board, needs a management token from the board\'s sidebar.'
+export const DELETE_NEEDS_TOKEN = 'Deleting a crew needs a management token from its board.'
 
 /**
  * Makes the management token for one board. The board must be one the person may bind a crew to (an owner or
@@ -94,6 +96,13 @@ export function requireOwnBoardFor(caller: CrewCaller, projectId: unknown): void
  * exists under that slug must be bound to that board. Other crews answer 404, as an unknown slug does.
  */
 export async function requireCreateOnOwnBoard(caller: CrewCaller, slug: string, projectId: unknown): Promise<void> {
+  if (caller.crewOwner) {
+    // A crew owner's own key rotates a crew of theirs. Making a crew, or binding one to a board, stays with a management token.
+    const [own] = await db.select().from(crews).where(eq(crews.slug, slug))
+    if (!own || projectId !== undefined) throw createError({ statusCode: 403, message: CREATE_NEEDS_TOKEN })
+    await requireCrewOnOwnBoard(caller, own)
+    return
+  }
   if (!caller.boardId) return
   requireOwnBoardFor(caller, projectId)
   const [existing] = await db.select().from(crews).where(eq(crews.slug, slug))
@@ -104,6 +113,11 @@ export async function requireCreateOnOwnBoard(caller: CrewCaller, slug: string, 
  * A management token reaches a crew only when the crew is bound to its board. Other crews read as not found.
  */
 export async function requireCrewOnOwnBoard(caller: CrewCaller, crew: Crew): Promise<void> {
+  if (caller.crewOwner) {
+    // A crew owner's own key reaches the crews its owner created, and no other person's.
+    if (crew.createdBy !== caller.userId) throw createError({ statusCode: 404, message: 'No crew of yours with that slug.' })
+    return
+  }
   if (!caller.boardId) return
   const [link] = await db.select({ id: crewBoards.id }).from(crewBoards)
     .where(and(eq(crewBoards.crewId, crew.id), eq(crewBoards.projectId, caller.boardId)))
@@ -115,6 +129,11 @@ export async function requireCrewOnOwnBoard(caller: CrewCaller, crew: Crew): Pro
  * the board it works on is the crew's only board, so it never detaches a crew from a board it does not own.
  */
 export async function requireCrewOnlyOnOwnBoard(caller: CrewCaller, crew: Crew): Promise<void> {
+  if (caller.crewOwner) {
+    await requireCrewOnOwnBoard(caller, crew)
+    // Taking a crew off its boards is for a management token of its board, not for the owner's remote key.
+    throw createError({ statusCode: 403, message: DELETE_NEEDS_TOKEN })
+  }
   if (!caller.boardId) return
   await requireCrewOnOwnBoard(caller, crew)
   const links = await db.select({ projectId: crewBoards.projectId }).from(crewBoards).where(eq(crewBoards.crewId, crew.id))

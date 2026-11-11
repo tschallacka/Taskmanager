@@ -23,11 +23,25 @@ export interface Project {
   archivedAt?: number | null
   // The dashboard widgets this project shows, in order; null is the default set.
   dashboardWidgets?: string[] | null
+  // The workspace the board lives in: a real board the list shows beside a crew's shadow opens after a switch to it.
+  teamId?: string | null
   customerId?: string | null
   customerName?: string | null
   audience?: Audience
   // Set by the server on a crew's shadow board opened by the staff of the real board.
   readOnly?: boolean
+  // On a crew's shadow board: whether this person may delete it (the server's rule, crew-board.delete.ts).
+  crewDeletable?: boolean
+  // The crew tree (server/utils/boardTree.ts): what the board is, and which boards it nests with. Only the list
+  // answers with these; a board opened on its own has none, and the board header reads them from the list.
+  role?: 'board' | 'real' | 'shadow' | 'crew_home'
+  // On a shadow board: the real board it works for. `openable`: this person belongs to that board's workspace, so the
+  // breadcrumb links to it (after a workspace switch).
+  realBoard?: { id: string, name: string, teamId: string | null, openable: boolean } | null
+  // On a real board: its crews' shadow boards that the list shows, each with its crew.
+  shadows?: { id: string, name: string, crewId: string, crewName: string, crewSlug: string }[]
+  // On a shadow board: its crew. On a crew's home board: the crew it is the home of.
+  crew?: { id: string, name: string, slug: string } | null
   // Colours pinned to this board's task labels, keyed by the label. A label
   // with no entry falls back to the colour derived from its own text.
   labelColors?: Record<string, string>
@@ -157,6 +171,8 @@ interface BoardPayload {
   githubBadges?: Record<string, GithubBadge[]>
   // Whether a crew works on this board, so the Office view is offered. Never sent to a customer.
   crewBoard?: boolean
+  // The crews on this board when it is a real board (its Office view picks one). Staff only; never for a customer.
+  linkedCrews?: { id: string, name: string }[]
   // The project's custom fields and each task's values. Staff only; a
   // contact's board carries empty ones.
   fields?: ProjectField[]
@@ -188,6 +204,8 @@ const _board = ref<{ columns: ProjectColumn[], tasks: ProjectTask[] } | null>(nu
 const _commentCounts = ref<Record<string, number>>({})
 // Whether the board is a crew's, so its Office view is offered. Set with the board it came with.
 const _crewBoard = ref(false)
+// The crews linked to the open board when it is a real board. Set with the board it came with.
+const _linkedCrews = ref<{ id: string, name: string }[]>([])
 // The open board's GitHub badges, from the board endpoint. Read by each card.
 const _githubBadges = ref<Record<string, GithubBadge[]>>({})
 // The open board's subtasks. Kept beside the cards rather than among them, so
@@ -279,6 +297,7 @@ const _boardCache = new Map<string, {
   commentCounts: Record<string, number>
   githubBadges: Record<string, GithubBadge[]>
   crewBoard: boolean
+  linkedCrews: { id: string, name: string }[]
 }>()
 
 function cacheBoard(projectId: string) {
@@ -291,7 +310,8 @@ function cacheBoard(projectId: string) {
     people: _people.value,
     commentCounts: _commentCounts.value,
     githubBadges: _githubBadges.value,
-    crewBoard: _crewBoard.value
+    crewBoard: _crewBoard.value,
+    linkedCrews: _linkedCrews.value
   })
   while (_boardCache.size > BOARD_CACHE_SIZE) _boardCache.delete(_boardCache.keys().next().value!)
 }
@@ -591,8 +611,9 @@ export function useProjects() {
     return updated
   }
 
-  async function deleteProject(id: string) {
-    await $fetch(`/api/projects/${id}`, { method: 'DELETE', headers: realtimeHeaders() })
+  // A crew's shadow board goes through the crew route, which applies the crew rule (crew-board.delete.ts).
+  async function deleteProject(id: string, crewBoard = false) {
+    await $fetch(crewBoard ? `/api/projects/${id}/crew-board` : `/api/projects/${id}`, { method: 'DELETE', headers: realtimeHeaders() })
     _projects.value = _projects.value.filter(p => p.id !== id)
     _allTasks.value = _allTasks.value.filter(t => t.projectId !== id)
     reindexSearch()
@@ -652,6 +673,7 @@ export function useProjects() {
         _commentCounts.value = cached?.commentCounts ?? {}
         _githubBadges.value = cached?.githubBadges ?? {}
         _crewBoard.value = cached?.crewBoard ?? false
+        _linkedCrews.value = cached?.linkedCrews ?? []
         _trashedCount.value = 0
       }
       _activeProjectId.value = id
@@ -669,6 +691,7 @@ export function useProjects() {
         _commentCounts.value = board.commentCounts ?? {}
         _githubBadges.value = board.githubBadges ?? {}
         _crewBoard.value = board.crewBoard ?? false
+        _linkedCrews.value = board.linkedCrews ?? []
         _trashedCount.value = board.trashedCount ?? 0
         ingestBoardFields(id, board.fields ?? [], board.fieldValues ?? {})
       }
@@ -831,6 +854,7 @@ export function useProjects() {
         _commentCounts.value = board.commentCounts ?? {}
         _githubBadges.value = board.githubBadges ?? {}
         _crewBoard.value = board.crewBoard ?? false
+        _linkedCrews.value = board.linkedCrews ?? []
         _trashedCount.value = board.trashedCount ?? 0
         ingestBoardFields(projectId, board.fields ?? [], board.fieldValues ?? {})
       }
@@ -1113,6 +1137,7 @@ export function useProjects() {
     labelColors,
     labelColor,
     setLabelColor,
+    linkedCrews: _linkedCrews,
     showTrashed: _showTrashed,
     trashedCount: _trashedCount,
     crewBoard: _crewBoard,

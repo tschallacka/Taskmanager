@@ -1,7 +1,7 @@
 <template>
   <span class="inline-flex items-center gap-2 select-none">
     <img
-      src="/logo.png"
+      src="/logo.svg"
       alt=""
       class="h-[1em] w-auto"
     >
