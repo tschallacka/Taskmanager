@@ -36,15 +36,21 @@ const { requireInstanceAdmin } = await import('../server/utils/instanceAdmin')
 const tag = randomBytes(4).toString('hex')
 const admin = `isx-${tag}-admin`
 const plain = `isx-${tag}-plain`
-const KEY = `sk-or-v1-${tag}-keyend9876`
 const PLAIN_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="10" height="10" fill="#f39418"/></svg>'
 const userIds = [admin, plain]
 const now = new Date()
 
 const savedEnv = process.env.SPROCKET_CLAUDE_FOR_ALL
 
+// The instance row is shared with other test files running at the same time (rate limits and the Sprocket key live on
+// it too). This resets only the branding and Claude Code fields this file sets, in place, and never deletes the row.
 async function resetRow() {
-  await db.delete(instanceSettings).where(eq(instanceSettings.id, SPROCKET_INSTANCE_ROW_ID))
+  await db.update(instanceSettings).set({
+    brandName: null,
+    brandLogoSvg: null,
+    sprocketClaudeForAll: false,
+    sprocketDefaultManner: 'professional'
+  }).where(eq(instanceSettings.id, SPROCKET_INSTANCE_ROW_ID))
 }
 
 function refusedWith(fn: () => unknown, status = 400) {
@@ -144,10 +150,8 @@ test('a refused logo or name stores nothing', async () => {
 test('the public branding carries only the name and the logo', async () => {
   await resetRow()
   await saveBrand({ name: 'Acme Tasks', logoSvg: PLAIN_SVG }, admin)
-  await saveSprocketInstance({ apiKey: KEY, forEveryone: true }, admin)
   const pub = await brandPublic()
   assert.deepEqual(Object.keys(pub).sort(), ['logoSrc', 'name'])
-  assert.ok(!JSON.stringify(pub).includes(KEY))
 })
 
 test('only the instance admin passes the admin rule for these pages and their API', async () => {
@@ -156,19 +160,6 @@ test('only the instance admin passes the admin rule for these pages and their AP
     () => requireInstanceAdmin({ context: { session: { user: { id: plain } } } } as never),
     (e: { statusCode?: number }) => e.statusCode === 403
   )
-})
-
-test('the key never comes back in full: the view shows its last four characters only', async () => {
-  await resetRow()
-  await saveSprocketInstance({ apiKey: KEY, model: 'openai/gpt-4o-mini' }, admin)
-  const view = await sprocketInstanceView()
-  assert.equal(view.keySet, true)
-  assert.equal(view.keyMasked?.endsWith('9876'), true)
-  assert.equal(view.keyMasked?.includes(KEY.slice(0, 12)), false)
-  assert.equal(JSON.stringify(view).includes(KEY), false)
-  assert.equal(JSON.stringify(view).includes(`${tag}-keyend`), false)
-  await saveSprocketInstance({ apiKey: null }, admin)
-  assert.equal((await sprocketInstanceView()).keySet, false)
 })
 
 test('Claude Code for everyone: the environment variable decides when it is set, the switch when it is not', async () => {
