@@ -12,11 +12,28 @@ the board.
 
 ## Where to find it
 
-1. Open a board that a crew works on. Only those have the **Office** tab, next to **Board** and **List**.
-2. Press **Office**. The room opens at the board's own address with `/office/` in front of the board's id.
+1. Open a board that a crew works on. Such a board has the **Office** tab, next to **Board** and **List**. That is a crew
+   board (the crew's own shadow board), and also the main board a crew is linked to, so the people who work on the main
+   board can watch its crew from there.
+2. Press **Office**. The room opens at the board's own address with `/office/` in front of the board's id. On a main
+   board with more than one crew, the tab opens a menu first: pick the crew to watch, and the room opens with `?crew=`
+   and that crew's id. A main board with one crew opens that crew straight away.
 3. To go back, press the arrow at the top left, or press the board's name.
 
-A board with no crew has no Office tab. Opening its office address by hand shows *No crew works on this board*.
+The office shows the crew of the board it is opened from. A board with no crew has no Office tab. Opening its office
+address by hand shows *No crew works on this board*. A crew that is switched off does not count.
+
+## The desk lights
+
+Each desk has a small light beside the name. It shows what the crew monitor says the person is doing:
+
+- a **red filled dot** is busy;
+- a **green ring** is idle;
+- a **grey dashed ring** is no status yet. The office never guesses busy or idle.
+
+The shape says the state as well as the colour. Hover the light (or tap it on a phone) to read the status text: "Busy: …",
+"Idle since 21:40", or "No status yet". The light changes while you watch, without a reload. The status comes from the crew monitor, which reads the board (see
+[The crew monitor](/help/agents/crew-monitor)).
 
 ## Who can see it
 

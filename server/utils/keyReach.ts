@@ -242,7 +242,7 @@ export async function reachedBoardsOf(userId: string, keys: ApiKey[]): Promise<M
   })
   const crewLinks = account?.crewId ? await crewLinksOf(account.crewId) : []
   const shadowTeams = keys.map(key => shadowTeamOf(grantOf(key))).filter((teamId): teamId is string => teamId !== null)
-  const shadowsByTeam = await shadowBoardsOfTeams(shadowTeams)
+  const shadowsByTeam = await shadowBoardsOfTeams(shadowTeams, userId)
   const crewGranted = new Map<string, string[]>(keys.map((key) => {
     const shadowTeam = shadowTeamOf(grantOf(key))
     return [key.id, grantedBoardIdsOf(grantOf(key), crewLinks, shadowTeam ? shadowsByTeam.get(shadowTeam) ?? [] : [])]

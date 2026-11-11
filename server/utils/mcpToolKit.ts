@@ -27,6 +27,12 @@ export interface McpToolDefinition {
    * at all.
    */
   destructive?: boolean
+  /**
+   * Reads or shows something Sprocket must never see: project secrets and their values, keys and tokens, passwords
+   * and sessions, another person's private data. Sprocket's run gets no such tool in its list, and a call to one by
+   * name is refused (see sprocketRefusal in mcpRegistry.ts). Set it on every new tool that does this.
+   */
+  sensitive?: boolean
   inputSchema: {
     type: 'object'
     properties: Record<string, unknown>

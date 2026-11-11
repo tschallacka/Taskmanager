@@ -10,6 +10,15 @@ export type Stage
 
 export type Role = 'pm' | 'worker' | 'ux' | 'cq' | 'qa' | 'boss'
 
+/** What the crew monitor says a person is doing: busy with a task, idle, or not known yet (never a guess). */
+export type DeskState = 'busy' | 'idle' | 'unknown'
+
+export interface PersonStatus {
+  state: DeskState
+  /** The monitor's words for it, such as "Idle since 21:40". Empty when there are none. */
+  note: string
+}
+
 export interface OfficePerson {
   /** The account id; tasks name their assignee by it. Empty for a stand-in. */
   userId: string
@@ -17,6 +26,22 @@ export interface OfficePerson {
   key: string
   name: string
   role: Role
+  /** The desk light's source. Absent or unknown shows the grey light. */
+  status?: PersonStatus
+}
+
+export type DeskShape = 'dot' | 'ring' | 'dashed'
+
+/**
+ * The desk light for a status: busy red and filled, idle green and a ring, unknown grey and dashed. The shape
+ * says it too, so the light does not rely on colour alone. The text is what hover and tap show.
+ */
+export function deskLightOf(status: PersonStatus | undefined): { state: DeskState, color: string, shape: DeskShape, text: string } {
+  const state: DeskState = status?.state ?? 'unknown'
+  const note = status?.note.trim() ?? ''
+  if (state === 'busy') return { state, color: '#d62828', shape: 'dot', text: note || 'Busy' }
+  if (state === 'idle') return { state, color: '#2a9d43', shape: 'ring', text: note || 'Idle' }
+  return { state: 'unknown', color: '#8e8e93', shape: 'dashed', text: 'No status yet' }
 }
 
 export interface OfficeTask {

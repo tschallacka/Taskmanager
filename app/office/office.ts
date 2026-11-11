@@ -275,6 +275,11 @@ export class OfficeScene {
 
   // ── Board in ───────────────────────────────────────────────────────────────
 
+  /** Each desk's light follows the status in the snapshot, live: no rebuild of the floor. */
+  private syncStatuses() {
+    for (const person of this.cast) this.actors.get(person.key)?.setStatus(person.status)
+  }
+
   setSnapshot(next: OfficeSnapshot) {
     const cast = castWithStandIns(next.cast)
     const castKey = cast.map(p => `${p.key}:${p.role}`).join(',')
@@ -289,6 +294,7 @@ export class OfficeScene {
       return
     }
     this.cast = cast
+    this.syncStatuses()
     for (const errand of errandsBetween(prev, next)) this.run(errand)
     for (const ping of pingsBetween(prev, next)) {
       const folder = this.folders.get(ping.taskId)
@@ -1645,7 +1651,7 @@ export class OfficeScene {
       this.hooks.onHover({
         kind: 'person',
         title: actor.person.name,
-        detail: `${ROLE_NAMES[actor.person.role]} · ${doing} · ${mine} folder${mine === 1 ? '' : 's'}`,
+        detail: `${ROLE_NAMES[actor.person.role]} · ${doing} · ${mine} folder${mine === 1 ? '' : 's'} · ${actor.statusText}`,
         x: this.pointer.x,
         y: this.pointer.y
       })

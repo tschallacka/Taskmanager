@@ -21,7 +21,7 @@ export async function regenerateKey(userId: string, keyId: string): Promise<{ to
       .from(apiKeys)
       .where(and(eq(apiKeys.id, keyId), eq(apiKeys.userId, userId)))
     if (!key) throw createError({ statusCode: 404, message: 'API key not found' })
-    return rotateSecret(tx, key)
+    return rotateSecret(tx, key, Date.now(), userId)
   })
 }
 
@@ -29,9 +29,9 @@ export async function regenerateKey(userId: string, keyId: string): Promise<{ to
  * Puts a new secret on a token inside the caller's transaction. The old digest is kept as replaced, so its
  * owner gets token_regenerated. Used by regenerating and by pairing a code.
  */
-export async function rotateSecret(tx: Tx, key: { id: string, keyHash: string }, now = Date.now()): Promise<{ token: string, keyPrefix: string }> {
+export async function rotateSecret(tx: Tx, key: { id: string, keyHash: string }, now = Date.now(), actorId: string | null = null): Promise<{ token: string, keyPrefix: string }> {
   const generated = generateApiKey()
-  await tx.insert(apiKeySecrets).values({ id: genId(), tokenId: key.id, keyHash: key.keyHash, state: 'replaced', changedAt: now })
+  await tx.insert(apiKeySecrets).values({ id: genId(), tokenId: key.id, keyHash: key.keyHash, state: 'replaced', changedAt: now, actorId })
   await tx.update(apiKeys)
     .set({ keyHash: generated.hash, keyPrefix: generated.displayPrefix })
     .where(eq(apiKeys.id, key.id))
@@ -49,7 +49,7 @@ export async function revokeKey(userId: string, keyId: string): Promise<boolean>
       .returning({ id: apiKeys.id, keyHash: apiKeys.keyHash, kind: apiKeys.kind })
     if (!deleted) return false
     const state = deleted.kind === 'management' ? 'revoked_management' : 'revoked'
-    await tx.insert(apiKeySecrets).values({ id: genId(), tokenId: deleted.id, keyHash: deleted.keyHash, state, changedAt: Date.now() })
+    await tx.insert(apiKeySecrets).values({ id: genId(), tokenId: deleted.id, keyHash: deleted.keyHash, state, changedAt: Date.now(), actorId: userId })
     return true
   })
 }
