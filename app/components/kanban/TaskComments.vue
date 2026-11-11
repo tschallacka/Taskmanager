@@ -694,8 +694,9 @@ defineExpose({ handleEscape })
         />
       </div>
 
+      <!-- The composer stays at the bottom of the activity while the list scrolls above it. -->
       <div
-        class="flex cursor-text items-start gap-2"
+        class="sticky bottom-0 z-10 -mx-5 flex cursor-text items-start gap-2 border-t border-default bg-default px-5 pb-3 pt-2"
         @click="composer?.focus()"
       >
         <UAvatar
@@ -709,17 +710,32 @@ defineExpose({ handleEscape })
           :placeholder="readonly || commentVisibility === 'customer' ? 'Write to the team and the customer…' : 'Add an internal comment…'"
           @submit="send"
         />
-        <UButton
+        <!-- Who can see the new comment: two labelled choices, always visible. Contacts never get the switch. -->
+        <div
           v-if="!readonly"
-          :icon="commentVisibility === 'internal' ? 'i-lucide-lock' : 'i-lucide-eye'"
-          size="xs"
-          :color="commentVisibility === 'internal' ? 'warning' : 'neutral'"
-          variant="ghost"
-          class="shrink-0"
-          :aria-label="commentVisibility === 'internal' ? 'Team only. Click to share with the customer.' : 'Shared with the customer. Click to make it team only.'"
-          :title="commentVisibility === 'internal' ? 'Team only. Click to share with the customer.' : 'Shared with the customer. Click to make it team only.'"
-          @click.stop="commentVisibility = commentVisibility === 'internal' ? 'customer' : 'internal'"
-        />
+          role="group"
+          aria-label="Who can see this comment"
+          class="flex shrink-0 overflow-hidden rounded-md border border-default text-xs"
+        >
+          <button
+            type="button"
+            :aria-pressed="commentVisibility === 'internal' ? 'true' : 'false'"
+            class="px-2 py-1 transition-colors"
+            :class="commentVisibility === 'internal' ? 'bg-warning/15 text-default' : 'text-muted hover:text-default'"
+            @click.stop="commentVisibility = 'internal'"
+          >
+            Internal
+          </button>
+          <button
+            type="button"
+            :aria-pressed="commentVisibility === 'customer' ? 'true' : 'false'"
+            class="border-l border-default px-2 py-1 transition-colors"
+            :class="commentVisibility === 'customer' ? 'bg-primary/15 text-default' : 'text-muted hover:text-default'"
+            @click.stop="commentVisibility = 'customer'"
+          >
+            Customer can see
+          </button>
+        </div>
         <UButton
           icon="i-lucide-arrow-up"
           size="xs"
