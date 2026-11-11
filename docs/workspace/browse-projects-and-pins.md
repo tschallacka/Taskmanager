@@ -13,7 +13,7 @@ Two things help you get to a board quickly: **Browse projects**, which lists eve
 Open **Browse projects** in the sidebar. It lists the projects of the workspace you are in, newest change first.
 
 1. Type in **Find a project** to narrow the list. It matches on the project's name.
-2. Read the row: the project's name, a coloured dot when the project has a health status (green on track, amber at
+2. Read the row: the project's name, a coloured dot when the project has a health status (green on track, orange at
    risk, red off track), **Open** (tasks not marked done), **Total** (all its tasks), and **Updated** (how long ago
    it last changed, shown on wider screens).
 3. Click a row to open the board.
