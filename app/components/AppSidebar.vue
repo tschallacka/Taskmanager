@@ -10,13 +10,38 @@ const userInitials = computed(() => {
   return name.split(' ').map((part: string) => part[0]).join('').slice(0, 2).toUpperCase()
 })
 
-const isDark = computed(() => colorMode.value === 'dark')
+// The three-way Appearance row: System, Dark, Light. The current choice shows a tick.
+const APPEARANCE = [
+  { value: 'system', label: 'System' },
+  { value: 'dark', label: 'Dark' },
+  { value: 'light', label: 'Light' }
+] as const
+const appearanceNow = computed(() => APPEARANCE.find(a => a.value === colorMode.preference)?.label ?? 'System')
+const appearanceItems = computed(() => APPEARANCE.map(a => ({
+  label: a.label,
+  icon: colorMode.preference === a.value ? 'i-lucide-check' : 'i-lucide-minus',
+  onSelect: () => {
+    colorMode.preference = a.value
+  }
+})))
 
-function toggleColorMode() {
-  colorMode.preference = isDark.value ? 'light' : 'dark'
-}
+// The Planning and Team groups of the sidebar: each link keeps its own route.
+const planningLinks = [
+  { label: 'Goals', icon: 'i-lucide-target', to: '/projects/goals' },
+  { label: 'Portfolios', icon: 'i-lucide-briefcase', to: '/projects/portfolios' },
+  { label: 'Timesheet', icon: 'i-lucide-clock', to: '/projects/timesheet' }
+]
+const teamLinks = [
+  { label: 'Members and customers', icon: 'i-lucide-users', to: '/team' },
+  { label: 'Crews and agents', icon: 'i-lucide-bot', to: '/admin/crews' }
+]
 
 const accountItems = computed(() => [[
+  {
+    label: 'Profile',
+    icon: 'i-lucide-user-round',
+    onSelect: () => navigateTo('/projects/profile')
+  },
   {
     label: 'Settings',
     icon: 'i-lucide-settings',
@@ -26,12 +51,14 @@ const accountItems = computed(() => [[
     label: 'Help',
     icon: 'i-lucide-life-buoy',
     onSelect: () => navigateTo('/help')
-  },
-  {
-    label: isDark.value ? 'Light mode' : 'Dark mode',
-    icon: isDark.value ? 'i-lucide-sun' : 'i-lucide-moon',
-    onSelect: toggleColorMode
   }
+], [
+  {
+    label: `Appearance: ${appearanceNow.value}`,
+    icon: 'i-lucide-sun-moon',
+    type: 'label' as const
+  },
+  ...appearanceItems.value
 ], [
   {
     label: 'Sign out',
@@ -140,6 +167,46 @@ watch(() => route.path, () => emit('close'))
 
       <div class="min-h-0 flex-1 overflow-y-auto p-2">
         <ProjectsListPanel />
+
+        <section
+          class="mt-3 space-y-0.5"
+          aria-label="Planning"
+        >
+          <h2 class="px-2 pb-1 text-xs font-medium uppercase tracking-wide text-muted">
+            Planning
+          </h2>
+          <UButton
+            v-for="link in planningLinks"
+            :key="link.to"
+            :to="link.to"
+            :icon="link.icon"
+            :label="link.label"
+            variant="ghost"
+            color="neutral"
+            block
+            class="justify-start"
+          />
+        </section>
+
+        <section
+          class="mt-3 space-y-0.5"
+          aria-label="Team"
+        >
+          <h2 class="px-2 pb-1 text-xs font-medium uppercase tracking-wide text-muted">
+            Team
+          </h2>
+          <UButton
+            v-for="link in teamLinks"
+            :key="link.to"
+            :to="link.to"
+            :icon="link.icon"
+            :label="link.label"
+            variant="ghost"
+            color="neutral"
+            block
+            class="justify-start"
+          />
+        </section>
       </div>
 
       <div class="shrink-0 space-y-1.5 border-t border-default p-2">
