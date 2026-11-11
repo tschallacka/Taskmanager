@@ -16,7 +16,8 @@ const { db } = await import('../server/db')
 const schema = await import('../server/db/schema')
 const { allowCrews } = await import('./helpers/crewLevels')
 const { crews, member, organization, projectColumns, projectTasks, projects, user } = schema
-const { attachCrew } = await import('../server/utils/crewBoards')
+const { attachCrew, crewShadowToDelete } = await import('../server/utils/crewBoards')
+const { hiddenCrewShadows } = await import('../server/utils/boardTree')
 const { readGrantedBoardIds } = await import('../server/utils/crewBoardAccess')
 const { requireProject, requireTask } = await import('../server/utils/projects')
 const { MCP_TOOLS } = await import('../server/utils/mcpRegistry')
@@ -39,6 +40,8 @@ const crewTeamAdmin = id('crew-team-admin')
 // A plain member of the crew's team who is no crew account.
 const crewTeamMember = id('crew-team-member')
 const stranger = id('stranger')
+// The instance admin: a plain member of the crew's team here, who still sees and deletes every crew board.
+const instanceAdmin = id('instance-admin')
 
 const realTeam = id('real-team')
 const crewTeam = id('crew-team')
@@ -56,6 +59,7 @@ const memberOf: Record<string, string[]> = {
   [crewMember]: [crewTeam],
   [crewTeamAdmin]: [crewTeam],
   [crewTeamMember]: [crewTeam],
+  [instanceAdmin]: [crewTeam],
   [stranger]: []
 }
 // A key of `userId`, for the whole of `teamId`, as the server builds it from the key's owner.
@@ -83,8 +87,8 @@ let shadowBoard = ''
 
 before(async () => {
   const at = new Date()
-  const people = [boss, realAdmin, realMember, crewMember, crewTeamAdmin, crewTeamMember, stranger]
-  await db.insert(user).values(people.map(u => ({ id: u, name: u, email: `${u}@arnotes.test`, emailVerified: true, createdAt: at, updatedAt: at })))
+  const people = [boss, realAdmin, realMember, crewMember, crewTeamAdmin, crewTeamMember, stranger, instanceAdmin]
+  await db.insert(user).values(people.map(u => ({ id: u, name: u, email: `${u}@arnotes.test`, emailVerified: true, createdAt: at, updatedAt: at, isInstanceAdmin: u === instanceAdmin })))
   await db.insert(organization).values([realTeam, crewTeam].map(t => ({ id: t, name: t, slug: t, createdAt: at })))
   await db.insert(member).values([
     { id: id('m1'), organizationId: realTeam, userId: boss, role: 'owner', createdAt: at },
@@ -93,7 +97,8 @@ before(async () => {
     { id: id('m4'), organizationId: realTeam, userId: realMember, role: 'member', createdAt: at },
     { id: id('m5'), organizationId: crewTeam, userId: crewMember, role: 'member', createdAt: at },
     { id: id('m6'), organizationId: crewTeam, userId: crewTeamAdmin, role: 'admin', createdAt: at },
-    { id: id('m7'), organizationId: crewTeam, userId: crewTeamMember, role: 'member', createdAt: at }
+    { id: id('m7'), organizationId: crewTeam, userId: crewTeamMember, role: 'member', createdAt: at },
+    { id: id('m8'), organizationId: crewTeam, userId: instanceAdmin, role: 'member', createdAt: at }
   ])
   await db.insert(crews).values({ id: crewId, slug: `tcv-${tag}`, name: 'Visibility crew', teamId: crewTeam, createdBy: boss, createdAt: now })
   await db.update(user).set({ crewId }).where(eq(user.id, crewMember))
@@ -112,7 +117,7 @@ after(async () => {
   const shadows = await db.select({ id: projects.id }).from(projects).where(eq(projects.teamId, crewTeam))
   await db.delete(projects).where(inArray(projects.id, [...shadows.map(s => s.id), realBoard]))
   await db.delete(organization).where(inArray(organization.id, [realTeam, crewTeam]))
-  await db.delete(user).where(inArray(user.id, [boss, realAdmin, realMember, crewMember, crewTeamAdmin, crewTeamMember, stranger]))
+  await db.delete(user).where(inArray(user.id, [boss, realAdmin, realMember, crewMember, crewTeamAdmin, crewTeamMember, stranger, instanceAdmin]))
   await db.delete(crews).where(eq(crews.id, crewId))
   await db.$client.end()
 })
@@ -140,6 +145,17 @@ test('the owner, the real board\'s admin and the crew\'s owner and admin open th
 test('a plain member of the crew\'s team who is no crew account gets 404 on the shadow board', async () => {
   await assert.rejects(requireProject(eventOf(crewTeamMember, crewTeam), shadowBoard), notFound)
   await assert.rejects(requireTask(eventOf(crewTeamMember, crewTeam), shadowTaskId), notFound)
+})
+
+test('the instance admin sees and deletes a hidden crew board, though no owner or admin of its teams', async () => {
+  // Not the crew's owner, and only a plain member of the crew's team: the rule would hide the board from them.
+  assert.equal((await requireProject(eventOf(instanceAdmin, crewTeam), shadowBoard)).id, shadowBoard)
+  assert.equal((await requireTask(eventOf(instanceAdmin, crewTeam), shadowTaskId)).task.id, shadowTaskId)
+  assert.ok(!(await hiddenCrewShadows(instanceAdmin, [shadowBoard])).has(shadowBoard))
+  // The delete path keeps its own rule: the instance admin may delete it.
+  assert.equal((await crewShadowToDelete(instanceAdmin, shadowBoard)).id, shadowBoard)
+  // A plain member of the crew's team, who is no crew account, still does not see it.
+  assert.ok((await hiddenCrewShadows(crewTeamMember, [shadowBoard])).has(shadowBoard))
 })
 
 test('a stranger with no team gets 404 on the shadow board', async () => {

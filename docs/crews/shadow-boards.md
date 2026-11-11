@@ -15,6 +15,7 @@ it.
 A crew board is seen by these people, and by nobody else:
 
 - the crew's owner, the person who made the crew;
+- the instance admin, who sees and may delete every crew board;
 - an owner or admin of the team that holds the real board;
 - an owner or admin of the team the crew board lives in;
 - the crew's own accounts, the people and agents who work for the crew.
