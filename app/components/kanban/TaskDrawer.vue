@@ -405,11 +405,17 @@ const subtasks = computed(() => shownTask.value ? allSubtasks(shownTask.value.id
 
 const taskInternal = computed(() => shownTask.value?.visibility === 'internal')
 
-async function toggleTaskVisibility() {
+// The labelled choices of the visibility select (the state row, redesign card 5/9).
+const visibilityItems = [
+  { label: 'Team only', value: 'internal', icon: 'i-lucide-lock' },
+  { label: 'Shared with customer', value: 'customer', icon: 'i-lucide-eye' }
+]
+
+async function setTaskVisibility(next: Visibility) {
   const task = props.task
   if (!task || readonly.value) return
   const before = task.visibility
-  const next = before === 'internal' ? 'customer' : 'internal'
+  if (before === next) return
   // The Undo toast is the safety net, so a change does not ask first.
   try {
     await updateTask(task.id, { visibility: next })
@@ -622,17 +628,16 @@ const menuItems = computed(() => [[
             <template v-if="activeProject">{{ activeProject.name }} · </template>edited {{ relativeTime(shownTask.updatedAt) }}
           </span>
 
-          <UButton
+          <!-- Who sees the task: a labelled select. The change is applied at once, with the 6 s Undo toast. -->
+          <USelect
             v-if="!readonly"
-            :icon="taskInternal ? 'i-lucide-lock' : 'i-lucide-eye'"
+            :model-value="taskInternal ? 'internal' : 'customer'"
+            :items="visibilityItems"
+            value-key="value"
             size="xs"
-            :color="taskInternal ? 'warning' : 'neutral'"
-            variant="soft"
-            :label="taskInternal ? 'Team only' : 'Shared with customer'"
-            :title="taskInternal
-              ? 'Team only. Click to share with the customer.'
-              : 'Shared with the customer. Click to make it team only.'"
-            @click="toggleTaskVisibility"
+            aria-label="Who sees this task"
+            class="shrink-0 w-44"
+            @update:model-value="(v: Visibility) => setTaskVisibility(v)"
           />
 
           <UButton
