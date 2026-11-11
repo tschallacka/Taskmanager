@@ -62,7 +62,7 @@ function formatDate(value: string): string {
           size="xs"
           aria-label="Back to settings"
         />
-        <h1 class="font-semibold text-sm">
+        <h1 class="text-base font-semibold text-default">
           AI history
         </h1>
       </div>

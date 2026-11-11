@@ -311,7 +311,7 @@ async function saveColumns(names: string[]) {
       to="#app-topbar-title"
     >
       <div class="flex min-w-0 items-center gap-3">
-        <h1 class="font-semibold text-sm truncate">
+        <h1 class="text-base font-semibold text-default truncate">
           {{ activeTeam ? activeTeam.name : 'Team' }}
         </h1>
         <UBadge

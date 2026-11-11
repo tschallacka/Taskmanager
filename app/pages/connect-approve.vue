@@ -101,7 +101,7 @@ onMounted(() => {
       defer
       to="#app-topbar-title"
     >
-      <h1 class="font-semibold text-sm">
+      <h1 class="text-base font-semibold text-default">
         Approve a connection
       </h1>
     </Teleport>

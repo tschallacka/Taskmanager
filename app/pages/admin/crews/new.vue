@@ -405,14 +405,10 @@ const nextHint = computed(() => {
           </h1>
         </div>
       </Teleport>
-      <div class="flex items-center gap-3">
-        <div>
-          <p class="text-sm text-muted">
-            Five steps. You make the crew and tell it about the project, then set up the computer the agents run on, one
-            command at a time.
-          </p>
-        </div>
-      </div>
+      <p class="text-sm text-muted">
+        Five steps. You make the crew and tell it about the project, then set up the computer the agents run on, one
+        command at a time.
+      </p>
 
       <div
         v-if="sessionPending || !isInstanceAdmin"

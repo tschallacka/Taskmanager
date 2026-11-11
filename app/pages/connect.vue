@@ -45,7 +45,7 @@ function onIssued(connection: IssuedConnection) {
           size="xs"
           aria-label="Back to settings"
         />
-        <h1 class="font-semibold text-sm min-w-0 truncate">
+        <h1 class="text-base font-semibold text-default min-w-0 truncate">
           Connect your Claude to this board
         </h1>
       </div>

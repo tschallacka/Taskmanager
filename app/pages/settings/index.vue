@@ -8,7 +8,6 @@ useSeoMeta({ title: 'Settings' })
 
 const { session, signOut, isInstanceAdmin } = useAuth()
 const { primaryColor, neutralColor, PRIMARY_COLORS, NEUTRAL_COLORS, setPrimaryColor, setNeutralColor, openrouterApiKeyMasked, openrouterModel, POPULAR_OPENROUTER_MODELS, setOpenRouterApiKey, setOpenRouterModel } = useUserSettings()
-const { sidebarOpen } = useSidebar()
 
 // The settings section list: each entry jumps to a section on this page (or to a settings page).
 const sections = [
@@ -168,25 +167,9 @@ function swatchStyle(color: string, selected: boolean) {
       defer
       to="#app-topbar-title"
     >
-      <h1 class="font-semibold text-sm">
+      <h1 class="text-base font-semibold text-default">
         Settings
       </h1>
-    </Teleport>
-    <Teleport
-      defer
-      to="#app-topbar-actions"
-    >
-      <div class="flex items-center gap-1">
-        <UButton
-          v-if="isInstanceAdmin"
-          to="/admin/crews"
-          label="Crews"
-          icon="i-lucide-boxes"
-          size="xs"
-          color="neutral"
-          variant="ghost"
-        />
-      </div>
     </Teleport>
 
     <div class="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
@@ -578,14 +561,6 @@ function swatchStyle(color: string, selected: boolean) {
     class="fixed bottom-0 left-0 right-0 z-20 lg:hidden flex items-center justify-around px-8 border-t border-default bg-default/95 backdrop-blur-sm"
     style="padding-top: 0.5rem; padding-bottom: max(0.5rem, env(safe-area-inset-bottom))"
   >
-    <UButton
-      icon="i-lucide-panel-left"
-      color="neutral"
-      variant="ghost"
-      size="md"
-      aria-label="Open sidebar"
-      @click="sidebarOpen = true"
-    />
     <UButton
       icon="i-lucide-arrow-left"
       label="Boards"
