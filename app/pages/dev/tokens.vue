@@ -225,6 +225,12 @@ const states = [
           variant="outline"
         />
         <UButton
+          label="Delete permanently"
+          icon="i-lucide-trash-2"
+          color="error"
+          variant="soft"
+        />
+        <UButton
           label="Filter"
           icon="i-lucide-filter"
           color="neutral"
@@ -235,6 +241,28 @@ const states = [
           icon="i-lucide-settings"
           color="neutral"
           variant="outline"
+        />
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <UBadge
+          color="success"
+          variant="soft"
+          label="Done"
+        />
+        <UBadge
+          color="warning"
+          variant="soft"
+          label="At risk"
+        />
+        <UBadge
+          color="error"
+          variant="soft"
+          label="Overdue"
+        />
+        <UBadge
+          color="info"
+          variant="soft"
+          label="Shared"
         />
       </div>
       <div class="flex max-w-md flex-col gap-2">
