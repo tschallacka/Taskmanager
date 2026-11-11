@@ -98,6 +98,25 @@ class CdpError extends Error {
   }
 }
 
+// Chrome forgets a page's session when the page is detached under a command (the reply reads "Session with given id not
+// found"). The page is still there, so the same target is attached again and the command repeated.
+export function isSessionGone(error) {
+  return error?.name === 'CdpError' && /Session with given id not found/.test(error.message ?? '')
+}
+
+// Runs task(); when the session is gone, runs reattach() and repeats task(), at most maxRetries times. Any other error
+// is thrown at once, and so is the error after the last retry.
+export async function retryAfterReattach(task, reattach, maxRetries = 2) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await task()
+    } catch (error) {
+      if (!isSessionGone(error) || attempt >= maxRetries) throw error
+      await reattach()
+    }
+  }
+}
+
 const describe = e => `${e.name}: ${e.message}`
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 const log = text => console.log(`${new Date().toISOString()} ${text}`)
@@ -1000,7 +1019,22 @@ class Pool {
       })
     }
     const tab = await this.tab(person, args.tab ?? DEFAULT_TAB, browser)
-    return tab.mutex.run(() => this.tabCommand(cmd, browser, tab, args))
+    return tab.mutex.run(() => retryAfterReattach(
+      () => this.tabCommand(cmd, browser, tab, args),
+      () => this.reattach(browser, tab)
+    ))
+  }
+
+  // Attaches again to the tab's own target, enables the page domains on the new session, and forgets the old one.
+  async reattach(browser, tab) {
+    const old = tab.session
+    const { sessionId } = await browser.call('Target.attachToTarget', { targetId: tab.target, flatten: true })
+    this.sessions.delete(old)
+    tab.session = sessionId
+    this.sessions.set(sessionId, tab)
+    for (const method of ['Page.enable', 'Runtime.enable', 'Log.enable']) {
+      await browser.call(method, {}, sessionId)
+    }
   }
 
   async tabCommand(cmd, browser, tab, args) {

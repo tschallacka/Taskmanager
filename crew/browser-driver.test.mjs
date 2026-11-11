@@ -17,7 +17,7 @@ import { after, describe, test } from 'node:test'
 import { once } from 'node:events'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import {
-  acquireLock, acquireLockWaiting, BrowserError, chromeArgs, encodeFrame, findChromium, formatDuration, idleNote, lockDecision, Mutex,
+  acquireLock, acquireLockWaiting, BrowserError, chromeArgs, encodeFrame, retryAfterReattach, findChromium, formatDuration, idleNote, lockDecision, Mutex,
   checkDirectory, checkSendMethod, checkShotPath, keepLock, openDirectory, parseCli, parseRequest, pidAlive, request, releaseLock, sameFolder, serve, shotRoots,
   socketPathFits, splitFrames, validWho, withTimeout
 } from './browser-driver.mjs'
@@ -228,6 +228,49 @@ describe('the lock', () => {
     } finally {
       await new Promise(resolve => listener.close(resolve))
     }
+  })
+
+  test('a command whose CDP session is gone re-attaches and repeats, at most twice; other errors are not retried', async () => {
+    // The fake reply is the one Chrome sends when the page was detached under the command.
+    const gone = () => Object.assign(new Error('Session with given id not found.'), { name: 'CdpError' })
+    let calls = 0
+    let reattached = 0
+    const recovered = await retryAfterReattach(async () => {
+      calls++
+      if (calls <= 2) throw gone()
+      return 'ok'
+    }, async () => { reattached++ })
+    assert.equal(recovered, 'ok')
+    assert.equal(calls, 3, 'the command ran, lost its session twice, and ran again')
+    assert.equal(reattached, 2)
+
+    calls = 0
+    reattached = 0
+    await assert.rejects(
+      retryAfterReattach(async () => {
+        calls++
+        throw gone()
+      }, async () => {
+        reattached++
+      }),
+      /Session with given id not found/
+    )
+    assert.equal(calls, 3, 'one run and two repeats, then it gives up')
+    assert.equal(reattached, 2)
+
+    calls = 0
+    reattached = 0
+    await assert.rejects(
+      retryAfterReattach(async () => {
+        calls++
+        throw new Error('something else went wrong')
+      }, async () => {
+        reattached++
+      }),
+      /something else went wrong/
+    )
+    assert.equal(calls, 1, 'an error that is not a lost session is not repeated')
+    assert.equal(reattached, 0)
   })
 
   test('a call dropped before its reply is retried; with start false and nothing answering, it is null', async () => {
