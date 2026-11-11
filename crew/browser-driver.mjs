@@ -81,6 +81,8 @@ const LOAD_MS = 30000 // how long goto waits for the load event
 const CLIENT_REPLY_MS = 150000 // the longest the server can take is a goto plus two 60 s calls
 const SPAWN_RETRY_MS = 10000
 const START_DEADLINE_MS = 40000
+// How long a caller waits for a folder's lock before it answers busy.
+const LOCK_WAIT_MS = 30000
 
 export class BrowserError extends Error {
   constructor(message) {
@@ -594,6 +596,19 @@ export async function acquireLock(dir, sock = join(dir, SOCKET_NAME)) {
     if (takeStale(file, owner) && (await claim(dir, sock))) return true
   }
   return false
+}
+
+/**
+ * Waits for the lock: tries acquireLock every pollMs until it is taken or timeoutMs has passed. False means the lock
+ * is still held by a live driver, which is the "busy, try again later" answer.
+ */
+export async function acquireLockWaiting(dir, sock = join(dir, SOCKET_NAME), { timeoutMs = LOCK_WAIT_MS, pollMs = 100 } = {}) {
+  const until = Date.now() + timeoutMs
+  for (;;) {
+    if (await acquireLock(dir, sock)) return true
+    if (Date.now() >= until) return false
+    await sleep(pollMs)
+  }
 }
 
 /**
@@ -1310,9 +1325,10 @@ function exchange(conn, message) {
  * Starts the driver when none is running and start is true. Throws when the command fails.
  */
 // A driver that is shutting down closes its socket under a call that has just connected. The call then gets a dropped
-// connection and no reply. Such a call is retried: with start false, a dropped connection means nothing is running, so
-// the answer is null; with start true, the next try starts a fresh driver. A command that drops before its reply may
-// have run already, so it can run twice. The browser commands the crew sends are ones a second run is harmless for.
+// connection and no reply. Such a call is retried. When every try is dropped, the answer depends on start: with start
+// false, nothing answers, so the answer is null; with start true the error is thrown. A command that drops before its
+// reply may have run already, so it can run twice. The browser commands the crew sends are ones a second run is
+// harmless for.
 const DROPPED = /connection failed|closed the connection/
 const DROP_RETRIES = 5
 const DROP_RETRY_MS = 300
@@ -1323,8 +1339,10 @@ export async function request(options) {
       return await requestOnce(options)
     } catch (error) {
       if (!(error instanceof BrowserError) || !DROPPED.test(error.message)) throw error
-      if ((options.start ?? true) === false) return null
-      if (attempt >= DROP_RETRIES) throw error
+      if (attempt >= DROP_RETRIES) {
+        if ((options.start ?? true) === false) return null
+        throw error
+      }
       await sleep(DROP_RETRY_MS)
     }
   }
