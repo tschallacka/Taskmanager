@@ -1,0 +1,197 @@
+/* ─── Design tokens ─────────────────────────────────────────────
+   The one place the look is written down (see also app/app.config.ts, `tokens`,
+   which holds the same fixed values for code that reads them in script).
+
+   Dark is the default. Light is the `.light` class that the colour mode sets on
+   <html>; both palettes are defined here and nowhere else.
+
+   Two kinds of colour:
+   - Roles (canvas, surfaces, hairlines, text, accent) point at Nuxt UI's
+     variables, so the neutral and accent colours a person picks in Settings keep
+     working. The owner's design uses zinc-like neutrals and amber, which is what
+     the defaults are.
+   - Status tones are fixed. They never follow the accent or neutral choice,
+     because a colour that means "overdue" must not change with a setting.
+
+   Every state keeps a word or an icon next to its colour (the design's rule,
+   "Colour is never the only signal"). The colour is a hint, not the message. */
+
+:root {
+  /* Type scale. Font: Public Sans (see --font-sans in main.css). */
+  --tm-font-size-greeting: 30px;
+  --tm-line-greeting: 40px;
+  --tm-font-size-title: 24px;          /* task panel and page headings */
+  --tm-line-title: 32px;
+  --tm-font-size-page: 22px;           /* board heading */
+  --tm-line-page: 32px;
+  --tm-font-size-section: 16px;        /* panel section heads */
+  --tm-line-section: 26px;
+  --tm-font-size-column: 15px;         /* column heads, board card title */
+  --tm-line-column: 22px;
+  --tm-font-size-card-title: 14px;     /* card title as the card anatomy sets it */
+  --tm-line-card-title: 20px;
+  --tm-font-size-body: 14px;           /* body text and controls */
+  --tm-line-body: 21px;
+  --tm-font-size-label: 13px;          /* chips, counts, meta */
+  --tm-line-label: 18px;
+  --tm-font-size-caption: 12px;        /* uppercase section labels, key hints */
+  --tm-line-caption: 16px;
+  --tm-font-weight-regular: 400;
+  --tm-font-weight-medium: 500;
+  --tm-font-weight-semibold: 600;
+
+  /* Spacing: a 4 px grid, with the two half steps the cards use. */
+  --tm-space-1: 4px;
+  --tm-space-2: 8px;
+  --tm-space-2h: 10px;
+  --tm-space-3: 12px;
+  --tm-space-3h: 14px;                 /* card padding */
+  --tm-space-4: 16px;
+  --tm-space-5: 24px;
+  --tm-space-6: 32px;
+
+  /* Radii. */
+  --tm-radius-sm: 6px;                 /* buttons, menu rows */
+  --tm-radius-md: 8px;                 /* inputs, segmented control */
+  --tm-radius-lg: 10px;                /* cards */
+  --tm-radius-xl: 12px;                /* columns */
+  --tm-radius-pill: 999px;             /* chips, avatars, dots */
+
+  /* Motion. */
+  --tm-duration-hover: 150ms;
+  --tm-duration-drop: 160ms;
+
+  /* Canvas and surfaces. Roles follow the Nuxt UI neutral colour. */
+  --tm-canvas: var(--ui-bg);
+  --tm-surface: var(--ui-bg-muted);     /* sidebar, columns */
+  --tm-raised: var(--ui-bg-elevated);   /* cards, controls */
+  --tm-hover: var(--ui-bg-accented);    /* one step lighter on hover */
+  --tm-hairline: var(--ui-border);
+  --tm-hairline-strong: var(--ui-border-accented);
+
+  /* Text. */
+  --tm-text: var(--ui-text-highlighted);
+  --tm-text-secondary: var(--ui-text);
+  --tm-text-muted: var(--ui-text-muted);
+  --tm-text-dimmed: var(--ui-text-dimmed);
+  --tm-text-on-accent: #1A1200;
+
+  /* Accent (amber by default). */
+  --tm-accent: var(--ui-primary);
+  --tm-accent-text: var(--ui-color-primary-400);
+  --tm-accent-soft: color-mix(in srgb, var(--ui-primary) 12%, transparent);
+
+  /* Focus ring: amber, 2 px, 2 px outside the control. */
+  --tm-focus: var(--ui-primary);
+  --tm-focus-width: 2px;
+  --tm-focus-offset: 2px;
+
+  /* Status tones, dark. Each tone is a background, a text colour and a dot. */
+  --tm-tone-ok-bg: rgba(74, 222, 128, 0.15);
+  --tm-tone-ok-fg: #86EFAC;
+  --tm-tone-ok-dot: #4ADE80;
+  --tm-tone-warn-bg: rgba(251, 146, 60, 0.15);
+  --tm-tone-warn-fg: #FDBA74;
+  --tm-tone-warn-dot: #FB923C;
+  --tm-tone-danger-bg: rgba(248, 113, 113, 0.15);
+  --tm-tone-danger-fg: #FCA5A5;
+  --tm-tone-danger-dot: #F87171;
+  --tm-tone-info-bg: rgba(96, 165, 250, 0.15);
+  --tm-tone-info-fg: #93C5FD;
+  --tm-tone-info-dot: #60A5FA;
+  --tm-tone-team-bg: rgba(245, 165, 36, 0.12);
+  --tm-tone-team-fg: #FFB938;
+  --tm-tone-team-dot: #F5A524;
+
+  /* The eight states, named as the design names them. */
+  --tm-status-on-track: var(--tm-tone-ok-fg);
+  --tm-status-at-risk: var(--tm-tone-warn-fg);
+  --tm-status-off-track: var(--tm-tone-danger-fg);
+  --tm-status-overdue: var(--tm-tone-danger-fg);
+  --tm-status-due-soon: var(--tm-tone-warn-fg);
+  --tm-status-waits-for: var(--tm-tone-warn-fg);
+  --tm-status-shared: var(--tm-tone-info-fg);
+  --tm-status-team-only: var(--tm-tone-team-fg);
+
+  --tm-shadow-drag: 0 14px 32px rgba(0, 0, 0, 0.5);
+  --tm-shadow-control: none;
+  color-scheme: dark;
+}
+
+.light {
+  color-scheme: light;
+  --tm-accent-text: var(--ui-color-primary-600);
+  --tm-shadow-control: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --tm-shadow-drag: 0 14px 32px rgba(0, 0, 0, 0.18);
+
+  --tm-tone-ok-bg: rgba(74, 222, 128, 0.15);
+  --tm-tone-ok-fg: #166534;
+  --tm-tone-ok-dot: #16A34A;
+  --tm-tone-warn-bg: rgba(251, 146, 60, 0.15);
+  --tm-tone-warn-fg: #9A3412;
+  --tm-tone-warn-dot: #EA580C;
+  --tm-tone-danger-bg: rgba(248, 113, 113, 0.15);
+  --tm-tone-danger-fg: #991B1B;
+  --tm-tone-danger-dot: #DC2626;
+  --tm-tone-info-bg: rgba(96, 165, 250, 0.15);
+  --tm-tone-info-fg: #1E40AF;
+  --tm-tone-info-dot: #2563EB;
+  --tm-tone-team-bg: rgba(217, 119, 6, 0.10);
+  --tm-tone-team-fg: #B45309;
+  --tm-tone-team-dot: #D97706;
+}
+
+/* Keyboard focus. :where keeps the selector at zero specificity, so a component
+   that sets its own outline still wins. Mouse focus shows nothing extra. */
+:where(a, button, input, select, textarea, summary, [tabindex], [role="button"], [role="tab"], [role="menuitem"], [role="option"], [contenteditable="true"]):focus-visible {
+  outline: var(--tm-focus-width) solid var(--tm-focus);
+  outline-offset: var(--tm-focus-offset);
+}
+
+/* Reduced motion: transitions and animations finish at once. Nothing is removed,
+   only the movement. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Small helpers the cards and the dev kitchen sink use. Each reads a token, so
+   no colour is typed here. */
+.tm-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tm-space-1);
+  padding: 2px var(--tm-space-2);
+  border-radius: var(--tm-radius-pill);
+  font-size: var(--tm-font-size-label);
+  line-height: var(--tm-line-label);
+  font-weight: var(--tm-font-weight-medium);
+  background: var(--tm-raised);
+  color: var(--tm-text-secondary);
+}
+
+.tm-tone-ok { background: var(--tm-tone-ok-bg); color: var(--tm-tone-ok-fg); }
+.tm-tone-warn { background: var(--tm-tone-warn-bg); color: var(--tm-tone-warn-fg); }
+.tm-tone-danger { background: var(--tm-tone-danger-bg); color: var(--tm-tone-danger-fg); }
+.tm-tone-info { background: var(--tm-tone-info-bg); color: var(--tm-tone-info-fg); }
+.tm-tone-team { background: var(--tm-tone-team-bg); color: var(--tm-tone-team-fg); }
+
+.tm-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--tm-radius-pill);
+  display: inline-block;
+  flex: none;
+}
+
+.tm-dot-ok { background: var(--tm-tone-ok-dot); }
+.tm-dot-warn { background: var(--tm-tone-warn-dot); }
+.tm-dot-danger { background: var(--tm-tone-danger-dot); }
+.tm-dot-info { background: var(--tm-tone-info-dot); }
+.tm-dot-team { background: var(--tm-tone-team-dot); }
