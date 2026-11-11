@@ -39,6 +39,7 @@ mentions.mjs
 package.json
 postbrief.mjs
 publish.mjs
+up.mjs
 setup.mjs
 susy.mjs
 tm.mjs
