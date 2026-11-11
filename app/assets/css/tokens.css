@@ -121,6 +121,8 @@
 .light {
   color-scheme: light;
   --tm-accent-text: var(--ui-color-primary-600);
+  /* The 500 step is under 3:1 on white for nine accents. The 700 step is 4.5:1 or more for all seventeen. */
+  --tm-focus: var(--ui-color-primary-700);
   --tm-shadow-control: 0 1px 2px rgba(0, 0, 0, 0.06);
   --tm-shadow-drag: 0 14px 32px rgba(0, 0, 0, 0.18);
 
@@ -139,6 +141,60 @@
   --tm-tone-team-bg: rgba(217, 119, 6, 0.10);
   --tm-tone-team-fg: #B45309;
   --tm-tone-team-dot: #D97706;
+}
+
+/* Nuxt UI's semantic colours (UBadge, UButton, alerts) read their shades from these
+   scales. Each scale is built from the status dot of its tone, so a success badge is
+   the on-track tone, an error is danger, a warning is at-risk and an info is shared.
+   The primary (accent) and neutral scales are left to the Settings colours. */
+:root {
+  --ui-color-success-50: color-mix(in srgb, var(--tm-tone-ok-dot) 8%, white);
+  --ui-color-success-100: color-mix(in srgb, var(--tm-tone-ok-dot) 16%, white);
+  --ui-color-success-200: color-mix(in srgb, var(--tm-tone-ok-dot) 28%, white);
+  --ui-color-success-300: color-mix(in srgb, var(--tm-tone-ok-dot) 45%, white);
+  --ui-color-success-400: color-mix(in srgb, var(--tm-tone-ok-dot) 75%, white);
+  --ui-color-success-500: var(--tm-tone-ok-dot);
+  --ui-color-success-600: color-mix(in srgb, var(--tm-tone-ok-dot) 80%, black);
+  --ui-color-success-700: color-mix(in srgb, var(--tm-tone-ok-dot) 60%, black);
+  --ui-color-success-800: color-mix(in srgb, var(--tm-tone-ok-dot) 45%, black);
+  --ui-color-success-900: color-mix(in srgb, var(--tm-tone-ok-dot) 30%, black);
+  --ui-color-success-950: color-mix(in srgb, var(--tm-tone-ok-dot) 18%, black);
+
+  --ui-color-error-50: color-mix(in srgb, var(--tm-tone-danger-dot) 8%, white);
+  --ui-color-error-100: color-mix(in srgb, var(--tm-tone-danger-dot) 16%, white);
+  --ui-color-error-200: color-mix(in srgb, var(--tm-tone-danger-dot) 28%, white);
+  --ui-color-error-300: color-mix(in srgb, var(--tm-tone-danger-dot) 45%, white);
+  --ui-color-error-400: color-mix(in srgb, var(--tm-tone-danger-dot) 75%, white);
+  --ui-color-error-500: var(--tm-tone-danger-dot);
+  --ui-color-error-600: color-mix(in srgb, var(--tm-tone-danger-dot) 80%, black);
+  --ui-color-error-700: color-mix(in srgb, var(--tm-tone-danger-dot) 60%, black);
+  --ui-color-error-800: color-mix(in srgb, var(--tm-tone-danger-dot) 45%, black);
+  --ui-color-error-900: color-mix(in srgb, var(--tm-tone-danger-dot) 30%, black);
+  --ui-color-error-950: color-mix(in srgb, var(--tm-tone-danger-dot) 18%, black);
+
+  --ui-color-warning-50: color-mix(in srgb, var(--tm-tone-warn-dot) 8%, white);
+  --ui-color-warning-100: color-mix(in srgb, var(--tm-tone-warn-dot) 16%, white);
+  --ui-color-warning-200: color-mix(in srgb, var(--tm-tone-warn-dot) 28%, white);
+  --ui-color-warning-300: color-mix(in srgb, var(--tm-tone-warn-dot) 45%, white);
+  --ui-color-warning-400: color-mix(in srgb, var(--tm-tone-warn-dot) 75%, white);
+  --ui-color-warning-500: var(--tm-tone-warn-dot);
+  --ui-color-warning-600: color-mix(in srgb, var(--tm-tone-warn-dot) 80%, black);
+  --ui-color-warning-700: color-mix(in srgb, var(--tm-tone-warn-dot) 60%, black);
+  --ui-color-warning-800: color-mix(in srgb, var(--tm-tone-warn-dot) 45%, black);
+  --ui-color-warning-900: color-mix(in srgb, var(--tm-tone-warn-dot) 30%, black);
+  --ui-color-warning-950: color-mix(in srgb, var(--tm-tone-warn-dot) 18%, black);
+
+  --ui-color-info-50: color-mix(in srgb, var(--tm-tone-info-dot) 8%, white);
+  --ui-color-info-100: color-mix(in srgb, var(--tm-tone-info-dot) 16%, white);
+  --ui-color-info-200: color-mix(in srgb, var(--tm-tone-info-dot) 28%, white);
+  --ui-color-info-300: color-mix(in srgb, var(--tm-tone-info-dot) 45%, white);
+  --ui-color-info-400: color-mix(in srgb, var(--tm-tone-info-dot) 75%, white);
+  --ui-color-info-500: var(--tm-tone-info-dot);
+  --ui-color-info-600: color-mix(in srgb, var(--tm-tone-info-dot) 80%, black);
+  --ui-color-info-700: color-mix(in srgb, var(--tm-tone-info-dot) 60%, black);
+  --ui-color-info-800: color-mix(in srgb, var(--tm-tone-info-dot) 45%, black);
+  --ui-color-info-900: color-mix(in srgb, var(--tm-tone-info-dot) 30%, black);
+  --ui-color-info-950: color-mix(in srgb, var(--tm-tone-info-dot) 18%, black);
 }
 
 /* Keyboard focus. :where keeps the selector at zero specificity, so a component

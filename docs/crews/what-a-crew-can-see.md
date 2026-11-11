@@ -32,8 +32,10 @@ real board therefore comes from a person's decision.
 
 | Who | What they get |
 |---|---|
-| A member of the crew's team | The crew board, with full access. |
-| Anyone else on your team (not a customer) | The crew board, **read only**. A banner says so, and the server refuses every change. They can still open and download what is attached to its tasks. |
+| The crew's own accounts, and the owner or an admin of the crew's team | The crew board, with full access. |
+| The crew's owner (the person who made the crew), or the instance admin | The crew board, as their team membership gives it. The instance admin sees and may delete every crew board. |
+| An owner or admin of your real board's team, who is not in the crew's team | The crew board, **read only**. A banner says so, and the server refuses every change. They can still open and download what is attached to its tasks. |
+| Anyone else on your team, a plain member | Nothing. The crew board is not in the board list, and its page, tasks and files answer as if it did not exist. |
 | A customer contact | Nothing. A crew board is never shown to customers. |
 
 For the people who may see it, the crew board is not a board of its own in the board list: it is a folder under the real board it works for. It opens from **Crews** on the team page, where the

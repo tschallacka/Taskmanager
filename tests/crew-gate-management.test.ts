@@ -23,7 +23,7 @@ const { db } = await import('../server/db')
 const { apiKeys, apiKeySecrets, crewBoards, crews, instanceSettings, member, organization, projects, teamSettings, user } = await import('../server/db/schema')
 const { generateApiKey } = await import('../server/utils/api-keys')
 const { revokeKey, rotateSecret } = await import('../server/utils/connectTokens')
-const { remoteManagementVerdict, isManagementToken, checkCrewKey } = await import('../server/utils/crewGate')
+const { remoteManagementVerdict, remoteCrewOwnerVerdict, isManagementToken, checkCrewKey } = await import('../server/utils/crewGate')
 const { setBoardCrews, setInstanceCrews, setTeamCrews } = await import('../server/utils/crewPermission')
 const { issueManagementToken } = await import('../server/utils/managementToken')
 
@@ -42,7 +42,7 @@ test('remote with the window open and a live management token: passes, and the w
   assert.deepEqual(decide({ local: REMOTE, windowOpen: true, tempKeyId: 'temp', verdict: ok({ management: true }) }), { pass: true })
 })
 
-test('remote with the window closed and an unbound crews:manage key (the instance admin\'s): plain 404', () => {
+test('remote with the window closed and a crews:manage key that is neither a token nor a crew owner\'s: plain 404', () => {
   assert.deepEqual(
     decide({ local: REMOTE, windowOpen: false, tempKeyId: null, verdict: ok({ management: false }) }),
     { pass: false, status: 404, outcome: 'remote, window closed', closeReason: null }
@@ -125,7 +125,7 @@ test('a remote management token gets a passing verdict bound to its board', asyn
   assert.deepEqual(decide({ local: REMOTE, windowOpen: false, tempKeyId: null, verdict }), { pass: true })
 })
 
-test('the instance admin\'s unbound crews:manage key is not a management token: the gate answers 404 for it', async () => {
+test('the instance admin\'s unbound crews:manage key is not a management token, and passes remotely as a crew owner\'s key', async () => {
   const generated = generateApiKey()
   await db.insert(apiKeys).values({
     id: adminKeyId,
@@ -139,12 +139,18 @@ test('the instance admin\'s unbound crews:manage key is not a management token: 
   })
   asToken(generated.token)
   assert.equal(await isManagementToken({} as never), false)
-  assert.equal(await remoteManagementVerdict({} as never), null)
+  // Not a token, so the remote verdict is the crew-owner one: the admin's key passes for its own crews.
+  const viaGate = await remoteManagementVerdict({} as never)
+  assert.equal(viaGate?.ok === true && viaGate.crewOwner === true, true)
+  assert.equal(viaGate?.ok === true && viaGate.management === true, false)
   // The same key still passes a local call, as today.
   const local = await checkCrewKey({} as never)
   assert.equal(local.ok, true)
   assert.equal(local.ok && local.management, false)
-  assert.deepEqual(decide({ local: REMOTE, windowOpen: false, tempKeyId: null, verdict: null }).status, 404)
+  // Pia's rule: the admin's permanent key passes the gate from outside, for the crews the admin created.
+  const remote = await remoteCrewOwnerVerdict({} as never)
+  assert.equal(remote?.ok && remote.crewOwner, true)
+  assert.deepEqual(decide({ local: REMOTE, windowOpen: false, tempKeyId: null, verdict: remote }), { pass: true })
 })
 
 test('no key, or an unknown one, is not a management token', async () => {

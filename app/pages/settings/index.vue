@@ -637,10 +637,10 @@ function swatchStyle(color: string, selected: boolean) {
     />
     <UButton
       icon="i-lucide-arrow-left"
+      label="Boards"
       color="neutral"
       variant="ghost"
       size="md"
-      aria-label="Back to boards"
       @click="navigateTo('/projects')"
     />
   </div>

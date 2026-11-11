@@ -1,6 +1,6 @@
 {
   "name": "arnotes",
-  "version": "0.8.0",
+  "version": "0.9.1",
   "description": "A self-hosted, tag-based note-taking application.",
   "private": true,
   "license": "MIT",
