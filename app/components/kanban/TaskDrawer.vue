@@ -4,9 +4,12 @@ import { format } from 'date-fns'
 import { relativeTime } from '~/composables/useRelativeTime'
 import type { Visibility, ProjectTask } from '~/composables/useProjects'
 import { dueDayToMs, isOverdueDay } from '~/utils/dueDate'
+import { absoluteUrl, copyTaskLink } from '~/utils/copyTaskLink'
+import { taskPanelPath } from '~/utils/taskPanelUrl'
 
 interface Task {
   id: string
+  projectId?: string
   columnId: string
   title: string
   description: string
@@ -25,6 +28,22 @@ const props = defineProps<{ task: Task | null }>()
 const emit = defineEmits<{ close: [] }>()
 
 const toast = useToast()
+
+// The task number is its id. The copy control puts a link to the task on the clipboard, as an html anchor with the
+// number as its text, and the bare number as plain text (utils/copyTaskLink.ts).
+const linkCopied = ref(false)
+async function copyTaskNumberLink() {
+  const task = props.task
+  if (!task) return
+  const path = taskPanelPath(task.projectId ?? '', task.id)
+  const href = absoluteUrl(window.location.origin, path)
+  if (!(await copyTaskLink(href, task.id))) {
+    toast.add({ title: 'The clipboard refused the link. Select the number and copy it.', icon: 'i-lucide-alert-triangle', color: 'warning' })
+    return
+  }
+  linkCopied.value = true
+  setTimeout(() => (linkCopied.value = false), 2000)
+}
 const {
   activeProject,
   isCustomerView,
@@ -567,6 +586,28 @@ const menuItems = computed(() => [[
               />
             </template>
           </UDropdownMenu>
+
+          <!-- The task number, with a copy control: the link to the task goes on the clipboard, as a number that is a link
+               in a rich editor. One compact element, so it fits a phone-width panel. -->
+          <span
+            class="inline-flex min-w-0 max-w-[11rem] shrink-0 items-center gap-0.5 font-mono text-xs text-muted"
+            data-testid="task-number"
+          >
+            <span
+              class="truncate"
+              :title="shownTask.id"
+            >{{ shownTask.id }}</span>
+            <UButton
+              :icon="linkCopied ? 'i-lucide-check' : 'i-lucide-link'"
+              size="xs"
+              color="neutral"
+              variant="ghost"
+              aria-label="Copy task link"
+              :title="linkCopied ? 'Copied' : 'Copy task link'"
+              class="shrink-0"
+              @click="copyTaskNumberLink"
+            />
+          </span>
 
           <!-- Board and last-edited time, kept to one quiet line; the exact
                timestamps live in the tooltip. -->
