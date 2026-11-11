@@ -48,8 +48,12 @@ function formatDate(value: string): string {
 
 <template>
   <div class="flex-1 min-w-0 flex flex-col overflow-hidden pb-14 lg:pb-0">
-    <div class="sticky top-0 z-10 border-b border-default bg-default/95 backdrop-blur-sm shrink-0">
-      <div class="px-4 pt-3 pb-3.5 flex items-center gap-3">
+    <!-- The back arrow and the title go into the shared top bar. -->
+    <Teleport
+      defer
+      to="#app-topbar-title"
+    >
+      <div class="flex min-w-0 items-center gap-3">
         <UButton
           to="/settings"
           icon="i-lucide-arrow-left"
@@ -62,7 +66,7 @@ function formatDate(value: string): string {
           AI history
         </h1>
       </div>
-    </div>
+    </Teleport>
 
     <div class="flex-1 overflow-y-auto">
       <UContainer class="py-6 space-y-4">
