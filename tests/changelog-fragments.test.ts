@@ -155,9 +155,22 @@ test('the CI rule passes the publish pull request that folded the fragments, and
   withFolder((dir) => {
     layout(dir, '0.1.1')
     // The folded PR: CHANGELOG.md gained the version heading, the fragments were deleted, package.json was raised.
-    const result = run(dir, ['changelog-check'], 'M\tCHANGELOG.md\nD\tchangelog.d/card1-first.md\nD\tchangelog.d/card2-second.md\nM\tpackage.json\nM\tnix/arnotes.nix\n')
+    const folded = 'M\tCHANGELOG.md\nD\tchangelog.d/card1-first.md\nD\tchangelog.d/card2-second.md\nM\tpackage.json\nM\tnix/arnotes.nix\n'
+      + '--- CHANGELOG.md diff\n@@ -1,3 +1,8 @@\n+## 0.1.1 - 2026-08-01\n+\n+- First\n+- Second\n'
+    const result = run(dir, ['changelog-check'], folded)
     assert.equal(result.status, 0, result.err)
-    assert.match(result.out, /^rule: folded changelog \(CHANGELOG\.md changed, 2 fragments deleted\)/)
+    assert.match(result.out, /^rule: folded changelog \(CHANGELOG\.md changed, 2 fragments deleted, version heading added\)/)
+  })
+})
+
+test('a hand edit of CHANGELOG.md with the fragments deleted, and no version heading added, is refused', () => {
+  withFolder((dir) => {
+    layout(dir, '0.1.1')
+    // Someone removed the fragments and typed into CHANGELOG.md by hand: no "## <version> - <date>" line is added.
+    const handEdit = 'M\tCHANGELOG.md\nD\tchangelog.d/card1-first.md\n--- CHANGELOG.md diff\n@@ -4 +4 @@\n-Initial open-source release.\n+Initial open-source release, edited.\n'
+    const result = run(dir, ['changelog-check'], handEdit)
+    assert.equal(result.status, 1)
+    assert.match(result.err, /changed without a new "## <version> - <date>" heading/)
   })
 })
 

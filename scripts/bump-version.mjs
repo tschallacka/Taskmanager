@@ -2,7 +2,7 @@
 // It also folds the changelog fragments (changelog.d/*.md) into CHANGELOG.md under the new version.
 //   node scripts/bump-version.mjs <patch|feature|breaking> [--dry-run]
 //   node scripts/bump-version.mjs changelog [--dry-run]     folds under the version package.json already has
-//   git diff --name-status origin/master...HEAD | node scripts/bump-version.mjs changelog-check   (the CI rule)
+//   (git diff --name-status origin/master...HEAD; echo "--- CHANGELOG.md diff"; git diff origin/master...HEAD -- CHANGELOG.md) | node scripts/bump-version.mjs changelog-check   (the CI rule)
 //   node scripts/bump-version.mjs tag [--ref <commit>] [--push] [--dry-run]
 // Plain node, no dependencies. Bump and changelog mode never run git, npm or the network. Tag mode runs git only:
 // it fetches origin master, creates one annotated tag and, with --push, pushes that one tag.
@@ -213,13 +213,20 @@ function changelogFold(args) {
   console.log(fold.line)
 }
 
-// The CI rule for a pull request. Reads `git diff --name-status origin/master...HEAD` on stdin and passes when one rule
+// The CI rule for a pull request. Reads on stdin the name-status lines of `git diff --name-status origin/master...HEAD`,
+// then a line `--- CHANGELOG.md diff`, then `git diff origin/master...HEAD -- CHANGELOG.md`. It passes when one rule
 // holds, printing which one: a worker's change adds a fragment; the merger's publish pull request carries the folded
-// CHANGELOG.md instead (CHANGELOG.md changed and its fragments deleted); a change touching only documentation or
-// dependency hashes needs none. Anything else is refused.
+// CHANGELOG.md instead (CHANGELOG.md changed, its fragments deleted, and the diff adds a `## <version> - <date>` heading,
+// so a hand edit of CHANGELOG.md does not pass); a change touching only documentation or dependency hashes needs none.
+// Anything else is refused.
 const NO_CHANGELOG_NEEDED = /(\.md$|^docs\/|^nix\/hashes\.json$|^flake\.lock$)/
+const CHANGELOG_DIFF_MARK = '--- CHANGELOG.md diff'
+const VERSION_HEADING_ADDED = /^\+## \d+\.\d+\.\d+ - \d{4}-\d{2}-\d{2}\s*$/m
 
-function changelogCheck(text) {
+function changelogCheck(input) {
+  const cut = input.indexOf(`\n${CHANGELOG_DIFF_MARK}`)
+  const text = cut < 0 ? input : input.slice(0, cut)
+  const changelogDiff = cut < 0 ? '' : input.slice(cut + CHANGELOG_DIFF_MARK.length + 2)
   const rows = text.split('\n').filter(Boolean).map((line) => {
     const fields = line.split('\t')
     return { status: fields[0][0], path: fields[fields.length - 1] }
@@ -231,7 +238,10 @@ function changelogCheck(text) {
   }
   const deleted = rows.filter(row => row.status === 'D' && /^changelog\.d\/.+\.md$/.test(row.path))
   if (deleted.length > 0 && rows.some(row => row.status === 'M' && row.path === CHANGELOG)) {
-    console.log(`rule: folded changelog (${CHANGELOG} changed, ${deleted.length} ${deleted.length === 1 ? 'fragment' : 'fragments'} deleted)`)
+    if (!VERSION_HEADING_ADDED.test(changelogDiff)) {
+      throw new Refusal(`${CHANGELOG} changed without a new "## <version> - <date>" heading: the fold adds it, a hand edit does not pass`)
+    }
+    console.log(`rule: folded changelog (${CHANGELOG} changed, ${deleted.length} ${deleted.length === 1 ? 'fragment' : 'fragments'} deleted, version heading added)`)
     return
   }
   if (rows.every(row => NO_CHANGELOG_NEEDED.test(row.path))) {

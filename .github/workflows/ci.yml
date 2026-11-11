@@ -82,7 +82,11 @@ jobs:
       - name: Require a changelog fragment or the folded changelog
         run: |
           git fetch --quiet origin "+refs/heads/master:refs/remotes/origin/master"
-          git diff --name-status origin/master...HEAD | node scripts/bump-version.mjs changelog-check
+          {
+            git diff --name-status origin/master...HEAD
+            echo "--- CHANGELOG.md diff"
+            git diff origin/master...HEAD -- CHANGELOG.md
+          } | node scripts/bump-version.mjs changelog-check
 
   # Only a green master is tagged: this job runs after ci and only for a push to master.
   tag:
