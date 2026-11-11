@@ -66,6 +66,24 @@ function reset() {
 // Each opening starts from nothing, and each closing drops the token.
 watch(() => props.open, reset)
 
+// The crew permission for this board, asked when the window opens: where crews are off for this person, the window
+// shows the one sentence the permission gives and no button. A failed check keeps the button; the make route still
+// refuses with the same sentence.
+const blocked = ref<string | null>(null)
+
+async function checkPermission() {
+  blocked.value = null
+  if (!props.open || !props.board) return
+  try {
+    const answer = await $fetch<{ refusal: string | null }>(`/api/projects/${props.board.id}/crews-allowed`)
+    blocked.value = answer.refusal
+  } catch {
+    blocked.value = null
+  }
+}
+
+watch(() => [props.open, props.board?.id], checkPermission, { immediate: true })
+
 onBeforeUnmount(stopTimer)
 
 // The server's sentence is shown as it is. A call that failed without one gets a plain line.
@@ -161,7 +179,15 @@ function close() {
             <span class="font-medium text-default">{{ board?.name }}</span>. It has no more rights than you have now, and it stops when the
             crew permission is withdrawn. It is shown once.
           </p>
+          <p
+            v-if="blocked"
+            class="text-sm text-error"
+            data-management-blocked
+          >
+            {{ blocked }}
+          </p>
           <UButton
+            v-else
             label="Make the token"
             icon="i-lucide-key-round"
             color="primary"
