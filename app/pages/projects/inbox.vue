@@ -10,7 +10,7 @@ definePageMeta({ layout: 'app' })
 const { sidebarOpen } = useSidebar()
 useSeoMeta({ title: 'Inbox' })
 
-const { items, unread, prefs, push, loaded, load, markRead, markAllRead, decideGuestRequest, setPreference, setPush, testPush } = useNotifications()
+const { items, unread, prefs, push, loaded, load, markRead, markAllRead, archive, archiveAll, decideGuestRequest, setPreference, setPush, testPush } = useNotifications()
 onMounted(load)
 
 // A guest manager's request for a person outside their domain is decided here, by a project admin.
@@ -193,6 +193,16 @@ async function sendTest() {
           variant="ghost"
           data-inbox-mark-all
           @click="markAllRead"
+        />
+        <UButton
+          v-if="!onAgentTab && items.length"
+          label="Archive all"
+          icon="i-lucide-archive"
+          size="xs"
+          color="neutral"
+          variant="ghost"
+          data-notification-archive-all
+          @click="archiveAll"
         />
         <UButton
           v-if="onAgentTab && auditUnread"
@@ -405,6 +415,20 @@ async function sendTest() {
                   <p class="mt-1 text-xs text-dimmed">
                     {{ item.projectName }}
                   </p>
+                  <div
+                    class="mt-2 flex flex-wrap gap-2"
+                    @click.stop
+                  >
+                    <UButton
+                      label="Archive"
+                      icon="i-lucide-archive"
+                      size="xs"
+                      color="neutral"
+                      variant="ghost"
+                      data-notification-archive
+                      @click="archive([item.id])"
+                    />
+                  </div>
                   <div
                     v-if="item.type === 'guest_request' && item.invitationStatus === 'awaiting_approval'"
                     class="mt-2 flex flex-wrap gap-2"

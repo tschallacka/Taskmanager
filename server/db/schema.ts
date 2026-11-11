@@ -535,6 +535,8 @@ export const notifications = pgTable(
     body: text('body').notNull().default(''),
     createdAt: bigint('created_at', { mode: 'number' }).notNull(),
     readAt: bigint('read_at', { mode: 'number' }),
+    // Set when the person archives it: it leaves the inbox and sits in the Read box until moved back or emptied.
+    archivedAt: bigint('archived_at', { mode: 'number' }),
     emailedAt: bigint('emailed_at', { mode: 'number' })
   },
   table => [

@@ -197,6 +197,29 @@ export function useNotifications() {
     await request('/api/notifications/read', { method: 'POST', headers: realtimeHeaders(), body: { all: true } })
   }
 
+  /**
+   * Archive moves notifications out of the inbox into the Read box. An archived one is read too, so the
+   * unread count drops with it. The list is taken out of the inbox at once and the server confirms after.
+   */
+  async function archive(ids: string[]) {
+    const unread = _items.value.filter(item => ids.includes(item.id) && !item.readAt).length
+    _items.value = _items.value.filter(item => !ids.includes(item.id))
+    _unread.value = Math.max(0, _unread.value - unread)
+    await request('/api/notifications/archive', { method: 'POST', headers: realtimeHeaders(), body: { ids } })
+  }
+
+  async function archiveAll() {
+    _items.value = []
+    _unread.value = 0
+    await request('/api/notifications/archive', { method: 'POST', headers: realtimeHeaders(), body: { all: true } })
+  }
+
+  /** Moves archived notifications back to the inbox. They stay read. */
+  async function unarchive(ids: string[]) {
+    await request('/api/notifications/unarchive', { method: 'POST', headers: realtimeHeaders(), body: { ids } })
+    await load()
+  }
+
   /** Turns a way of being told on or off; a desktop notification needs the browser's permission first. */
   async function setPreference(key: 'email' | 'browser', value: boolean): Promise<string | null> {
     if (key === 'browser' && value) {
@@ -228,5 +251,5 @@ export function useNotifications() {
     })
   }
 
-  return { items: _items, unread: _unread, prefs: _prefs, push: _push, loaded: _loaded, load, markRead, markAllRead, decideGuestRequest, setPreference, setPush, testPush, init }
+  return { items: _items, unread: _unread, prefs: _prefs, push: _push, loaded: _loaded, load, markRead, markAllRead, archive, archiveAll, unarchive, decideGuestRequest, setPreference, setPush, testPush, init }
 }
