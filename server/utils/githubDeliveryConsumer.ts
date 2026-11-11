@@ -80,7 +80,31 @@ export interface ConsumerDeps {
   budgetMs?: number
   dbLimitMs?: number
   holdMaxAgeMs?: number
+  /** The timer the database limits use. Production uses the real one; a test drives its own, so no limit depends on the load. */
+  timer?: LimitTimer
 }
+
+/** Arms a limit after ms and returns a handle to clear it. The real one is setTimeout (unref'd, so it never keeps the process alive). */
+export interface LimitTimer {
+  set: (fire: () => void, ms: number) => unknown
+  clear: (handle: unknown) => void
+}
+
+const REAL_TIMER: LimitTimer = {
+  set: (fire, ms) => {
+    const handle = setTimeout(fire, ms)
+    ;(handle as { unref?: () => void }).unref?.()
+    return handle
+  },
+  clear: handle => clearTimeout(handle as ReturnType<typeof setTimeout>)
+}
+
+/** The timer a database limit is armed with. The run's budget and deadlines stay on the real clock; only the limit moves. */
+interface Limits {
+  timer: LimitTimer
+}
+
+const REAL_LIMITS: Limits = { timer: REAL_TIMER }
 
 export interface DeliveryConsumer {
   /** The handler the queue calls for each delivery. It returns the disposition; the queue performs it. */
@@ -168,36 +192,36 @@ function parseBody(body: Buffer): Parsed | null {
  * Abandoned, and a limit ends it with a transient failure. The work is not cancelled here: the caller keeps
  * tracking it.
  */
-function bounded<T>(work: Promise<T>, limitMs: number, what: string, ctx: Ctx): Promise<T> {
+function bounded<T>(work: Promise<T>, limitMs: number, what: string, ctx: Ctx, limits: Limits): Promise<T> {
   if (ctx.signal.aborted) return Promise.reject(new Abandoned())
   const left = Math.min(limitMs, ctx.deadline - Date.now())
   if (left <= 0) return Promise.reject(new DeliveryError('transient', `${what}: the delivery ran past its budget`))
-  let timer: ReturnType<typeof setTimeout> | undefined
+  let timer: unknown
   let onAbort: () => void = () => {}
   const stop = new Promise<never>((_resolve, reject) => {
-    timer = setTimeout(() => reject(new DeliveryError('transient', `${what} took longer than ${Math.round(left / 1000)} s`)), left)
-    ;(timer as { unref?: () => void }).unref?.()
+    timer = limits.timer.set(() => reject(new DeliveryError('transient', `${what} took longer than ${Math.round(left / 1000)} s`)), left)
     onAbort = () => reject(new Abandoned())
     ctx.signal.addEventListener('abort', onAbort, { once: true })
   })
   return Promise.race([work, stop]).finally(() => {
-    clearTimeout(timer)
+    limits.timer.clear(timer)
     ctx.signal.removeEventListener('abort', onAbort)
   })
 }
 
 /** A call made after its run has stopped: its own limit only, not any run's budget. */
-function detached<T>(work: Promise<T>, what: string, limitMs = DB_LIMIT_MS): Promise<T> {
+function detached<T>(work: Promise<T>, what: string, limits: Limits, limitMs = DB_LIMIT_MS): Promise<T> {
   return bounded(work, limitMs, what, {
     signal: new AbortController().signal,
     apply: new AbortController().signal,
     deadline: Date.now() + limitMs,
     deferred: false
-  })
+  }, limits)
 }
 
 export function createDeliveryConsumer(queue: Pick<DeliveryQueue, 'publish'>, deps: ConsumerDeps): DeliveryConsumer {
   const now = deps.now ?? Date.now
+  const limits: Limits = { timer: deps.timer ?? REAL_TIMER }
   const log = deps.log ?? (() => {})
   const budgetMs = deps.budgetMs ?? BUDGET_MS
   const dbLimitMs = deps.dbLimitMs ?? DB_LIMIT_MS
@@ -252,8 +276,8 @@ export function createDeliveryConsumer(queue: Pick<DeliveryQueue, 'publish'>, de
         owner: parsed?.repo?.owner ?? '',
         repo: parsed?.repo?.repo ?? '',
         receivedAt: at
-      }), 'recording a late success')
-      await detached(deps.failures.markResolved(message.deliveryId), 'resolving the record')
+      }), 'recording a late success', limits)
+      await detached(deps.failures.markResolved(message.deliveryId), 'resolving the record', limits)
       log(`GitHub delivery ${id} (${message.event}): a late success after the last attempt is recorded; its row is resolved`)
     } catch (error) {
       log(`GitHub delivery ${id} (${message.event}): a late success could not be recorded (${errorSummary(error)})`)
@@ -267,7 +291,7 @@ export function createDeliveryConsumer(queue: Pick<DeliveryQueue, 'publish'>, de
   async function decideFor(message: HandedMessage, parsed: Parsed | null, key: string | null, ctx: Ctx): Promise<Disposition> {
     const id = message.deliveryId
     const made = message.attempt + 1
-    const step = <T>(work: Promise<T>, what: string): Promise<T> => bounded(work, dbLimitMs, what, ctx)
+    const step = <T>(work: Promise<T>, what: string): Promise<T> => bounded(work, dbLimitMs, what, ctx, limits)
 
     // The failed path: the row first. The row is written even when the run's budget is spent (its own limit), so
     // the last failure is kept; an abandoned attempt writes nothing (its adapter has already written the row).
@@ -289,7 +313,7 @@ export function createDeliveryConsumer(queue: Pick<DeliveryQueue, 'publish'>, de
           payload: message.body.toString('utf8'),
           firstSeenAt: at,
           failedAt: at
-        }), 'recording the failure')
+        }), 'recording the failure', limits)
         if (fresh) tellPm({ deliveryId: id, event: message.event, owner: parsed?.repo?.owner ?? '', repo: parsed?.repo?.repo ?? '', class: kind, attempts: Math.min(made, MAX_ATTEMPTS), reason })
       } catch (error) {
         stopIfAbandoned(error)
@@ -389,7 +413,7 @@ export function createDeliveryConsumer(queue: Pick<DeliveryQueue, 'publish'>, de
       if (key && applying.get(key) === running) applying.delete(key)
     }))
     try {
-      await bounded(work, Infinity, 'the work', ctx)
+      await bounded(work, Infinity, 'the work', ctx, REAL_LIMITS)
     } catch (error) {
       // An apply still running after its attempt was given up: its answer is decided by lateAnswer.
       if (!settled) void finished.then(ok => lateAnswer(message, made, ok, parsed, at))
@@ -455,7 +479,7 @@ export function createDeliveryConsumer(queue: Pick<DeliveryQueue, 'publish'>, de
     const parsed = parseBody(message.body)
     const at = now()
     const kind: FailureClass = reason === 'body over size cap' ? 'permanent' : 'transient'
-    const fresh = !(await detached(deps.failures.exists(message.deliveryId), 'reading the record'))
+    const fresh = !(await detached(deps.failures.exists(message.deliveryId), 'reading the record', limits))
     await detached(deps.failures.upsertFailed({
       deliveryId: message.deliveryId,
       event: message.event,
@@ -468,7 +492,7 @@ export function createDeliveryConsumer(queue: Pick<DeliveryQueue, 'publish'>, de
       payload: message.body.toString('utf8'),
       firstSeenAt: at,
       failedAt: at
-    }), 'recording the failure')
+    }), 'recording the failure', limits)
     if (fresh) tellPm({ deliveryId: message.deliveryId, event: message.event, owner: parsed?.repo?.owner ?? '', repo: parsed?.repo?.repo ?? '', class: kind, attempts: Math.min(message.attempt + 1, MAX_ATTEMPTS), reason })
   }
 

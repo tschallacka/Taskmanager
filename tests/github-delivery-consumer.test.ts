@@ -179,8 +179,29 @@ function harness(work: Work, options: HarnessOptions = {}) {
   const queue: MemoryDeliveryQueue = createMemoryDeliveryQueue({ manualClock: true })
   // The consumer and the queue run on the same clock: advancing the queue advances the holds' age too.
   const advanceQueue = queue.advance.bind(queue)
+  // The database limits are timers on that same clock: they fire when the test advances it, never by the wall clock,
+  // so a loaded machine cannot make slow-but-correct work time out.
+  const armed: { id: number, at: number, fire: () => void }[] = []
+  let nextId = 1
+  const timer = {
+    set: (fire: () => void, ms: number) => {
+      const id = nextId++
+      armed.push({ id, at: time.ms + ms, fire })
+      return id
+    },
+    clear: (handle: unknown) => {
+      const i = armed.findIndex(a => a.id === handle)
+      if (i >= 0) armed.splice(i, 1)
+    }
+  }
   queue.advance = (ms: number) => {
     time.ms += ms
+    const due = armed.filter(a => a.at <= time.ms).sort((a, b) => a.at - b.at || a.id - b.id)
+    for (const limit of due) {
+      const i = armed.indexOf(limit)
+      if (i >= 0) armed.splice(i, 1)
+      limit.fire()
+    }
     advanceQueue(ms)
   }
   const rows = fakeRows()
@@ -199,7 +220,8 @@ function harness(work: Work, options: HarnessOptions = {}) {
     budgetMs: options.workLimitMs,
     dbLimitMs: options.dbLimitMs,
     holdMaxAgeMs: options.holdMaxAgeMs,
-    now: () => time.ms
+    now: () => time.ms,
+    timer
   })
   let stop: (() => Promise<void>) | null = null
   return {
@@ -209,6 +231,8 @@ function harness(work: Work, options: HarnessOptions = {}) {
     ledger,
     calls,
     consumer,
+    /** How many database limits are armed on the fake clock right now. */
+    armedLimits: () => armed.length,
     async start() {
       stop = await queue.consume(consumer.handle, {
         prefetch: 1,
@@ -224,6 +248,15 @@ function harness(work: Work, options: HarnessOptions = {}) {
       return queue.publish('main', { deliveryId, event, attempt: 0, body: Buffer.from(body, 'utf8') })
     }
   }
+}
+
+/** Lets the handler run until a database limit is armed: the step is in hand, and the test decides when its clock moves. */
+async function untilArmed(h: { armedLimits: () => number }) {
+  for (let i = 0; i < 500; i++) {
+    if (h.armedLimits() > 0) return
+    await new Promise(resolve => setTimeout(resolve, 2))
+  }
+  throw new Error('no database limit was armed')
 }
 
 /** Lets the handler and the queue run until nothing is in hand and main is empty. Retry queues are not waited for. */
@@ -371,6 +404,9 @@ describe('the consumer: database limits, holds and the broker count', () => {
     h.ledger.hang = true
     await h.start()
     await h.publish('d-hang', fixture('issues-opened', 'example-owner/hang-test'))
+    // The hung read has armed its 20 ms limit on the fake clock; the test moves the clock past it.
+    await untilArmed(h)
+    h.queue.advance(20)
     await drain(h.queue)
     assert.equal(h.queue.peek('retry30s').length, 1)
     h.ledger.hang = false
