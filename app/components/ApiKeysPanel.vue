@@ -287,7 +287,6 @@ const revoking = ref<string | null>(null)
 const regenerating = ref<string | null>(null)
 // The setup prompt of one key. Its token is set only right after a regenerate: that secret is shown once, never again.
 const shownPrompt = ref<{ id: string, token: string | null } | null>(null)
-const promptCopied = ref(false)
 
 // The ready-to-paste setup: the key in the shell, then the server added to Claude Code. Without a secret the key is a placeholder.
 function setupCommandFor(token: string | null): string {
@@ -299,7 +298,7 @@ function showPrompt(key: ApiKeySummary) {
   promptCopied.value = false
 }
 
-async function copyPrompt() {
+async function copySetupPrompt() {
   if (!shownPrompt.value) return
   await copyWithFeedback(setupCommandFor(shownPrompt.value.token), promptCopied, 'Setup prompt copied')
 }
@@ -917,7 +916,7 @@ function reachLabel(key: ApiKeySummary): string {
                       color="neutral"
                       variant="soft"
                       size="xs"
-                      @click="copyPrompt"
+                      @click="copySetupPrompt"
                     />
                   </div>
                 </div>
