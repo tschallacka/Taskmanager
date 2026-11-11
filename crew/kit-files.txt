@@ -39,6 +39,7 @@ mentions.mjs
 package.json
 pia-health.mjs
 pia-session.mjs
+pia-term.sh
 postbrief.mjs
 publish.mjs
 setup.mjs
