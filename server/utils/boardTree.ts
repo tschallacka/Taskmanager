@@ -72,8 +72,8 @@ const PLAIN: BoardTreeFields = { role: 'board', realBoard: null, shadows: [], cr
 /**
  * The crew shadow boards among `boardIds` that `userId` may not see. A crew's board is seen only by the crew's owner,
  * by the owners and admins of the team it lives in (the crew's team) and of the real board's team, and by the crew's
- * own accounts (user.crewId). Every other board is not a crew board and is never hidden here. The list and the search
- * both use this one rule.
+ * own accounts (user.crewId). The instance admin sees and deletes every crew board (owner's decision, 2026-11-11). Every
+ * other board is not a crew board and is never hidden here. The list and the search both use this one rule.
  */
 export async function hiddenCrewShadows(userId: string, boardIds: string[]): Promise<Set<string>> {
   const hidden = new Set<string>()
@@ -93,13 +93,14 @@ export async function hiddenCrewShadows(userId: string, boardIds: string[]): Pro
     .innerJoin(realBoard, eq(realBoard.id, crewBoards.projectId))
     .where(inArray(crewBoards.shadowProjectId, boardIds))
   if (!rows.length) return hidden
-  const [account] = await db.select({ crewId: user.crewId }).from(user).where(eq(user.id, userId))
+  const [account] = await db.select({ crewId: user.crewId, isInstanceAdmin: user.isInstanceAdmin }).from(user).where(eq(user.id, userId))
   const adminTeams = new Set((await db
     .select({ teamId: member.organizationId })
     .from(member)
     .where(and(eq(member.userId, userId), inArray(member.role, ['owner', 'admin'])))).map(row => row.teamId))
   for (const row of rows) {
-    const visible = row.createdBy === userId
+    const visible = Boolean(account?.isInstanceAdmin)
+      || row.createdBy === userId
       || (row.shadowTeamId !== null && adminTeams.has(row.shadowTeamId))
       || (row.realTeamId !== null && adminTeams.has(row.realTeamId))
       || (Boolean(account?.crewId) && account?.crewId === row.crewId)
@@ -205,6 +206,15 @@ export async function boardTreeFields(boardIds: string[], shown: Set<string>): P
     }
   }
   return result
+}
+
+/**
+ * Whether `projectId` is a crew's shadow board. A shadow is seen only under the crew rule (hiddenCrewShadows), and a
+ * shared link is anonymous, so a shadow is never served by link (publicAccess, the attachment route, the share switch).
+ */
+export async function isCrewShadow(projectId: string): Promise<boolean> {
+  const [row] = await db.select({ id: crewBoards.id }).from(crewBoards).where(eq(crewBoards.shadowProjectId, projectId))
+  return Boolean(row)
 }
 
 /**

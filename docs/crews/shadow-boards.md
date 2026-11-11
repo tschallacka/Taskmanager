@@ -15,6 +15,7 @@ it.
 A crew board is seen by these people, and by nobody else:
 
 - the crew's owner, the person who made the crew;
+- the instance admin, who sees and may delete every crew board;
 - an owner or admin of the team that holds the real board;
 - an owner or admin of the team the crew board lives in;
 - the crew's own accounts, the people and agents who work for the crew.
@@ -67,6 +68,9 @@ An archived crew board does not show in the folder. Archived boards leave the li
 archived view (see [Browse projects and pins](/help/workspace/browse-projects-and-pins)).
 
 ## Things to know
+
+- A crew board is never shared by link. Its link cannot be turned on (the server refuses it), and a shared link to its
+  files answers as if they did not exist.
 
 - Nothing moves when a board is folded. The folder is only how the list draws the boards: no board changes its team,
   its name or its members.
