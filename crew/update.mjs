@@ -21,8 +21,8 @@ import { dirname, join, resolve } from 'node:path'
 import { kitDir } from './home.mjs'
 
 const NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
-// What a kit never ships: tests, dotfiles, logins, runs, and the archive itself.
-const NOT_KIT = /\.test\.mjs$|^\.|^(creds|crew|crew\.config|package-lock|crew-kit)\.json$|\.log$|^kit\.tar\.gz$/
+// What a kit never ships: tests, dotfiles, logins, runs, the kit's own records, and the archive itself.
+const NOT_KIT = /\.test\.mjs$|^test-fixtures\.mjs$|^\.|^(creds|crew|crew\.config|package-lock|crew-kit|kit-instance)\.json$|\.log$|^kit\.tar\.gz$/
 const SHAPE = /\.(mjs|md|tmpl|json|sh)$/
 // The list of kit files travels with a folder kit (not with the board's archive), so it is installed when present.
 const LIST = 'kit-files.txt'
@@ -147,6 +147,9 @@ async function front() {
       const recorded = manifest?.files
       const current = !recorded || kit.names.every(name => recorded[name] === sha(join(target, name)))
       if (current) {
+        // A crew home with no record of this kit (one installed before the record existed) is linked to it now, so
+        // `crew update --all` and the next update know which folder it uses.
+        if ((manifest?.kit ? resolve(manifest.kit) : null) !== target) linkHome(here, target, kit)
         recordInstance(target, host, kit.version)
         console.log(`The crew kit in ${target} is up to date: version ${kit.version} from ${kit.label}. Nothing changed.`)
         return 0
@@ -380,23 +383,32 @@ function candidateHomes() {
   return readdirSync(root).map(name => join(root, name)).filter(path => lstatSync(path).isDirectory())
 }
 
-// `crew update --all`: runs the kit's own update once per crew home that was installed from this kit folder. A crew
-// home that was never updated has no record of its kit, so it is named and left for a run by hand.
+// Links a crew home to the kit folder it was installed from: the record names the folder and the sha of each kit file
+// the folder holds, as an install writes it.
+function linkHome(home, folder, kit) {
+  const files = Object.fromEntries(kit.names.map(name => [name, sha(join(folder, name))]))
+  writeFileSync(join(home, MANIFEST), `${JSON.stringify({ version: kit.version, source: kit.label, kit: folder, installedAt: new Date().toISOString(), files }, null, 2)}\n`, { mode: 0o600 })
+}
+
+// `crew update --all`: runs the kit's own update once for every crew home of this kit folder. A home that names another
+// kit folder is skipped. A home with no record of its kit (installed before the record existed) is taken as this one:
+// its update links it, and the instance check still refuses a kit of another instance, with the same one sentence.
 function updateAll() {
   const target = resolve(valueOf('--kit') ?? kitDir)
-  const passed = ARGS.filter(arg => arg !== '--all')
+  // Every argument but --all goes to each home's update, so --from and --kit reach it as given.
+  const forwarded = ARGS.filter(arg => arg !== '--all')
   let worst = 0
   for (const home of candidateHomes()) {
-    const manifest = readJson(join(home, MANIFEST))
-    if (!manifest?.kit) {
-      console.log(`${home}: no record of its kit (never updated): run crew update for this crew by hand, with CREW_HOME=${home}`)
+    if (!existsSync(join(home, 'crew.json'))) {
+      console.log(`${home}: not a crew home (no crew.json): skipped`)
       continue
     }
-    if (resolve(manifest.kit) !== target) {
+    const manifest = readJson(join(home, MANIFEST))
+    if (manifest?.kit && resolve(manifest.kit) !== target) {
       console.log(`${home}: uses the kit in ${manifest.kit}, not this one: skipped`)
       continue
     }
-    const run = spawnSync(process.execPath, [join(target, 'update.mjs'), ...passed.filter(arg => arg !== '--kit' && arg !== target)], {
+    const run = spawnSync(process.execPath, [join(target, 'update.mjs'), ...forwarded], {
       env: { ...process.env, CREW_HOME: home },
       encoding: 'utf8'
     })
