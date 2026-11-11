@@ -577,7 +577,16 @@ describe('the shared browser (real Chromium)', { skip: SKIP }, () => {
       const dir = newDir()
       await ask(dir, 'w1', 'goto', { url: `${site.url}/read` })
       const chromium = chromiumPids(dir).at(-1)
-      await waitUntil(async () => (await request({ dir, cmd: 'status', start: false })) === null, 20000, 'the driver to exit')
+      // While the driver shuts down, a status call can land on a socket it is closing: that reply is ECONNRESET or
+      // "the shared browser stopped", which means the driver is gone. The Chromium check below is what proves it.
+      const exited = async () => {
+        try {
+          return (await request({ dir, cmd: 'status', start: false })) === null
+        } catch (error) {
+          return error instanceof BrowserError && /connection failed|stopped/.test(error.message)
+        }
+      }
+      await waitUntil(exited, 20000, 'the driver to exit')
       await waitUntil(() => !pidAlive(chromium), 15000, 'Chromium to exit')
     })
   })
