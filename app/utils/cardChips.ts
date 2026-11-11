@@ -1,6 +1,7 @@
 // The chips on a board card (redesign 4/9). Labels first, two of them and "+N"; then the state chips. A chip appears
 // only with a reason, and a finished task shows none. Pure: the card component and the tests both use it.
 import { dueDayToMs, isOverdueDay, todayIso } from './dueDate'
+import { waitsChipLabel } from './taskBlockers'
 
 export type ChipTone = 'neutral' | 'warn' | 'danger'
 
@@ -15,12 +16,6 @@ export const LABELS_SHOWN = 2
 
 export function labelChipsOf(tags: string[]): { shown: string[], more: number } {
   return { shown: tags.slice(0, LABELS_SHOWN), more: Math.max(0, tags.length - LABELS_SHOWN) }
-}
-
-/** The local calendar day (`YYYY-MM-DD`) of a timestamp, for a due date read out of a description. */
-export function dayOfMs(ms: number): string {
-  const d = new Date(ms)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 /** A due day is "due soon" when it falls within two days, today included. Past days are overdue, not due soon. */
@@ -49,8 +44,7 @@ export function stateChipsOf(input: StateInput): StateChip[] {
   if (input.overdue) chips.push({ key: 'overdue', label: 'Overdue', tone: 'danger' })
   else if (input.dueSoon) chips.push({ key: 'due-soon', label: 'Due soon', tone: 'warn' })
   if (input.blocked) {
-    const count = input.blockedBy ?? null
-    chips.push({ key: 'waits', label: count && count > 0 ? `Waits for ${count}` : 'Waits', tone: 'warn' })
+    chips.push({ key: 'waits', label: waitsChipLabel(input.blockedBy ?? null), tone: 'warn' })
   }
   if (input.visibility === 'internal') chips.push({ key: 'team-only', label: 'Team only', tone: 'warn' })
   else if (input.visibility === 'customer' && input.customerBoard) chips.push({ key: 'shared', label: 'Shared with customer', tone: 'neutral' })

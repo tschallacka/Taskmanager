@@ -55,8 +55,9 @@ The circle at the left of a card's title is the **done mark**. Click it to tick 
 it again to undo. On a focused card, **Space** ticks it off too.
 
 A right-click on a card (a long press on a touchscreen) opens its menu: **Open**, **Mark done**, **Assign to...**,
-**Move to column...**, **Set due date...** (which opens the panel), **Copy link** and **Delete**, which moves the task to the
-trash for 7 days. The same actions are in the panel, so nothing needs a right-click. In the panel the same thing is the **Mark done** button, which then reads **Done**.
+**Move to column...**, **Set due date...** (which opens the panel), **Copy link** and **Delete**, which moves the task
+to the trash for 7 days. The same actions are in the panel, so nothing needs a right-click. In the panel the same
+thing is the **Mark done** button, which then reads **Done**.
 
 The done mark is separate from the column. Ticking a task does not move it, and moving it into *Done* does not tick
 it. A ticked task is greyed out, and overdue dates stop turning red.
@@ -64,15 +65,16 @@ it. A ticked task is greyed out, and overdue dates stop turning red.
 ## Assign a task
 
 Right-click a card (press and hold it on a touchscreen) and pick **Assign to...**, or pick **Assignee** in the panel.
-Choose someone, or **Unassigned**. A card shows its assignee's picture only once someone is set. You can pick the team's members and, if the board is filed under a customer, that customer's contacts,
-who are marked *(customer)*. The person you assign is told, unless it is you.
+Choose someone, or **Unassigned**. A card shows its assignee's picture only once someone is set. You can pick the
+team's members and, if the board is filed under a customer, that customer's contacts, who are marked *(customer)*.
+The person you assign is told, unless it is you.
 
 ## Start and due dates
 
 Pick **Start date** and **Due date** in the panel; the **x** beside a date clears it. A due date turns red on the card
-once it has passed and the task is not done, and it shows **Due soon** in orange when it falls within two days. The **Timeline** tab draws a bar from the start to the due date and the
-**Calendar** tab puts the task on its due day. If a task has no due date, the soonest `@date` written in its
-description stands in for it on the card.
+once it has passed and the task is not done, and it shows **Due soon** in orange when it falls within two days. The
+**Timeline** tab draws a bar from the start to the due date and the **Calendar** tab puts the task on its due day.
+If a task has no due date, the soonest `@date` written in its description stands in for it on the card.
 
 ## Labels
 
