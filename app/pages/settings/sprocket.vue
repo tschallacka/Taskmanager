@@ -4,7 +4,24 @@ useSeoMeta({ title: 'Sprocket' })
 
 const { sidebarOpen } = useSidebar()
 const toast = useToast()
-const { settings, agent, load, save } = useSprocketSettings()
+const { settings, agent, load, save, saveManner } = useSprocketSettings()
+
+// The manner picker: the person's own pick, or null for the site default. The tone only; what Sprocket may do is not set here.
+const savingManner = ref(false)
+async function pickManner(manner: string | null) {
+  savingManner.value = true
+  try {
+    await saveManner(manner)
+    toast.add({ title: manner ? 'Sprocket will answer in this manner' : 'Sprocket uses the site default manner', icon: 'i-lucide-check', duration: 1500 })
+  } catch (e) {
+    toast.add({ title: 'Could not save the manner', description: errMsg(e), icon: 'i-lucide-alert-triangle', color: 'error' })
+  } finally {
+    savingManner.value = false
+  }
+}
+
+// Who answers a person with no key of their own: the instance's Sprocket, when the admin turned it on for everyone.
+const instanceAnswers = computed(() => settings.value?.instance?.on === true && settings.value.answersWith === 'instance-key')
 
 const loadError = ref<string | null>(null)
 onMounted(() => {
@@ -206,6 +223,86 @@ async function copySkill() {
               class="text-primary underline"
             >Settings</NuxtLink>.
           </p>
+        </div>
+
+        <!-- Who answers you, when you have no key of your own -->
+        <div
+          v-if="settings"
+          class="rounded-xl border border-default bg-default p-5 text-sm"
+        >
+          <p
+            v-if="settings.answersWith === 'own-key' || settings.answersWith === 'agent'"
+            id="sprocket-answers"
+          >
+            Your own Sprocket answers you. The instance's Sprocket is not used while yours is set.
+          </p>
+          <p
+            v-else-if="instanceAnswers"
+            id="sprocket-answers"
+          >
+            The instance's Sprocket answers you, on the instance's OpenRouter key and the model
+            <code class="font-mono">{{ settings.instance?.model }}</code>. It counts against your daily limit of
+            {{ settings.instance?.userDailyLimit }} messages ({{ settings.instance?.usedToday ?? 0 }} used today). Set your
+            own OpenRouter key or Claude Code above, and yours answers you instead.
+          </p>
+          <p
+            v-else
+            id="sprocket-answers"
+          >
+            Nothing answers you yet. You have no OpenRouter key or Claude Code of your own, and the instance has no
+            Sprocket for everyone. Set one above.
+          </p>
+        </div>
+
+        <!-- How Sprocket reacts: the manner, chosen by the person -->
+        <div
+          v-if="settings?.manner"
+          class="rounded-xl border border-default bg-default overflow-hidden"
+          aria-labelledby="manner-heading"
+        >
+          <div class="px-5 py-3 border-b border-default bg-elevated/40 flex items-center gap-2">
+            <UIcon
+              name="i-lucide-message-circle"
+              class="size-4 text-primary"
+            />
+            <span
+              id="manner-heading"
+              class="text-xs font-semibold text-muted uppercase tracking-wider"
+            >How Sprocket reacts</span>
+          </div>
+          <div class="p-5 space-y-3">
+            <p class="text-xs text-muted">
+              The tone only. What Sprocket may do does not change. Your pick wins; without one, the site default
+              ({{ settings.manner.siteDefault }}) answers.
+            </p>
+            <div class="grid gap-3 sm:grid-cols-2">
+              <button
+                v-for="option in settings.manner.options"
+                :key="option.id"
+                type="button"
+                :data-manner="option.id"
+                class="text-left rounded-lg border p-3 transition-colors cursor-pointer"
+                :class="settings.manner.pick === option.id ? 'border-primary bg-primary/5' : 'border-default hover:bg-elevated/40'"
+                :disabled="savingManner"
+                @click="pickManner(option.id)"
+              >
+                <p class="text-sm font-medium">
+                  {{ option.label }}
+                </p>
+                <p class="text-xs text-muted mt-1">
+                  {{ option.sample }}
+                </p>
+              </button>
+            </div>
+            <button
+              type="button"
+              class="text-xs text-primary underline"
+              :disabled="savingManner || settings.manner.pick === null"
+              @click="pickManner(null)"
+            >
+              Use the site default ({{ settings.manner.siteDefault }})
+            </button>
+          </div>
         </div>
 
         <!-- Claude Code -->

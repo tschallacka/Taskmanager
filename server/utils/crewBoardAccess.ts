@@ -7,10 +7,10 @@
 import { and, eq, inArray } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { db } from '../db'
-import { crewBoards, crews, member, projects, user } from '../db/schema'
+import { crewBoards, crews, member, projects } from '../db/schema'
 import type { Project } from '../db/schema'
 import type { ApiKeyContext } from './api-keys'
-import { hiddenCrewShadows } from './boardTree'
+import { crewIdOfUser, hiddenCrewShadows } from './boardTree'
 
 /** What a key's grant needs of its context: the person, the key's limit, and the teams the person belongs to. */
 export type GrantContext = Pick<ApiKeyContext, 'userId' | 'teamId' | 'projectId' | 'customerId' | 'memberTeamIds'>
@@ -154,8 +154,8 @@ export async function isStaffOfShadowedBoard(userId: string, projectId: string):
  */
 export async function readGrantedBoardIds(context: GrantContext): Promise<string[]> {
   if (context.customerId) return []
-  const [account] = await db.select({ crewId: user.crewId }).from(user).where(eq(user.id, context.userId))
-  const links = account?.crewId ? await crewLinksOf(account.crewId) : []
+  const crewId = await crewIdOfUser(context.userId)
+  const links = crewId ? await crewLinksOf(crewId) : []
   const shadowTeam = shadowTeamOf(context)
   const shadowIds = shadowTeam ? await shadowBoardIdsOfTeam(shadowTeam, context.userId) : []
   const granted = grantedBoardIdsOf(context, links, shadowIds)

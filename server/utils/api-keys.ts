@@ -2,11 +2,12 @@ import type { H3Event } from 'h3'
 import { createHash, randomBytes, timingSafeEqual } from 'crypto'
 import { eq } from 'drizzle-orm'
 import { db } from '../db'
-import { apiKeys, apiKeyBoards, apiKeyBoardScopes, apiKeySecrets, apiKeyWorkspaces, API_KEY_SCOPES, crews, member, user } from '../db/schema'
+import { apiKeys, apiKeyBoards, apiKeyBoardScopes, apiKeySecrets, apiKeyWorkspaces, API_KEY_SCOPES, crews, member } from '../db/schema'
 import { boardScopesOf, isTokenExpired, tokenRefusal } from './connectTokenRules'
 import { crewRefusal } from './crewPermission'
 import type { ApiKey, ApiKeyScope } from '../db/schema'
 import { isTeamMember } from './auth-helpers'
+import { crewIdOfUser } from './boardTree'
 
 // Keys are recognisable on sight so they can be spotted in configs and logs.
 export const API_KEY_PREFIX = 'arn_'
@@ -162,9 +163,9 @@ async function findKey(token: string) {
 
 /** Refuses a key of a crew account whose crew the permission no longer reaches. A key of any other person passes. */
 async function refuseIfCrewOff(userId: string): Promise<void> {
-  const [owner] = await db.select({ crewId: user.crewId }).from(user).where(eq(user.id, userId))
-  if (!owner?.crewId) return
-  const [crew] = await db.select().from(crews).where(eq(crews.id, owner.crewId))
+  const crewId = await crewIdOfUser(userId)
+  if (!crewId) return
+  const [crew] = await db.select().from(crews).where(eq(crews.id, crewId))
   const refusal = crew ? await crewRefusal(crew) : null
   if (refusal) throw createError({ statusCode: 401, statusMessage: 'Unauthorized', message: refusal, data: { code: 'crew_permission' } })
 }
