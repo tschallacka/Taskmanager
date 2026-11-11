@@ -28,12 +28,14 @@ function fail(e: unknown, fallback: string) {
 }
 
 // The team level of the crew permission. Only owners and admins get it; a member gets none and sees no switch.
-const teamPermission = ref<{ crewsAllowed: boolean, instanceAllowed: boolean } | null>(null)
+const teamPermission = ref<{ crewsAllowed: boolean, instanceAllowed: boolean, refusal: string | null } | null>(null)
 const savingPermission = ref(false)
+// Where crews are off, the one sentence the permission gives: shown in place of the add form.
+const teamRefusal = computed(() => teamPermission.value?.refusal ?? null)
 
 async function loadTeamPermission() {
   try {
-    teamPermission.value = await $fetch<{ crewsAllowed: boolean, instanceAllowed: boolean }>(`/api/teams/${props.teamId}/crews-allowed`)
+    teamPermission.value = await $fetch<{ crewsAllowed: boolean, instanceAllowed: boolean, refusal: string | null }>(`/api/teams/${props.teamId}/crews-allowed`)
   } catch {
     teamPermission.value = null
   }
@@ -165,8 +167,16 @@ const SELECT_CLASS = 'min-w-0 flex-1 rounded-md border border-default bg-default
       A crew that works on a board keeps a board of its own for it, in its own team. It reads this board and never changes it; the results are carried over by whoever runs the crew.
     </p>
 
+    <p
+      v-if="data?.canAttach && teamRefusal"
+      class="text-sm text-error"
+      data-team-crew-blocked
+    >
+      {{ teamRefusal }}
+    </p>
+
     <form
-      v-if="data?.canAttach"
+      v-if="data?.canAttach && !teamRefusal"
       class="space-y-2 rounded-xl border border-default p-3"
       data-team-crew-form
       @submit.prevent="addCrew"
