@@ -2,7 +2,7 @@
 // (whose .git is a file), and says nothing for a folder that is not a checkout. Each test works in throwaway folders
 // it removes itself, with real git. Run:
 //   node --test crew/session-hooks.test.mjs
-import { test, before, after } from 'node:test'
+import { test, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -11,15 +11,9 @@ import { spawnSync } from 'node:child_process'
 
 const ENTRY = '.claude/settings.local.json'
 const root = mkdtempSync(join(tmpdir(), 'session-hooks-test-'))
-const crewHome = join(root, 'crew-home')
-mkdirSync(crewHome, { recursive: true })
-writeFileSync(join(crewHome, 'crew.json'), JSON.stringify({ team: 'test', people: {}, nicks: {} }))
-process.env.CREW_HOME = crewHome
 
-let excludeFromGit, gitExcludeFile
-before(async () => {
-  ({ excludeFromGit, gitExcludeFile } = await import('./session-hooks.mjs'))
-})
+// session-hooks.mjs loads no crew.json (it imports home.mjs only), so no CREW_HOME is set here.
+import { excludeFromGit, gitExcludeFile } from './session-hooks.mjs'
 
 const git = (cwd, args) => spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd, encoding: 'utf8' })
 

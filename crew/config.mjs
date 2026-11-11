@@ -6,7 +6,7 @@
 // to the kit folder. crew.json (written by `crew setup`, or by hand) holds the product,
 // URLs, people and chat settings; creds.json holds the accounts and keys the board made.
 import { readFileSync, existsSync, readdirSync } from 'node:fs'
-import { crewHome, kitDir } from './home.mjs'
+import { crewHome, kitDir, shellWord } from './home.mjs'
 import { CAST, EXTRA_CAST, forkMemberPlan, forkRole } from './cast.mjs'
 import { migrateCrewHome, renameKeys } from './keys.mjs'
 
@@ -165,8 +165,8 @@ export const modelProblems = resolvedModels.problems
  */
 export const agentNames = Object.fromEntries(CAST.filter(key => !EXTRA_CAST.includes(key)).map(key => [key, `${slugify(config.crew.slug || config.team)}-${slugify(config.people[key])}`]))
 
-// A path as one shell word, quoted only when it has to be.
-export const shellWord = text => (/^[\w@%+=:,./-]+$/.test(text) ? text : `'${text.replace(/'/g, `'\\''`)}'`)
+// shellWord comes from home.mjs (one rule for the kit); config re-exports it for the scripts that import it from here.
+export { shellWord }
 
 // The documents the owner edits by hand. init writes each once and keeps it; update merges the new template into it.
 export const OWNER_FILES = ['PROJECT-RULES.md', 'BRIEF.md']

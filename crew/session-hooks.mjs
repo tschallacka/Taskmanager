@@ -3,8 +3,8 @@
 // so a file edited by hand keeps its own settings. Used for Pia's session (pia-session.mjs) and Boss's (boss-session).
 import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
-// The one shell-word rule of the kit lives in config.mjs; importing it here keeps the two from drifting apart.
-import { shellWord } from './config.mjs'
+// The one shell-word rule of the kit lives in home.mjs, which has no side effects; this file must not load config.mjs.
+import { shellWord } from './home.mjs'
 
 export { shellWord }
 
