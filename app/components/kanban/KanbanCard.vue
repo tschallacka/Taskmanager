@@ -219,7 +219,7 @@ const hasMeta = computed(() =>
       </span>
       <span
         v-if="blockedChip"
-        class="flex min-w-0 items-center truncate rounded px-1.5 py-0.5 text-[0.6875rem] font-medium ring-1 ring-inset text-warning ring-warning/40"
+        class="tm-tone-warn flex min-w-0 items-center truncate rounded-(--tm-radius-pill) px-1.5 py-0.5 text-[0.6875rem] font-medium"
         title="Waits for open tasks on this board"
         data-blocked-chip
       >
@@ -269,19 +269,19 @@ const hasMeta = computed(() =>
         <span
           v-if="due !== null"
           class="flex items-center gap-1"
-          :class="overdue ? 'font-medium text-error' : ''"
+          :class="overdue ? 'font-medium text-(--tm-status-overdue)' : ''"
         >
           <UIcon
             name="i-lucide-calendar"
             class="size-3"
           />
-          {{ dueLabel }}
+          {{ overdue ? 'Overdue · ' : '' }}{{ dueLabel }}
         </span>
 
         <span
           v-if="checklist"
           class="flex items-center gap-1 tabular-nums"
-          :class="checklistDone ? 'text-success' : ''"
+          :class="checklistDone ? 'text-(--tm-status-on-track)' : ''"
         >
           <UIcon
             name="i-lucide-list-checks"
