@@ -474,6 +474,7 @@ async function confirmDelete() {
 }
 
 const menuItems = computed(() => [[
+  { label: 'Copy link', icon: 'i-lucide-link', onSelect: copyTaskNumberLink },
   { label: 'Reset panel width', icon: 'i-lucide-rotate-ccw', onSelect: resetWidth }
 ], ...(readonly.value
   ? []
