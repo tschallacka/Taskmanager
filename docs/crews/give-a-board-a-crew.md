@@ -34,6 +34,9 @@ The Crews list shows each link as *crew name, works on board name*. Next to it:
   otherwise it opens read only.
 - The **x** takes the crew off the board. Every owner and admin of the team sees it.
 - A **disabled** tag means the instance admin switched the crew off.
+- **Forked members already on this board** lists the members forked for this board before forking was switched off,
+  one badge each, with the name and the agent type. Forking is no longer offered; these stay until the crew is taken
+  off the board (see [Fork a crew](/help/crews/fork-a-crew)).
 
 Anyone else on the team sees the list and the **Crew board** button, but not the add button or the **x**.
 
