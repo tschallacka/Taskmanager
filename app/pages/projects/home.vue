@@ -4,7 +4,6 @@ import { dueDayToMs, isOverdueDay } from '~/utils/dueDate'
 
 definePageMeta({ layout: 'app' })
 
-const { sidebarOpen } = useSidebar()
 useSeoMeta({ title: 'Home' })
 
 const { session } = useAuth()
@@ -34,16 +33,14 @@ function openTask(task: { id: string, projectId: string }) {
 
 <template>
   <div class="flex min-w-0 flex-1 flex-col overflow-y-auto">
-    <header class="flex shrink-0 items-center gap-2 px-4 py-3 lg:hidden">
-      <UButton
-        icon="i-lucide-panel-left"
-        color="neutral"
-        variant="ghost"
-        size="sm"
-        aria-label="Open sidebar"
-        @click="sidebarOpen = true"
-      />
-    </header>
+    <Teleport
+      defer
+      to="#app-topbar-title"
+    >
+      <h1 class="text-base font-semibold text-default">
+        Home
+      </h1>
+    </Teleport>
 
     <div class="mx-auto w-full max-w-4xl px-4 pb-12 pt-6 lg:px-6">
       <p class="text-sm text-muted">
