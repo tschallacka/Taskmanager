@@ -5,7 +5,7 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, describe, test } from 'node:test'
-import { addPeople, mergeNewPeople, newPeopleOf, parseAddArgs, REFUSED, writeCredsAtomic } from './people.mjs'
+import { addPeople, missingLines, missingPeople, mergeNewPeople, newPeopleOf, parseAddArgs, REFUSED, writeCredsAtomic } from './people.mjs'
 
 const scratch = mkdtempSync(join(tmpdir(), 'crew-people-test-'))
 after(() => rmSync(scratch, { recursive: true, force: true }))
@@ -184,5 +184,31 @@ describe('crew people add: the arguments', () => {
   test('a token on the command line is refused: it belongs in the environment', () => {
     assert.match(parseAddArgs(['add', 'arn_abc123']).error, /not on the command line/)
     assert.match(parseAddArgs(['add', '--token=x']).error, /not on the command line/)
+  })
+})
+
+describe('crew update: the missing-people hint', () => {
+  const cast = { cast: [{ key: 'susy', present: true }, { key: 'janet', present: false }, { key: 'pat', present: false }] }
+  const board = (status, body) => async () => ({ ok: status < 300, status, json: async () => body })
+
+  test('without a token nothing is asked, and the hint says how to check', async () => {
+    assert.equal(await missingPeople({ origin: 'http://x', slug: 'acme', token: undefined, fetchImpl: () => assert.fail('asked') }), null)
+    assert.match(missingLines(null)[0], /run crew people add/)
+  })
+
+  test('a cast with missing people names them and the command, and runs nothing', async () => {
+    const missing = await missingPeople({ origin: 'http://x', slug: 'acme', token: 'tok', fetchImpl: board(200, cast) })
+    assert.deepEqual(missing, ['janet', 'pat'])
+    assert.deepEqual(missingLines(missing), ['people: this crew is missing janet, pat. To add them, run: crew people add'])
+  })
+
+  test('nobody missing prints no line; a board that cannot be asked gives the check line', async () => {
+    const everyone = await missingPeople({ origin: 'http://x', slug: 'acme', token: 'tok', fetchImpl: board(200, { cast: [{ key: 'susy', present: true }] }) })
+    assert.deepEqual(missingLines(everyone), [])
+    assert.equal(await missingPeople({ origin: 'http://x', slug: 'acme', token: 'tok', fetchImpl: board(403, {}) }), null)
+    const down = async () => {
+      throw new Error('down')
+    }
+    assert.equal(await missingPeople({ origin: 'http://x', slug: 'acme', token: 'tok', fetchImpl: down }), null)
   })
 })

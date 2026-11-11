@@ -110,6 +110,29 @@ export async function addPeople({ origin, slug, home, token, people = null, fetc
   return 0
 }
 
+/**
+ * The people of the crew's cast that are missing, from GET /api/crews/:slug. null when the board cannot be asked (no
+ * token, no slug, or an error): the caller then says how to check, and nothing is changed.
+ */
+export async function missingPeople({ origin, slug, token, fetchImpl = fetch }) {
+  if (!token || !slug) return null
+  try {
+    const res = await fetchImpl(`${origin}/api/crews/${encodeURIComponent(slug)}`, { headers: { authorization: `Bearer ${token}` } })
+    if (!res.ok) return null
+    const body = await res.json()
+    return (body.cast ?? []).filter(person => !person.present).map(person => person.key)
+  } catch {
+    return null
+  }
+}
+
+/** The lines `crew update` ends with about missing people. It offers the command and runs nothing by itself. */
+export function missingLines(missing) {
+  if (missing === null) return ['people: to check for missing people, run crew people add (it changes nothing when nobody is missing)']
+  if (missing.length === 0) return []
+  return [`people: this crew is missing ${missing.join(', ')}. To add them, run: crew people add`]
+}
+
 async function printCast(fetchImpl, base, headers, log) {
   const res = await fetchImpl(base, { headers: { authorization: headers.authorization } })
   if (!res.ok) return

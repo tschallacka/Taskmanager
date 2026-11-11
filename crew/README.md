@@ -336,6 +336,8 @@ or password is printed, and it runs `init` afterwards so the new people get thei
   line; a token-looking argument is refused. Or use the crew owner's crews:manage key in the same variable. A crew
   member's key cannot add people, and the command says so in one sentence.
 - Nobody missing: it prints "nothing to add" and the cast, and changes nothing.
+- `crew update` ends by checking the cast when a management token is set: if people are missing it prints the command to
+  run, and runs nothing by itself. Without a token it says how to check.
 - It prints the names it added and the cast (`present` or `missing`), then "tell Pia: new people ...".
 - If the keys were made on the board but could not be written to `creds.json` (a full disk, say), the command says
   those keys are lost. They cannot be fetched again: the board only makes missing people. Ask Boss for a recovery path.
