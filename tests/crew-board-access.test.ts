@@ -111,7 +111,8 @@ test('get_task reads an internal task on the real board with the grant, and cann
   const withGrant = { ...keyOf(crewMember, crewTeam), readGrantedBoardIds: [realBoard] }
   const read = await tool('get_task').handler({ id: task }, withGrant) as { title?: string, task?: { title?: string } }
   assert.match(JSON.stringify(read), /Secret internal task/)
-  await assert.rejects(tool('get_task').handler({ id: task }, keyOf(crewMember, crewTeam)), /not in this workspace|No task/)
+  // Without the grant the real board is not reached: the refusal names the reason and the shadow board (mcp-board-roles.test.ts).
+  await assert.rejects(tool('get_task').handler({ id: task }, keyOf(crewMember, crewTeam)), /is the real board your crew reads/)
 })
 
 test('a write tool is never given the grant, and neither is a read that exposes secrets', () => {

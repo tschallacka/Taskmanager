@@ -29,6 +29,11 @@ export function isTakenOff(board: Pick<Project, 'archivedAt' | 'name'>): boolean
   return board.archivedAt != null && board.name.endsWith(TAKEN_OFF_SUFFIX)
 }
 
+/** The sentence a write on a board taken off its crew is refused with: such a board is read-only. */
+export function takenOffRefusal(board: Pick<Project, 'name'>): string {
+  return `"${board.name}" is a crew board taken off its crew, so it is read-only: nothing can be added to it. Use the crew's current board instead.`
+}
+
 /** The boards in `ids` this key may write to. A key without the write scope writes to none. */
 async function writableIds(context: ApiKeyContext, ids: string[]): Promise<Set<string>> {
   if (!ids.length || !context.scopes.includes('boards:write')) return new Set()
@@ -67,6 +72,8 @@ export async function boardRoleFields(
       note = 'The real board: read it; your crew never writes here. Boss carries results over.'
     } else if (crewId && role === 'shadow' && realBoard) {
       note = `Your crew's working board for '${realBoard.name}'. Plan and work here.`
+    } else if (crewId && role === 'crew_home') {
+      note = 'The crew\'s home board: where the crew was made. Your crew works on its shadow board for a real board, not here.'
     }
 
     result.set(board.id, {

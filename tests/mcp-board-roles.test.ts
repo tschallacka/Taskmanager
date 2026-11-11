@@ -143,6 +143,52 @@ test('get_board carries the same role fields as list_boards', async () => {
   assert.equal(answer.shadowBoard?.id, shadowBoard)
 })
 
+test('a task update, move or comment on a real-board task is refused with the reason and the shadow board to use', async () => {
+  const taskId = `tmrtask${tag}`
+  await db.insert(projectTasks).values({ id: taskId, projectId: realBoard, columnId: column, title: 'Real task', visibility: 'internal', position: 1, createdAt: now, updatedAt: now })
+  try {
+    for (const [name, args] of [['update_task', { id: taskId, title: 'Changed' }], ['move_task', { id: taskId, column: 'To do' }], ['post_task_update', { id: taskId, body: 'Note' }]] as const) {
+      await assert.rejects(
+        tool(name).handler(args, keyOf(crewMember, crewTeam)),
+        (error: Error) => {
+          assert.match(error.message, /is the real board your crew reads; it never writes there/, name)
+          assert.match(error.message, new RegExp(`\\(id ${shadowBoard}\\): use that board`), name)
+          return true
+        },
+        name
+      )
+    }
+    const row = await db.select({ title: projectTasks.title }).from(projectTasks).where(eq(projectTasks.id, taskId))
+    assert.equal(row[0]?.title, 'Real task')
+  } finally {
+    await db.delete(projectTasks).where(eq(projectTasks.id, taskId))
+  }
+})
+
+test('a board taken off its crew is read-only: create_task on it is refused with the reason', async () => {
+  await assert.rejects(
+    tool('create_task').handler({ board: takenOff, column: 'To do', title: 'Late' }, keyOf(boss, realTeam)),
+    /taken off its crew, so it is read-only/
+  )
+  const rows = await db.select({ id: projectTasks.id }).from(projectTasks).where(eq(projectTasks.projectId, takenOff))
+  assert.equal(rows.length, 0)
+})
+
+test('the crew\'s home board carries a note for a crew key', async () => {
+  const home = id('home')
+  await db.insert(projects).values({ id: home, userId: boss, teamId: crewTeam, name: 'Roles home', createdAt: now, updatedAt: now })
+  await db.update(crews).set({ boardId: home }).where(eq(crews.id, crewId))
+  try {
+    const rows = await listed(keyOf(crewMember, crewTeam))
+    const row = rows.get(home)!
+    assert.equal(row.role, 'crew_home')
+    assert.match(row.note ?? '', /home board/)
+  } finally {
+    await db.update(crews).set({ boardId: null }).where(eq(crews.id, crewId))
+    await db.delete(projects).where(eq(projects.id, home))
+  }
+})
+
 test('a crew\'s write on its real board is refused with the reason and the shadow board to use', async () => {
   await assert.rejects(
     tool('create_task').handler({ board: realBoard, column: 'To do', title: 'Sneaky' }, keyOf(crewMember, crewTeam)),

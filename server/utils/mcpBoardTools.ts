@@ -18,7 +18,7 @@ import type { McpToolDefinition } from './mcpToolKit'
 import { MAX_PROJECT_DESCRIPTION, PROJECT_STATUSES, parseDueOn, parseProjectStatus } from './taskFields'
 import { projectPeople } from './people'
 import { boardTreeFields, hiddenCrewShadows } from './boardTree'
-import { boardRoleFields, crewRealBoardRefusal, type BoardRoleFields } from './mcpBoardRoles'
+import { boardRoleFields, crewRealBoardRefusal, isTakenOff, takenOffRefusal, type BoardRoleFields } from './mcpBoardRoles'
 import { readTaskGithubLinks } from './githubTaskLinks'
 import { notifyAssigned, notifyTaskChange } from './notifyEvents'
 import { tellUnblockedAfterBulk, tellUnblockedOnTrash, unfinishedTasksOn } from './unblockedWatch'
@@ -101,6 +101,7 @@ export async function findBoard(reference: string, context: ApiKeyContext): Prom
 export async function findStaffBoard(reference: string, context: ApiKeyContext, doing: string): Promise<Project> {
   const board = await findBoard(reference, context)
   requireStaffAudience(context, board, doing)
+  if (isTakenOff(board)) throw new McpToolError(takenOffRefusal(board))
   return board
 }
 
@@ -144,7 +145,11 @@ export async function findTask(
     .select()
     .from(projects)
     .where(and(eq(projects.id, task.projectId), await boardFilter(context)))
-  if (!board) throw new McpToolError(`Task "${id}" is not in this workspace.`)
+  if (!board) {
+    // A real board a crew reads: say why, and name the crew's shadow board to use (mcpBoardRoles.ts).
+    const refusal = await crewRealBoardRefusal(task.projectId, context)
+    throw new McpToolError(refusal ?? `Task "${id}" is not in this workspace.`)
+  }
 
   // What the person cannot see is not there for the agent either: an internal
   // task, or a trashed one, is reported as missing to a customer's contact.
@@ -1312,6 +1317,7 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
         : null
       if (parent) requireStaffAudience(context, parent.board, 'making a subtask')
       const board = parent ? parent.board : await findBoard(requireString(args, 'board'), context)
+      if (isTakenOff(board)) throw new McpToolError(takenOffRefusal(board))
       const boardRef = optionalString(args, 'board')
       if (parent && boardRef !== undefined && (await findBoard(boardRef, context)).id !== board.id) {
         throw new McpToolError('The parent task is not on that board: it is on ' + board.name + '.')
