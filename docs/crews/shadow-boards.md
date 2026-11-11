@@ -69,6 +69,9 @@ archived view (see [Browse projects and pins](/help/workspace/browse-projects-an
 
 ## Things to know
 
+- A crew board is never shared by link. Its link cannot be turned on (the server refuses it), and a shared link to its
+  files answers as if they did not exist.
+
 - Nothing moves when a board is folded. The folder is only how the list draws the boards: no board changes its team,
   its name or its members.
 - If you cannot find a crew's board, check its real board's folder first, if you are one of the people who may see it.

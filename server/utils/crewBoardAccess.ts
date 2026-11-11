@@ -98,12 +98,11 @@ export async function shadowBoardIdsOfTeam(teamId: string, userId: string): Prom
 }
 
 /**
- * The shadow board `projectId` as a team's staff may read it, or undefined when it is not one of theirs or the person
- * may not see it under the crew rule.
+ * The shadow board `projectId` as a team's staff may read it, or undefined when it is not one of theirs. The crew rule
+ * is NOT applied here: the caller (requireProject) checks hiddenCrewShadows once, before it asks.
  */
-export async function shadowBoardForStaff(teamId: string | null, projectId: string, userId: string): Promise<Project | undefined> {
+export async function shadowBoardForStaff(teamId: string | null, projectId: string): Promise<Project | undefined> {
   if (!teamId) return undefined
-  if ((await hiddenCrewShadows(userId, [projectId])).has(projectId)) return undefined
   const real = alias(projects, 'real_board')
   const [row] = await db
     .select({ shadow: projects })
@@ -131,11 +130,10 @@ export async function isOwnCrewBoard(crewId: string, projectId: string): Promise
 }
 
 /**
- * Whether `userId` belongs to a team whose board `projectId` is the shadow of, and may see it under the crew rule:
- * for serving files.
+ * Whether `userId` belongs to a team whose board `projectId` is the shadow of: for serving files. The crew rule is NOT
+ * applied here: the attachment route checks hiddenCrewShadows once, before it asks.
  */
 export async function isStaffOfShadowedBoard(userId: string, projectId: string): Promise<boolean> {
-  if ((await hiddenCrewShadows(userId, [projectId])).has(projectId)) return false
   const real = alias(projects, 'real_board')
   const [row] = await db
     .select({ id: crewBoards.id })

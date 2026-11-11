@@ -209,6 +209,15 @@ export async function boardTreeFields(boardIds: string[], shown: Set<string>): P
 }
 
 /**
+ * Whether `projectId` is a crew's shadow board. A shadow is seen only under the crew rule (hiddenCrewShadows), and a
+ * shared link is anonymous, so a shadow is never served by link (publicAccess, the attachment route, the share switch).
+ */
+export async function isCrewShadow(projectId: string): Promise<boolean> {
+  const [row] = await db.select({ id: crewBoards.id }).from(crewBoards).where(eq(crewBoards.shadowProjectId, projectId))
+  return Boolean(row)
+}
+
+/**
  * Whether a real board that a crew's shadow leads to is an ordinary row in the list (the person belongs to its
  * workspace, so the row opens it after a switch) or a read-only label row (anyone else: a crew member).
  */

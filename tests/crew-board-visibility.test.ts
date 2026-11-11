@@ -8,6 +8,8 @@ import assert from 'node:assert/strict'
 import { randomBytes } from 'node:crypto'
 import { createError } from 'h3'
 import { eq, inArray } from 'drizzle-orm'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 // Nitro provides createError as a global; the helpers under test expect it.
 Object.assign(globalThis, { createError })
@@ -22,6 +24,9 @@ const { readGrantedBoardIds } = await import('../server/utils/crewBoardAccess')
 const { requireProject, requireTask } = await import('../server/utils/projects')
 const { MCP_TOOLS } = await import('../server/utils/mcpRegistry')
 const { boardFilter } = await import('../server/utils/mcpAccess')
+const { findPublicProject } = await import('../server/utils/publicAccess')
+const { taskAttachmentDir } = await import('../server/utils/attachments')
+const { auth } = await import('../server/lib/auth')
 
 const tag = randomBytes(4).toString('hex')
 const id = (name: string) => `tcv-${tag}-${name}`
@@ -168,8 +173,9 @@ test('a plain member\'s team key is granted no shadow board, so get_board and ge
   const context = keyOf(realMember, realTeam)
   assert.deepEqual(await readGrantedBoardIds(context), [])
   const reach = await withReach(context)
-  await assert.rejects(tool('get_board').handler({ board: shadowBoard }, reach), /No board|not/)
-  await assert.rejects(tool('get_task').handler({ id: shadowTaskId }, reach), /not in this workspace|No task/)
+  // The exact not-found messages of mcpBoardTools.ts: a different error must fail these tests.
+  await assert.rejects(tool('get_board').handler({ board: shadowBoard }, reach), /No board ".*" in this workspace\./)
+  await assert.rejects(tool('get_task').handler({ id: shadowTaskId }, reach), /is not in this workspace\.|No task with id/)
   const visible = (await db.select({ id: projects.id }).from(projects).where(await boardFilter(reach))).map(row => row.id)
   assert.ok(!visible.includes(shadowBoard))
   // search_tasks does not turn up the shadow's task either.
@@ -198,4 +204,56 @@ test('a plain member\'s key limited to the real board does not reach the shadow 
 test('the crew\'s own account reads the real board it was given, and is not granted other shadows', async () => {
   assert.deepEqual(await readGrantedBoardIds(keyOf(crewMember, crewTeam)), [realBoard])
   assert.ok(!(await readGrantedBoardIds(keyOf(crewTeamMember, crewTeam))).includes(shadowBoard))
+})
+
+// ─── A crew board is never served by a shared link (an anonymous reader has no person for the crew rule) ───
+
+// The route files only ask who the session is and write headers; stand in for those, as the tree test does.
+let sessionUser: string | null = null
+;(auth.api as unknown as { getSession: () => Promise<unknown> }).getSession = async () => (sessionUser ? { user: { id: sessionUser } } : null)
+Object.assign(globalThis, {
+  defineEventHandler: (handler: unknown) => handler,
+  getRouterParam: (event: { params: Record<string, string> }, key: string) => event.params[key],
+  readBody: async (event: { body?: unknown }) => event.body ?? {},
+  setHeader: () => {}
+})
+
+test('a shared link never serves a crew board: not its files, not its public read, not the share switch', async () => {
+  const linkTask = `tcvlink${tag}`
+  const bytes = Buffer.from('not really a png')
+  const dir = taskAttachmentDir(linkTask)
+  await db.insert(projectTasks).values({ id: linkTask, projectId: shadowBoard, columnId: `${column}-shadow`, title: 'Shared note', visibility: 'customer', position: 1, createdAt: now, updatedAt: now })
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, 'pic.png'), bytes)
+  // The shadow is switched on for a link, as a crew board could be before this rule.
+  await db.update(projects).set({ isPublic: true }).where(eq(projects.id, shadowBoard))
+  try {
+    assert.equal(await findPublicProject(shadowBoard), null)
+    // A real board that is shared still reads by link: the rule is for crew boards only.
+    await db.update(projects).set({ isPublic: true }).where(eq(projects.id, realBoard))
+    assert.equal((await findPublicProject(realBoard))?.id, realBoard)
+    await db.update(projects).set({ isPublic: false }).where(eq(projects.id, realBoard))
+
+    // Anonymous: 404, as if the file did not exist. A signed-in plain member of the real team: 404 too.
+    const route = (await import('../server/api/attachments/tasks/[taskId]/[filename].get')).default as unknown as (event: unknown) => Promise<Buffer>
+    const read = (userId: string | null) => {
+      sessionUser = userId
+      return route({ params: { taskId: linkTask, filename: 'pic.png' }, headers: new Headers() })
+    }
+    await assert.rejects(read(null), notFound)
+    await assert.rejects(read(realMember), notFound)
+    // The crew's own account still reads its file.
+    assert.deepEqual(await read(crewMember), bytes)
+    sessionUser = null
+
+    // The share switch: the crew's owner may not switch a crew board's link on.
+    const put = (await import('../server/api/projects/[id]')).default as unknown as (event: unknown) => Promise<unknown>
+    const editor = { method: 'PUT', params: { id: shadowBoard }, body: { isPublic: true }, ...eventOf(boss, crewTeam, 'PUT') }
+    await assert.rejects(put(editor), (e: { statusCode?: number, message?: string }) => e.statusCode === 400 && /cannot be shared by link/.test(e.message ?? ''))
+  } finally {
+    await db.update(projects).set({ isPublic: false }).where(eq(projects.id, shadowBoard))
+    await db.update(projects).set({ isPublic: false }).where(eq(projects.id, realBoard))
+    await db.delete(projectTasks).where(eq(projectTasks.id, linkTask))
+    rmSync(dir, { recursive: true, force: true })
+  }
 })
