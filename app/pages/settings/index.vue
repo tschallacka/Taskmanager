@@ -10,6 +10,13 @@ const { session, signOut, isInstanceAdmin } = useAuth()
 const { primaryColor, neutralColor, PRIMARY_COLORS, NEUTRAL_COLORS, setPrimaryColor, setNeutralColor, openrouterApiKeyMasked, openrouterModel, POPULAR_OPENROUTER_MODELS, setOpenRouterApiKey, setOpenRouterModel } = useUserSettings()
 
 // The settings section list: each entry jumps to a section on this page (or to a settings page).
+// A jump to a section of this page scrolls the page's own scroll box to it: a plain #hash does not scroll
+// a box that is not the document, so the phone list and the wide list both use this.
+function jumpTo(to: string) {
+  if (!to.startsWith('#')) return
+  document.getElementById(to.slice(1))?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
 const sections = [
   { label: 'Your stats', icon: 'i-lucide-chart-column', to: '#stats' },
   { label: 'Account', icon: 'i-lucide-user-round', to: '#account' },
@@ -181,13 +188,14 @@ function swatchStyle(color: string, selected: boolean) {
         <UButton
           v-for="s in sections"
           :key="s.to"
-          :to="s.to"
+          :to="s.to.startsWith('#') ? undefined : s.to"
           :label="s.label"
           :icon="s.icon"
           color="neutral"
           variant="ghost"
           size="sm"
           class="shrink-0 justify-start"
+          @click="jumpTo(s.to)"
         />
         <UButton
           v-if="isInstanceAdmin"

@@ -6,7 +6,6 @@ import { queryForView } from '~/utils/projectViewQuery'
 definePageMeta({ layout: 'app' })
 
 const route = useRoute()
-const { sidebarOpen } = useSidebar()
 const searchOpen = useSearchModal()
 
 const {
@@ -735,14 +734,6 @@ useSeoMeta({
       class="fixed bottom-0 left-0 right-0 z-20 flex items-center justify-around border-t border-default bg-default/95 px-8 backdrop-blur-sm lg:hidden"
       style="padding-top: 0.5rem; padding-bottom: max(0.5rem, env(safe-area-inset-bottom))"
     >
-      <UButton
-        icon="i-lucide-panel-left"
-        color="neutral"
-        variant="ghost"
-        size="md"
-        aria-label="Open sidebar"
-        @click="sidebarOpen = true"
-      />
       <UButton
         icon="i-lucide-search"
         color="neutral"
