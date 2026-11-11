@@ -51,8 +51,12 @@ real terminal, so never start it headless. In that terminal:
 ```
 export CREW_HOME={{crew_dir}}
 mkdir -p {{crew_dir}}/pia-session && cd {{crew_dir}}/pia-session
-claude --model {{models.pia.model}} --add-dir {{crew_dir}} --add-dir {{kit_dir}} --settings {{kit_dir}}/claude-long-run.json
+claude --model {{models.pia.model}} --add-dir {{crew_dir}} --add-dir {{kit_dir}} --settings {{kit_dir}}/pia-session.settings.json
 ```
+
+`pia-session.settings.json` is the long-run profile plus Pia's listener hooks (the Stop and SessionStart hooks that keep her
+listener running). It is one file on purpose: her session takes a single `--settings`, so nothing depends on how two
+files are combined. Its env block is the profile's, and a kit test keeps the two equal.
 
 `--model` is her model from the table above. It applies when her provider is `claude`; for another provider the
 kit has no way to start her yet, so Boss tells the Owner instead of starting her on Claude.

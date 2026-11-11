@@ -49,3 +49,13 @@ test('the checked version or a newer one gets no warning', () => {
 test('an unreadable version says so', () => {
   assert.match(versionWarning('no version here'), /could not read/)
 })
+
+test('the PM session file has the profile env and its listener hooks, and nothing else the profile lacks', () => {
+  const pia = JSON.parse(readFileSync(join(kit, 'pia-session.settings.json'), 'utf8'))
+  assert.deepEqual(pia.env, profile.env, 'the env block is the same as the profile')
+  const commands = JSON.stringify(pia.hooks)
+  assert.match(commands, /pia-listener-hook\.sh\\" stop/)
+  assert.match(commands, /pia-listener-hook\.sh\\" sessionstart/)
+  assert.match(commands, /\$CREW_HOME\/bin\//, 'the hook is found through CREW_HOME, not a fixed path')
+  assert.equal(pia.permissions, undefined, 'the PM rules stay in the session folder, not in the kit')
+})

@@ -1,0 +1,30 @@
+{
+  "env": {
+    "BASH_DEFAULT_TIMEOUT_MS": "1800000",
+    "BASH_MAX_TIMEOUT_MS": "7200000",
+    "CLAUDE_CODE_AUTO_BACKGROUND_TIMEOUT_MS": "1800000",
+    "BASH_MAX_OUTPUT_LENGTH": "150000",
+    "MCP_TIMEOUT": "60000",
+    "CLAUDE_CODE_MCP_AUTO_BACKGROUND_MS": "600000",
+    "CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT": "1800000",
+    "CLAUDE_ASYNC_AGENT_STALL_TIMEOUT_MS": "3600000"
+  },
+  "outputStyle": "concise",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "sh \"$CREW_HOME/bin/pia-listener-hook.sh\" stop" }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|compact",
+        "hooks": [
+          { "type": "command", "command": "sh \"$CREW_HOME/bin/pia-listener-hook.sh\" sessionstart" }
+        ]
+      }
+    ]
+  }
+}
