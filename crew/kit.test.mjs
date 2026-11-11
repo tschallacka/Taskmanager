@@ -24,6 +24,9 @@ import { crewHome } from './home.mjs'
 import { codeAt, keyOf } from './totp.mjs'
 import { createOTP } from '@better-auth/utils/otp'
 import { CAST, EXTRA_CAST, forkMemberPlan, forkRole } from './cast.mjs'
+import { copyKitFiles, kitListed, writeCrewJson } from './test-fixtures.mjs'
+
+const kitFilesOf = kitListed
 
 test('the extra workers the kit names are the ones the app shares: one list, and this fails when they differ', () => {
   const shared = readFileSync(join(KIT, '..', 'shared', 'utils', 'extraWorkers.ts'), 'utf8')
@@ -45,7 +48,7 @@ test('an extra worker plays its role from its fork, and the plan of a forked mem
 const KIT = dirname(fileURLToPath(import.meta.url))
 const CREW = join(KIT, 'crew.mjs')
 const DRIVER = join(KIT, 'browser-driver.mjs')
-const NOT_SHIPPED = /\.test\.mjs$|^\.|^kit-files\.txt$/
+const NOT_SHIPPED = /\.test\.mjs$|^\.|^kit-files\.txt$|^test-fixtures\.mjs$/
 const SECRET_OR_RUN = /^(creds|crew|crew\.config|package-lock)\.json$|\.log$/
 
 describe('the kit file list', () => {
@@ -513,17 +516,11 @@ describe('CREW_HOME and the agent types', () => {
 // ---------- crew update: the kit folder and the owner files (no browser needed) ----------
 
 describe('crew update: the kit folder and the owner files', () => {
-  const kitFilesOf = dir => readFileSync(join(dir, 'kit-files.txt'), 'utf8').split('\n').map(line => line.trim()).filter(line => line && !line.startsWith('#'))
   const editFile = (path, change) => writeFileSync(path, change(readFileSync(path, 'utf8')))
 
-  // A copy of the kit's listed files, as a folder the crew runs from.
-  function copyKit(dest, from = KIT) {
-    mkdirSync(dest, { recursive: true })
-    for (const name of [...kitFilesOf(from), 'kit-files.txt']) copyFileSync(join(from, name), join(dest, name))
-  }
-  function writeConfig(crew, url) {
-    writeFileSync(join(crew.home, 'crew.json'), JSON.stringify({ team: 'Test Crew', crew: { slug: 'test' }, product: { name: 'Test', repo: '' }, board: { url } }))
-  }
+  // A copy of the kit's listed files, as a folder the crew runs from (the fixture the update tests share).
+  const copyKit = (dest, from = KIT) => copyKitFiles(dest, from)
+  const writeConfig = (crew, url) => writeCrewJson(crew.home, { slug: 'test', url, team: 'Test Crew' })
   function newCrew() {
     const root = mkdtempSync(join(SCRATCH, 'kit-update-'))
     made.push(root)
@@ -575,7 +572,11 @@ describe('crew update: the kit folder and the owner files', () => {
     const out = await updateKit(dirA, crew, ['--from', KIT, '--kit', dirA])
     assert.equal(out.code, 0, out.stderr)
     assert.match(out.stdout, /is up to date/)
-    assert.deepEqual(snapshot(crew.home), before, 'the crew home is the same after the check')
+    // The crew home had no record of its kit (init does not write one), so the check links it to the folder it runs
+    // from. That link is the one change; every owner file and the rest of the home stay as they were.
+    const { '/crew-kit.json': link, ...rest } = snapshot(crew.home)
+    assert.deepEqual(rest, before, 'the crew home is the same after the check, apart from its link')
+    assert.equal(JSON.parse(link).kit, dirA, 'the home now names the kit folder it runs from')
     assert.deepEqual(backupsOf(crew), [], 'no backup when nothing changed')
   })
 

@@ -1,25 +1,21 @@
 // The one-line crew update: the shell script served at /crew/update.sh. It fetches this instance's kit
 // and runs the kit's own update.mjs from that fresh copy, so an old kit without update.mjs can update too.
-// Usage on the agent's machine:  curl -fsSL <origin>/crew/update.sh | sh -s -- <crew home>
-
-/** The origin as a plain http(s) URL with a host, so it can be written into the script inside single quotes. */
-export function crewUpdateOrigin(origin: string): string {
-  if (!/^https?:\/\/[A-Za-z0-9.:-]+$/.test(origin)) throw new Error(`not a plain origin: ${origin}`)
-  return origin
-}
+// The command itself is written once, in shared/utils/crewUpdate.ts.
+import { crewUpdateCommand, crewUpdateOrigin } from '../../shared/utils/crewUpdate'
 
 export function crewUpdateScript(origin: string): string {
   const url = crewUpdateOrigin(origin)
+  const usage = crewUpdateCommand(url)
   return `#!/bin/sh
 # Updates a crew to this Taskmanager's crew kit. Nothing interactive, and no secret is printed.
-# Usage: curl -fsSL ${url}/crew/update.sh | sh -s -- <crew home>
+# Usage: ${usage}
 # The kit folder is the one the crew home recorded in crew-kit.json (kit), else ~/crew-kit-<host>.
 set -eu
 ORIGIN='${url}'
 HOST=$(printf '%s' "$ORIGIN" | sed -e 's|^[a-z]*://||' -e 's|/.*||')
 HOME_ARG="\${1:-}"
 if [ -z "$HOME_ARG" ]; then
-  echo "usage: curl -fsSL $ORIGIN/crew/update.sh | sh -s -- <crew home>" >&2
+  echo "usage: ${usage}" >&2
   exit 64
 fi
 CREW_HOME_DIR=$(cd "$HOME_ARG" && pwd)
