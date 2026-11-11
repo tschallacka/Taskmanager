@@ -488,6 +488,9 @@ async function submitColumn() {
 
 const isFiltering = computed(() => activeTags.value.length > 0)
 
+// The Done column gets the dashed drop slot when it is empty: finished work lands here.
+const isDoneColumn = (column: { name: string }) => /^done$/i.test(column.name.trim())
+
 // Filtered once per render instead of three times per column (header count,
 // list and empty state each asked for the same list).
 const tasksByColumn = computed(() => {
@@ -829,6 +832,14 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onBoardKeydown))
           class="px-1 py-2 text-xs text-dimmed"
         >
           Nothing matches the filter
+        </p>
+
+        <p
+          v-else-if="!isFiltering && isDoneColumn(column) && tasksOf(column.id).length === 0"
+          class="rounded-lg border border-dashed border-default px-3 py-4 text-center text-sm leading-5 text-muted"
+          data-done-drop-slot
+        >
+          Drag a finished task here, or tick its circle.
         </p>
 
         <!-- Composer sits with the cards, not pinned to the bottom of a tall

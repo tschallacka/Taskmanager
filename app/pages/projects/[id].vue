@@ -431,7 +431,17 @@ useSeoMeta({
             :variant="activeTags.length ? 'soft' : 'ghost'"
           >
             <span class="hidden sm:inline">Labels</span>
-            <span v-if="activeTags.length">{{ activeTags.length }}</span>
+            <!-- Active filters show as chips inside the button: the first two by name, then a count. -->
+            <span
+              v-for="tag in activeTags.slice(0, 2)"
+              :key="tag"
+              class="tm-chip tm-tone-info max-w-28 truncate"
+              data-filter-chip
+            >{{ tag }}</span>
+            <span
+              v-if="activeTags.length > 2"
+              class="tm-chip tm-tone-info"
+            >+{{ activeTags.length - 2 }}</span>
           </UButton>
 
           <template #content>
@@ -524,13 +534,13 @@ useSeoMeta({
     <!-- Archived: out of the lists and its rules are paused; the board itself stays usable -->
     <div
       v-if="activeProject?.archivedAt"
-      class="flex flex-wrap items-center gap-3 border-b border-warning/40 bg-warning/10 px-4 py-2 text-sm text-default lg:px-6"
+      class="flex flex-wrap items-center gap-3 border-b border-primary/40 bg-primary/10 px-4 py-2 text-sm text-default lg:px-6"
       data-archived-banner
     >
       <span class="inline-flex items-center gap-1.5 font-medium">
         <UIcon
           name="i-lucide-archive"
-          class="size-4 text-warning"
+          class="size-4 text-primary"
         />
         Archived
       </span>
