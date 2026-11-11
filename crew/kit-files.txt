@@ -37,6 +37,7 @@ keys.mjs
 listen.mjs
 mentions.mjs
 package.json
+pia-session.mjs
 postbrief.mjs
 publish.mjs
 setup.mjs

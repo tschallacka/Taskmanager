@@ -11,6 +11,7 @@
 //   crew janet stale plan|run <card> [--dry-run]         the crew's stale worktrees: plan, then run what is granted (janet.mjs)
 //   crew publish <slug> <branch> <title> <msg-file> <pr-file>   the merger's one command: squash onto a fresh base, check, push, open the PR (publish.mjs)
 //   crew totp <file>           the current authenticator code for a dev copy's two-factor secret (totp.mjs)
+//   crew pia-session           the name of Pia's current session, pia-session-<id>, read from her newest transcript (pia-session.mjs)
 //   crew setup                 make the crew by hand through the crew API (setup.mjs)
 //   crew channel <who>         the Claude Code channel server for one person (channel.mjs)
 //   crew <who> browser goto|shot|eval|console|tabs|close-tab|done   the shared browser, one context per person (browser.mjs)
@@ -23,7 +24,7 @@ import { fileURLToPath } from 'node:url'
 
 const kit = dirname(fileURLToPath(import.meta.url))
 const [first, ...rest] = process.argv.slice(2)
-const scripts = { listen: 'listen.mjs', watch: 'watch.mjs', init: 'init.mjs', setup: 'setup.mjs', channel: 'channel.mjs', update: 'update.mjs', mentions: 'mentions.mjs', totp: 'totp.mjs', janet: 'janet.mjs', publish: 'publish.mjs' }
+const scripts = { listen: 'listen.mjs', watch: 'watch.mjs', init: 'init.mjs', setup: 'setup.mjs', channel: 'channel.mjs', update: 'update.mjs', mentions: 'mentions.mjs', totp: 'totp.mjs', janet: 'janet.mjs', publish: 'publish.mjs', 'pia-session': 'pia-session.mjs' }
 
 if (!first || first === '-h' || first === '--help') {
   console.log('usage: crew <who> <command ...> | crew <who> browser <command> | crew browser status|shutdown | crew listen <who> [sec] | crew watch | crew init | crew setup | crew channel <who> | crew mentions [minutes|--follow] | crew publish <slug> <branch> <title> <msg-file> <pr-file> | crew update [--check] [--from <kit folder|kit.tar.gz>] [--kit <folder>]')
