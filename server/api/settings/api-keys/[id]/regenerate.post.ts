@@ -1,4 +1,4 @@
-import { regenerateKey } from '../../../utils/connectTokens'
+import { regenerateKey } from '../../../../utils/connectTokens'
 
 /**
  * Gives a key a new secret. The name, boards and permissions stay; the old secret stops working at once and

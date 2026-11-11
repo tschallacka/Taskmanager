@@ -6,7 +6,7 @@ import { and, eq } from 'drizzle-orm'
 import { auth } from '#server/lib/auth'
 import { isTeamMember } from '#server/utils/auth-helpers'
 import { isStaffOfShadowedBoard } from '#server/utils/crewBoardAccess'
-import { hiddenCrewShadows } from '#server/utils/boardTree'
+import { hiddenCrewShadows, isCrewShadow } from '#server/utils/boardTree'
 import { guestRowOf } from '#server/utils/guests'
 import { ATTACHMENT_MIME, SAFE_FILENAME, SAFE_ID, taskAttachmentDir } from '#server/utils/attachments'
 
@@ -39,13 +39,17 @@ export default defineEventHandler(async (event) => {
   if (!row) throw createError({ statusCode: 404, message: 'Not found' })
 
   const sharedWithCustomers = row.visibility === 'customer'
-  const isPublic = sharedWithCustomers && row.isPublic && (!row.publicUntil || row.publicUntil > Date.now())
+  // A crew's shadow board is never served by link (isCrewShadow): its files go to the crew rule only.
+  const crewShadow = await isCrewShadow(row.projectId)
+  const isPublic = sharedWithCustomers && row.isPublic && (!row.publicUntil || row.publicUntil > Date.now()) && !crewShadow
   if (!isPublic) {
     const session = await auth.api.getSession({ headers: event.headers })
     const userId = session?.user.id
-    // A crew shadow the person may not see (hiddenCrewShadows) serves no files, as it opens no board.
-    const hiddenShadow = userId !== undefined && (await hiddenCrewShadows(userId, [row.projectId])).has(row.projectId)
-    const allowed = userId !== undefined && !hiddenShadow && (
+    // A crew shadow the person may not see (hiddenCrewShadows), or anyone with no session, gets no files: 404, as if it
+    // did not exist. The one rule is applied here, once, for every route into the files.
+    const hiddenShadow = crewShadow && (userId === undefined || (await hiddenCrewShadows(userId, [row.projectId])).has(row.projectId))
+    if (hiddenShadow) throw createError({ statusCode: 404, message: 'Not found' })
+    const allowed = userId !== undefined && (
       userId === row.userId
       || (row.teamId ? await isTeamMember(userId, row.teamId) : false)
       || (sharedWithCustomers && row.customerId ? await isCustomerContact(userId, row.customerId) : false)
