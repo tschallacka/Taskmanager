@@ -57,7 +57,7 @@ Sprocket, the assistant in the chat panel, can be answered by Claude Code instea
 | Variable | What it does |
 |---|---|
 | `SPROCKET_CLAUDE_BIN` | The `claude` program. By default the server looks in `~/.local/bin`, Homebrew's and `/usr/local/bin`, then the `PATH`. If you set it and the file is not there, Claude Code counts as not installed. |
-| `SPROCKET_CLAUDE_FOR_ALL` | `true` lets every account choose Claude Code, on that same login. |
+| `SPROCKET_CLAUDE_FOR_ALL` | `true` lets every account choose Claude Code, on that same login. `false` locks it off. When unset, the Claude Code for everyone switch on [Instance settings](/help/admin/instance-settings) decides. |
 | `SPROCKET_MCP_URL` | How a run reaches this server's own agent endpoint. By default `http://localhost:<PORT>/api/mcp`, or the address in `HOST` when that is a specific address (not `0.0.0.0`). |
 
 A run works as one of the chooser's own API keys, which needs at least board read access, so it sees only what that key may. It gets a short-lived key that exists only in the server's memory for that run, and only a short list of environment variables (such as `HOME` and `PATH`), never the server's secrets. A run stops after 10 minutes.

@@ -30,10 +30,15 @@ export interface SprocketInstanceView {
   defaultManner: SprocketManner
   /** Why the key cannot be stored or read on this install (SECRETS_ENCRYPTION_KEY), or null. */
   keyProblem: string | null
+  /** The Claude Code for everyone switch as stored. It does not apply while claudeEnvSetting is set. */
+  claudeForEveryone: boolean
+  /** SPROCKET_CLAUDE_FOR_ALL as the server reads it: 'true' or 'false' when set, null when unset. A set value decides. */
+  claudeEnvSetting: 'true' | 'false' | null
 }
 
 export interface SprocketInstancePatch {
   forEveryone?: boolean
+  claudeForEveryone?: boolean
   model?: string
   /** A new key, or null to clear the stored one. Omitted keeps the stored key as it is. */
   apiKey?: string | null
@@ -68,8 +73,27 @@ export async function sprocketInstanceView(): Promise<SprocketInstanceView> {
     userDailyLimit: row?.sprocketUserDailyLimit ?? 200,
     instanceDailyCap: row?.sprocketInstanceDailyCap ?? 2000,
     defaultManner: resolveManner(row?.sprocketDefaultManner, null),
-    keyProblem: secretsUnavailableReason()
+    keyProblem: secretsUnavailableReason(),
+    claudeForEveryone: row?.sprocketClaudeForAll ?? false,
+    claudeEnvSetting: claudeEnvSetting()
   }
+}
+
+/** SPROCKET_CLAUDE_FOR_ALL as set in the environment: 'true' or 'false' when it is set to one of those, else null. */
+export function claudeEnvSetting(): 'true' | 'false' | null {
+  const value = process.env.SPROCKET_CLAUDE_FOR_ALL?.trim().toLowerCase()
+  return value === 'true' || value === 'false' ? value : null
+}
+
+/**
+ * Whether every signed-in user may choose Claude Code. The environment variable decides when it is set (true or
+ * false); otherwise the Instance settings switch does. The instance admin may always choose it (sprocketAgent.ts).
+ */
+export async function claudeForEveryoneOn(): Promise<boolean> {
+  const env = claudeEnvSetting()
+  if (env !== null) return env === 'true'
+  const row = await storedRow()
+  return row?.sprocketClaudeForAll === true
 }
 
 // The masked form needs the last four characters of the key. They are read from the encrypted value, never stored
@@ -97,6 +121,7 @@ export async function saveSprocketInstance(patch: SprocketInstancePatch, userId:
   const update: Partial<typeof instanceSettings.$inferInsert> = { updatedAt: Date.now(), updatedBy: userId }
 
   if (patch.forEveryone !== undefined) update.sprocketForEveryone = Boolean(patch.forEveryone)
+  if (patch.claudeForEveryone !== undefined) update.sprocketClaudeForAll = Boolean(patch.claudeForEveryone)
   if (patch.model !== undefined) {
     const model = patch.model.trim()
     if (!model || model.length > 200) throw createError({ statusCode: 400, message: 'Send the model id, e.g. openai/gpt-4o-mini.' })

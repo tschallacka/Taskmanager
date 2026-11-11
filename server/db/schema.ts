@@ -151,6 +151,12 @@ export const instanceSettings = pgTable('instance_settings', {
   sprocketInstanceDailyCap: integer('sprocket_instance_daily_cap').notNull().default(2000),
   // The site default manner, used when a person has picked none (see sprocketManner.ts).
   sprocketDefaultManner: text('sprocket_default_manner').notNull().default('professional'),
+  // Claude Code for everyone (Instance settings). SPROCKET_CLAUDE_FOR_ALL in the environment still decides when it is set.
+  sprocketClaudeForAll: boolean('sprocket_claude_for_all').notNull().default(false),
+  // Branding (Instance settings): the app name shown next to the logo, and an uploaded logo as SVG text. Null means
+  // the defaults: "Taskmanager" and the logo that ships with the app (public/logo.svg).
+  brandName: text('brand_name'),
+  brandLogoSvg: text('brand_logo_svg'),
   updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
   updatedBy: text('updated_by').references(() => user.id, { onDelete: 'set null' })
 })
