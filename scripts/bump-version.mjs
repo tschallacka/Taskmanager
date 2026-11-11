@@ -244,7 +244,8 @@ function changelogCheck(input) {
     console.log(`rule: folded changelog (${CHANGELOG} changed, ${deleted.length} ${deleted.length === 1 ? 'fragment' : 'fragments'} deleted, version heading added)`)
     return
   }
-  if (rows.every(row => NO_CHANGELOG_NEEDED.test(row.path))) {
+  // The changelog itself is never "documentation": a hand edit of CHANGELOG.md is not a fold (the rule above needs the heading).
+  if (rows.every(row => row.path !== CHANGELOG && NO_CHANGELOG_NEEDED.test(row.path))) {
     console.log('rule: not needed (only documentation or dependency hashes changed)')
     return
   }

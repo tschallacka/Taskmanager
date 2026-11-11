@@ -185,6 +185,16 @@ test('the CI rule refuses a hand edit of CHANGELOG.md, and a code change with no
   })
 })
 
+test('the CI rule refuses a hand edit of CHANGELOG.md alone: the documentation exemption does not cover it', () => {
+  withFolder((dir) => {
+    layout(dir, '0.1.1')
+    const handEdit = run(dir, ['changelog-check'], 'M\tCHANGELOG.md\n')
+    assert.equal(handEdit.status, 1)
+    assert.doesNotMatch(handEdit.out, /^rule: not needed/)
+    assert.match(handEdit.err, /adds no changelog fragment/)
+  })
+})
+
 test('the CI rule passes a change of documentation or dependency hashes only, and says so', () => {
   withFolder((dir) => {
     layout(dir, '0.1.1')
