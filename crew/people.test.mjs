@@ -5,7 +5,7 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, describe, test } from 'node:test'
-import { mergeNewPeople, newPeopleOf, writeCredsAtomic } from './people.mjs'
+import { addPeople, mergeNewPeople, newPeopleOf, parseAddArgs, REFUSED, writeCredsAtomic } from './people.mjs'
 
 const scratch = mkdtempSync(join(tmpdir(), 'crew-people-test-'))
 after(() => rmSync(scratch, { recursive: true, force: true }))
@@ -75,5 +75,114 @@ describe('crew people add: the write', () => {
     assert.throws(() => writeCredsAtomic(join(dir, 'missing-folder', 'creds.json'), {}))
     writeCredsAtomic(file, { people: { wade: { apiKey: 'arn_wade' }, susy: { apiKey: 'arn_susy' } } })
     assert.deepEqual(Object.keys(JSON.parse(readFileSync(file, 'utf8')).people).sort(), ['susy', 'wade'])
+  })
+})
+
+// ── The command: a fake board, no network ─────────────────────────────────
+
+/** A fetch that answers from a list of responses, in order, and records each call. */
+function fakeBoard(responses) {
+  const calls = []
+  const fetchImpl = async (url, init = {}) => {
+    calls.push({ url, method: init.method ?? 'GET', headers: init.headers ?? {}, body: init.body })
+    const next = responses.shift()
+    return { ok: next.status >= 200 && next.status < 300, status: next.status, json: async () => next.body }
+  }
+  return { fetchImpl, calls }
+}
+
+const cast = { cast: [{ key: 'susy', present: true }, { key: 'janet', present: false }] }
+const origin = 'http://127.0.0.1:9'
+const newHome = () => mkdtempSync(join(scratch, 'crew-'))
+
+describe('crew people add: the command', () => {
+  test('no token: refused before any call, and the message names the variable, not a value', async () => {
+    const { fetchImpl, calls } = fakeBoard([])
+    const lines = []
+    const code = await addPeople({ origin, slug: 'acme', home: newHome(), token: undefined, fetchImpl, log: l => lines.push(l) })
+    assert.equal(code, 2)
+    assert.equal(calls.length, 0, 'no call is made without a token')
+    assert.match(lines.join('\n'), /TASKMANAGER_MANAGEMENT_TOKEN is not set/)
+  })
+
+  test('a member key or a bad token: one refusal sentence, nothing written', async () => {
+    const home = newHome()
+    const { fetchImpl } = fakeBoard([{ status: 403, body: {} }])
+    const lines = []
+    const code = await addPeople({ origin, slug: 'acme', home, token: 'tok', fetchImpl, log: l => lines.push(l) })
+    assert.equal(code, 3)
+    assert.deepEqual(lines, [REFUSED])
+    assert.equal(readdirSync(home).length, 0, 'no creds.json is written')
+  })
+
+  test('the token goes in the Authorization header, and the body names only the people asked for', async () => {
+    const { fetchImpl, calls } = fakeBoard([{ status: 200, body: { people: {} } }, { status: 200, body: cast }])
+    await addPeople({ origin, slug: 'acme', home: newHome(), token: 'tok-123', people: ['susy'], fetchImpl, log: () => {} })
+    assert.equal(calls[0].url, `${origin}/api/crews/acme/people`)
+    assert.equal(calls[0].headers.authorization, 'Bearer tok-123')
+    assert.deepEqual(JSON.parse(calls[0].body), { people: ['susy'] })
+  })
+
+  test('nobody missing: "nothing to add", the cast is printed, and creds.json is not touched', async () => {
+    const home = newHome()
+    writeFileSync(join(home, 'creds.json'), JSON.stringify({ people: { wade: { apiKey: 'arn_wade' } } }), { mode: 0o600 })
+    const before = readFileSync(join(home, 'creds.json'), 'utf8')
+    const { fetchImpl } = fakeBoard([{ status: 200, body: { people: {} } }, { status: 200, body: cast }])
+    const lines = []
+    const code = await addPeople({ origin, slug: 'acme', home, token: 'tok', fetchImpl, log: l => lines.push(l) })
+    assert.equal(code, 0)
+    assert.match(lines[0], /nothing to add/)
+    assert.equal(readFileSync(join(home, 'creds.json'), 'utf8'), before)
+  })
+
+  test('new people: their keys merge in, the old entry stays, init runs, and only names are printed', async () => {
+    const home = newHome()
+    writeFileSync(join(home, 'creds.json'), JSON.stringify({ people: { wade: { apiKey: 'arn_wade' } } }), { mode: 0o600 })
+    const added = { people: { susy: { email: 's@acme.invalid', password: 'PW-SECRET', apiKey: 'KEY-SECRET', name: 'Susy' } } }
+    const { fetchImpl } = fakeBoard([{ status: 200, body: added }, { status: 200, body: cast }])
+    const lines = []
+    let inited = 0
+    const runInit = () => {
+      inited += 1
+    }
+    const log = line => lines.push(line)
+    const code = await addPeople({ origin, slug: 'acme', home, token: 'tok', fetchImpl, runInit, log })
+    assert.equal(code, 0)
+    assert.equal(inited, 1, 'init runs once after the merge')
+    const creds = JSON.parse(readFileSync(join(home, 'creds.json'), 'utf8'))
+    assert.deepEqual(creds.people.wade, { apiKey: 'arn_wade' }, 'the old entry is untouched')
+    assert.equal(creds.people.susy.apiKey, 'KEY-SECRET')
+    assert.equal(statSync(join(home, 'creds.json')).mode & 0o777, 0o600)
+    const printed = lines.join('\n')
+    assert.match(printed, /added susy/)
+    assert.match(printed, /tell Pia: new people susy/)
+    assert.doesNotMatch(printed, /PW-SECRET|KEY-SECRET/, 'no key or password is printed')
+  })
+
+  test('a failure after the call but before the write names the lost people and says they cannot be fetched again', async () => {
+    const home = join(scratch, 'not-a-folder', 'crew')
+    const added = { people: { janet: { email: 'j@acme.invalid', password: 'PW-J', apiKey: 'KEY-J' } } }
+    const { fetchImpl } = fakeBoard([{ status: 200, body: added }, { status: 200, body: cast }])
+    const lines = []
+    const code = await addPeople({ origin, slug: 'acme', home, token: 'tok', fetchImpl, log: l => lines.push(l) })
+    assert.equal(code, 4)
+    assert.match(lines[0], /janet were made on the board but could not be written/)
+    assert.match(lines[0], /cannot get them again/)
+    assert.doesNotMatch(lines.join('\n'), /KEY-J|PW-J/, 'no key is printed even when the write fails')
+  })
+})
+
+describe('crew people add: the arguments', () => {
+  test('add with a list, or with nothing, and no other verb', () => {
+    assert.deepEqual(parseAddArgs(['add']), { people: null })
+    assert.deepEqual(parseAddArgs(['add', '--people', 'susy, janet']), { people: ['susy', 'janet'] })
+    assert.deepEqual(parseAddArgs(['add', '--people=susy']), { people: ['susy'] })
+    assert.match(parseAddArgs(['remove']).error, /usage: crew people add/)
+    assert.match(parseAddArgs(['add', '--people']).error, /needs a list of keys/)
+  })
+
+  test('a token on the command line is refused: it belongs in the environment', () => {
+    assert.match(parseAddArgs(['add', 'arn_abc123']).error, /not on the command line/)
+    assert.match(parseAddArgs(['add', '--token=x']).error, /not on the command line/)
   })
 })
