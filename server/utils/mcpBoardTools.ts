@@ -19,6 +19,7 @@ import { MAX_PROJECT_DESCRIPTION, PROJECT_STATUSES, parseDueOn, parseProjectStat
 import { projectPeople } from './people'
 import { boardTreeFields, hiddenCrewShadows } from './boardTree'
 import { boardRoleFields, crewRealBoardRefusal, isTakenOff, takenOffRefusal, type BoardRoleFields } from './mcpBoardRoles'
+import { taskShareUrl } from './shareLinks'
 import { readTaskGithubLinks } from './githubTaskLinks'
 import { notifyAssigned, notifyTaskChange } from './notifyEvents'
 import { tellUnblockedAfterBulk, tellUnblockedOnTrash, unfinishedTasksOn } from './unblockedWatch'
@@ -434,6 +435,8 @@ async function taskDetail(task: ProjectTask, board: Project, context: ApiKeyCont
 
   return {
     id: task.id,
+    // The link to share with a person: it opens this task on its board (shareLinks.ts).
+    url: taskShareUrl(board.id, task.id),
     board: { id: board.id, name: board.name },
     column: column?.name ?? task.columnId,
     title: task.title,
