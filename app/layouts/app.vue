@@ -28,7 +28,9 @@ const { sidebarOpen } = useSidebar()
       <AppSidebar @close="sidebarOpen = false" />
     </UDashboardSidebar>
 
-    <div class="flex min-w-0 flex-1 overflow-hidden">
+    <!-- The page scrolls here: a page without a scroller of its own (the help pages, Instance settings at a short
+         window) reaches its last line. Horizontal overflow stays clipped, as it was. -->
+    <div class="flex min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
       <slot />
     </div>
 
