@@ -52,21 +52,25 @@ A task's subtasks always move with it. Moving a card is also noted in the task's
 ## Mark a task done
 
 The circle at the left of a card's title is the **done mark**. Click it to tick the task off without opening it; click
-it again to undo. In the panel the same thing is the **Mark done** button, which then reads **Done**.
+it again to undo. On a focused card, **Space** ticks it off too.
+
+A right-click on a card (a long press on a touchscreen) opens its menu: **Open**, **Mark done**, **Assign to...**,
+**Move to column...**, **Set due date...** (which opens the panel), **Copy link** and **Delete**, which moves the task to the
+trash for 7 days. The same actions are in the panel, so nothing needs a right-click. In the panel the same thing is the **Mark done** button, which then reads **Done**.
 
 The done mark is separate from the column. Ticking a task does not move it, and moving it into *Done* does not tick
 it. A ticked task is greyed out, and overdue dates stop turning red.
 
 ## Assign a task
 
-Click the round person button at the foot of a card, or **Assignee** in the panel, and pick someone, or
-**Unassigned**. You can pick the team's members and, if the board is filed under a customer, that customer's contacts,
+Right-click a card (press and hold it on a touchscreen) and pick **Assign to...**, or pick **Assignee** in the panel.
+Choose someone, or **Unassigned**. A card shows its assignee's picture only once someone is set. You can pick the team's members and, if the board is filed under a customer, that customer's contacts,
 who are marked *(customer)*. The person you assign is told, unless it is you.
 
 ## Start and due dates
 
 Pick **Start date** and **Due date** in the panel; the **x** beside a date clears it. A due date turns red on the card
-once it has passed and the task is not done. The **Timeline** tab draws a bar from the start to the due date and the
+once it has passed and the task is not done, and it shows **Due soon** in orange when it falls within two days. The **Timeline** tab draws a bar from the start to the due date and the
 **Calendar** tab puts the task on its due day. If a task has no due date, the soonest `@date` written in its
 description stands in for it on the card.
 
@@ -76,7 +80,7 @@ Labels are short words, such as *bug* or *design*, that you can filter by.
 
 - In the panel click **Add a label...** and type. **Enter** or a comma adds it; Backspace on an empty box removes the
   last one. Focus the box to see the board's existing labels and pick one, so you do not end up with *bug* and *bugs*.
-- Labels are saved in lower case, a task holds at most 10, and a card shows the first three.
+- Labels are saved in lower case, a task holds at most 10, and a card shows the first two, then **+N** for the rest.
 - **Right-click** a label and pick a colour to colour that label on the whole board, or **Automatic** to go back to the
   colour its text gives it.
 - Once a board has labels, a **Labels** button appears at the top of the board. It lists each label with how many tasks

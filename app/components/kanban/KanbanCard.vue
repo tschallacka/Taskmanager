@@ -4,9 +4,9 @@ import { relativeTime } from '~/composables/useRelativeTime'
 import { deletionSourceLabel } from '#shared/utils/board'
 import { descriptionDetails } from '~/utils/cardDetails'
 import { selectChipsOf } from '~/composables/useCustomFields'
-import { blockedChipLabel } from '~/utils/taskBlockers'
 import { chipStyle } from '#shared/utils/colors'
 import { dueDayToMs, isOverdueDay } from '~/utils/dueDate'
+import { dayOfMs, dueSoon, labelChipsOf, stateChipsOf } from '~/utils/cardChips'
 import { boardGithubBadgesOf, boardPeople, boardPerson, boardSubtasksOf } from '~/composables/useProjects'
 import type { ProjectTask } from '~/composables/useProjects'
 
@@ -31,6 +31,10 @@ const props = defineProps<{
   // A customer contact's board: labels are shown, not recoloured, and the
   // done mark is shown but not a button.
   readonly?: boolean
+  // The columns the context menu's "Move to column..." offers. Left out, the item is not shown.
+  columns?: { id: string, name: string }[]
+  // The board is filed under a customer: only then can a task be "Shared with customer".
+  customerBoard?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -39,6 +43,8 @@ const emit = defineEmits<{
   purge: [taskId: string]
   toggleComplete: [taskId: string]
   assign: [taskId: string, personId: string | null]
+  move: [taskId: string, columnId: string]
+  delete: [taskId: string]
 }>()
 
 // A card in the board's trash is drawn in place, faded, so it is obvious both
@@ -72,14 +78,38 @@ const overdue = computed(() => {
   if (completed.value || due.value === null) return false
   return props.task.dueOn ? isOverdueDay(props.task.dueOn) : due.value < Date.now()
 })
+const dueIsSoon = computed(() => {
+  if (completed.value || overdue.value || due.value === null) return false
+  return dueSoon(props.task.dueOn ?? dayOfMs(due.value))
+})
 
 // Only staff are ever sent an internal task, so the mark needs no audience check.
 const internal = computed(() => props.task.visibility === 'internal')
 
 const assignee = computed(() => boardPerson(props.task.assigneeId))
 
-// The quick-assign menu on the card's foot, the same choices as the task panel's.
-const assignItems = computed(() => [
+// The state chips in their fixed order, each with a reason. A customer reads "Shared with you".
+const stateChips = computed(() => stateChipsOf({
+  done: completed.value,
+  overdue: overdue.value,
+  dueSoon: dueIsSoon.value,
+  blocked: !!props.task.blocked,
+  blockedBy: props.task.blockedBy ? props.task.blockedBy.length : null,
+  visibility: props.task.visibility,
+  customerBoard: !!props.customerBoard
+}).map(chip => (chip.key === 'shared' && props.readonly ? { ...chip, label: 'Shared with you' } : chip)))
+
+// The labels on the card: the first two, then "+N".
+const labelChips = computed(() => labelChipsOf(props.task.tags))
+
+// The context menu: the same actions as the task panel's, so nothing is right-click only. "Assign to..." lists the
+// people; "Move to column..." lists the columns; the done mark and the trash are the panel's too.
+function copyLink() {
+  const url = `${window.location.origin}/projects/${props.task.projectId ?? ''}?task=${props.task.id}`
+  navigator.clipboard?.writeText(url).catch(() => {})
+}
+
+const assignChildren = computed(() => [
   [{ label: 'Unassigned', icon: 'i-lucide-user-x', onSelect: () => emit('assign', props.task.id, null) }],
   boardPeople().map(person => ({
     label: person.kind === 'customer' ? `${person.name || person.email || ''} (customer)` : person.name || person.email || '',
@@ -87,6 +117,30 @@ const assignItems = computed(() => [
     onSelect: () => emit('assign', props.task.id, person.id)
   }))
 ])
+
+const menuItems = computed(() => {
+  if (trashed.value) return []
+  const open = { label: 'Open', icon: 'i-lucide-panel-right-open', onSelect: () => emit('open', props.task.id) }
+  const copy = { label: 'Copy link', icon: 'i-lucide-link', onSelect: copyLink }
+  if (props.readonly) return [[open, copy]]
+  const done = {
+    label: completed.value ? 'Mark as not done' : 'Mark done',
+    icon: completed.value ? 'i-lucide-circle' : 'i-lucide-circle-check',
+    onSelect: () => emit('toggleComplete', props.task.id)
+  }
+  const assign = { label: 'Assign to...', icon: 'i-lucide-user-round', children: assignChildren.value }
+  const move = props.columns?.length
+    ? [{
+        label: 'Move to column...',
+        icon: 'i-lucide-columns-3',
+        children: [props.columns.map(column => ({ label: column.name, onSelect: () => emit('move', props.task.id, column.id) }))]
+      }]
+    : []
+  // "Set due date..." opens the panel, where the date is set.
+  const due = { label: 'Set due date...', icon: 'i-lucide-calendar', onSelect: () => emit('open', props.task.id) }
+  const del = { label: 'Delete', icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: () => emit('delete', props.task.id) }
+  return [[open, done, assign, ...move, due, copy], [del]]
+})
 
 // A select field's choice, such as a priority, rides the card as a coloured chip.
 const fieldChips = computed(() => selectChipsOf(props.task.projectId, props.task.id))
@@ -125,121 +179,132 @@ const githubBadge = computed(() => {
   return { icon, label, checksTone, title: badge.title }
 })
 
-// The blocked mark: a task with an open blocker on this board. Derived on the server, never stored.
-const blockedChip = computed(() => props.task.blocked ? blockedChipLabel(props.task.blockedBy?.length ?? null) : '')
-
-// One row of small print under the card, or none at all.
-const hasMeta = computed(() =>
-  props.task.tags.length > 0 || !!checklist.value || due.value !== null || !!props.commentCount
-  || internal.value || (!!assignee.value && props.readonly) || subtasks.value.length > 0 || fieldChips.value.length > 0
-  || !!githubBadge.value
-  || !!blockedChip.value
+// The counts row: subtasks, checklist, comments, the first GitHub link and the assignee. Shown only with a reason.
+const hasCounts = computed(() =>
+  !!checklist.value || !!props.commentCount || subtasks.value.length > 0 || !!githubBadge.value || !!assignee.value
 )
 </script>
 
 <template>
-  <div
-    :data-id="task.id"
-    :data-card-id="trashed ? undefined : task.id"
-    :role="trashed ? undefined : 'button'"
-    :tabindex="trashed ? undefined : 0"
-    class="group rounded-lg border bg-default px-3 py-2.5 transition-all"
-    :class="trashed
-      ? 'border-dashed border-default opacity-50 hover:opacity-100'
-      : 'cursor-pointer border-default hover:border-primary/40 hover:shadow-sm focus:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/30'"
-    @click="trashed || $emit('open', task.id)"
-    @keydown.enter.prevent="trashed || $emit('open', task.id)"
-    @keydown.space.prevent="trashed || $emit('open', task.id)"
+  <UContextMenu
+    :items="menuItems"
+    :disabled="trashed"
   >
-    <!-- The task's first attached image, bled to the card edges as its cover. -->
-    <img
-      v-if="cover && !trashed"
-      :src="cover"
-      alt=""
-      loading="lazy"
-      data-card-cover
-      class="-mx-3 -mt-2.5 mb-2 aspect-[16/9] w-[calc(100%+1.5rem)] max-w-none rounded-t-lg object-cover"
-    >
-
-    <div class="flex items-start gap-1.5">
-      <!-- The done mark, Asana's circle. A button for staff, so ticking a task
-           off does not mean opening it; `.stop` keeps the click off the card. -->
-      <button
-        v-if="!trashed && !readonly"
-        type="button"
-        class="mt-px shrink-0 rounded-full transition-colors"
-        :class="completed ? 'text-success' : 'text-dimmed opacity-60 hover:text-success hover:opacity-100'"
-        :aria-label="completed ? 'Mark as not done' : 'Mark as done'"
-        :title="completed ? 'Mark as not done' : 'Mark as done'"
-        @click.stop="$emit('toggleComplete', task.id)"
-        @keydown.enter.stop
-        @keydown.space.stop
-      >
-        <UIcon
-          :name="completed ? 'i-lucide-circle-check' : 'i-lucide-circle'"
-          class="size-4"
-        />
-      </button>
-      <UIcon
-        v-else-if="completed"
-        name="i-lucide-circle-check"
-        class="mt-px size-4 shrink-0 text-success"
-      />
-      <p
-        class="line-clamp-2 text-sm font-medium leading-snug"
-        :class="trashed
-          ? 'text-muted line-through decoration-1'
-          : completed ? 'text-muted' : 'text-default'"
-      >
-        {{ task.title }}
-      </p>
-    </div>
-
-    <p
-      v-if="snippet"
-      class="mt-1 line-clamp-2 text-xs leading-relaxed text-muted"
-    >
-      {{ snippet }}
-    </p>
-
-    <!-- Labels carry the colour on a card; everything else stays small print so
-         the row reads as one quiet line however much of it is filled in. -->
     <div
-      v-if="hasMeta"
-      class="mt-2 flex items-center gap-1.5"
+      :data-id="task.id"
+      :data-card-id="trashed ? undefined : task.id"
+      :role="trashed ? undefined : 'button'"
+      :tabindex="trashed ? undefined : 0"
+      class="group rounded-lg border bg-(--tm-raised) px-3 py-2.5 transition-colors duration-150"
+      :class="[
+        trashed
+          ? 'border-dashed border-default opacity-50 hover:opacity-100'
+          : 'cursor-pointer border-default hover:bg-(--tm-hover)',
+        completed && !trashed ? 'opacity-70' : ''
+      ]"
+      @click="trashed || $emit('open', task.id)"
+      @keydown.enter.prevent="trashed || $emit('open', task.id)"
+      @keydown.space.prevent="trashed || readonly || $emit('toggleComplete', task.id)"
     >
-      <span
-        v-for="chip in fieldChips"
-        :key="chip.fieldId"
-        class="flex min-w-0 items-center truncate rounded px-1.5 py-0.5 text-[0.6875rem] font-medium ring-1 ring-inset"
-        :style="chipStyle(chip.color)"
-        data-field-chip
+      <!-- The task's first attached image, bled to the card edges as its cover. -->
+      <img
+        v-if="cover && !trashed"
+        :src="cover"
+        alt=""
+        loading="lazy"
+        data-card-cover
+        class="-mx-3 -mt-2.5 mb-2 aspect-[16/9] w-[calc(100%+1.5rem)] max-w-none rounded-t-lg object-cover"
       >
-        <span class="truncate">{{ chip.label }}</span>
-      </span>
-      <span
-        v-if="blockedChip"
-        class="tm-tone-warn flex min-w-0 items-center truncate rounded-(--tm-radius-pill) px-1.5 py-0.5 text-[0.6875rem] font-medium"
-        title="Waits for open tasks on this board"
-        data-blocked-chip
-      >
-        <span class="truncate">{{ blockedChip }}</span>
-      </span>
-      <KanbanLabelChip
-        v-for="tag in task.tags.slice(0, 3)"
-        :key="tag"
-        :tag="tag"
-        :editable="!trashed && !readonly"
-        chip-class="text-[0.6875rem]"
-      />
-      <span
-        v-if="task.tags.length > 3"
-        class="text-[0.6875rem] text-dimmed"
-      >
-        +{{ task.tags.length - 3 }}
-      </span>
 
-      <span class="ml-auto flex shrink-0 items-center gap-2 text-[0.6875rem] text-dimmed">
+      <div class="flex items-start gap-1">
+        <!-- The done mark: a 16 px circle in a 32 px hit area. Ticking it completes the task in place. -->
+        <button
+          v-if="!trashed && !readonly"
+          type="button"
+          class="-m-2 flex size-8 shrink-0 items-center justify-center rounded-full transition-colors"
+          :class="completed ? 'text-success' : 'text-dimmed hover:text-success'"
+          :aria-label="completed ? 'Mark as not done' : 'Mark as done'"
+          :title="completed ? 'Mark as not done' : 'Mark as done'"
+          data-card-done
+          @click.stop="$emit('toggleComplete', task.id)"
+          @keydown.enter.stop
+          @keydown.space.stop
+        >
+          <UIcon
+            :name="completed ? 'i-lucide-circle-check' : 'i-lucide-circle'"
+            class="size-4"
+          />
+        </button>
+        <UIcon
+          v-else-if="completed"
+          name="i-lucide-circle-check"
+          class="mt-0.5 size-4 shrink-0 text-success"
+        />
+        <p
+          class="line-clamp-2 text-sm leading-5 font-medium"
+          :class="trashed
+            ? 'text-muted line-through decoration-1'
+            : completed ? 'text-muted line-through decoration-1' : 'text-default'"
+        >
+          {{ task.title }}
+        </p>
+      </div>
+
+      <p
+        v-if="snippet && !completed"
+        class="mt-1 line-clamp-2 text-xs leading-relaxed text-muted"
+      >
+        {{ snippet }}
+      </p>
+
+      <!-- The chips row, in a fixed order: labels (two, then "+N"), the select fields, then the state chips. A finished
+           task shows none of them. -->
+      <div
+        v-if="!completed && (labelChips.shown.length || fieldChips.length || stateChips.length)"
+        class="mt-2 flex flex-wrap items-center gap-1.5"
+      >
+        <KanbanLabelChip
+          v-for="tag in labelChips.shown"
+          :key="tag"
+          :tag="tag"
+          :editable="!trashed && !readonly"
+          chip-class="text-[0.6875rem]"
+        />
+        <span
+          v-if="labelChips.more"
+          class="text-[0.6875rem] text-dimmed"
+          data-label-more
+        >
+          +{{ labelChips.more }}
+        </span>
+        <span
+          v-for="chip in fieldChips"
+          :key="chip.fieldId"
+          class="flex min-w-0 items-center truncate rounded px-1.5 py-0.5 text-[0.6875rem] font-medium ring-1 ring-inset"
+          :style="chipStyle(chip.color)"
+          data-field-chip
+        >
+          <span class="truncate">{{ chip.label }}</span>
+        </span>
+        <span
+          v-for="chip in stateChips"
+          :key="chip.key"
+          class="flex min-w-0 items-center truncate rounded-(--tm-radius-pill) px-1.5 py-0.5 text-[0.6875rem] font-medium"
+          :class="chip.tone === 'danger' ? 'tm-tone-danger' : chip.tone === 'warn' ? 'tm-tone-warn' : 'tm-chip'"
+          :title="chip.key === 'waits' ? 'Waits for open tasks on this board' : undefined"
+          :data-state-chip="chip.key"
+          :data-blocked-chip="chip.key === 'waits' ? '' : undefined"
+        >
+          <span class="truncate">{{ chip.label }}</span>
+        </span>
+      </div>
+
+      <!-- The counts: subtasks, checklist, comments, the first GitHub link, the due date, and the assignee when one is
+           set (the empty slot is gone). -->
+      <div
+        v-if="hasCounts || (due !== null && !completed) || internal"
+        class="mt-2 flex flex-wrap items-center gap-2.5 text-[0.6875rem] text-dimmed"
+      >
         <span
           v-if="githubBadge"
           class="flex min-w-0 items-center gap-1"
@@ -255,19 +320,7 @@ const hasMeta = computed(() =>
         </span>
 
         <span
-          v-if="internal"
-          class="flex items-center gap-1 text-warning"
-          title="Team only: the customer does not see this task"
-        >
-          <UIcon
-            name="i-lucide-lock"
-            class="size-3"
-          />
-          Team only
-        </span>
-
-        <span
-          v-if="due !== null"
+          v-if="due !== null && !completed"
           class="flex items-center gap-1"
           :class="overdue ? 'font-medium text-(--tm-status-overdue)' : ''"
         >
@@ -275,7 +328,7 @@ const hasMeta = computed(() =>
             name="i-lucide-calendar"
             class="size-3"
           />
-          {{ overdue ? 'Overdue · ' : '' }}{{ dueLabel }}
+          {{ dueLabel }}
         </span>
 
         <span
@@ -315,89 +368,44 @@ const hasMeta = computed(() =>
         </span>
 
         <UAvatar
-          v-if="assignee && readonly"
+          v-if="assignee"
+          class="ml-auto"
           :src="assignee.image ?? undefined"
           :alt="assignee.name || assignee.email || ''"
           size="3xs"
           :title="`Assigned to ${assignee.name || assignee.email || ''}`"
-        />
-      </span>
-    </div>
-
-    <!-- Asana's foot: who has it, as a button that picks someone (a dashed empty
-         person until somebody does), and an arrow that opens the task. -->
-    <div
-      v-if="!trashed && !readonly"
-      class="mt-2 flex items-center justify-between"
-    >
-      <UDropdownMenu :items="assignItems">
-        <button
-          type="button"
-          class="flex size-6 items-center justify-center rounded-full transition-colors"
-          :class="assignee ? '' : 'border border-dashed border-dimmed text-dimmed hover:border-primary hover:text-primary'"
-          :aria-label="assignee ? `Assigned to ${assignee.name || assignee.email || ''}, change` : 'Assign to someone'"
-          :title="assignee ? `Assigned to ${assignee.name || assignee.email || ''}` : 'Assign to someone'"
-          data-card-assign
-          @click.stop
-          @keydown.enter.stop
-          @keydown.space.stop
-        >
-          <UAvatar
-            v-if="assignee"
-            :src="assignee.image ?? undefined"
-            :alt="assignee.name || assignee.email || ''"
-            size="xs"
-          />
-          <UIcon
-            v-else
-            name="i-lucide-user"
-            class="size-3.5"
-          />
-        </button>
-      </UDropdownMenu>
-      <button
-        type="button"
-        class="flex size-6 items-center justify-center rounded-md text-dimmed opacity-0 transition-opacity hover:bg-elevated hover:text-default focus:opacity-100 group-hover:opacity-100"
-        aria-label="Open task"
-        title="Open task"
-        data-card-open
-        @click.stop="$emit('open', task.id)"
-        @keydown.enter.stop
-        @keydown.space.stop
-      >
-        <UIcon
-          name="i-lucide-chevron-right"
-          class="size-4"
-        />
-      </button>
-    </div>
-
-    <div
-      v-if="trashed"
-      class="mt-2 border-t border-default pt-2"
-    >
-      <p class="truncate text-[0.6875rem] text-dimmed">
-        {{ trashedLabel }}
-      </p>
-      <div class="mt-1 flex items-center gap-1">
-        <UButton
-          label="Restore"
-          icon="i-lucide-undo-2"
-          size="xs"
-          color="neutral"
-          variant="soft"
-          @click.stop="$emit('restore', task.id)"
-        />
-        <UButton
-          icon="i-lucide-trash-2"
-          size="xs"
-          color="error"
-          variant="ghost"
-          aria-label="Delete permanently"
-          title="Delete permanently"
-          @click.stop="$emit('purge', task.id)"
+          data-card-assignee
         />
       </div>
+
+      <div
+        v-if="trashed"
+        class="mt-2 border-t border-default pt-2"
+      >
+        <p class="truncate text-[0.6875rem] text-dimmed">
+          {{ trashedLabel }} · kept 7 days
+        </p>
+        <div class="mt-1 flex items-center gap-1">
+          <UButton
+            label="Restore"
+            icon="i-lucide-undo-2"
+            size="xs"
+            color="neutral"
+            variant="soft"
+            @click.stop="$emit('restore', task.id)"
+          />
+          <UButton
+            label="Delete now"
+            icon="i-lucide-trash-2"
+            size="xs"
+            color="error"
+            variant="ghost"
+            aria-label="Delete now"
+            title="Delete now"
+            @click.stop="$emit('purge', task.id)"
+          />
+        </div>
+      </div>
     </div>
-  </div>
+  </UContextMenu>
 </template>

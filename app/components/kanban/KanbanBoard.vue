@@ -14,6 +14,7 @@ const {
   board,
   boardColumns,
   isCustomerView,
+  activeProject,
   updateTask,
   columnTasks,
   visibleColumnTasks,
@@ -41,6 +42,24 @@ async function onToggleComplete(taskId: string) {
     await updateTask(taskId, { completed: task.completedAt == null })
   } catch {
     toast.add({ title: 'Could not update the task', icon: 'i-lucide-alert-triangle', color: 'error' })
+  }
+}
+
+// The card's context menu: "Move to column..." puts the task at the end of that column, and "Delete" moves it to the
+// board's trash, where it stays for 7 days (the trash's Restore brings it back).
+async function onMoveTask(taskId: string, columnId: string) {
+  try {
+    await moveTask(taskId, columnId, null, null)
+  } catch {
+    toast.add({ title: 'Could not move the task', icon: 'i-lucide-alert-triangle', color: 'error' })
+  }
+}
+
+async function onDeleteTask(taskId: string) {
+  try {
+    await deleteTask(taskId)
+  } catch {
+    toast.add({ title: 'Could not move the task to the trash', icon: 'i-lucide-alert-triangle', color: 'error' })
   }
 }
 
@@ -807,9 +826,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onBoardKeydown))
             :task="task"
             :comment-count="commentCount(task.id)"
             :readonly="isCustomerView"
+            :columns="liveColumns.filter(other => other.id !== column.id)"
+            :customer-board="!!activeProject?.customerId"
             @open="emit('openTask', $event)"
             @toggle-complete="onToggleComplete"
             @assign="onAssign"
+            @move="onMoveTask"
+            @delete="onDeleteTask"
             @restore="onRestoreTask"
             @purge="askPurgeTask"
           />
