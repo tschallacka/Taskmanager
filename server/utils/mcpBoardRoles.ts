@@ -8,8 +8,8 @@ import { projects } from '../db/schema'
 import type { Project } from '../db/schema'
 import { forCall, type ApiKeyContext } from './api-keys'
 import { boardFilter } from './mcpAccess'
-import { crewIdOfUser, crewLinksOf } from './crewBoardAccess'
-import { TAKEN_OFF_SUFFIX, plainBoardTreeFields, type BoardRole, type BoardTreeFields } from './boardTree'
+import { crewLinksOf } from './crewBoardAccess'
+import { TAKEN_OFF_SUFFIX, crewIdOfUser, plainBoardTreeFields, type BoardRole, type BoardTreeFields } from './boardTree'
 
 /** The roles an agent sees: an ordinary board, the crew's home, a real board a crew reads, a crew's shadow, a board taken off. */
 export type McpBoardRole = BoardRole | 'taken_off'
