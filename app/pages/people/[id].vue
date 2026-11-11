@@ -9,7 +9,6 @@ import type { PersonView } from '~/components/PersonCard.vue'
 definePageMeta({ layout: 'app' })
 
 const route = useRoute()
-const { sidebarOpen } = useSidebar()
 const { session } = useAuth()
 
 const view = ref<PersonView | null>(null)
@@ -39,17 +38,6 @@ useSeoMeta({ title: computed(() => view.value?.person.name ?? 'Profile') })
 
 <template>
   <div class="flex min-w-0 flex-1 flex-col overflow-y-auto">
-    <header class="flex shrink-0 items-center gap-2 px-4 py-3 lg:hidden">
-      <UButton
-        icon="i-lucide-panel-left"
-        color="neutral"
-        variant="ghost"
-        size="sm"
-        aria-label="Open sidebar"
-        @click="sidebarOpen = true"
-      />
-    </header>
-
     <div class="mx-auto w-full max-w-4xl px-4 pb-12 pt-6 lg:px-6">
       <p
         v-if="loading"
