@@ -704,47 +704,53 @@ defineExpose({ handleEscape })
           size="2xs"
           class="mt-0.5 shrink-0"
         />
-        <UpdateComposer
-          ref="composer"
-          v-model="draft"
-          :placeholder="readonly || commentVisibility === 'customer' ? 'Write to the team and the customer…' : 'Add an internal comment…'"
-          @submit="send"
-        />
-        <!-- Who can see the new comment: two labelled choices, always visible. Contacts never get the switch. -->
-        <div
-          v-if="!readonly"
-          role="group"
-          aria-label="Who can see this comment"
-          class="flex shrink-0 overflow-hidden rounded-md border border-default text-xs"
-        >
-          <button
-            type="button"
-            :aria-pressed="commentVisibility === 'internal' ? 'true' : 'false'"
-            class="px-2 py-1 transition-colors"
-            :class="commentVisibility === 'internal' ? 'bg-warning/15 text-default' : 'text-muted hover:text-default'"
-            @click.stop="commentVisibility = 'internal'"
-          >
-            Internal
-          </button>
-          <button
-            type="button"
-            :aria-pressed="commentVisibility === 'customer' ? 'true' : 'false'"
-            class="border-l border-default px-2 py-1 transition-colors"
-            :class="commentVisibility === 'customer' ? 'bg-primary/15 text-default' : 'text-muted hover:text-default'"
-            @click.stop="commentVisibility = 'customer'"
-          >
-            Customer can see
-          </button>
+        <div class="flex min-w-0 flex-1 flex-col gap-2">
+          <UpdateComposer
+            ref="composer"
+            v-model="draft"
+            :placeholder="readonly || commentVisibility === 'customer' ? 'Write to the team and the customer…' : 'Add an internal comment…'"
+            @submit="send"
+          />
+          <!-- The switch and the send button sit on their own line under the text, so the text has the full width on a phone. -->
+          <div class="flex items-center justify-between gap-2">
+            <!-- Who can see the new comment: two labelled choices, always visible. Contacts never get the switch. -->
+            <div
+              v-if="!readonly"
+              role="group"
+              aria-label="Who can see this comment"
+              class="flex shrink-0 overflow-hidden rounded-md border border-default text-xs"
+            >
+              <button
+                type="button"
+                :aria-pressed="commentVisibility === 'internal' ? 'true' : 'false'"
+                class="px-2 py-1 transition-colors"
+                :class="commentVisibility === 'internal' ? 'bg-warning/15 text-default' : 'text-muted hover:text-default'"
+                @click.stop="commentVisibility = 'internal'"
+              >
+                Internal
+              </button>
+              <button
+                type="button"
+                :aria-pressed="commentVisibility === 'customer' ? 'true' : 'false'"
+                class="border-l border-default px-2 py-1 transition-colors"
+                :class="commentVisibility === 'customer' ? 'bg-primary/15 text-default' : 'text-muted hover:text-default'"
+                @click.stop="commentVisibility = 'customer'"
+              >
+                Customer can see
+              </button>
+            </div>
+            <span v-else />
+            <UButton
+              icon="i-lucide-arrow-up"
+              size="xs"
+              color="primary"
+              class="shrink-0"
+              :disabled="!draft.trim()"
+              aria-label="Add comment"
+              @click="send"
+            />
+          </div>
         </div>
-        <UButton
-          icon="i-lucide-arrow-up"
-          size="xs"
-          color="primary"
-          class="shrink-0"
-          :disabled="!draft.trim()"
-          aria-label="Add comment"
-          @click="send"
-        />
       </div>
     </div>
 
