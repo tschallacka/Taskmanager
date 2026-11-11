@@ -56,7 +56,7 @@ watch(railCollapsed, (value) => {
     >
       <header
         data-testid="app-topbar"
-        class="flex shrink-0 items-center gap-2 border-b border-default px-4 py-3 lg:px-6"
+        class="flex shrink-0 flex-wrap items-center gap-2 border-b border-default px-4 py-3 lg:px-6"
       >
         <UButton
           icon="i-lucide-panel-left"
@@ -73,7 +73,7 @@ watch(railCollapsed, (value) => {
         />
         <div
           id="app-topbar-actions"
-          class="flex shrink-0 items-center gap-2"
+          class="flex shrink-0 items-center gap-2 max-sm:w-full empty:hidden"
         />
       </header>
       <div class="flex min-w-0 flex-1 overflow-hidden">
