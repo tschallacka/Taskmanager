@@ -48,8 +48,31 @@ watch(railCollapsed, (value) => {
       </template>
     </UDashboardSidebar>
 
-    <div class="flex min-w-0 flex-1 overflow-hidden">
-      <slot />
+    <!-- One top bar on every page: the sidebar button on a phone, the page title (breadcrumb) and the page's own
+         actions. Pages put their title and actions into the two named places with Teleport (defer). -->
+    <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
+      <header class="flex shrink-0 items-center gap-2 border-b border-default px-4 py-3 lg:px-6">
+        <UButton
+          icon="i-lucide-panel-left"
+          color="neutral"
+          variant="ghost"
+          size="sm"
+          class="lg:hidden"
+          aria-label="Open sidebar"
+          @click="sidebarOpen = true"
+        />
+        <div
+          id="app-topbar-title"
+          class="flex min-w-0 flex-1 items-center gap-2"
+        />
+        <div
+          id="app-topbar-actions"
+          class="flex shrink-0 items-center gap-2"
+        />
+      </header>
+      <div class="flex min-w-0 flex-1 overflow-hidden">
+        <slot />
+      </div>
     </div>
 
     <SearchModal />
