@@ -4,7 +4,8 @@
 // connect, and every request is authorised on its own.
 import { authenticateApiKey, hasScope } from '../../utils/api-keys'
 import type { ApiKeyContext } from '../../utils/api-keys'
-import { toolsForKey, toolsForScopes } from '../../utils/mcpRegistry'
+import { sprocketRefusal, toolsForKey, toolsForScopes, toolsForSprocket } from '../../utils/mcpRegistry'
+import { hideForSprocket } from '../../utils/sprocketRun'
 import { mayUseReadGrant, readGrantedBoardIds } from '../../utils/crewBoardAccess'
 import { recordAgentAction } from '../../utils/agentAudit'
 import { bossInstructions } from '../../utils/crewBossSkill'
@@ -146,7 +147,8 @@ async function handleMessage(message: JsonRpcMessage, context: ApiKeyContext) {
 
     case 'tools/list':
       return result(id, {
-        tools: toolsForKey(context).map(tool => ({
+        // A Sprocket run gets the same list as the key, less the sensitive tools (mcpRegistry.ts toolsForSprocket).
+        tools: (context.sprocketRun ? toolsForSprocket(context) : toolsForKey(context)).map(tool => ({
           name: tool.name,
           title: tool.title,
           description: tool.description,
@@ -167,6 +169,9 @@ async function handleMessage(message: JsonRpcMessage, context: ApiKeyContext) {
       }
 
       const tool = toolsForKey(context).find(candidate => candidate.name === name)
+      // A Sprocket run is refused a sensitive tool by name, even though the list it was given never shows one.
+      const refusal = tool ? sprocketRefusal(tool, context) : null
+      if (tool && refusal) return toolFailure(id, refusal)
       if (!tool) {
         // A tool that exists but is out of scope gets a message the model can act
         // on, rather than one that reads like a client bug.
@@ -190,7 +195,9 @@ async function handleMessage(message: JsonRpcMessage, context: ApiKeyContext) {
         const callContext = mayUseReadGrant(tool)
           ? { ...scoped, readGrantedBoardIds: await readGrantedBoardIds(context) }
           : scoped
-        const value = await tool.handler(asRecord(params.arguments), callContext)
+        // A Sprocket run's answer has no address its person may not see (sprocketRun.ts hideForSprocket).
+        const raw = await tool.handler(asRecord(params.arguments), callContext)
+        const value = context.sprocketRun ? await hideForSprocket(raw, context.userId) : raw
         if (!tool.readOnly) void announceWrite(tool, value, context)
         // Only what succeeded is recorded; the recording never fails or slows the call.
         if (tool.audit ?? !tool.readOnly) void recordAgentAction(tool, asRecord(params.arguments), value, context)

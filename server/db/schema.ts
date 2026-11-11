@@ -141,6 +141,16 @@ export const instanceSettings = pgTable('instance_settings', {
   id: text('id').primaryKey(),
   crewsAllowed: boolean('crews_allowed').notNull().default(false),
   rateLimits: json('rate_limits').$type<RateLimitSettings | null>(),
+  // Site-wide Sprocket (Instance settings): answers every signed-in user on the instance's OpenRouter key, when on.
+  // The key is stored encrypted with SECRETS_ENCRYPTION_KEY (secretCrypto.ts), never in clear.
+  sprocketForEveryone: boolean('sprocket_for_everyone').notNull().default(false),
+  sprocketModel: text('sprocket_instance_model').notNull().default('openai/gpt-4o-mini'),
+  sprocketOpenrouterKey: text('sprocket_openrouter_key'),
+  // Messages per user per day, and in all for the instance per day (counted in rate_limit_hits, see sprocketInstance.ts).
+  sprocketUserDailyLimit: integer('sprocket_user_daily_limit').notNull().default(200),
+  sprocketInstanceDailyCap: integer('sprocket_instance_daily_cap').notNull().default(2000),
+  // The site default manner, used when a person has picked none (see sprocketManner.ts).
+  sprocketDefaultManner: text('sprocket_default_manner').notNull().default('professional'),
   updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
   updatedBy: text('updated_by').references(() => user.id, { onDelete: 'set null' })
 })
@@ -733,6 +743,8 @@ export const userSettings = pgTable('user_settings', {
   sprocketModel: text('sprocket_model').notNull().default('haiku'),
   // null leaves the effort to Claude Code's own default
   sprocketEffort: text('sprocket_effort'),
+  // Sprocket's manner (tone) this person picked; null takes the instance's default. See sprocketManner.ts.
+  sprocketManner: text('sprocket_manner'),
   updatedAt: timestamp('updated_at').notNull()
 })
 
@@ -875,7 +887,9 @@ export const apiKeySecrets = pgTable(
     // 'revoked_management' marks a revoked secret of a management token: the key row goes with the revoke, so the
     // state is the only place its kind survives. A text column, so no migration is needed.
     state: text('state').$type<'replaced' | 'revoked' | 'revoked_management'>().notNull(),
-    changedAt: bigint('changed_at', { mode: 'number' }).notNull()
+    changedAt: bigint('changed_at', { mode: 'number' }).notNull(),
+    // Who made the change (the key's owner, who revoked or regenerated it). Null for rows written before this column.
+    actorId: text('actor_id')
   },
   table => [index('api_key_secrets_token_idx').on(table.tokenId)]
 )

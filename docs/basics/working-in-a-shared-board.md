@@ -21,7 +21,7 @@ counts in the header only include what you can see.
 
 - On the **Board** tab the tasks are laid out in columns, from first stage to last. The column a task is in tells you
   how far it has come. A circle with a tick beside a task's title means it is done.
-- A card shows the title, the start of its description, labels, a due date (red when it is overdue), the number of
+- A card shows the title, the start of its description, labels, a due date (red, with the word **Overdue** in front of it, when it is overdue), the number of
   comments and subtasks, and who it is assigned to.
 - A card marked **Blocked** (or **Blocked by 2**) is waiting for other tasks to be finished first. You may not be able
   to see the task it waits for: it then reads as *a hidden task*.

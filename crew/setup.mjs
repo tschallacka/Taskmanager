@@ -36,6 +36,10 @@ if (res.status === 409) {
 }
 if (!res.ok) {
   console.error(`The crew API answered ${res.status}: ${body.message ?? 'no detail'}`)
+  // The one 403 sentence the gate sends a crews:manage key whose owner has no live crew of their own (see NO_LIVE_CREW_SENTENCE).
+  if (res.status === 403 && /no live crew here/.test(body.message ?? '')) {
+    console.error('Ask the instance admin for a management token from the board\'s sidebar, and run this again with that token as CREW_ADMIN_KEY.')
+  }
   process.exit(1)
 }
 

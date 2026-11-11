@@ -11,8 +11,9 @@ import type { Peer } from 'crossws'
 import type { H3Event } from 'h3'
 import { eq } from 'drizzle-orm'
 import { db } from '../db'
-import { projects } from '../db/schema'
+import { crewBoards, projects } from '../db/schema'
 import { getUserActiveTeamId } from './auth-helpers'
+import { hiddenCrewShadows } from './boardTree'
 
 /**
  * What changed, at the coarsest useful grain — the client refetches the affected
@@ -87,12 +88,14 @@ interface Subscription {
   topics: string[]
   /** The tab that caused a change ignores its own echo. */
   clientId: string | null
+  /** The signed-in person behind the socket; none for a shared link. */
+  userId: string | null
 }
 
 const subscriptions = new Map<Peer, Subscription>()
 
-export function subscribePeer(peer: Peer, topics: string | string[], clientId: string | null) {
-  subscriptions.set(peer, { topics: Array.isArray(topics) ? topics : [topics], clientId })
+export function subscribePeer(peer: Peer, topics: string | string[], clientId: string | null, userId: string | null = null) {
+  subscriptions.set(peer, { topics: Array.isArray(topics) ? topics : [topics], clientId, userId })
 }
 
 export function unsubscribePeer(peer: Peer) {
@@ -121,11 +124,15 @@ export function closeTopic(topic: string, code = 4404, reason = 'Not shared') {
   }
 }
 
-/** Sends once to every peer on any of the topics; a peer on two hears it once. */
-function fanout(topics: Set<string>, payload: string, originClientId?: string | null) {
+/**
+ * Sends once to every peer on any of the topics; a peer on two hears it once. With `viewers`, only the signed-in
+ * people in that set hear it: a peer with no person behind it (a shared link) is left out.
+ */
+function fanout(topics: Set<string>, payload: string, originClientId?: string | null, viewers?: Set<string> | null) {
   for (const [peer, subscription] of subscriptions) {
     if (!subscription.topics.some(topic => topics.has(topic))) continue
     if (originClientId && subscription.clientId === originClientId) continue
+    if (viewers && !(subscription.userId && viewers.has(subscription.userId))) continue
     try {
       peer.send(payload)
     } catch {
@@ -149,6 +156,25 @@ async function projectTopics(projectId: string): Promise<string[]> {
   const topics = [workspaceTopic(project.userId, project.teamId), guestTopic(projectId)]
   if (project.customerId) topics.push(customerTopic(project.customerId))
   return topics
+}
+
+/** Whether the board is a crew's shadow board: only those can be hidden from a person. */
+async function isCrewShadow(projectId: string): Promise<boolean> {
+  const [link] = await db.select({ id: crewBoards.id }).from(crewBoards).where(eq(crewBoards.shadowProjectId, projectId)).limit(1)
+  return Boolean(link)
+}
+
+/** The signed-in people with a socket open who may see this shadow board, decided once per person. */
+async function shadowViewers(projectId: string): Promise<Set<string>> {
+  const listening = new Set<string>()
+  for (const subscription of subscriptions.values()) {
+    if (subscription.userId) listening.add(subscription.userId)
+  }
+  const viewers = new Set<string>()
+  await Promise.all([...listening].map(async (userId) => {
+    if (!(await hiddenCrewShadows(userId, [projectId])).has(projectId)) viewers.add(userId)
+  }))
+  return viewers
 }
 
 /**
@@ -179,7 +205,15 @@ export async function publish(topic: string, event: RealtimeEvent, originClientI
     if (publicTopic) topics.add(publicTopic)
   }
 
-  fanout(topics, JSON.stringify(event), originClientId)
+  // A hidden crew shadow's events reach only the people who may see that board (hiddenCrewShadows), whichever
+  // topic they listen on: the workspace topic alone would tell every team member that a board they cannot open
+  // changed. A failed lookup tells no one rather than everyone.
+  const projectId = 'projectId' in event ? event.projectId : undefined
+  const viewers = projectId && await isCrewShadow(projectId).catch(() => true)
+    ? await shadowViewers(projectId).catch(() => new Set<string>())
+    : null
+
+  fanout(topics, JSON.stringify(event), originClientId, viewers)
 }
 
 /**

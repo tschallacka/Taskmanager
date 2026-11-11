@@ -1,6 +1,8 @@
 {
   pkgs,
   system,
+  # The short git commit the app is built from (flake.nix passes it), or null. The server reports it as build.
+  build ? null,
 }:
 let
   mkNodeDeps = pkgs.callPackage ./node-deps.nix { };
@@ -52,7 +54,7 @@ let
 in
 {
   inherit nodeDeps;
-  arnotes = pkgs.callPackage ./arnotes.nix { inherit nodeDeps; };
+  arnotes = pkgs.callPackage ./arnotes.nix { inherit nodeDeps build; };
   schema = pkgs.callPackage ./schema.nix { nodeDeps = schemaDeps; };
 
   # Updater variants that always force a wrong hash so the build reports the
