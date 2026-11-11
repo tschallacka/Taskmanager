@@ -59,6 +59,11 @@ function main(argv) {
     console.error('usage: crew devadmin show <key> | crew devadmin make-admin <key> <email>')
     return 2
   }
+  // A key that is not a crew key is refused in one line, before any database address is built (devDatabaseUrl throws).
+  if (!CREW_KEYS.includes(key)) {
+    console.error(`refused: unknown key "${key}"`)
+    return 3
+  }
   const url = devDatabaseUrl(key, process.env.DEV_DB_USER || 'arnotes', Number(process.env.DEV_DB_PORT || PORT))
   const refused = checkTarget(url, key)
   if (refused) {
