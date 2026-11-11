@@ -38,6 +38,14 @@ useSeoMeta({ title: computed(() => view.value?.person.name ?? 'Profile') })
 
 <template>
   <div class="flex min-w-0 flex-1 flex-col overflow-y-auto">
+    <Teleport
+      defer
+      to="#app-topbar-title"
+    >
+      <h1 class="text-base font-semibold text-default">
+        People
+      </h1>
+    </Teleport>
     <div class="mx-auto w-full max-w-4xl px-4 pb-12 pt-6 lg:px-6">
       <p
         v-if="loading"

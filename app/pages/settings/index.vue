@@ -7,19 +7,18 @@ definePageMeta({ layout: 'app' })
 useSeoMeta({ title: 'Settings' })
 
 const { session, signOut, isInstanceAdmin } = useAuth()
-const colorMode = useColorMode()
 const { primaryColor, neutralColor, PRIMARY_COLORS, NEUTRAL_COLORS, setPrimaryColor, setNeutralColor, openrouterApiKeyMasked, openrouterModel, POPULAR_OPENROUTER_MODELS, setOpenRouterApiKey, setOpenRouterModel } = useUserSettings()
 const { sidebarOpen } = useSidebar()
 
 // The settings section list: each entry jumps to a section on this page (or to a settings page).
 const sections = [
-  { label: 'Your stats', icon: 'i-lucide-chart-column', hash: '#stats' },
-  { label: 'Account', icon: 'i-lucide-user-round', hash: '#account' },
-  { label: 'Appearance', icon: 'i-lucide-sun-moon', hash: '#appearance' },
-  { label: 'API keys and MCP', icon: 'i-lucide-key-round', hash: '#api-keys' },
-  { label: 'AI', icon: 'i-lucide-sparkles', hash: '#ai' },
-  { label: 'Sprocket', icon: 'i-lucide-cog', hash: '/settings/sprocket' },
-  { label: 'AI history', icon: 'i-lucide-history', hash: '/settings/ai-history' }
+  { label: 'Your stats', icon: 'i-lucide-chart-column', to: '#stats' },
+  { label: 'Account', icon: 'i-lucide-user-round', to: '#account' },
+  { label: 'Appearance', icon: 'i-lucide-sun-moon', to: '#appearance' },
+  { label: 'API keys and MCP', icon: 'i-lucide-key-round', to: '#api-keys' },
+  { label: 'AI', icon: 'i-lucide-sparkles', to: '#ai' },
+  { label: 'Sprocket', icon: 'i-lucide-cog', to: '/settings/sprocket' },
+  { label: 'AI history', icon: 'i-lucide-history', to: '/settings/ai-history' }
 ]
 
 const toast = useToast()
@@ -132,12 +131,6 @@ async function changeModel(model: string) {
 
 const openrouterDocsUrl = 'https://openrouter.ai/keys'
 
-const isDark = computed(() => colorMode.value === 'dark')
-
-function toggleColorMode() {
-  colorMode.preference = isDark.value ? 'light' : 'dark'
-}
-
 const userInitials = computed(() => {
   const name = session.value?.user?.name
   if (!name) return '?'
@@ -193,42 +186,25 @@ function swatchStyle(color: string, selected: boolean) {
           color="neutral"
           variant="ghost"
         />
-        <UButton
-          to="/settings/sprocket"
-          label="Sprocket"
-          icon="i-lucide-cog"
-          color="neutral"
-          variant="ghost"
-          size="xs"
-        />
-        <UButton
-          to="/settings/ai-history"
-          label="AI history"
-          icon="i-lucide-history"
-          color="neutral"
-          variant="ghost"
-          size="xs"
-        />
       </div>
     </Teleport>
 
-    <div class="flex min-h-0 flex-1 overflow-hidden">
-      <!-- The section list: on a wide screen it sits on the left; each entry jumps to its section. -->
+    <div class="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
+      <!-- The section list: a row of jumps on a phone, a column on the left on a wide screen. -->
       <nav
         aria-label="Settings sections"
-        class="hidden w-52 shrink-0 space-y-0.5 overflow-y-auto border-r border-default p-3 lg:block"
+        class="flex shrink-0 gap-1 overflow-x-auto border-b border-default p-2 lg:w-52 lg:flex-col lg:gap-0.5 lg:overflow-y-auto lg:border-b-0 lg:border-r lg:p-3"
       >
         <UButton
           v-for="s in sections"
-          :key="s.hash"
-          :to="s.hash"
+          :key="s.to"
+          :to="s.to"
           :label="s.label"
           :icon="s.icon"
           color="neutral"
           variant="ghost"
           size="sm"
-          block
-          class="justify-start"
+          class="shrink-0 justify-start"
         />
         <UButton
           v-if="isInstanceAdmin"
@@ -341,33 +317,8 @@ function swatchStyle(color: string, selected: boolean) {
                 <span class="text-xs font-semibold text-muted uppercase tracking-wider">Appearance</span>
               </div>
 
+              <!-- The colour mode is set in one place: the account menu's Appearance row (AppSidebar.vue). -->
               <div class="divide-y divide-default">
-                <!-- Dark mode -->
-                <div class="px-5 py-4 flex items-center gap-4">
-                  <div class="size-8 rounded-lg bg-elevated flex items-center justify-center shrink-0">
-                    <UIcon
-                      :name="isDark ? 'i-lucide-moon' : 'i-lucide-sun'"
-                      class="size-4 text-default"
-                    />
-                  </div>
-                  <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium">
-                      Theme
-                    </p>
-                    <p class="text-xs text-muted mt-0.5">
-                      Switch between light and dark mode
-                    </p>
-                  </div>
-                  <UButton
-                    :label="isDark ? 'Light mode' : 'Dark mode'"
-                    variant="soft"
-                    color="neutral"
-                    size="sm"
-                    class="shrink-0"
-                    @click="toggleColorMode"
-                  />
-                </div>
-
                 <!-- Primary color -->
                 <div class="px-5 py-4 space-y-3">
                   <div class="flex items-center gap-4">

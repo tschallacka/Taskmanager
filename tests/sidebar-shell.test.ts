@@ -32,7 +32,7 @@ test('Crews and agents appears only for the instance admin', () => {
 })
 
 test('the account menu offers Profile, Settings and Help, then one Appearance row', () => {
-  assert.match(script, /label: 'Profile'[^}]*to|label: 'Profile'[\s\S]*?navigateTo\('\/projects\/profile'\)/)
+  assert.match(script, /label: 'Profile',\s*icon: 'i-lucide-user-round',\s*onSelect: \(\) => navigateTo\('\/projects\/profile'\)/)
   assert.match(script, /navigateTo\('\/settings'\)/)
   assert.match(script, /navigateTo\('\/help'\)/)
 })

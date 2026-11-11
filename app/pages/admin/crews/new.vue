@@ -387,19 +387,26 @@ const nextHint = computed(() => {
 <template>
   <div class="h-full overflow-y-auto px-4 pb-10 pt-6 lg:px-6">
     <div class="mx-auto max-w-3xl space-y-6">
-      <div class="flex items-center gap-3">
-        <UButton
-          to="/admin/crews"
-          icon="i-lucide-arrow-left"
-          color="neutral"
-          variant="ghost"
-          size="sm"
-          aria-label="Back to Crews"
-        />
-        <div>
-          <h1 class="text-xl font-semibold text-default">
+      <Teleport
+        defer
+        to="#app-topbar-title"
+      >
+        <div class="flex min-w-0 items-center gap-3">
+          <UButton
+            to="/admin/crews"
+            icon="i-lucide-arrow-left"
+            color="neutral"
+            variant="ghost"
+            size="sm"
+            aria-label="Back to Crews"
+          />
+          <h1 class="text-base font-semibold text-default">
             New crew
           </h1>
+        </div>
+      </Teleport>
+      <div class="flex items-center gap-3">
+        <div>
           <p class="text-sm text-muted">
             Five steps. You make the crew and tell it about the project, then set up the computer the agents run on, one
             command at a time.

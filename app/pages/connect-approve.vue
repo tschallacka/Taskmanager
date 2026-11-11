@@ -96,13 +96,15 @@ onMounted(() => {
 
 <template>
   <div class="flex-1 min-w-0 flex flex-col overflow-hidden pb-14 lg:pb-0">
-    <div class="sticky top-0 z-10 border-b border-default bg-default/95 backdrop-blur-sm shrink-0">
-      <div class="px-4 pt-3 pb-3.5">
-        <h1 class="font-semibold text-sm">
-          Approve a connection
-        </h1>
-      </div>
-    </div>
+    <!-- The title goes into the shared top bar. -->
+    <Teleport
+      defer
+      to="#app-topbar-title"
+    >
+      <h1 class="font-semibold text-sm">
+        Approve a connection
+      </h1>
+    </Teleport>
 
     <div class="flex-1 overflow-y-auto">
       <UContainer class="py-6 px-4 max-w-2xl space-y-4">
