@@ -62,6 +62,10 @@ first, and start `claude` with `--dangerously-load-development-channels server:t
 flags. Then send her prompt as her first message: the one under "Channel mode: Pia's session" when the channel is on,
 otherwise the one under "PM". Check that she answers and has read `CREW.md`, then stop: do not start anyone else.
 
+**Talking to Pia.** Boss talks to Pia by SendMessage first: find her session with ListAgents (its name starts with
+`pia-session-`, and it changes on every restart), and send the message there. Pia answers the same way. The terminal
+is the fallback, for when the SendMessage route is down; use the `interactive-shell` skill on her terminal, as above.
+
 Boss checks Pia at the start of every turn (the rule is in `WORKFLOW.md`, section 1). When she is unavailable, Boss
 starts her again the same way, posts one line on the task that waited for her, and tells the Owner when she is
 unavailable again after one restart.
