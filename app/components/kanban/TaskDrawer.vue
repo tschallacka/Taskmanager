@@ -882,6 +882,11 @@ const menuItems = computed(() => [[
             :readonly="readonly"
           />
 
+          <KanbanTaskBlocking
+            v-if="shownTask"
+            :task-id="shownTask.id"
+          />
+
           <KanbanTaskGithub
             v-if="shownTask"
             :task-id="shownTask.id"

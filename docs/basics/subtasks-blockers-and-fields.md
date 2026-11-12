@@ -45,6 +45,8 @@ Rules the app enforces, with a message that says which one you hit:
 - A task cannot wait for itself, and cannot wait for the same task twice.
 - No loops: if A waits for B, B cannot wait for A, directly or through other tasks.
 
+**Blocking** is the other side of the same link: under the task panel's **Blocking** section you see the tasks that wait for this one, each one a link that opens it, with whether it is open or finished. When this task is finished, they read as now free. You add and remove the links in the waiting task's own **Blocked by**, not here.
+
 A task is **blocked** while any task it waits for is still open. The card shows a chip, **Blocked by 2** (or just
 **Blocked**), and the panel says how many are still open. A blocking task counts as finished when its column is an
 ending column (see [How a board works](/help/basics/boards-and-columns)), when it has the done mark, or when it is in

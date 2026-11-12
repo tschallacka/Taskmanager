@@ -31,6 +31,8 @@ import type { Audience } from './auth-helpers'
 import { checkNewLink, describeCycle, openBlockers } from './taskDependencies'
 import type { TaskLink } from './taskDependencies'
 import { terminalColumnIds } from '../../shared/utils/board'
+import { blockingOf } from './taskBlocking'
+import type { BlockingList } from './taskBlocking'
 
 export interface Actor {
   userId: string
@@ -332,4 +334,33 @@ export function blockedStatesFrom(links: readonly TaskLink[], blockers: Readonly
 export interface BlockedState {
   blocked: boolean
   openBlockerIds: string[]
+}
+
+/**
+ * The Blocking list of a task: the live tasks that wait for it (the inverse of listBlockers), read from the same link
+ * rows. A customer sees the titles of customer-visible waiting tasks and a count of the rest (blockingOf in
+ * taskBlocking.ts decides that). `free` says the task itself is finished, so the waiting tasks may be picked up.
+ */
+export async function blockingFor(taskId: string, projectId: string, viewer: Actor, columnId: string, completedAt: number | null, deletedAt: number | null): Promise<BlockingList> {
+  const rows = await db
+    .select({ blockedId: taskDependencies.blockedTaskId })
+    .from(taskDependencies)
+    .where(eq(taskDependencies.blockerTaskId, taskId))
+  const waiting = await tasksById(db, rows.map(row => row.blockedId))
+  const finishedColumns = await finishedColumnsOf(db, [projectId])
+  const blockerFinished = isFinishedTask({ columnId, completedAt, deletedAt }, finishedColumns)
+  return blockingOf({
+    taskId,
+    links: rows.map(row => ({ blockedTaskId: row.blockedId, blockerTaskId: taskId })),
+    tasks: new Map([...waiting.values()].map(task => [task.id, {
+      id: task.id,
+      title: task.title,
+      columnId: task.columnId,
+      visibility: task.visibility,
+      deleted: task.deletedAt !== null
+    }])),
+    terminalColumnIds: finishedColumns,
+    blockerFinished,
+    audience: viewer.audience
+  })
 }

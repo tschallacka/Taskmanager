@@ -31,7 +31,7 @@ import type { TriggerKind } from './ruleSpec'
 import { changesToTask, inboxBriefs, logActivity } from './taskActivity'
 import { checkFieldValues, describeFieldValues, listFields, loadFieldValues, setFieldValues } from './customFields'
 import { attachReplyPreviews, signedName } from './taskComments'
-import { addBlocker, blockedState, blockedStatesOn, listBlockers, NOT_ON_BOARD, removeBlocker } from './taskDependencyService'
+import { addBlocker, blockedState, blockedStatesOn, blockingFor, listBlockers, NOT_ON_BOARD, removeBlocker } from './taskDependencyService'
 import type { Actor, Tx } from './taskDependencyService'
 import { blockedMark, checkLinkCount, linkOrFail } from './mcpBlockerLinks'
 import type { BlockedMark } from './mcpBlockerLinks'
@@ -407,6 +407,8 @@ async function taskDetail(task: ProjectTask, board: Project, context: ApiKeyCont
   const columns = await projectColumnsOrdered(board.id)
   const column = columns.find(c => c.id === task.columnId)
   const blockers = await listBlockers(task.id, { userId: context.userId, audience })
+  // The tasks waiting for this one: the inverse of blockers, team view by title, customers see the visible ones only.
+  const blocking = await blockingFor(task.id, task.projectId, { userId: context.userId, audience }, task.columnId, task.completedAt ?? null, task.deletedAt ?? null)
 
   const sinceAt = thread.since === undefined ? undefined : await sinceMoment(task.id, thread.since, audience)
   const fetched = await db
@@ -442,6 +444,7 @@ async function taskDetail(task: ProjectTask, board: Project, context: ApiKeyCont
     ...(audience === 'staff' ? await describedFields(board, task) : {}),
     ...(await blockedFor(task.id, audience)),
     ...(blockers.length ? { blockers } : {}),
+    ...(blocking.count ? { blocking } : {}),
     description: task.description ? htmlToMarkdown(task.description) : '',
     // The GitHub links the caller may see, with what GitHub says about each (see githubTaskLinks).
     github: (await readTaskGithubLinks({ taskId: task.id, audience })).links,
