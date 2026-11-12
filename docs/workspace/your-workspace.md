@@ -18,10 +18,10 @@ so if something you expect is missing, check the switcher first.
 
 - **New project** (the board button next to the logo) and the **Search tasks and boards** field. See
   [Search tasks and boards](/help/workspace/search).
-- The workspace links: **Home**, **Inbox** (with a count of what is unread), **My tasks**, **Browse projects**,
+- The workspace links: **Home**, **Inbox** (with a count of what is unread), **My tasks**, **All projects**,
   **Goals**, **Portfolios**, **Timesheet** and **Profile**.
 - A running timer, if you have one.
-- **Pinned**: boards you chose to keep close. See [Browse projects and pin boards](/help/workspace/browse-projects-and-pins).
+- **Pinned**: boards you chose to keep close. See [All projects and pin boards](/help/workspace/browse-projects-and-pins).
 - **Projects**: every project of the workspace you are in, newest change first. Each row shows the customer (if the
   project has one), when it last changed, and how many tasks it holds.
 - The team switcher, and under it your account menu: **Settings**, **Help**, **Dark mode** or **Light mode**, and
