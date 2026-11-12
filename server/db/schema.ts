@@ -1443,6 +1443,28 @@ export const crewBoards = pgTable(
 
 export type CrewBoard = typeof crewBoards.$inferSelect
 
+// The crew's mail, kept until the recipient's mailer has delivered it (acked). A person's mailer fetches its pending
+// mail once a minute and acks each one it delivered. The sender is never taken from the body: from_key is the
+// sender account's person key. Delivered mail older than 7 days and undelivered older than 30 days are deleted on
+// write (see server/utils/crewMail.ts). No `read` column: not needed (Boss, 2026-11-12).
+export const crewMail = pgTable(
+  'crew_mail',
+  {
+    id: text('id').primaryKey(),
+    crewId: text('crew_id').notNull().references(() => crews.id, { onDelete: 'cascade' }),
+    fromKey: text('from_key').notNull(),
+    toKey: text('to_key').notNull(),
+    text: text('text').notNull(),
+    created: bigint('created', { mode: 'number' }).notNull(),
+    delivered: bigint('delivered', { mode: 'number' })
+  },
+  table => [
+    index('crew_mail_pending_idx').on(table.crewId, table.toKey, table.delivered)
+  ]
+)
+
+export type CrewMail = typeof crewMail.$inferSelect
+
 // A member of a crew forked for one board (Q36): its own account and key, named for the board
 // (`internal-tools-wren`), with a key limited to that board's shadow board. The account belongs to the
 // crew (user.crewId) so it is cut off with the crew, but the crew's own rotate leaves it alone.
