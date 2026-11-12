@@ -73,6 +73,31 @@ async function newProject() {
   navigateTo('/projects?new=1')
 }
 
+// The rail's project icons: the pinned boards (eight at most), each with its kind icon and health tint.
+// The rail has no project list, so the pins load here.
+const { pins, pinsLoaded, loadPins } = usePins()
+const { projects } = useProjects()
+const { switchWorkspace } = useWorkspace()
+onMounted(() => {
+  if (!pinsLoaded.value) loadPins().catch(() => {})
+})
+const railPins = computed(() => pins.value.slice(0, 8).map((pin) => {
+  const project = projects.value.find(p => p.id === pin.projectId)
+  const kind = project?.role === 'shadow'
+    ? 'i-lucide-users-round'
+    : project?.role === 'crew_home'
+      ? 'i-lucide-house'
+      : project?.customerId ? 'i-lucide-building-2' : 'i-lucide-kanban'
+  const tint = ({ on_track: 'text-success', at_risk: 'text-warning', off_track: 'text-error' } as Record<string, string>)[project?.status ?? ''] ?? 'text-dimmed'
+  return { pin, name: project?.name ?? pin.name, icon: kind, tint }
+}))
+
+// A pin in another workspace switches to it first, as the pinned rows of the list do.
+async function openRailPin(pin: { projectId: string, teamId: string | null }) {
+  await switchWorkspace(pin.teamId)
+  await navigateTo(`/projects/${pin.projectId}`)
+}
+
 const route = useRoute()
 
 // Closes the mobile sidebar drawer once navigation actually lands somewhere.
@@ -113,6 +138,25 @@ watch(() => route.path, () => emit('close'))
         aria-label="Search tasks and boards"
         @click="searchOpen = true"
       />
+      <div
+        v-if="railPins.length"
+        class="flex flex-col items-center gap-1 border-t border-default pt-2"
+        data-rail-projects
+      >
+        <UButton
+          v-for="item in railPins"
+          :key="item.pin.projectId"
+          :icon="item.icon"
+          size="sm"
+          color="neutral"
+          variant="ghost"
+          :class="item.tint"
+          :aria-label="item.name"
+          :title="item.name"
+          :data-rail-project="item.pin.projectId"
+          @click="openRailPin(item.pin)"
+        />
+      </div>
       <!-- On the rail the avatar opens the same account menu as the wide sidebar's account row. -->
       <UDropdownMenu
         :items="accountItems"

@@ -38,12 +38,20 @@ export async function listPins(userId: string): Promise<PinnedBoard[]> {
   })
 }
 
-/** Pins a board the person can open; 404 for any other, so a foreign id says nothing. */
+/** The most boards one person can have pinned at once: the sidebar's Pinned group holds eight. */
+export const PIN_LIMIT = 8
+
+/** Pins a board the person can open; 404 for any other, so a foreign id says nothing. A ninth pin is refused with 409. */
 export async function pinBoard(userId: string, projectId: string) {
   const { filter } = await reachOf(userId)
   const [project] = await db.select({ id: projects.id }).from(projects).where(and(eq(projects.id, projectId), filter))
   if (!project || (await hiddenCrewShadows(userId, [projectId])).has(projectId)) {
     throw createError({ statusCode: 404, message: 'Project not found' })
+  }
+  const pinned = await db.select({ projectId: boardPins.projectId }).from(boardPins).where(eq(boardPins.userId, userId))
+  if (pinned.some(pin => pin.projectId === projectId)) return
+  if (pinned.length >= PIN_LIMIT) {
+    throw createError({ statusCode: 409, message: 'Eight boards are pinned already. Unpin one to pin another.' })
   }
   await db.insert(boardPins).values({ userId, projectId, createdAt: Date.now() }).onConflictDoNothing()
 }

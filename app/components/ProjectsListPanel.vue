@@ -129,8 +129,10 @@ async function openPin(pin: PinnedBoard) {
 async function togglePin(projectId: string) {
   try {
     await (isPinned(projectId) ? unpinBoard(projectId) : pinBoard(projectId))
-  } catch {
-    toast.add({ title: 'Could not change the pin', color: 'error' })
+  } catch (error) {
+    // The server answers 409 when eight boards are already pinned; say so in its own words.
+    const message = (error as { data?: { message?: string } })?.data?.message
+    toast.add({ title: message ?? 'Could not change the pin', color: 'error' })
   }
 }
 
@@ -166,6 +168,37 @@ function countLabel(project: Project) {
 function countTitle(project: Project) {
   const { open, total } = countsFor(project)
   return project.terminalColumnIds?.length ? `${open} open of ${total}` : `${total} in total`
+}
+
+// The kind of a row, shown as its icon: a crew's board, a crew home, a customer's board, or a board.
+function kindOf(project: Project) {
+  if (project.role === 'shadow') return 'crew_board'
+  if (project.role === 'crew_home') return 'crew_home'
+  if (project.customerId) return 'customer_board'
+  return 'board'
+}
+
+const KIND_ICON: Record<string, string> = {
+  crew_board: 'i-lucide-users-round',
+  crew_home: 'i-lucide-house',
+  customer_board: 'i-lucide-building-2',
+  board: 'i-lucide-kanban'
+}
+
+function kindIcon(project: Project) {
+  return KIND_ICON[kindOf(project)] ?? 'i-lucide-kanban'
+}
+
+// The icon and the open count take the board's health (its status) as their tint; the open row is primary.
+const HEALTH_TINT: Record<string, string> = {
+  on_track: 'text-success',
+  at_risk: 'text-warning',
+  off_track: 'text-error'
+}
+
+function kindTint(project: Project) {
+  if (activeId.value === project.id) return 'text-primary'
+  return HEALTH_TINT[project.status ?? ''] ?? 'text-dimmed'
 }
 
 // ─── Inline rename / delete ────────────────────────────────
@@ -426,9 +459,11 @@ function menuItems(project: Project) {
           @click.stop="toggleTree(project.id)"
         />
         <UIcon
-          :name="project.role === 'shadow' ? 'i-lucide-users-round' : project.role === 'crew_home' ? 'i-lucide-house' : project.customerId ? 'i-lucide-building-2' : 'i-lucide-kanban'"
+          :name="kindIcon(project)"
           class="mt-0.5 size-4 shrink-0"
-          :class="activeId === project.id ? 'text-primary' : 'text-dimmed group-hover:text-muted'"
+          :class="kindTint(project)"
+          :data-kind="kindOf(project)"
+          :data-health="project.status ?? 'unset'"
         />
         <div class="min-w-0 flex-1">
           <p class="truncate text-sm font-medium leading-snug text-default">
@@ -441,6 +476,14 @@ function menuItems(project: Project) {
             {{ rowNote(project) }}
           </p>
         </div>
+        <!-- The open count, in the board's health tint: the design's number at the row's right edge. -->
+        <span
+          v-if="!isLabelRow(project) && countsFor(project).open"
+          class="mt-0.5 shrink-0 text-xs font-semibold tabular-nums"
+          :class="kindTint(project)"
+          :title="countTitle(project)"
+          data-open-count
+        >{{ countsFor(project).open }}</span>
         <!-- The menu keeps its slot even when invisible, so rows never jump on hover. -->
         <UDropdownMenu
           v-if="!isLabelRow(project)"

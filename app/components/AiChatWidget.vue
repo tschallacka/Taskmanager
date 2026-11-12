@@ -20,12 +20,17 @@ const byAgent = computed(() => sprocket.value?.provider === 'agent')
 const hasApiKey = computed(() => !!openrouterApiKey.value || !!openrouterApiKeyMasked.value)
 const ready = computed(() => byAgent.value ? !!sprocket.value?.agentKeyId : hasApiKey.value)
 
+// The first time the panel opens in this browser it says what Sprocket needs; after that the short line stays.
+const setupSeen = useCookie<boolean>('sprocket-setup-seen', { default: () => false, maxAge: 60 * 60 * 24 * 365 })
+const firstOpen = ref(!setupSeen.value)
+
 function toggle() {
   open.value = !open.value
   if (open.value) {
     // A change on the settings page shows the next time the panel opens.
     loadSprocket(true).catch(() => {})
     nextTick(() => inputEl.value?.focus())
+    setupSeen.value = true
   }
 }
 
@@ -270,8 +275,18 @@ function openTarget(m: ChatMessage) {
           v-if="!ready"
           class="mt-4 w-full rounded-lg border border-default bg-elevated/40 p-3 text-left"
         >
-          <p class="text-xs text-default">
-            {{ byAgent ? 'Pick the agent I work as, and I am ready.' : 'No OpenRouter API key yet. Add one, or let Claude Code answer.' }}
+          <p
+            class="text-xs text-default"
+            data-sprocket-setup
+          >
+            <template v-if="firstOpen">
+              {{ byAgent
+                ? 'I need to know which agent I work as. Pick it once in Sprocket settings.'
+                : 'I need an OpenRouter API key, or Claude Code to answer. Set it once in Sprocket settings.' }}
+            </template>
+            <template v-else>
+              {{ byAgent ? 'Pick the agent I work as, and I am ready.' : 'No OpenRouter API key yet. Add one, or let Claude Code answer.' }}
+            </template>
           </p>
           <UButton
             label="Sprocket settings"
