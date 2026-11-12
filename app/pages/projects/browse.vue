@@ -3,7 +3,7 @@ import { formatDistanceToNow } from 'date-fns'
 
 definePageMeta({ layout: 'app' })
 
-useSeoMeta({ title: 'Browse projects' })
+useSeoMeta({ title: 'All projects' })
 
 const { projects, allTasks, unarchiveProject } = useProjects()
 
