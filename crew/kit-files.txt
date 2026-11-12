@@ -34,6 +34,7 @@ crew.config.example.json
 crew.mjs
 detach.sh
 dev-copies.mjs
+down.mjs
 fonts.conf.tmpl
 guard.sh
 home.mjs
