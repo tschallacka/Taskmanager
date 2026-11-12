@@ -12,6 +12,7 @@ import { pathToFileURL } from 'node:url'
 import { crewHome } from './home.mjs'
 import { renameKeys } from './keys.mjs'
 import { rpcResult } from './mentions.mjs'
+import { blockedOnOf } from './blocked-on.mjs'
 
 export const DEFAULTS = { questionMinutes: 10, idleMinutes: 10, gateMinutes: 15, cleanGrantMinutes: 5, cleanPlanMinutes: 10, cleanDoneMinutes: 15, stuckMinutes: 240 }
 export const WORKERS = ['wren', 'wick', 'wynn', 'wade']
@@ -287,6 +288,13 @@ export function candidatesFor(card, th, ctx) {
   add('ready to clean, not assigned to cleaner', 'pia', lastChange(card), th.idleMinutes, tags.includes('ready to clean') && key !== cleaner)
   add('clean plan, no check', 'pia', lastChange(card), th.cleanPlanMinutes, tags.includes('clean plan') && !tags.includes('cleaning granted') && !postedBy(card, null, lastChange(card)))
   add('cleaning granted, cleaner not working', cleaner, lastChange(card), th.cleanGrantMinutes, tags.includes('cleaning granted') && !tags.includes('clean done') && !postedBy(card, [cleaner], lastChange(card)))
+
+  // A card in Blocked that names whom it waits for (its BLOCKED ON line, blocked-on.mjs): that person is poked after the
+  // normal threshold, then the PM. Only a card with a line is poked here; a Blocked card with no line is not poked by this
+  // (a finding for the PM, to be ruled on separately).
+  const blockedOn = blockedOnOf(card.updates ?? [])
+  const namedKey = blockedOn && [...AGENTS, 'boss'].includes(blockedOn.key) ? blockedOn.key : null
+  add(`blocked, waiting on ${namedKey}`, namedKey ?? 'pia', lastChange(card), th.idleMinutes, card.column === 'Blocked' && Boolean(namedKey))
   add('clean done, not checked', 'pia', lastChange(card), th.cleanDoneMinutes, tags.includes('clean done') && !tags.includes('cleaned') && !postedBy(card, ['pia'], lastChange(card)))
   return out
 }
