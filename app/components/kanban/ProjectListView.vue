@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { columnDotAttrs } from '~/utils/tagColors'
 import type { ProjectTask } from '~/composables/useProjects'
-import { errorMessage } from '~/utils/untypedFetch'
+import { errorMessage, untypedFetch } from '~/utils/untypedFetch'
 
 const emit = defineEmits<{ openTask: [taskId: string] }>()
 
@@ -54,13 +54,31 @@ const sortBy = ref<SortBy>('due')
 const VIEW_KEY = (boardId: string | null) => `tm-list-view:${boardId ?? ''}`
 
 // The optional columns of each row. Chosen once per board and remembered; the default shows all three.
-type OptionalColumn = 'assignee' | 'due' | 'labels'
+type OptionalColumn = 'assignee' | 'due' | 'labels' | 'time'
 const OPTIONAL_COLUMNS: { id: OptionalColumn, label: string }[] = [
   { id: 'assignee', label: 'Assignee' },
   { id: 'due', label: 'Due' },
-  { id: 'labels', label: 'Labels' }
+  { id: 'labels', label: 'Labels' },
+  { id: 'time', label: 'Time' }
 ]
-const shownColumns = ref<Record<OptionalColumn, boolean>>({ assignee: true, due: true, labels: true })
+const shownColumns = ref<Record<OptionalColumn, boolean>>({ assignee: true, due: true, labels: true, time: true })
+
+// The minutes logged on each task of this board, from everyone on the team. Read once per board; a time entry logged
+// in the row moves its task's total at once.
+const taskMinutes = ref<Record<string, number>>({})
+
+async function loadTaskTime() {
+  if (!activeProjectId.value) return
+  try {
+    taskMinutes.value = await untypedFetch<Record<string, number>>(`/api/projects/${activeProjectId.value}/task-time`)
+  } catch {
+    taskMinutes.value = {}
+  }
+}
+
+function onLogged(taskId: string, minutes: number) {
+  taskMinutes.value = { ...taskMinutes.value, [taskId]: (taskMinutes.value[taskId] ?? 0) + minutes }
+}
 
 function loadView() {
   try {
@@ -84,8 +102,14 @@ function saveView() {
   } catch { /* the choice lasts this visit */ }
 }
 
-onMounted(loadView)
-watch(activeProjectId, loadView)
+onMounted(() => {
+  loadView()
+  loadTaskTime()
+})
+watch(activeProjectId, () => {
+  loadView()
+  loadTaskTime()
+})
 watch([groupBy, sortBy, shownColumns], saveView, { deep: true })
 
 /** Tasks in the chosen order: by due day (none last) or by title. */
@@ -278,8 +302,10 @@ function subtaskProgress(taskId: string) {
               <ListRowMeta
                 :task="task"
                 :shown="shownColumns"
+                :minutes="taskMinutes[task.id] ?? 0"
                 layout="fold"
                 class="mt-0.5 md:hidden"
+                @logged="onLogged"
               />
             </div>
 
@@ -313,8 +339,10 @@ function subtaskProgress(taskId: string) {
             <ListRowMeta
               :task="task"
               :shown="shownColumns"
+              :minutes="taskMinutes[task.id] ?? 0"
               layout="column"
               class="hidden md:flex"
+              @logged="onLogged"
             />
           </li>
 
