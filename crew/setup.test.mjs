@@ -2,7 +2,7 @@
 // reaches a real board or the real crew folder. Run from the repo root: node --test crew/setup.test.mjs
 import assert from 'node:assert/strict'
 import { spawn, spawnSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import http from 'node:http'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
@@ -130,6 +130,24 @@ describe('crew setup', () => {
       assert.match(run.stderr, /Nothing was rotated/)
       assert.equal(seen.keys, 0, 'no keys are fetched for a crew that was not made')
       assert.equal(seen.body.rotate, undefined)
+    } finally {
+      server.close()
+    }
+  })
+
+  test('a crew home that already holds creds.json stops before any call, and changes nothing', async () => {
+    const { server, seen, origin } = await fakeApi()
+    try {
+      const home = join(scratch, 'home-existing')
+      mkdirSync(home, { recursive: true })
+      writeFileSync(join(home, 'creds.json'), '{"people":{"pia":{"api_key":"KEEP"}}}\n')
+      const run = await runSetup(origin, ['--slug', 'existing-crew'], { home })
+      assert.equal(run.status, 1)
+      assert.match(run.stderr, /already holds creds\.json/)
+      assert.match(run.stderr, /Nothing was changed/)
+      assert.equal(seen.creates, 0, 'no crew is made when the home is taken')
+      assert.equal(seen.keys, 0)
+      assert.equal(readFileSync(join(home, 'creds.json'), 'utf8'), '{"people":{"pia":{"api_key":"KEEP"}}}\n')
     } finally {
       server.close()
     }

@@ -9,7 +9,8 @@
 // What it does, in order:
 //   1. POST /api/crews with "projectId": the board. The crew is always new: a taken slug stops the command (409),
 //      it never rotates an existing crew.
-//   2. The crew home is ~/crew-home/<slug> (mode 700), unless CREW_HOME is set.
+//   2. The crew home is ~/crew-<slug> (mode 700), unless CREW_HOME is set. A home that already holds creds.json stops the
+//      command before step 1, with nothing changed.
 //   3. The keys are fetched once, as JSON, straight into creds.json (mode 600). Nothing secret is printed.
 //   4. crew.json is written from the create answer: the team, the slug, the product, the repository and the
 //      crew's work board, which is the shadow board of the crew (by id and url). The real board is kept as context.
@@ -102,6 +103,13 @@ const boardName = userboard.board_name ?? args.board
 const slug = args.slug ?? slugFor(boardName)
 if (!/^[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$/.test(slug)) usage(`the slug "${slug}" is not 2 to 63 characters of a to z, 0 to 9 and hyphens`)
 const name = args.name ?? `${boardName} crew`
+// The crew home: CREW_HOME when set, else ~/crew-<slug>. Decided before any call, so a home that already holds keys stops
+// the command with nothing changed.
+const home = process.env.CREW_HOME || join(homedir(), `crew-${slug}`)
+if (existsSync(join(home, 'creds.json'))) {
+  console.error(`Stopped: the crew home ${home} already holds creds.json. Nothing was changed. Point CREW_HOME at a new folder, or move that one away first.`)
+  process.exit(1)
+}
 
 const created = await call('POST', `${api}/crews`, {
   slug,
@@ -117,7 +125,6 @@ if (!created.res.ok) stop(created.res, created.answer)
 const answer = created.answer
 
 // The keys: one call, as JSON, into creds.json. The answer of the create holds none.
-const home = process.env.CREW_HOME || join(homedir(), 'crew-home', slug)
 mkdirSync(home, { recursive: true, mode: 0o700 })
 chmodSync(home, 0o700)
 const keysUrl = new URL(answer.keys_url ?? `/api/crews/${slug}/keys`, origin).href

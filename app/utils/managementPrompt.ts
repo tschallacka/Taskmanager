@@ -34,6 +34,7 @@ Step 1: get the kit. Keep it in ~/crew-kit-<host>, where <host> is the host name
 Step 2: make the crew. In the kit folder, run the setup with the token in the environment variable only:
   cd ~/crew-kit-<host> && TASKMANAGER_MANAGEMENT_TOKEN=<token> node setup.mjs --origin ${origin} --board ${boardId} --repo <repository path>
   The crew is always new. If the command says the slug is taken, run it again with --slug <another slug>. Never rotate a crew.
+  The crew gets its own home, ~/crew-<slug> (the slug the command makes, or the one you passed with --slug). Do not set CREW_HOME, and do not use any other folder. If that folder already holds creds.json, the command stops and changes nothing: use another --slug.
 
 Step 3: report. The command prints three lines: the crew home, the work board's address, and what to do next. Tell the user those three lines, and nothing else from the output.
 
