@@ -201,7 +201,7 @@ function cancelLabels() {
     <span
       v-if="shown.labels"
       class="flex min-w-0 items-center gap-1"
-      :class="layout === 'column' ? 'max-w-40' : ''"
+      :class="layout === 'column' ? 'w-40 justify-end' : ''"
       @click.stop
     >
       <input
