@@ -23,9 +23,9 @@ const { db } = await import('../server/db')
 const { apiKeys, crewBoards, crewMail, crews, member, organization, projects, user } = await import('../server/db/schema')
 const { createOrRotateCrew, purgeCrew } = await import('../server/utils/crewProvisioning')
 const { cleanupMailOnWrite } = await import('../server/utils/crewMail')
-const postMail = (await import('../server/api/crews/[slug]/mail/index.post')).default
-const getMail = (await import('../server/api/crews/[slug]/mail/index.get')).default
-const ackMail = (await import('../server/api/crews/[slug]/mail/[id]/ack.post')).default
+const postMail = (await import('../server/api/crew-mail/[slug]/index.post')).default
+const getMail = (await import('../server/api/crew-mail/[slug]/index.get')).default
+const ackMail = (await import('../server/api/crew-mail/[slug]/[id]/ack.post')).default
 
 const tag = randomBytes(4).toString('hex')
 const now = Date.now()
@@ -65,9 +65,9 @@ before(async () => {
   }
   const app = createApp()
   const router = createRouter()
-  router.post('/api/crews/:slug/mail', postMail)
-  router.get('/api/crews/:slug/mail', getMail)
-  router.post('/api/crews/:slug/mail/:id/ack', ackMail)
+  router.post('/api/crew-mail/:slug', postMail)
+  router.get('/api/crew-mail/:slug', getMail)
+  router.post('/api/crew-mail/:slug/:id/ack', ackMail)
   app.use(router)
   server = createServer(toNodeListener(app))
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', () => resolve()))
@@ -86,9 +86,9 @@ after(async () => {
 })
 
 test('a member sends to another member; the recipient reads it with its own key and the sender is the caller', async () => {
-  const sent = await call('POST', `/api/crews/${slugA}/mail`, keys.A.pia, { id: id(1), to: 'wick', text: 'hello wick', from: 'boss' })
+  const sent = await call('POST', `/api/crew-mail/${slugA}`, keys.A.pia, { id: id(1), to: 'wick', text: 'hello wick', from: 'boss' })
   assert.equal(sent.status, 201)
-  const got = await call('GET', `/api/crews/${slugA}/mail?to=wick`, keys.A.wick)
+  const got = await call('GET', `/api/crew-mail/${slugA}?to=wick`, keys.A.wick)
   assert.equal(got.status, 200)
   const mail = got.body.mail.find((m: any) => m.id === id(1))
   assert.ok(mail, 'the mail is pending for wick')
@@ -97,61 +97,61 @@ test('a member sends to another member; the recipient reads it with its own key 
 })
 
 test('a member reads only its own mail; the boss key reads any recipient', async () => {
-  const refused = await call('GET', `/api/crews/${slugA}/mail?to=wick`, keys.A.pia)
+  const refused = await call('GET', `/api/crew-mail/${slugA}?to=wick`, keys.A.pia)
   assert.equal(refused.status, 403)
-  const boss = await call('GET', `/api/crews/${slugA}/mail?to=wick`, keys.A.boss)
+  const boss = await call('GET', `/api/crew-mail/${slugA}?to=wick`, keys.A.boss)
   assert.equal(boss.status, 200)
 })
 
 test('only the recipient acks; a wrong ack is 403, the recipient acks once and a second ack changes nothing', async () => {
-  const wrong = await call('POST', `/api/crews/${slugA}/mail/${id(1)}/ack`, keys.A.pia, {})
+  const wrong = await call('POST', `/api/crew-mail/${slugA}/${id(1)}/ack`, keys.A.pia, {})
   assert.equal(wrong.status, 403)
-  const first = await call('POST', `/api/crews/${slugA}/mail/${id(1)}/ack`, keys.A.wick, {})
+  const first = await call('POST', `/api/crew-mail/${slugA}/${id(1)}/ack`, keys.A.wick, {})
   assert.equal(first.status, 200)
-  const again = await call('POST', `/api/crews/${slugA}/mail/${id(1)}/ack`, keys.A.wick, {})
+  const again = await call('POST', `/api/crew-mail/${slugA}/${id(1)}/ack`, keys.A.wick, {})
   assert.equal(again.status, 200)
   assert.equal(again.body.delivered, first.body.delivered)
-  const after1 = await call('GET', `/api/crews/${slugA}/mail?to=wick`, keys.A.wick)
+  const after1 = await call('GET', `/api/crew-mail/${slugA}?to=wick`, keys.A.wick)
   assert.equal(after1.body.mail.some((m: any) => m.id === id(1)), false, 'a delivered mail is no longer pending')
 })
 
 test('a key of another crew, or a customer key, cannot send: 403', async () => {
-  const other = await call('POST', `/api/crews/${slugA}/mail`, keys.B.pia, { id: id(2), to: 'wick', text: 'cross' })
+  const other = await call('POST', `/api/crew-mail/${slugA}`, keys.B.pia, { id: id(2), to: 'wick', text: 'cross' })
   assert.equal(other.status, 403)
-  const customer = await call('POST', `/api/crews/${slugA}/mail`, keys.A.customer, { id: id(3), to: 'pia', text: 'customer' })
+  const customer = await call('POST', `/api/crew-mail/${slugA}`, keys.A.customer, { id: id(3), to: 'pia', text: 'customer' })
   assert.equal(customer.status, 403)
 })
 
 test('the same id with the same text is the same mail (201 again); another text is 409', async () => {
-  const one = await call('POST', `/api/crews/${slugA}/mail`, keys.A.pia, { id: id(4), to: 'wren', text: 'same' })
+  const one = await call('POST', `/api/crew-mail/${slugA}`, keys.A.pia, { id: id(4), to: 'wren', text: 'same' })
   assert.equal(one.status, 201)
-  const twice = await call('POST', `/api/crews/${slugA}/mail`, keys.A.pia, { id: id(4), to: 'wren', text: 'same' })
+  const twice = await call('POST', `/api/crew-mail/${slugA}`, keys.A.pia, { id: id(4), to: 'wren', text: 'same' })
   assert.equal(twice.status, 201)
-  const other = await call('POST', `/api/crews/${slugA}/mail`, keys.A.pia, { id: id(4), to: 'wren', text: 'different' })
+  const other = await call('POST', `/api/crew-mail/${slugA}`, keys.A.pia, { id: id(4), to: 'wren', text: 'different' })
   assert.equal(other.status, 409)
 })
 
 test('a bad id, an empty text, a text over the 1 MB safety stop, or a recipient that is not a member is 400, the stop says the size', async () => {
-  assert.equal((await call('POST', `/api/crews/${slugA}/mail`, keys.A.pia, { id: 'nope', to: 'wick', text: 'x' })).status, 400)
-  assert.equal((await call('POST', `/api/crews/${slugA}/mail`, keys.A.pia, { id: id(5), to: 'wick', text: '   ' })).status, 400)
-  const over = await call('POST', `/api/crews/${slugA}/mail`, keys.A.pia, { id: id(6), to: 'wick', text: 'x'.repeat(1024 * 1024 + 1) })
+  assert.equal((await call('POST', `/api/crew-mail/${slugA}`, keys.A.pia, { id: 'nope', to: 'wick', text: 'x' })).status, 400)
+  assert.equal((await call('POST', `/api/crew-mail/${slugA}`, keys.A.pia, { id: id(5), to: 'wick', text: '   ' })).status, 400)
+  const over = await call('POST', `/api/crew-mail/${slugA}`, keys.A.pia, { id: id(6), to: 'wick', text: 'x'.repeat(1024 * 1024 + 1) })
   assert.equal(over.status, 413, 'over the safety stop is 413')
   assert.match(over.body.data?.error ?? '', /1048577 bytes/, 'the size reaches the sender in the body')
-  assert.equal((await call('POST', `/api/crews/${slugA}/mail`, keys.A.pia, { id: id(7), to: 'customer', text: 'x' })).status, 400)
+  assert.equal((await call('POST', `/api/crew-mail/${slugA}`, keys.A.pia, { id: id(7), to: 'customer', text: 'x' })).status, 400)
 })
 
 test('a 100 KB mail is stored, fetched and kept whole: the recipient gets the same text, byte for byte', async () => {
   const big = `${'0123456789'.repeat(10 * 1024)}END`
   assert.equal(Buffer.byteLength(big, 'utf8') > 100 * 1024, true)
-  const sent = await call('POST', `/api/crews/${slugA}/mail`, keys.A.pia, { id: id(8), to: 'wynn', text: big })
+  const sent = await call('POST', `/api/crew-mail/${slugA}`, keys.A.pia, { id: id(8), to: 'wynn', text: big })
   assert.equal(sent.status, 201)
-  const got = await call('GET', `/api/crews/${slugA}/mail?to=wynn`, keys.A.wynn)
+  const got = await call('GET', `/api/crew-mail/${slugA}?to=wynn`, keys.A.wynn)
   assert.equal(got.status, 200)
   const mail = got.body.mail.find((m: any) => m.id === id(8))
   assert.ok(mail, 'the 100 KB mail is pending for wynn')
   assert.equal(mail.text.length, big.length)
   assert.equal(mail.text, big)
-  const acked = await call('POST', `/api/crews/${slugA}/mail/${id(8)}/ack`, keys.A.wynn, {})
+  const acked = await call('POST', `/api/crew-mail/${slugA}/${id(8)}/ack`, keys.A.wynn, {})
   assert.equal(acked.status, 200)
 })
 
@@ -159,7 +159,7 @@ test('more than 30 sends a minute from one sender is 429 with Retry-After', asyn
   // Sends so far from pia in this minute: the ones above that were 201. Send until the limit, then one more.
   let last = { status: 0, body: null as any, retryAfter: null as string | null }
   for (let n = 0; n < 40 && last.status !== 429; n++) {
-    last = await call('POST', `/api/crews/${slugA}/mail`, keys.A.pia, { id: id(100 + n), to: 'wade', text: `burst ${n}` })
+    last = await call('POST', `/api/crew-mail/${slugA}`, keys.A.pia, { id: id(100 + n), to: 'wade', text: `burst ${n}` })
   }
   assert.equal(last.status, 429)
   assert.equal(last.retryAfter, '60')
@@ -171,19 +171,19 @@ test('the pending cap: a recipient with 500 undelivered mails refuses the next o
     id: randomBytes(16).toString('hex'), crewId: crewA.id, fromKey: 'rita', toKey: 'tess', text: `backlog ${n}`, created: now, delivered: null
   }))
   await db.insert(crewMail).values(rows)
-  const refused = await call('POST', `/api/crews/${slugA}/mail`, keys.A.wren, { id: id(60), to: 'tess', text: 'one more' })
+  const refused = await call('POST', `/api/crew-mail/${slugA}`, keys.A.wren, { id: id(60), to: 'tess', text: 'one more' })
   assert.equal(refused.status, 409)
   assert.match(String(refused.body.message ?? refused.body.data?.error ?? JSON.stringify(refused.body)), /500 undelivered/)
 })
 
 test('an ack of an unknown id is 404, and an ack of another crew\'s mail is 404 too', async () => {
-  const unknown = await call('POST', `/api/crews/${slugA}/mail/${id(98)}/ack`, keys.A.pia, {})
+  const unknown = await call('POST', `/api/crew-mail/${slugA}/${id(98)}/ack`, keys.A.pia, {})
   assert.equal(unknown.status, 404)
-  const sent = await call('POST', `/api/crews/${slugA}/mail`, keys.A.wren, { id: id(97), to: 'wick', text: 'for wick only' })
+  const sent = await call('POST', `/api/crew-mail/${slugA}`, keys.A.wren, { id: id(97), to: 'wick', text: 'for wick only' })
   assert.equal(sent.status, 201)
-  const other = await call('POST', `/api/crews/${slugB}/mail/${id(97)}/ack`, keys.B.wick, {})
+  const other = await call('POST', `/api/crew-mail/${slugB}/${id(97)}/ack`, keys.B.wick, {})
   assert.equal(other.status, 404, 'crew B cannot see or ack crew A\'s mail')
-  const stillPending = await call('GET', `/api/crews/${slugA}/mail?to=wick`, keys.A.wick)
+  const stillPending = await call('GET', `/api/crew-mail/${slugA}?to=wick`, keys.A.wick)
   assert.equal(stillPending.body.mail.some((m: any) => m.id === id(97)), true, 'the mail is still pending for wick')
 })
 

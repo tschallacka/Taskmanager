@@ -84,7 +84,7 @@ test('the delivered line is built from the row: a text that claims another sende
 test('the fetch asks for one recipient, and a failed fetch is reported, not thrown by tick', async () => {
   const endpoint = fakeEndpoint()
   await fetchMail({ fetch: endpoint.fetchImpl, base: BASE, slug: 'tm', key: 'k1', to: 'pia' })
-  assert.ok(endpoint.calls[0].url.endsWith('/api/crews/tm/mail?to=pia'))
+  assert.ok(endpoint.calls[0].url.endsWith('/api/crew-mail/tm?to=pia'), 'the mail URL is under /api/crew-mail, outside the crew gate')
   const dir = mkdtempSync(join(tmpdir(), 'mail-client-'))
   const down = fakeEndpoint({ down: true })
   const result = await tick({ fetch: down.fetchImpl, base: BASE, slug: 'tm', key: 'k1', to: 'pia', mailboxDir: dir, deliver: () => {} })

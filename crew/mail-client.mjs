@@ -20,7 +20,8 @@ export function mailLine(mail) {
 }
 
 function endpoint(base, slug, path = '') {
-  return `${base.replace(/\/$/, '')}/api/crews/${encodeURIComponent(slug)}/mail${path}`
+  // /api/crew-mail, not /api/crews: the crew gate answers a member key on /api/crews/* with a 404 from a remote machine.
+  return `${base.replace(/\/$/, '')}/api/crew-mail/${encodeURIComponent(slug)}${path}`
 }
 
 async function call(fetchImpl, url, init, key) {

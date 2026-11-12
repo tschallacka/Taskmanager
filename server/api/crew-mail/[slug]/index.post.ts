@@ -1,9 +1,9 @@
 import { setHeader, setResponseStatus } from 'h3'
-import { db } from '../../../../db'
-import { crewMail } from '../../../../db/schema'
+import { db } from '../../../db'
+import { crewMail } from '../../../db/schema'
 import { eq } from 'drizzle-orm'
-import { cleanupMailOnWrite, isMailRecipient, mailError, pendingFor, requireMailCaller, sendsInLastMinute } from '../../../../utils/crewMail'
-import { MAIL_PENDING_LIMIT, MAIL_SENDS_PER_MINUTE, MAIL_TEXT_SAFETY_BYTES, mailIdProblem, mailTextProblem } from '../../../../utils/crewMailRules'
+import { cleanupMailOnWrite, isMailRecipient, mailError, pendingFor, requireMailCaller, sendsInLastMinute } from '../../../utils/crewMail'
+import { MAIL_PENDING_LIMIT, MAIL_SENDS_PER_MINUTE, MAIL_TEXT_SAFETY_BYTES, mailIdProblem, mailTextProblem } from '../../../utils/crewMailRules'
 
 // Postgres' unique violation (23505), as the driver reports it directly or wrapped in its cause.
 function isUniqueViolation(error: unknown): boolean {
