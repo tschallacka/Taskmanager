@@ -618,7 +618,6 @@ export function prStateFromGh(branch, repoRoot) {
   return 'none'
 }
 
-
 function postUpdateFile(who, id, text, kit, work) {
   const file = join(work, 'janet-update.md')
   mkdirSync(work, { recursive: true })
