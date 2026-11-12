@@ -30,3 +30,11 @@ test('the session refresh is exported by useAuth and signals the session to re-r
   assert.match(auth, /\$store\.notify\('\$sessionSignal'\)/)
   assert.match(auth, /return \{\s*session,\s*refreshSession,/)
 })
+
+test('the card assignee and the list row use the shared avatar with the person id', () => {
+  const card = read('app/components/kanban/KanbanCard.vue')
+  assert.match(card, /<UserAvatar[\s\S]*?:user-id="assignee\.id"/)
+  assert.doesNotMatch(card, /<UAvatar\s+v-if="assignee/, 'the card no longer uses the plain avatar for the assignee')
+  const row = read('app/components/kanban/ListRowMeta.vue')
+  assert.match(row, /<UserAvatar[\s\S]*?:user-id="personById\(task\.assigneeId\)!\.id"/)
+})
