@@ -1,8 +1,6 @@
 <script setup lang="ts">
-import { format } from 'date-fns'
 import { columnDotAttrs } from '~/utils/tagColors'
-import { dueDayToMs, isOverdueDay, todayIso } from '~/utils/dueDate'
-import { boardPeople, type ProjectTask } from '~/composables/useProjects'
+import type { ProjectTask } from '~/composables/useProjects'
 import { errorMessage } from '~/utils/untypedFetch'
 
 const emit = defineEmits<{ openTask: [taskId: string] }>()
@@ -23,29 +21,26 @@ async function setField(taskId: string, fieldId: string, value: string | null) {
   }
 }
 
-// The cells edit in place: the assignee from a menu (the card's quick-assign choices), the date from a date input.
-// A save that fails says so, and the cell keeps what the server has.
-async function saveCell(taskId: string, patch: { assigneeId?: string | null, dueOn?: string | null }, failed: string) {
+// The title edits in place: a click opens the field, Enter or leaving it saves, Escape keeps the old title.
+// A save that fails says so, and the title keeps what the server has.
+const titleTaskId = ref<string | null>(null)
+const titleDraft = ref('')
+
+function startTitle(task: ProjectTask) {
+  titleDraft.value = task.title
+  titleTaskId.value = task.id
+}
+
+async function commitTitle(task: ProjectTask) {
+  if (titleTaskId.value !== task.id) return
+  titleTaskId.value = null
+  const title = titleDraft.value.trim()
+  if (!title || title === task.title) return
   try {
-    await updateTask(taskId, patch)
+    await updateTask(task.id, { title })
   } catch (e) {
-    toast.add({ title: errorMessage(e, failed), icon: 'i-lucide-alert-triangle', color: 'error' })
+    toast.add({ title: errorMessage(e, 'Could not save the title'), icon: 'i-lucide-alert-triangle', color: 'error' })
   }
-}
-
-function setDue(taskId: string, value: string) {
-  return saveCell(taskId, { dueOn: value || null }, 'Could not save the due date')
-}
-
-function assignItems(taskId: string) {
-  return [
-    [{ label: 'Unassigned', icon: 'i-lucide-user-x', onSelect: () => saveCell(taskId, { assigneeId: null }, 'Could not change the assignee') }],
-    boardPeople().map(person => ({
-      label: person.kind === 'customer' ? `${person.name || person.email || ''} (customer)` : person.name || person.email || '',
-      avatar: { src: person.image ?? undefined, alt: person.name || person.email || '' },
-      onSelect: () => saveCell(taskId, { assigneeId: person.id }, 'Could not change the assignee')
-    }))
-  ]
 }
 
 const collapsed = ref(new Set<string>())
@@ -135,17 +130,6 @@ function toggleSection(id: string) {
   const next = new Set(collapsed.value)
   if (!next.delete(id)) next.add(id)
   collapsed.value = next
-}
-
-function dueLabel(day: string) {
-  const today = todayIso()
-  if (day === today) return 'Today'
-  if (dueDayToMs(day) - dueDayToMs(today) === 86400000) return 'Tomorrow'
-  return format(dueDayToMs(day), 'MMM d')
-}
-
-function overdue(task: ProjectTask) {
-  return !!task.dueOn && !task.completedAt && isOverdueDay(task.dueOn)
 }
 
 function allSubtasks(taskId: string): ProjectTask[] {
@@ -269,12 +253,35 @@ function subtaskProgress(taskId: string) {
               />
             </button>
 
-            <span
-              class="min-w-0 flex-1 truncate text-sm"
-              :class="task.completedAt ? 'text-dimmed line-through' : 'text-default'"
-            >
-              {{ task.title }}
-            </span>
+            <div class="min-w-0 flex-1">
+              <!-- The title edits in place on a click; Enter or leaving the field saves it, Escape keeps the old title. -->
+              <input
+                v-if="titleTaskId === task.id"
+                v-model="titleDraft"
+                data-list-title-input
+                class="w-full min-w-0 rounded bg-default px-1.5 py-0.5 text-sm text-default outline-none ring-1 ring-primary"
+                @click.stop
+                @keydown.enter.prevent="commitTitle(task)"
+                @keydown.escape="titleTaskId = null"
+                @blur="commitTitle(task)"
+              >
+              <span
+                v-else
+                class="block truncate text-sm"
+                :class="task.completedAt ? 'text-dimmed line-through' : 'text-default'"
+                data-list-title
+                @click.stop="startTitle(task)"
+              >
+                {{ task.title }}
+              </span>
+              <!-- On a phone the extra columns fold under the title; on a wide screen they are columns of their own. -->
+              <ListRowMeta
+                :task="task"
+                :shown="shownColumns"
+                layout="fold"
+                class="mt-0.5 md:hidden"
+              />
+            </div>
 
             <span
               v-if="subtaskProgress(task.id).total"
@@ -286,18 +293,6 @@ function subtaskProgress(taskId: string) {
                 class="size-3"
               />
               {{ subtaskProgress(task.id).done }}/{{ subtaskProgress(task.id).total }}
-            </span>
-
-            <span
-              v-if="shownColumns.labels"
-              class="hidden shrink-0 items-center gap-1 sm:flex"
-            >
-              <KanbanLabelChip
-                v-for="tag in task.tags.slice(0, 2)"
-                :key="tag"
-                :tag="tag"
-                chip-class="text-[0.6875rem]"
-              />
             </span>
 
             <span
@@ -314,56 +309,13 @@ function subtaskProgress(taskId: string) {
               />
             </span>
 
-            <span
-              v-if="shownColumns.assignee"
-              class="flex w-6 shrink-0 justify-center"
-              @click.stop
-            >
-              <!-- The assignee cell: click to change it, the same choices as the card's quick-assign menu. -->
-              <UDropdownMenu
-                :items="assignItems(task.id)"
-                :content="{ align: 'end', collisionPadding: 12 }"
-              >
-                <button
-                  class="rounded-full ring-primary transition-shadow hover:ring-1 focus-visible:ring-1"
-                  :aria-label="personById(task.assigneeId) ? `Assignee: ${personById(task.assigneeId)!.name || personById(task.assigneeId)!.email || ''}. Change it` : 'Unassigned. Assign someone'"
-                  data-list-assign
-                >
-                  <UAvatar
-                    v-if="personById(task.assigneeId)"
-                    :src="personById(task.assigneeId)!.image ?? undefined"
-                    :alt="personById(task.assigneeId)!.name || personById(task.assigneeId)!.email || ''"
-                    size="2xs"
-                    data-list-assignee
-                  />
-                  <UIcon
-                    v-else
-                    name="i-lucide-user-plus"
-                    class="size-4 text-dimmed"
-                  />
-                </button>
-              </UDropdownMenu>
-            </span>
-
-            <span
-              v-if="shownColumns.due"
-              class="w-28 shrink-0 text-right text-xs tabular-nums"
-              :class="overdue(task) ? 'font-medium text-error' : 'text-dimmed'"
-              @click.stop
-            >
-              <!-- The due cell: pick a date in place; clearing it removes the date. -->
-              <input
-                type="date"
-                min="2000-01-01"
-                max="2999-12-31"
-                :value="task.dueOn ?? ''"
-                :aria-label="task.dueOn ? `Due ${dueLabel(task.dueOn)}. Change the date` : 'No due date. Pick one'"
-                class="w-full rounded bg-transparent px-1 py-0.5 text-right text-xs tabular-nums outline-none transition-colors hover:bg-elevated focus:ring-1 focus:ring-primary"
-                :class="overdue(task) ? 'text-error' : task.dueOn ? 'text-default' : 'text-dimmed'"
-                data-list-due
-                @change="setDue(task.id, ($event.target as HTMLInputElement).value)"
-              >
-            </span>
+            <!-- The wide-screen cells: the assignee, the due date and the labels, each edited in place. -->
+            <ListRowMeta
+              :task="task"
+              :shown="shownColumns"
+              layout="column"
+              class="hidden md:flex"
+            />
           </li>
 
           <li
