@@ -18,10 +18,10 @@ so if something you expect is missing, check the switcher first.
 
 - **New project** (the board button next to the logo) and the **Search tasks and boards** field. See
   [Search tasks and boards](/help/workspace/search).
-- The workspace links: **Home**, **Inbox** (with a count of what is unread), **My tasks**, **Browse projects**,
+- The workspace links: **Home**, **Inbox** (with a count of what is unread), **My tasks**, **All projects**,
   **Goals**, **Portfolios**, **Timesheet** and **Profile**.
 - A running timer, if you have one.
-- **Pinned**: boards you chose to keep close. See [Browse projects and pin boards](/help/workspace/browse-projects-and-pins).
+- **Pinned**: boards you chose to keep close. See [All projects and pin boards](/help/workspace/browse-projects-and-pins).
 - **Projects**: every project of the workspace you are in, newest change first. Each row shows the customer (if the
   project has one), when it last changed, and how many tasks it holds.
 - The team switcher, and under it your account menu: **Settings**, **Help**, **Dark mode** or **Light mode**, and
@@ -31,11 +31,22 @@ so if something you expect is missing, check the switcher first.
 
 Home is the page to land on to see what is yours today.
 
-- A greeting with your first name, today's date, and how many tasks assigned to you are completed.
-- **My tasks**: the next six open tasks assigned to you, soonest due date first. A date in red is overdue. Click the
-  circle to mark a task complete, or click the row to open the task on its board. **View all** opens
-  [My tasks](/help/workspace/my-tasks).
-- **Projects**: your six most recently changed projects. **Browse** opens the full list.
+- A greeting with your first name and today's date.
+- Four numbers: **Due today**, **Overdue** (red when there is any), **Done this week** (since Monday), and **Timer**,
+  which names the task of the timer you have running, or says **None running**. The numbers count only the tasks
+  assigned to you.
+- **Getting started**, for a new person: five steps (create a project, add a task, finish one, invite someone, let an
+  agent help) with a progress bar. The first three mark themselves from your work. **Invite someone** and **Let an
+  agent help** are marked when you follow their link, on that browser only. **Hide** removes the card; it also leaves
+  on its own when all five are done.
+- **My tasks**: your open tasks, in three groups by due date: **Overdue**, **Today**, then **Later** (tasks with no
+  date are in Later). Click the circle to mark a task complete, or click the row to open the task on its board.
+  **View all** opens [My tasks](/help/workspace/my-tasks).
+- **Inbox**: how many items are unread, and the latest three. Click one to open it. **View all** opens the inbox.
+- **Projects**: your six most recently changed projects. Each shows its health (on track, at risk or off track, when
+  the project has one), a progress bar of its done tasks, how many are done, and when it last changed. The member
+  avatars of a project card come in a later change (card mwd39fc3xrw3et97ubg). **All projects** opens
+  the full list. The dashed **New project** row starts a new project.
 
 If nothing is assigned to you, the card says **Nothing assigned to you.**
 

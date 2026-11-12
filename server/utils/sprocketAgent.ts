@@ -6,9 +6,14 @@ import { delimiter, join } from 'node:path'
 import { and, eq } from 'drizzle-orm'
 import { db } from '../db'
 import { aiUsageRecords, apiKeys, user } from '../db/schema'
-import { issueRunToken } from './api-keys'
+import { issueSprocketRunToken } from './api-keys'
 import { SPROCKET_CHARACTER } from './chatTools'
 import type { WireMessage } from './chatHistory'
+import { claudeForEveryoneOn } from './sprocketInstance'
+import { sprocketPersonOf } from './sprocketPerson'
+import { sprocketRunContext } from './sprocketRun'
+import { promptWithManner } from './sprocketManner'
+import type { SprocketManner } from './sprocketManner'
 
 // Sprocket answered by Claude Code: the server runs `claude -p` for each message, with the
 // model and effort the person chose, and gives it Taskmanager's MCP endpoint as its only
@@ -66,7 +71,7 @@ export async function claudeVersion(bin: string): Promise<string | null> {
 }
 
 export async function mayUseClaude(userId: string): Promise<boolean> {
-  if (process.env.SPROCKET_CLAUDE_FOR_ALL === 'true') return true
+  if (await claudeForEveryoneOn()) return true
   const [row] = await db.select({ admin: user.isInstanceAdmin }).from(user).where(eq(user.id, userId))
   return row?.admin === true
 }
@@ -117,21 +122,6 @@ export interface AgentSettings {
   effort: string | null
 }
 
-/** Checks the picked agent before anything starts, so a bad setting is a plain 400. */
-async function requireAgentKey(userId: string, keyId: string | null) {
-  const missing = () => createError({ statusCode: 400, statusMessage: 'Pick the agent Sprocket works as, in Settings → Sprocket.' })
-  if (!keyId) throw missing()
-  const [key] = await db.select().from(apiKeys).where(and(eq(apiKeys.id, keyId), eq(apiKeys.userId, userId)))
-  if (!key) throw missing()
-  if (key.expiresAt && key.expiresAt <= Date.now()) {
-    throw createError({ statusCode: 400, statusMessage: `The agent "${key.name}" has expired. Pick another in Settings → Sprocket.` })
-  }
-  if (!key.scopes.includes('boards:read')) {
-    throw createError({ statusCode: 400, statusMessage: `The agent "${key.name}" cannot read boards. Give it boards:read, or pick another.` })
-  }
-  return key
-}
-
 interface StreamEvent {
   type?: string
   subtype?: string
@@ -162,18 +152,27 @@ export async function agentChatResponse(opts: {
   history: WireMessage[]
   today: string
   thinking: boolean
+  /** The manner of this person's answers (sprocketManner.ts). */
+  manner: SprocketManner
 }): Promise<Response> {
   if (!(await mayUseClaude(opts.userId))) {
     throw createError({ statusCode: 403, statusMessage: 'Claude Code answers for the instance admin only on this server. Switch Sprocket to OpenRouter in Settings → Sprocket.' })
   }
   const bin = claudeBinary()
   if (!bin) throw createError({ statusCode: 503, statusMessage: 'Claude Code is not installed where this server runs. Set SPROCKET_CLAUDE_BIN, or switch Sprocket to OpenRouter.' })
-  const key = await requireAgentKey(opts.userId, opts.settings.agentKeyId)
+  // A picked agent key must be the person's own: another person's key is refused before anything runs. The run itself
+  // goes out as a Sprocket run key for this person (sprocketRun.ts), the same as the OpenRouter answer, so the agent key
+  // no longer decides what it may reach.
+  if (opts.settings.agentKeyId) {
+    const [picked] = await db.select({ id: apiKeys.id }).from(apiKeys)
+      .where(and(eq(apiKeys.id, opts.settings.agentKeyId), eq(apiKeys.userId, opts.userId)))
+    if (!picked) throw createError({ statusCode: 400, statusMessage: 'Pick the agent Sprocket works as, in Settings → Sprocket.' })
+  }
   const prompt = promptOf(opts.history)
   const model = isSprocketModel(opts.settings.model) ? opts.settings.model : 'haiku'
   const effort = isSprocketEffort(opts.settings.effort) ? opts.settings.effort : null
 
-  const run = issueRunToken(key.id)
+  const run = issueSprocketRunToken(await sprocketRunContext(await sprocketPersonOf(opts.userId)))
   // A private folder per run: the working directory (no project instructions to find) and
   // the MCP config. The run token travels in the child's environment only; Claude Code fills
   // `${TASKMANAGER_API_KEY}` in when it reads the config, so the token never touches disk.
@@ -197,7 +196,7 @@ export async function agentChatResponse(opts: {
     '--output-format', 'stream-json',
     '--include-partial-messages',
     '--verbose',
-    '--system-prompt', systemPrompt(opts.today)
+    '--system-prompt', promptWithManner(systemPrompt(opts.today), opts.manner)
   ]
   const child = spawn(bin, args, { cwd: dir, env: { ...childEnv(bin), [KEY_VARIABLE]: run.token }, stdio: ['pipe', 'pipe', 'pipe'] })
   child.stdin.end(prompt)

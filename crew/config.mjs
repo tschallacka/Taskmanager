@@ -6,7 +6,7 @@
 // to the kit folder. crew.json (written by `crew setup`, or by hand) holds the product,
 // URLs, people and chat settings; creds.json holds the accounts and keys the board made.
 import { readFileSync, existsSync, readdirSync } from 'node:fs'
-import { crewHome, kitDir } from './home.mjs'
+import { crewHome, kitDir, shellWord } from './home.mjs'
 import { CAST, EXTRA_CAST, forkMemberPlan, forkRole } from './cast.mjs'
 import { migrateCrewHome, renameKeys } from './keys.mjs'
 
@@ -59,6 +59,8 @@ export const config = {
   // The slug the crew API files this crew under (setup.mjs reads it).
   crew: raw.crew ?? {},
   devLog: raw.devLog ?? `${here}dev.log`,
+  // The folder Boss runs its Claude Code session in: init writes Boss's Stop hook there (boss-session.mjs). Empty: none is written.
+  bossSession: raw.bossSession ? String(raw.bossSession).replace(/\/$/, '') : '',
   // The merger's `crew publish` (publish.mjs validates it and names every problem); the repository defaults to the product's.
   publish: { repo: raw.product?.repo ?? '', ...raw.publish }
 }
@@ -163,11 +165,12 @@ export const modelProblems = resolvedModels.problems
  */
 export const agentNames = Object.fromEntries(CAST.filter(key => !EXTRA_CAST.includes(key)).map(key => [key, `${slugify(config.crew.slug || config.team)}-${slugify(config.people[key])}`]))
 
-// A path as one shell word, quoted only when it has to be.
-const shellWord = text => (/^[\w@%+=:,./-]+$/.test(text) ? text : `'${text.replace(/'/g, `'\\''`)}'`)
+// shellWord comes from home.mjs (one rule for the kit); config re-exports it for the scripts that import it from here.
+export { shellWord }
 
 // The documents the owner edits by hand. init writes each once and keeps it; update merges the new template into it.
-export const OWNER_FILES = ['PROJECT-RULES.md', 'BRIEF.md']
+// JANET.md is one of them: the janitor's card is filled in by the crew, so a crew's own edits must survive an update.
+export const OWNER_FILES = ['PROJECT-RULES.md', 'BRIEF.md', 'JANET.md']
 
 /** Fills {{key}} from the template values; a key with no value stays as it is. */
 export function renderTemplate(text, values = templateValues()) {

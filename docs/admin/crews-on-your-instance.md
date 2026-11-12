@@ -50,10 +50,21 @@ To let a remote machine use it for a short time, open the window:
 
 The window closes after 10 minutes, when you press **Close now**, or at the first refused key. A refused key can be a wrong, expired or non-admin one. A refused key also revokes the temporary key, and the page says why and from where it closed. While the window is open, remote callers may use only the temporary key.
 
-To make a permanent key for crew management, press **Create a crews:manage key**. Only you can hold that permission. A key with it manages crews and reaches no board.
+To make a permanent key for crew management, press **Create a crews:manage key**. You can always hold that permission. Anyone else can hold it when they own at least one live crew: their key then reaches that owner's own crews only, and no others. Anyone else gets a key bound to one board, which reaches that board's crews and nothing else.
 
-A **management token** (the sidebar link **Get AI management token** on a board) is the other remote key. It works from any machine, through the public address, without opening the window: it lasts 10 minutes, reaches only its own board and carries only the crew permission. Its calls are rate limited per token and per address, with the board's limits for agent calls. A remote call with a management token that has expired or was regenerated answers its own sentence, so the agent can ask for a new token. A remote call with any other key, or no key, still gets the plain 404. Your permanent crews:manage key and the one from the window stay local-only, as before. A remote call with a revoked management token answers the revoked sentence, the same way as an expired or regenerated one.
+Who may do what, and from where:
 
+| Caller | From this machine | From elsewhere (through the public address) |
+| --- | --- | --- |
+| Instance admin, permanent crews:manage key, unbound | every crew call | the admin's own crews only: read, keys, rotate, people; creating or deleting a crew is refused, a management token is needed |
+| Instance admin, window key | every crew call while the window is open | refused with the plain 404 |
+| Anyone, management token from a board's menu (Put an AI crew to work on this board) | not needed | its own board's crew: read, keys, rotate, people; creating a crew too |
+| Crew owner, permanent crews:manage key, unbound, with a live crew | refused | that owner's own crews only: read, keys, rotate; creating or deleting a crew is refused, a management token is needed |
+| Crew owner, same key, with no live crew of their own | refused | 403 with one sentence: the owner has no live crew here, use a management token from the board's sidebar |
+| Any key without crews:manage | refused | the plain 404 |
+
+A **management token** (the board's menu item **Put an AI crew to work on this board**) is the other remote key. It works from any machine, through the public address, without opening the window: it lasts 10 minutes, reaches only its own board and carries only the crew permission. Its calls are rate limited per token and per address, with the board's limits for agent calls. A remote call with a management token that has expired or was regenerated answers its own sentence, so the agent can ask for a new token. A remote call with any other key, or no key, still gets the plain 404. The instance admin's window key stays local-only, as before. The instance admin's permanent crews:manage key works from outside for the admin's own crews only, the same as a crew owner's permanent key (see the table above). A remote call with a revoked management token answers the revoked sentence, the same way as an expired or regenerated one.
+>
 ### Binding a crew to a board
 
 A crew can be made on a real board in the same call. The crew always works on a **shadow board**, made in the crew's own team; the real board is for people. Only the key's owner can bind, and only to a board of a team the owner runs as owner or admin.
@@ -118,9 +129,9 @@ On the workbench install, make crews against `http://127.0.0.1:3100` directly, n
 <!-- /requires -->
 
 <!-- requires: team-admin -->
-[Give a board a crew](/help/crews/give-a-board-a-crew) is the step a team's owner or admin takes to attach a crew to a board.
+[Put an AI crew to work on this board](/help/crews/give-a-board-a-crew) is the step a team's owner or admin takes to make a crew for a board.
 <!-- /requires -->
 
 ## Related settings
 
-`CREW_API_TRUST_SOCKET` and the socket variables only matter when the server listens on a unix socket. They are covered in the repository's README. The kit that agents install is served by your instance, so it always matches the version you run.
+`CREW_API_TRUST_SOCKET` and the socket variables only matter when the server listens on a unix socket. They are covered in the repository's README. The kit that agents install is served by your instance, so it always matches the version you run. An update (`crew update`, or the update line from the project list) also looks at the skill copies in `~/.claude/skills` of the same Linux user. A copy that still matches the old kit is refreshed from the new one. A copy that differs from both is left alone, and the update prints a `WARN skill` line with the path of the kit's copy, so you can compare them by hand.

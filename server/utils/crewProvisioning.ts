@@ -15,8 +15,8 @@ import {
 } from '../db/schema'
 import type { ApiKeyScope, Crew } from '../db/schema'
 import { authenticateApiKey, generateApiKey, hasScope } from './api-keys'
-import { createCrewAccount, crewAddress, personKeyOf } from './crewAccounts'
-import { CREW_SENTENCES, boardOfCrewKey, crewPermissionRefusal } from './crewPermission'
+import { AddressClash, createCrewAccount, crewAddress, personKeyOf } from './crewAccounts'
+import { CREW_SENTENCES, boardOfCrewKey, crewPermissionRefusal, ownsLiveCrew } from './crewPermission'
 import { genId } from './projects'
 
 // The people a crew is made of, in the order the response lists them. `team` is the
@@ -104,6 +104,8 @@ export interface CrewCaller {
   keyName: string
   // Set for a management token: the one board it works on. Null for every other caller.
   boardId?: string | null
+  // Set for a remote crews:manage key of a person who created a live crew: it reaches only that person's own crews.
+  crewOwner?: boolean
 }
 
 type Minted = Map<string, { password: string, apiKey: string }>
@@ -161,8 +163,10 @@ async function addPeopleTo(crew: Crew, people: readonly CrewPerson[], minted: Mi
   try {
     for (const person of people) {
       const password = secret()
-      const made = await makePersonOf(crew, person, password).catch(() => {
-        throw createError({ statusCode: 409, message: 'An address this crew needs belongs to another account.' })
+      // Only the real address clash is a 409. Any other failure (a database error, say) keeps its own cause.
+      const made = await makePersonOf(crew, person, password).catch((error: unknown) => {
+        if (error instanceof AddressClash) throw createError({ statusCode: 409, message: 'An address this crew needs belongs to another account.' })
+        throw error
       })
       if (made.created) madeUsers.push(made.id)
       const apiKey = await mintKey(made.id, person.team === 'contact' ? null : crew.teamId, `crew ${person.key}`)
@@ -483,6 +487,12 @@ export async function requireCrewManager(event: H3Event): Promise<CrewCaller> {
     throw createError({ statusCode: 403, message: 'This token is not bound to a board.' })
   }
   if (!ownerIsAdmin && !key.projectId) {
+    // A crew owner's own unbound key reaches the crews its owner created, never a board (see requireCrewOnOwnBoard).
+    if (key.kind !== 'management' && (await ownsLiveCrew(key.userId))) {
+      const ownRefusal = await crewPermissionRefusal(key.userId, null)
+      if (ownRefusal) throw createError({ statusCode: 403, message: ownRefusal })
+      return { userId: key.userId, keyId: key.keyId, keyName: key.keyName, boardId: null, crewOwner: true }
+    }
     throw createError({ statusCode: 403, message: CREW_SENTENCES.noBoard })
   }
   const boardId = boardOfCrewKey(key, ownerIsAdmin)

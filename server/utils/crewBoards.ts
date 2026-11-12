@@ -8,14 +8,17 @@ import { and, asc, desc, eq, inArray, isNotNull, isNull, notInArray, sql } from 
 import { alias } from 'drizzle-orm/pg-core'
 import { createError } from 'h3'
 import { db } from '../db'
-import { crewBoards, crews, member, organization, projectColumns, projects, user } from '../db/schema'
+import { crewBoardMembers, crewBoards, crews, member, organization, projectColumns, projects, projectTasks, user } from '../db/schema'
 import type { Crew, CrewBoard } from '../db/schema'
 import { genId } from './projects'
-import { crewPermissionRefusal } from './crewPermission'
+import { crewPermissionRefusal, isInstanceAdmin } from './crewPermission'
 import { BOARD_COLUMNS, CREW_PEOPLE, accountsOf, baseUrl, createOrRotateCrew } from './crewProvisioning'
 import type { CrewCaller, CrewInput } from './crewProvisioning'
-import { personKeyOf } from './crewAccounts'
+import { isCrewUser, personKeyOf } from './crewAccounts'
 import { removeForks } from './crewForks'
+import { TEAM_ADMIN_ROLES } from './auth-helpers'
+import { removeTaskAttachments } from './attachments'
+import { CREW_SHADOW_SUFFIX, TAKEN_OFF_SUFFIX, hiddenCrewShadows } from './boardTree'
 
 export interface CrewChoice {
   id: string
@@ -40,7 +43,7 @@ export interface CrewLinkView {
 
 /** The name the shadow board carries: the real board's, marked as the crew's. */
 export function shadowBoardName(realName: string): string {
-  return `${realName} (crew)`
+  return `${realName}${CREW_SHADOW_SUFFIX}`
 }
 
 /** A crew the caller made and that is live: the only kind they may attach (Q42a). Others read as not found. */
@@ -128,8 +131,76 @@ export async function detachCrew(link: CrewBoard): Promise<void> {
   await removeForks(link.id)
   await db.transaction(async (tx) => {
     await tx.delete(crewBoards).where(eq(crewBoards.id, link.id))
-    await tx.update(projects).set({ archivedAt: Date.now(), name: sql`${projects.name} || ' (taken off)'` }).where(eq(projects.id, link.shadowProjectId))
+    await tx.update(projects).set({ archivedAt: Date.now(), name: sql`${projects.name} || ${TAKEN_OFF_SUFFIX}` }).where(eq(projects.id, link.shadowProjectId))
   })
+}
+
+/**
+ * The crew shadow board `shadowId` as `userId` may delete it. 404 when it is not a crew's shadow, or is hidden from the
+ * person (the instance admin sees every crew board, so hidden does not stop them); 403 when they may not delete it.
+ */
+export async function crewShadowToDelete(userId: string, shadowId: string) {
+  const board = await crewBoardOf(shadowId)
+  if (!board) throw createError({ statusCode: 404, message: 'Project not found' })
+  const instanceAdmin = await isInstanceAdmin(userId)
+  if (!instanceAdmin && (await hiddenCrewShadows(userId, [shadowId])).has(shadowId)) {
+    throw createError({ statusCode: 404, message: 'Project not found' })
+  }
+  if (!(await mayDeleteCrewBoard(userId, board))) {
+    throw createError({ statusCode: 403, message: 'Only the board\'s owner, its crew\'s owner, an owner or admin of its team, or the instance admin can delete a crew board' })
+  }
+  return board
+}
+
+/** A crew's shadow board with the crew it is coupled to: the team member who made the crew, and the crew's team. */
+export async function crewBoardOf(shadowId: string) {
+  const [row] = await db
+    .select({
+      id: projects.id,
+      userId: projects.userId,
+      teamId: projects.teamId,
+      crewCreatedBy: crews.createdBy,
+      crewTeamId: crews.teamId
+    })
+    .from(crewBoards)
+    .innerJoin(projects, eq(projects.id, crewBoards.shadowProjectId))
+    .innerJoin(crews, eq(crews.id, crewBoards.crewId))
+    .where(eq(crewBoards.shadowProjectId, shadowId))
+  return row
+}
+
+/**
+ * Whether `userId` may delete a crew's shadow board: the board's owner or the team member its crew is coupled to
+ * (crews.created_by), an owner or admin of the board's team or of the crew's team, or the instance admin. A crew
+ * account never may, whatever its team role; a customer contact has none of these.
+ */
+export async function mayDeleteCrewBoard(userId: string, board: NonNullable<Awaited<ReturnType<typeof crewBoardOf>>>): Promise<boolean> {
+  if (await isCrewUser(userId)) return false
+  if (userId === board.userId || userId === board.crewCreatedBy) return true
+  if (await isInstanceAdmin(userId)) return true
+  const teams = [...new Set([board.teamId, board.crewTeamId].filter((teamId): teamId is string => Boolean(teamId)))]
+  if (!teams.length) return false
+  const roles = await db.select({ role: member.role }).from(member)
+    .where(and(eq(member.userId, userId), inArray(member.organizationId, teams)))
+  return roles.some(row => TEAM_ADMIN_ROLES.includes(row.role))
+}
+
+/**
+ * Deletes a crew's shadow board for good, in one transaction: the forked members' accounts (their keys go with them),
+ * and the board row, which takes its columns, tasks, comments, pins, notifications and the crew link with it. Then the
+ * files of its tasks are removed from disk, once the rows are gone.
+ */
+export async function deleteCrewBoard(shadowId: string): Promise<void> {
+  const tasks = await db.select({ id: projectTasks.id }).from(projectTasks).where(eq(projectTasks.projectId, shadowId))
+  await db.transaction(async (tx) => {
+    const forks = await tx.select({ userId: crewBoardMembers.userId })
+      .from(crewBoardMembers)
+      .innerJoin(crewBoards, eq(crewBoards.id, crewBoardMembers.linkId))
+      .where(eq(crewBoards.shadowProjectId, shadowId))
+    if (forks.length) await tx.delete(user).where(inArray(user.id, forks.map(row => row.userId)))
+    await tx.delete(projects).where(eq(projects.id, shadowId))
+  })
+  removeTaskAttachments(tasks.map(task => task.id))
 }
 
 /**

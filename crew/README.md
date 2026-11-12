@@ -102,14 +102,16 @@ The workflow's hard rules (the AI text editor for every document, CodeGraph for 
 
 ## Making the crew by hand
 
-`setup.mjs` is a thin client of the same crew API, for a person who runs the kit without the
-Taskmanager instance's own automation (run from the kit folder):
+`crew setup` (`setup.mjs`) makes one new crew for one board in one go. It is a thin client of the crew
+API, with the management token that "Put an AI crew to work on this board" gives (10 minutes, one board):
 
-    CREW_ADMIN_KEY=<key> node setup.mjs              # needs "crew": { "slug": "..." } in crew.json
-    CREW_ADMIN_KEY=<key> node setup.mjs --rotate    # the crew exists, creds.json is lost
+    TASKMANAGER_MANAGEMENT_TOKEN=<token> node setup.mjs --origin <url> --board <board id> --repo <path> [--name <crew name>] [--slug <slug>]
 
-The key is read from the environment and is never written to a file. Keys and passwords are shown
-once, in the response that is written to `creds.json`.
+The token comes from `TASKMANAGER_MANAGEMENT_TOKEN`, or from stdin. It is never read from the command line. A
+crews:manage key does not work here: the remote crew API takes a management token. The crew is always new: a taken
+slug stops the command with 409 and nothing is rotated. The crew home is `~/crew-home/<slug>` (or `CREW_HOME`), with
+`creds.json` (mode 600) fetched once, and `crew.json` with the crew's work board, the shadow board, named by its id.
+The command ends with three lines: the crew home, the work board's url, and what to do next.
 
 ## The chat line (optional)
 
@@ -317,12 +319,32 @@ accounts, after which their definitions and the file are yours to delete.
     crew janet clean plan|run <who> <card> [--dry-run] [--worktree <path>]   Janet's cleanup of a finished worker: the plan deletes nothing, run needs cleaning granted (janet.mjs, JANET.md)
     crew mentions [minutes|--follow]   Pia's updates that write @cato, each printed once: since the last check, or every 60 s for a Monitor (mentions.mjs)
     crew update [--check] [--from <kit folder|kit.tar.gz>] [--kit <folder>]   bring the kit folder up to date (update.mjs)
-    crew setup                    make the crew by hand (setup.mjs)
+    crew setup                    make one new crew for a board in one go, with its management token (setup.mjs)
+    crew people add [--people a,b]   add the crew's missing people, their keys into creds.json (people.mjs, below)
     crew publish <slug> <branch> <title> <msg-file> <pr-file>   the merger's one command: squash a branch onto a fresh base, check the merged tree, push, open the pull request (publish.mjs, below)
     crew <who> browser goto|shot|eval|console|tabs|close-tab|done   the shared browser (browser.mjs)
     crew browser status|shutdown  the shared browser for everyone
 
 The old file names (`tm.mjs`, `listen.mjs`, ...) still work.
+
+## Adding missing people (`crew people add`)
+
+A crew made before a role existed (susy, janet, pat, tess, rita) is missing that person's account and key. To add
+them, run `crew people add` (or `crew people add --people susy,janet` for only some). It asks the board for the missing
+people and writes only their new keys into `CREW_HOME/creds.json` (mode 0600). Existing entries are never changed, no key
+or password is printed, and it runs `init` afterwards so the new people get their agent types.
+
+- The token: put the crew's management token in `TASKMANAGER_MANAGEMENT_TOKEN`. It is never taken from the command
+  line; a token-looking argument is refused. Or use the crew owner's crews:manage key in the same variable. A crew
+  member's key cannot add people, and the command says so in one sentence.
+- Nobody missing: it prints "nothing to add" and the cast, and changes nothing.
+- `crew update` ends by checking the cast when a management token is set: if people are missing it prints the command to
+  run, and runs nothing by itself. Without a token it says how to check.
+- It prints the names it added and the cast (`present` or `missing`), then "tell Pia: new people ...".
+- If the keys were made on the board but could not be written to `creds.json` (a full disk, say), the command says
+  those keys are lost. They cannot be fetched again: the board only makes missing people. Ask Boss for a recovery path.
+
+The board's answer is checked by `crew/people.test.mjs` and `crew/people-route.test.mjs` (a fake board, no network).
 
 ## Publish (the merger's one command)
 
@@ -350,6 +372,8 @@ The exit codes: 0 published; 1 a git or setup failure; 2 usage; 3 a merge confli
 
 `crew.mjs` runs it as `publish.mjs`; `publish.test.mjs` runs it against throwaway git repositories in a folder under the kit's own folder, removed after each run.
 
+**Changelog fragments (Taskmanager).** A change adds `changelog.d/<card-id>-<slug>.md` instead of a line in `CHANGELOG.md` (CONTRIBUTING.md, "Changelog"). The publish that bumps the version folds them in: `node scripts/bump-version.mjs changelog` puts them under the new version heading, deletes them, and must run on the merged tree before the version commit is made, with `changelog.d` and `CHANGELOG.md` staged with it. The kit's own publish does not run that fold: it is a step of the repository's publish script, and a worker never runs it or edits `CHANGELOG.md`.
+
 Post long text from a file, not inline JSON: write the Markdown to a file and run `crew wren update <taskId> body.md`. An update is internal (staff only) unless `--customer` is given; a customer contact's update is customer-visible whatever the flag says, because the server decides. The board prints `posted as internal` or `posted as customer`. An empty body, a file over 200 KB, invalid UTF-8 or NUL bytes exit 65; a missing file, a symlink or a non-file exits 66; an unknown flag exits 64; a board that cannot be reached exits 69 (try again). The one-line form is `crew wren mcp post_task_update`, with a JSON object holding the id and the body.
 
 ## The shared browser
@@ -369,9 +393,21 @@ Limits, which the design does not remove:
 
 ## Updating
 
-`crew update` brings the kit folder up to date with the kit the board serves. `crew update --check` says whether an update is waiting and writes nothing. `crew update --from <folder or kit.tar.gz>` installs a kit you already have. Your state stays in `CREW_HOME`. The board's archive does not carry `kit-files.txt`, so a board update does not replace that list: it takes the files to remove from `crew-kit.json`, the record of the last install. A crew that was never updated has no record yet, and its removals are read from the `kit-files.txt` it came with.
-Every kit file it replaces or removes is first copied to `CREW_HOME/backups/update-<time>/kit`. The owner's files (`PROJECT-RULES.md`, `BRIEF.md`) are merged from the template they came from, kept in `CREW_HOME/kit-base`, so your edits and a template change both survive. A crew made before kit-base existed has no recorded template for these two files, so its first update keeps them as they are and prints a WARN; a later update merges any template change from there on. When both change the same line, your file is kept, the merge with markers is set aside in the backup, and the update says CONFLICT. The skill copies in the Claude skills folder are refreshed only while they still match the old kit. Then `init` renders the documents from the new templates, and the install is recorded in `CREW_HOME/crew-kit.json`.
-The kit's changes are in `CHANGELOG.md`; a line about the Taskmanager server is listed in the report, never made here. A kit from before this command has no `update.mjs`, so the old folder cannot update itself. Unpack the new kit into a folder of its own, for example `~/crew-kit-new`, and run it against the old folder with the crew's home set:
+To update a crew's kit, run this one line, with the crew home (the folder that holds `crew.json`) as the argument:
+
+    curl -fsSL https://<host>/crew/update.sh | sh -s -- ~/crew-home/<slug>
+
+It works from any state: no kit folder yet, a kit from before `update.mjs` existed, or a current kit. The kit folder is the one the crew home recorded in `crew-kit.json`, else `~/crew-kit-<host>`. The line fetches the kit that instance serves and runs that kit's `update.mjs` from the fresh copy. Nothing is interactive and no key is printed. The Taskmanager project list has an "Update this crew's kit" item that copies a prompt with this line.
+
+Once a crew home is updated, `crew update` brings its kit folder up to date with the kit the board serves. `crew update --check` says whether an update is waiting and writes nothing. `crew update --from <folder or kit.tar.gz>` installs a kit you already have. `crew update --all` runs the update once for every crew home of this kit folder. A home whose record names another kit folder is skipped; a home with no record of its kit (one installed before the record existed) is taken as this one, and its update links it to this folder; a folder without a `crew.json` is named as not a crew home. A kit of another instance is still refused.
+
+A kit folder belongs to one instance: after an install it records its host and version in `kit-instance.json`. `crew update` refuses a kit folder of another instance in one sentence, and changes nothing. Make a kit folder for each instance (for example `~/crew-kit-<host>`).
+
+When it finishes, the report says the kit version before and after (`X -> Y`), the crew home it updated, and any CONFLICT or FAIL to fix by hand. Your state stays in `CREW_HOME`. The board's archive does not carry `kit-files.txt`, so a board update does not replace that list: it takes the files to remove from `crew-kit.json`, the record of the last install. A crew that was never updated has no record yet, and its removals are read from the `kit-files.txt` it came with.
+Every kit file it replaces or removes is first copied to `CREW_HOME/backups/update-<time>/kit`. The owner's files (`PROJECT-RULES.md`, `BRIEF.md`, `JANET.md`) are merged, so your edits and a template change both survive. A crew made before kit-base existed has no recorded template for these files (and `JANET.md` was not an owner file before, so every crew's first update keeps it as it is and prints a WARN), so its first update keeps them as they are and prints a WARN; a later update merges any template change from there on. When both change the same line, your file is kept, the merge with markers is set aside in the backup, and the update says CONFLICT. The skill copies in the Claude skills folder are refreshed only while they still match the old kit. Then `init` renders the documents from the new templates, and the install is recorded in `CREW_HOME/crew-kit.json`.
+The kit's changes are in `CHANGELOG.md`; a line about the Taskmanager server is listed in the report, never made here. A first install (no kit folder yet) makes the folder, but `init` reports FAIL until the kit folder has its packages: run `npm install` in the kit folder, then `CREW_HOME=<crew home> node <kit folder>/init.mjs` again.
+
+If the one line does not work, the kit can be unpacked by hand. A kit from before this command has no `update.mjs`, so the old folder cannot update itself. Unpack the new kit into a folder of its own, for example `~/crew-kit-new`, and run it against the old folder with the crew's home set:
 
     CREW_HOME=~/crew-home/<slug> node ~/crew-kit-new/update.mjs --from ~/crew-kit-new --kit <the old kit folder>
 
