@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.19.1 - 2026-11-12
+
+- **The result of Regenerate key, Edit boards and Add a board shows in the key's own row.** The one-time code and prompt appear under the row that was clicked, which scrolls into view, and the confirmation of a save or an added board shows there too; the box at the top of the Connect page is for a new connection only. `app/components/connect/ConnectTokens.vue`, `docs/agents/create-and-revoke-a-key.md`.
+
 ## 0.19.0 - 2026-11-12
 
 - **Task panel redesign (5/9).** The properties are in two columns in the order Assignee, Due date, Start date, Labels, custom fields, with Time, Blocked by and GitHub as full-width blocks below; on a phone they are rows with a chevron, and a read-only panel shows values only. The description's command row shows while its text has focus. Activity has Comments and History tabs and opens as a sheet on a phone, with the composer at its bottom. The panel's address is /projects/<id>/<task>, and the router now fails loudly if the board route is missing. TaskDrawer.vue is about 980 lines. Files: app/components/RichEditor.vue, app/components/kanban/SubtaskList.vue, app/components/kanban/TaskComments.vue, app/components/kanban/TaskDrawer.vue, app/components/kanban/TaskFields.vue, app/pages/projects/[id].vue, app/router.options.ts, app/utils/copyTaskLink.ts, app/utils/taskPanelUrl.ts, docs/basics/comments-and-updates.md, docs/basics/tasks.md, tests/copy-task-link.test.ts, tests/task-panel-url.test.ts, changelog.d/mwc4jeh2v7fyfk2qi2-task-panel.md.
