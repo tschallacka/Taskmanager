@@ -31,3 +31,12 @@ test('the health chip shows the project status from Overview, with its word, and
   assert.match(page, /v-if="healthChip"/)
   assert.match(page, /data-health-chip/)
 })
+
+test('the board shows its people as avatars: four, then a count; none for a customer', () => {
+  assert.match(page, /fetch<\{ people: \{ id: string, name: string, image\?: string \| null \}\[\] \}>\(`\/api\/projects\/\$\{id\}\/members`\)/)
+  assert.match(page, /if \(id && !isCustomerView\.value\) loadBoardPeople\(id\)/)
+  assert.match(page, /v-if="boardPeople\.length"/)
+  assert.match(page, /boardPeople\.slice\(0, 4\)/)
+  assert.match(page, />\+\{\{ boardPeople\.length - 4 \}\}</)
+  assert.match(page, /data-board-avatars/)
+})

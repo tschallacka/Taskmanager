@@ -245,6 +245,22 @@ const healthChip = computed(() => {
   const status = activeProject.value?.status
   return status ? HEALTH[status] : null
 })
+// Who is on the board, for the avatars in the top bar: the members list, four shown and a count after. A customer, or
+// anyone the list refuses, sees none.
+const boardPeople = ref<{ id: string, name: string, image?: string | null }[]>([])
+async function loadBoardPeople(id: string) {
+  try {
+    const res = await $fetch<{ people: { id: string, name: string, image?: string | null }[] }>(`/api/projects/${id}/members`)
+    boardPeople.value = res.people ?? []
+  } catch {
+    boardPeople.value = []
+  }
+}
+watch(projectId, (id) => {
+  if (id && !isCustomerView.value) loadBoardPeople(id)
+  else boardPeople.value = []
+}, { immediate: true })
+const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase()
 const { switchWorkspace } = useWorkspace()
 const { refresh: refreshProjects } = useProjects()
 const { customers, ensureLoaded: ensureCustomers } = useCustomers()
@@ -460,6 +476,28 @@ useSeoMeta({
       </span>
 
       <div class="ml-auto flex shrink-0 items-center gap-1">
+        <!-- Who is on the board: the first four as avatars, then a count. -->
+        <span
+          v-if="boardPeople.length"
+          class="flex shrink-0 items-center pl-1"
+          data-board-avatars
+        >
+          <UAvatar
+            v-for="person in boardPeople.slice(0, 4)"
+            :key="person.id"
+            :src="person.image || undefined"
+            :alt="person.name"
+            :text="initials(person.name)"
+            size="xs"
+            class="-ml-1.5 ring-2 ring-default"
+            :title="person.name"
+          />
+          <span
+            v-if="boardPeople.length > 4"
+            class="tm-chip -ml-1.5"
+            data-board-avatars-more
+          >+{{ boardPeople.length - 4 }}</span>
+        </span>
         <!-- Label filter -->
         <UPopover
           v-if="boardTagCounts.length"
