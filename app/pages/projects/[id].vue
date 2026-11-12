@@ -35,6 +35,8 @@ const {
 } = useProjects()
 
 const projectId = computed(() => route.params.id as string)
+// The board's own component, for the New task button in the view row (its newTask opens the first column's composer).
+const boardRef = ref<{ newTask: () => void } | null>(null)
 
 const VIEWS = [
   { key: 'overview', label: 'Overview', icon: 'i-lucide-layout-dashboard' },
@@ -730,6 +732,16 @@ useSeoMeta({
       >
         The office shows the crew of this board at work: every task is a folder that moves between the desks as the board changes. On a board with more than one crew, the menu picks which crew to watch.
       </HelpHint>
+      <!-- New task, at the right end of the view row, on the board view. It opens the composer in the first column. -->
+      <UButton
+        v-if="view === 'board' && !isReadOnlyBoard && !isCustomerView"
+        label="New task"
+        icon="i-lucide-plus"
+        size="xs"
+        class="ml-auto shrink-0"
+        data-new-task
+        @click="boardRef?.newTask()"
+      />
     </nav>
 
     <!-- Trash summary. The board itself draws the deleted columns and cards in
@@ -816,6 +828,7 @@ useSeoMeta({
         />
         <KanbanBoard
           v-else-if="view === 'board'"
+          ref="boardRef"
           :project-id="projectId"
           @open-task="drawerTaskId = $event"
         />

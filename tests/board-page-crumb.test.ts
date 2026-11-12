@@ -49,3 +49,15 @@ test('row 2 shows the five main views as tabs, in design order, and the rest und
   assert.match(page, /v-if="moreViews\.some\(v => v\.key === 'office'\)"/)
   assert.match(page, /page="agents\/office-view"/)
 })
+
+test('row 2 has New task at its right end, on the board view, opening the first column\'s composer', () => {
+  assert.match(page, /const boardRef = ref<\{ newTask: \(\) => void \} \| null>\(null\)/)
+  assert.match(page, /ref="boardRef"/)
+  assert.match(page, /data-new-task/)
+  assert.match(page, /label="New task"/)
+  assert.match(page, /view === 'board' && !isReadOnlyBoard && !isCustomerView/)
+  assert.match(page, /@click="boardRef\?\.newTask\(\)"/)
+  const board = readFileSync(join(process.cwd(), 'app', 'components', 'kanban', 'KanbanBoard.vue'), 'utf8')
+  assert.match(board, /function newTask\(\) \{\s*const first = liveColumns\.value\[0\]\s*if \(first\) startCompose\(first\.id\)/)
+  assert.match(board, /defineExpose\(\{ newTask \}\)/)
+})

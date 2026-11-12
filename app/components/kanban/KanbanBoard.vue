@@ -405,6 +405,13 @@ function columnMenu(column: ProjectColumn): DropdownMenuItem[][] {
 // there is nothing trashed in state to draw.
 const liveColumns = computed(() => boardColumns.value.filter(column => !isTrashed(column)))
 
+// The page's New task button (row 2): opens the composer in the first column, the same as that column's Add task.
+function newTask() {
+  const first = liveColumns.value[0]
+  if (first) startCompose(first.id)
+}
+defineExpose({ newTask })
+
 // A live column counts the cards on it, as it always has; the trashed cards
 // sitting in it are not part of the board. A trashed column counts what
 // restoring it would bring back, which is everything still inside it.
