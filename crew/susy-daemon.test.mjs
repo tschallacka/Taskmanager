@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import { mkdtempSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { tick, pendingKey, postBody, postFresh, runOnce, statusLines, heartbeatAgeMinutes, heartbeatFresh, daemonCommand, SESSION, upPart } from './susy-daemon.mjs'
+import { tick, pendingKey, postBody, postFresh, runOnce, statusLines, heartbeatAgeMinutes, heartbeatFresh, daemonCommand, SESSION, upPart, isDaemonPid, lockState, takeLock, releaseLock, LOCK_NAME } from './susy-daemon.mjs'
 import { spawnSync } from 'node:child_process'
 import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -159,4 +159,30 @@ test('the up part: its check passes on a fresh heartbeat and fails on a stale on
   assert.doesNotMatch(part.start, /--live/)
   assert.match(upPart({ home, kit, live: true }).start, / start --live$/)
   assert.equal(upPart({ home, kit, live: true }).name, 'susy daemon (live)')
+})
+
+test('the lock: one loop at a time; a live holder refuses; a stale pid is taken over; release only what this process holds', () => {
+  const home = mkdtempSync(join(tmpdir(), 'susy-lock-'))
+  const live = pid => pid === 4242
+  const dead = () => false
+  assert.equal(lockState(home, { isDaemon: dead }).state, 'free')
+  assert.equal(takeLock(home, { isDaemon: dead, pid: 111 }).ok, true)
+  assert.equal(readFileSync(join(home, '.listen', LOCK_NAME), 'utf8').trim(), '111')
+  // A second loop, while 111 is alive: refused. (Here 111 is treated as a live daemon.)
+  assert.deepEqual(takeLock(home, { isDaemon: pid => pid === 111, pid: 222 }), { ok: false, heldBy: 111 })
+  // A stale pid (its process is not a daemon any more): taken over.
+  const over = takeLock(home, { isDaemon: dead, pid: 333 })
+  assert.equal(over.ok, true)
+  assert.equal(over.tookOverStale, 111)
+  // A held lock is not released by another process.
+  releaseLock(home, 111)
+  assert.equal(readFileSync(join(home, '.listen', LOCK_NAME), 'utf8').trim(), '333')
+  releaseLock(home, 333)
+  assert.equal(lockState(home, { isDaemon: live }).state, 'free')
+})
+
+test('a pid is a daemon only when it is alive and its command line names the daemon', () => {
+  assert.equal(isDaemonPid(process.pid, () => 'node /x/susy-daemon.mjs loop'), true)
+  assert.equal(isDaemonPid(process.pid, () => 'node /x/other.mjs'), false)
+  assert.equal(isDaemonPid(999999999, () => 'node /x/susy-daemon.mjs loop'), false, 'a dead pid is not a daemon')
 })

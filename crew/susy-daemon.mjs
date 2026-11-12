@@ -11,7 +11,7 @@
 // written each tick in both modes. Nothing crashes the loop.
 // Files in CREW_HOME/.listen: susy-daemon.json, susy-daemon-dryrun.log, and susy.json (agent ids and the last round,
 // shared with `crew susy`).
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -223,6 +223,52 @@ export function statusLines(home, now = Date.now()) {
   return out
 }
 
+// The single-instance lock: one loop at a time, and no `once --live` while a loop runs. The pid file names the loop's
+// process; a pid that is dead, or is not a susy-daemon process, is stale and is taken over.
+export const LOCK_NAME = 'susy-daemon.pid'
+
+/** Whether a pid is a live susy-daemon process: it exists, and its command line names this daemon. */
+export function isDaemonPid(pid, readCmdline = p => readFileSync(`/proc/${p}/cmdline`, 'utf8')) {
+  try {
+    process.kill(pid, 0)
+  } catch {
+    return false
+  }
+  try {
+    return readCmdline(pid).includes('susy-daemon.mjs')
+  } catch {
+    return false
+  }
+}
+
+/** `free` (no pid file), `stale` (a pid file whose pid is not a live daemon), or `held` (a live daemon's pid). */
+export function lockState(home, { isDaemon = pid => isDaemonPid(pid) } = {}) {
+  const file = join(home, '.listen', LOCK_NAME)
+  if (!existsSync(file)) return { state: 'free' }
+  const pid = Number(readFileSync(file, 'utf8').trim())
+  if (!Number.isInteger(pid) || pid <= 0 || !isDaemon(pid)) return { state: 'stale', pid: Number.isInteger(pid) ? pid : null }
+  return { state: 'held', pid }
+}
+
+/** Takes the lock for this process. Refused (`ok: false`) while another live daemon holds it; a stale pid is taken over. */
+export function takeLock(home, { isDaemon, pid = process.pid } = {}) {
+  const current = lockState(home, { isDaemon })
+  if (current.state === 'held' && current.pid !== pid) return { ok: false, heldBy: current.pid }
+  mkdirSync(join(home, '.listen'), { recursive: true })
+  writeFileSync(join(home, '.listen', LOCK_NAME), `${pid}\n`, { mode: 0o600 })
+  return { ok: true, tookOverStale: current.state === 'stale' ? current.pid : null }
+}
+
+/** Releases the lock if this process holds it. */
+export function releaseLock(home, pid = process.pid) {
+  const file = join(home, '.listen', LOCK_NAME)
+  try {
+    if (Number(readFileSync(file, 'utf8').trim()) === pid) rmSync(file)
+  } catch {
+    // no lock file: nothing to release
+  }
+}
+
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 
 /**
@@ -234,7 +280,7 @@ export function upPart({ home, kit, live = false, node = process.execPath }) {
   const daemon = join(kit, 'susy-daemon.mjs')
   return {
     name: live ? 'susy daemon (live)' : 'susy daemon (dry-run)',
-    check: `CREW_HOME=${JSON.stringify(home)} ${JSON.stringify(node)} ${JSON.stringify(daemon)} status | grep -q fresh`,
+    check: `CREW_HOME=${JSON.stringify(home)} ${JSON.stringify(node)} ${JSON.stringify(daemon)} check`,
     start: `CREW_HOME=${JSON.stringify(home)} ${JSON.stringify(node)} ${JSON.stringify(daemon)} start${live ? ' --live' : ''}`
   }
 }
@@ -245,6 +291,10 @@ async function main(argv) {
   if (command === 'status') {
     console.log(statusLines(home).join('\n'))
     return 0
+  }
+  if (command === 'check') {
+    // The up-part check: exit 0 only when the heartbeat's tick time is younger than STALE_MINUTES. No text is matched.
+    return heartbeatFresh(readJson(heartbeatPath(home), null)) ? 0 : 1
   }
   if (command === 'up-part') {
     console.log(JSON.stringify(upPart({ home, kit: dirname(fileURLToPath(import.meta.url)), live: rest.includes('--live') }), null, 2))
@@ -265,8 +315,22 @@ async function main(argv) {
     return 64
   }
   const live = rest.includes('--live')
+  if (command === 'once' && !live) {
+    await runOnce(home, Date.now(), { live: false })
+    return 0
+  }
+  // The lock: a loop always holds it, and a once --live takes it for its one tick. A second loop, or a once --live while a
+  // loop runs, is refused. A pid file whose process is gone is taken over.
+  const lock = takeLock(home)
+  if (!lock.ok) {
+    console.error(`susy-daemon: refused: a loop already runs (pid ${lock.heldBy}); one loop at a time, and no once --live while it runs`)
+    return 75
+  }
+  if (lock.tookOverStale) console.log(`susy-daemon: took over a stale lock (pid ${lock.tookOverStale})`)
+  for (const signal of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(signal, () => { releaseLock(home); process.exit(0) })
+  process.on('exit', () => releaseLock(home))
   if (command === 'once') {
-    await runOnce(home, Date.now(), { live })
+    await runOnce(home, Date.now(), { live: true })
     return 0
   }
   const seconds = Number(rest.find(arg => /^\d+$/.test(arg))) || TICK_SECONDS
