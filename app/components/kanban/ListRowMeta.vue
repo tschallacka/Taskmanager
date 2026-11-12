@@ -6,15 +6,56 @@ import { format } from 'date-fns'
 import { dueDayToMs, isOverdueDay, todayIso } from '~/utils/dueDate'
 import { boardPeople, type ProjectTask } from '~/composables/useProjects'
 import { errorMessage } from '~/utils/untypedFetch'
+import { parseDuration } from '#shared/utils/duration'
 
 const props = defineProps<{
   task: ProjectTask
-  shown: { assignee: boolean, due: boolean, labels: boolean }
+  shown: { assignee: boolean, due: boolean, labels: boolean, time: boolean }
   layout: 'column' | 'fold'
+  // The minutes logged on this task so far, from everyone on the team.
+  minutes: number
 }>()
+
+const emit = defineEmits<{ logged: [taskId: string, minutes: number] }>()
 
 const { personById, updateTask } = useProjects()
 const toast = useToast()
+
+// "1h 30m", "45m" or "2h" for display.
+function formatMinutes(minutes: number) {
+  if (!minutes) return ''
+  const hours = Math.floor(minutes / 60)
+  const rest = minutes % 60
+  if (!hours) return `${rest}m`
+  return rest ? `${hours}h ${rest}m` : `${hours}h`
+}
+
+// The time cell logs time in place: a typed duration is saved as a time entry on the task, then the total moves.
+const editingTime = ref(false)
+const timeDraft = ref('')
+
+function startTime() {
+  timeDraft.value = ''
+  editingTime.value = true
+}
+
+async function commitTime() {
+  if (!editingTime.value) return
+  editingTime.value = false
+  const text = timeDraft.value.trim()
+  if (!text) return
+  const minutes = parseDuration(text)
+  if (minutes === null) {
+    toast.add({ title: 'Time is written like 1h 30m, 1:30 or 45m', color: 'error' })
+    return
+  }
+  try {
+    await $fetch(`/api/tasks/${props.task.id}/time`, { method: 'POST', headers: realtimeHeaders(), body: { minutes } })
+    emit('logged', props.task.id, minutes)
+  } catch (e) {
+    toast.add({ title: errorMessage(e, 'Could not log the time'), icon: 'i-lucide-alert-triangle', color: 'error' })
+  }
+}
 
 async function saveCell(patch: { assigneeId?: string | null, dueOn?: string | null, tags?: string[] }, failed: string) {
   try {
@@ -127,6 +168,34 @@ function cancelLabels() {
         data-list-due
         @change="setDue(($event.target as HTMLInputElement).value)"
       >
+    </span>
+
+    <span
+      v-if="shown.time"
+      class="shrink-0 tabular-nums"
+      :class="layout === 'column' ? 'block w-16 text-right' : ''"
+      @click.stop
+    >
+      <input
+        v-if="editingTime"
+        v-model="timeDraft"
+        data-list-time-input
+        placeholder="1h 30m"
+        class="w-20 rounded bg-default px-1.5 py-0.5 text-xs text-default outline-none ring-1 ring-primary"
+        @keydown.enter.prevent="commitTime"
+        @keydown.escape="editingTime = false"
+        @blur="commitTime"
+      >
+      <button
+        v-else
+        class="rounded px-1 py-0.5 text-xs transition-colors hover:bg-elevated"
+        :class="minutes ? 'text-default' : 'text-dimmed'"
+        :aria-label="minutes ? `Time logged: ${formatMinutes(minutes)}. Log more` : 'No time logged. Log some'"
+        data-list-time
+        @click.stop="startTime"
+      >
+        {{ minutes ? formatMinutes(minutes) : '+ time' }}
+      </button>
     </span>
 
     <span

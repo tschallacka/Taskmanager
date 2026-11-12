@@ -57,3 +57,22 @@ test('the cells stop the row click, so a tap on a cell does not open the task', 
   assert.match(meta, /<span\s+v-if="shown\.due"[\s\S]*?@click\.stop/)
   assert.match(meta, /<span\s+v-if="shown\.labels"[\s\S]*?@click\.stop/)
 })
+
+test('the time cell shows the minutes logged on the task and logs a typed duration in place through the task time API', () => {
+  assert.match(meta, /data-list-time\b/)
+  assert.match(meta, /data-list-time-input/)
+  assert.match(meta, /parseDuration\(text\)/, 'the typed time reads the same way the server reads it')
+  assert.match(meta, /\$fetch\(`\/api\/tasks\/\$\{props\.task\.id\}\/time`, \{ method: 'POST'/)
+  assert.match(meta, /emit\('logged', props\.task\.id, minutes\)/)
+  assert.match(list, /:minutes="taskMinutes\[task\.id\] \?\? 0"/)
+  assert.match(list, /@logged="onLogged"/)
+})
+
+test('the board time endpoint sums each task\'s entries for the board, from everyone, all days', () => {
+  const route = readFileSync(new URL('../server/api/projects/[id]/task-time.get.ts', import.meta.url), 'utf8')
+  assert.match(route, /routeStaffProject\(event\)/, 'staff only')
+  assert.match(route, /sum\(\$\{timeEntries\.minutes\}\)/)
+  assert.match(route, /groupBy\(timeEntries\.taskId\)/)
+  assert.match(route, /eq\(timeEntries\.projectId, project\.id\)/, 'the board, not a range of days')
+  assert.doesNotMatch(route, /getQuery|parseRange/, 'no day range from the query')
+})
