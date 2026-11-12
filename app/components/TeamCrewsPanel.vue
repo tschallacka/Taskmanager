@@ -14,7 +14,7 @@ const { switchWorkspace } = useWorkspace()
 const data = ref<TeamCrewsList | null>(null)
 const loading = ref(false)
 const projectId = ref('')
-// The board whose "Add a crew to this board" window is open.
+// The board whose "Put an AI crew to work on this board" window is open.
 const managementBoard = ref<{ id: string, name: string } | null>(null)
 const confirmDetach = ref<TeamCrewLink | null>(null)
 const detaching = ref(false)
@@ -182,7 +182,7 @@ const SELECT_CLASS = 'min-w-0 flex-1 rounded-md border border-default bg-default
       @submit.prevent="addCrew"
     >
       <p class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
-        Add a crew to this board
+        Put an AI crew to work on this board
         <HelpHint page="crews/give-a-board-a-crew">
           Pick a board, then the window gives you a 10-minute token and a prompt. An AI agent with that prompt makes a new crew for the board, which gets a board of its own. It reads your board and never changes it.
         </HelpHint>
@@ -215,7 +215,7 @@ const SELECT_CLASS = 'min-w-0 flex-1 rounded-md border border-default bg-default
           :disabled="!canAdd"
           data-team-crew-add
         >
-          Add a crew to this board
+          Put an AI crew to work on this board
         </UButton>
       </div>
     </form>

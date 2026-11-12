@@ -206,7 +206,7 @@ const WORKSPACE_LINKS = [
 ]
 
 const deleteTarget = ref<{ id: string, name: string, crewBoard?: boolean } | null>(null)
-// The board whose management token dialog is open ("Get AI management token").
+// The board whose management token dialog is open ("Put an AI crew to work on this board").
 const managementBoard = ref<{ id: string, name: string } | null>(null)
 
 async function confirmDelete() {
@@ -270,7 +270,7 @@ function menuItems(project: Project) {
       onSelect: () => { void navigateTo({ path: '/connect', query: { board: project.id } }) }
     },
     {
-      label: 'Add a crew to this board',
+      label: 'Put an AI crew to work on this board',
       icon: 'i-lucide-users-round',
       onSelect: () => { managementBoard.value = { id: project.id, name: project.name } }
     },

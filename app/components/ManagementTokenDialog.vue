@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { countdownText, managementPrompt, refusalLink } from '~/utils/managementPrompt'
 
-// "Get AI management token": makes the 10-minute token for one board and shows it once, with the copy-paste prompt
+// "Put an AI crew to work on this board": makes the 10-minute token for one board and shows it once, with the copy-paste prompt
 // for the agent. The token lives only in this component: it is cleared when the dialog closes or the time runs out.
 
 const props = defineProps<{
@@ -163,8 +163,8 @@ function close() {
 <template>
   <UModal
     :open="open"
-    title="Add a crew to this board"
-    description="A token for 10 minutes. Give the prompt to an AI agent: it makes a new crew for this board and keeps its keys."
+    :title="`Put an AI crew to work on ${board?.name ?? 'this board'}`"
+    description="This makes a one-time code for 10 minutes. Paste the prompt below into a new Claude Code session: it sets up a crew (a PM, workers and testers) that works on this board and keeps its own keys."
     :ui="{ footer: 'justify-end' }"
     @update:open="(value: boolean) => emit('update:open', value)"
   >
@@ -174,10 +174,8 @@ function close() {
         data-management-dialog
       >
         <template v-if="phase === 'idle' || phase === 'working'">
-          <p class="text-sm text-muted">
-            The token works for 10 minutes and only on
-            <span class="font-medium text-default">{{ board?.name }}</span>. It has no more rights than you have now, and it stops when the
-            crew permission is withdrawn. It is shown once.
+          <p class="text-xs text-muted">
+            It has no more rights than you have now, and it stops when the crew permission is withdrawn. It is shown once.
           </p>
           <p
             v-if="blocked"
@@ -188,7 +186,7 @@ function close() {
           </p>
           <UButton
             v-else
-            label="Make the token"
+            label="Get the prompt"
             icon="i-lucide-key-round"
             color="primary"
             :loading="phase === 'working'"
@@ -240,7 +238,7 @@ function close() {
             The token has expired and is no longer shown. Make a new one if the agent still needs to manage the crew.
           </p>
           <UButton
-            label="Make a new token"
+            label="Get a new prompt"
             icon="i-lucide-key-round"
             color="primary"
             data-management-make
