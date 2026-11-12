@@ -235,6 +235,16 @@ const teamName = computed(() => {
   const id = activeProject.value?.teamId
   return id ? (teams.value.find(team => team.id === id)?.name ?? null) : null
 })
+// The project's health, as set on Overview, shown as a chip in the top bar. Nothing is shown when no status is set.
+const HEALTH = {
+  on_track: { label: 'On track', tone: 'tm-tone-ok', dot: 'tm-dot-ok' },
+  at_risk: { label: 'At risk', tone: 'tm-tone-warn', dot: 'tm-dot-warn' },
+  off_track: { label: 'Off track', tone: 'tm-tone-danger', dot: 'tm-dot-danger' }
+} as const
+const healthChip = computed(() => {
+  const status = activeProject.value?.status
+  return status ? HEALTH[status] : null
+})
 const { switchWorkspace } = useWorkspace()
 const { refresh: refreshProjects } = useProjects()
 const { customers, ensureLoaded: ensureCustomers } = useCustomers()
@@ -385,6 +395,19 @@ useSeoMeta({
       >
         {{ activeProject?.name ?? 'Board' }}
       </button>
+
+      <span
+        v-if="healthChip"
+        class="tm-chip shrink-0"
+        :class="healthChip.tone"
+        data-health-chip
+      >
+        <span
+          class="tm-dot"
+          :class="healthChip.dot"
+        />
+        {{ healthChip.label }}
+      </span>
 
       <UDropdownMenu
         v-if="activeProject?.shadows?.length"

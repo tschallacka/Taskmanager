@@ -21,3 +21,13 @@ test('the crumb shows team, then project, on a normal board only', () => {
   assert.match(page, /\{\{ teamName \}\}/)
   assert.match(page, /\{\{ activeProject\.name \}\}/)
 })
+
+test('the health chip shows the project status from Overview, with its word, and nothing when none is set', () => {
+  assert.match(page, /const HEALTH = \{/)
+  assert.match(page, /on_track: \{ label: 'On track', tone: 'tm-tone-ok', dot: 'tm-dot-ok' \}/)
+  assert.match(page, /at_risk: \{ label: 'At risk', tone: 'tm-tone-warn', dot: 'tm-dot-warn' \}/)
+  assert.match(page, /off_track: \{ label: 'Off track', tone: 'tm-tone-danger', dot: 'tm-dot-danger' \}/)
+  assert.match(page, /return status \? HEALTH\[status\] : null/)
+  assert.match(page, /v-if="healthChip"/)
+  assert.match(page, /data-health-chip/)
+})
