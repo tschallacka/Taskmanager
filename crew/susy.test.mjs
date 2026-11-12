@@ -288,3 +288,35 @@ test('the check reads an agent id Pia wrote, and names it in the SendMessage lin
   const c = card('w10', { column: 'In progress', assignee: 'Wynn Worker', updatedAt: NOW - 30 * MIN })
   assert.match(run([c], { agents: setAgent({}, 'wynn', 'ag-42') }).lines[0], /SendMessage to agent ag-42/)
 })
+
+// Card mwcytequ3yduaddw3o4: Susy's own pokes and markers are not card changes. The board moves updatedAt on her post too.
+const poke = (to, reason, minutesAgo) => update(agent('susy'), `poked ${to} | ${reason} | at ${at(minutesAgo)}`, minutesAgo)
+const LADDER_STEPS = ['wynn', 'wynn', 'pia', 'pia', 'boss', 'boss']
+
+test('her own pokes are not changes: the ladder climbs wynn, wynn, pia, pia, boss, boss, then quiet', () => {
+  for (let done = 0; done <= LADDER_STEPS.length; done++) {
+    // `done` pokes on the card, one every 11 minutes, the last 11 minutes ago; the board's updatedAt is that last poke.
+    const updates = []
+    for (let i = 0; i < done; i++) updates.push(poke(LADDER_STEPS[i], 'in progress, no update', 11 * (done - i)))
+    const updatedAt = done ? NOW - 11 * MIN : NOW - 60 * MIN
+    const c = card(`ladder${done}`, { column: 'In progress', assignee: 'Wynn Worker', updatedAt, updates })
+    const pokes = run([c]).actions.filter(a => a.kind === 'poke')
+    if (done === LADDER_STEPS.length) assert.equal(pokes.length, 0, 'after the last rung the card is quiet')
+    else {
+      assert.equal(pokes.length, 1, `poke ${done + 1}`)
+      assert.equal(pokes[0].to, LADDER_STEPS[done], `poke ${done + 1} goes to ${LADDER_STEPS[done]}`)
+    }
+  }
+})
+
+test('a later update by another person resets the ladder: the open poke is cleared, and the next one starts from the first rung', () => {
+  const updates = [poke('wynn', 'in progress, no update', 44), poke('wynn', 'in progress, no update', 33), poke('pia', 'in progress, no update', 22), poke('pia', 'in progress, no update', 11)]
+  updates.push(update(agent('wynn'), 'Working on it.', 5))
+  const c = card('reset1', { column: 'In progress', assignee: 'Wynn Worker', updatedAt: NOW - 5 * MIN, updates })
+  const soon = run([c])
+  assert.equal(soon.actions.filter(a => a.kind === 'clear').length, 1, 'the open poke closes when the card changes')
+  assert.equal(soon.actions.filter(a => a.kind === 'poke').length, 0, 'nothing is poked within the threshold of the change')
+  const later = run([c], { now: NOW + 6 * MIN }).actions.filter(a => a.kind === 'poke')
+  assert.equal(later.length, 1)
+  assert.equal(later[0].to, 'wynn', 'after the reset the ladder starts again at the worker')
+})

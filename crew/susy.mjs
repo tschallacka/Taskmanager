@@ -92,18 +92,31 @@ function ledgerOf(card) {
     .sort((a, b) => a.at - b.at)
 }
 
-/** Every time the card changed: its own last update time and each update by anyone but Susy. */
+// The board moves a card's updatedAt when anyone posts on it, Susy included. Her own posts are within this slack of it.
+const OWN_POST_SLACK = 2000
+
+/**
+ * Every time the card changed by someone other than Susy: each update by anyone but her, and the card's own time (a move,
+ * an edit) unless her own post is what moved it. Her pokes and markers never count (card mwcytequ3yduaddw3o4).
+ */
 function changeTimes(card) {
-  const times = [card.updatedAt]
-  for (const update of card.updates ?? []) {
-    if (authorKey(update.author) !== 'susy') times.push(Date.parse(update.at))
-  }
+  const updates = card.updates ?? []
+  const susyAt = updates.filter(update => authorKey(update.author) === 'susy').map(update => Date.parse(update.at))
+  const times = updates.filter(update => authorKey(update.author) !== 'susy').map(update => Date.parse(update.at))
+  const own = card.updatedAt
+  if (Number.isFinite(own) && !susyAt.some(t => Math.abs(t - own) <= OWN_POST_SLACK)) times.push(own)
   return times.filter(Number.isFinite)
 }
 
-/** The time of the latest change by anyone but Susy, or the card's own time when that is later. */
+/**
+ * The time of the latest change by someone other than Susy. With none known, the card has been in this state since before
+ * her first post on it, so that post's time minus one millisecond (it still counts as a poke after the start).
+ */
 function lastChange(card) {
-  return Math.max(...changeTimes(card))
+  const times = changeTimes(card)
+  if (times.length) return Math.max(...times)
+  const susyPosts = (card.updates ?? []).filter(update => authorKey(update.author) === 'susy').map(update => Date.parse(update.at)).filter(Number.isFinite)
+  return susyPosts.length ? Math.min(...susyPosts) - 1 : card.updatedAt
 }
 
 /** Updates by agents whose keys are in `keys` (or by anyone but Susy when `keys` is null), at or after `since`. */
@@ -232,12 +245,12 @@ export function candidatesFor(card, th, ctx) {
 
   // A review gate that the owner has not posted on since the card entered it.
   const owner = GATES[card.column]
-  add('gate untouched', owner ?? 'pia', card.updatedAt, th.gateMinutes, Boolean(owner) && !postedBy(card, [owner], card.updatedAt))
+  add('gate untouched', owner ?? 'pia', lastChange(card), th.gateMinutes, Boolean(owner) && !postedBy(card, [owner], lastChange(card)))
 
   // Stuck in its column: far longer than the other cards in the same column (see STUCK_FACTOR).
-  const age = ctx.now - card.updatedAt
+  const age = ctx.now - lastChange(card)
   const others = (ctx.columnCards.get(card.column) ?? []).filter(other => other.id !== card.id).map(other => other.age)
-  add('stuck in column', key ?? 'pia', card.updatedAt, th.idleMinutes,
+  add('stuck in column', key ?? 'pia', lastChange(card), th.idleMinutes,
     !RESTING.includes(card.column) && others.length >= 2 && age >= th.stuckMinutes * MIN && age > STUCK_FACTOR * median(others))
 
   // Blocked by a card with no owner, or in a cycle of blockers.
@@ -245,16 +258,16 @@ export function candidatesFor(card, th, ctx) {
     const blocker = ctx.byId.get(id)
     return blocker && !blocker.assignee && !blocker.completed && blocker.column !== 'Done'
   })
-  add('blocked by an unowned card', 'pia', card.updatedAt, th.idleMinutes, Boolean(card.blocked) && unowned)
-  add('blocked in a cycle', 'pia', card.updatedAt, th.idleMinutes, ctx.cycle.has(card.id))
+  add('blocked by an unowned card', 'pia', lastChange(card), th.idleMinutes, Boolean(card.blocked) && unowned)
+  add('blocked in a cycle', 'pia', lastChange(card), th.idleMinutes, ctx.cycle.has(card.id))
 
   // The cleaning tags: a card that is ready to clean, planned, granted, or done.
   const tags = card.tags
   const cleaner = ctx.cleaner
-  add('ready to clean, not assigned to cleaner', 'pia', card.updatedAt, th.idleMinutes, tags.includes('ready to clean') && key !== cleaner)
-  add('clean plan, no check', 'pia', card.updatedAt, th.cleanPlanMinutes, tags.includes('clean plan') && !tags.includes('cleaning granted') && !postedBy(card, null, card.updatedAt))
-  add('cleaning granted, cleaner not working', cleaner, card.updatedAt, th.cleanGrantMinutes, tags.includes('cleaning granted') && !tags.includes('clean done') && !postedBy(card, [cleaner], card.updatedAt))
-  add('clean done, not checked', 'pia', card.updatedAt, th.cleanDoneMinutes, tags.includes('clean done') && !tags.includes('cleaned') && !postedBy(card, ['pia'], card.updatedAt))
+  add('ready to clean, not assigned to cleaner', 'pia', lastChange(card), th.idleMinutes, tags.includes('ready to clean') && key !== cleaner)
+  add('clean plan, no check', 'pia', lastChange(card), th.cleanPlanMinutes, tags.includes('clean plan') && !tags.includes('cleaning granted') && !postedBy(card, null, lastChange(card)))
+  add('cleaning granted, cleaner not working', cleaner, lastChange(card), th.cleanGrantMinutes, tags.includes('cleaning granted') && !tags.includes('clean done') && !postedBy(card, [cleaner], lastChange(card)))
+  add('clean done, not checked', 'pia', lastChange(card), th.cleanDoneMinutes, tags.includes('clean done') && !tags.includes('cleaned') && !postedBy(card, ['pia'], lastChange(card)))
   return out
 }
 
@@ -294,7 +307,7 @@ export function findPokes(cards, opts) {
   const columnCards = new Map()
   for (const card of cards) {
     const list = columnCards.get(card.column) ?? []
-    list.push({ id: card.id, age: now - card.updatedAt })
+    list.push({ id: card.id, age: now - lastChange(card) })
     columnCards.set(card.column, list)
   }
   const ctx = { keyOf: opts.keyOf, byId, busy, cycle: cycleCards(cards), cleaner: opts.cleaner ?? DEFAULT_CLEANER, agents: opts.agents ?? {}, now, columnCards }
