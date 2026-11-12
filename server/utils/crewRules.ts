@@ -135,7 +135,7 @@ export function noteAuthorFor(members: Map<string, string>): string | null {
 }
 
 /** The author of a rule's comment and the rule source for its actions: the crew's Boss account, else Pia's. */
-async function sourceFor(_project: RuleProject, name: string, members: Map<string, string>): Promise<RuleSource> {
+export async function sourceFor(_project: RuleProject, name: string, members: Map<string, string>): Promise<RuleSource> {
   return { id: `crew:${name}`, name, createdBy: noteAuthorFor(members), mayChangeVisibility: false }
 }
 
