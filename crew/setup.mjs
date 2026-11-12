@@ -55,7 +55,7 @@ async function readToken() {
 }
 
 // The slug is the crew's name in the API: lowercase letters, digits and hyphens, 2 to 63 characters.
-export function slugFor(name) {
+function slugFor(name) {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 63)
 }
 
@@ -125,7 +125,7 @@ const keysRes = await fetch(`${keysUrl}${keysUrl.includes('?') ? '&' : '?'}forma
 const keys = await keysRes.json().catch(() => ({}))
 if (!keysRes.ok) stop(keysRes, keys)
 const creds = join(home, 'creds.json')
-writeFileSync(creds, JSON.stringify({ ...keys, base: keys.base ?? origin }, null, 2))
+writeFileSync(creds, JSON.stringify({ ...keys, base: keys.base ?? origin }, null, 2), { mode: 0o600 })
 chmodSync(creds, 0o600)
 
 // crew.json: the work board is the shadow board, named by its id. The real board is context only.
@@ -142,7 +142,7 @@ const crewJson = {
   board: { url: shadow.url, id: shadow.board_id, name: shadow.board_name ?? `${boardName} crew board` },
   realBoard: { url: real.url ?? '', id: real.board_id ?? args.board, name: real.board_name ?? boardName, readOnly: true }
 }
-writeFileSync(join(home, 'crew.json'), `${JSON.stringify(crewJson, null, 2)}\n`)
+writeFileSync(join(home, 'crew.json'), `${JSON.stringify(crewJson, null, 2)}\n`, { mode: 0o600 })
 chmodSync(join(home, 'crew.json'), 0o600)
 
 // The agent types: init.mjs in the crew home. Its failures are printed by init itself.

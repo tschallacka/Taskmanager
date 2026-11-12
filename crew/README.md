@@ -319,7 +319,7 @@ accounts, after which their definitions and the file are yours to delete.
     crew janet clean plan|run <who> <card> [--dry-run] [--worktree <path>]   Janet's cleanup of a finished worker: the plan deletes nothing, run needs cleaning granted (janet.mjs, JANET.md)
     crew mentions [minutes|--follow]   Pia's updates that write @cato, each printed once: since the last check, or every 60 s for a Monitor (mentions.mjs)
     crew update [--check] [--from <kit folder|kit.tar.gz>] [--kit <folder>]   bring the kit folder up to date (update.mjs)
-    crew setup                    make the crew by hand (setup.mjs)
+    crew setup                    make one new crew for a board in one go, with its management token (setup.mjs)
     crew people add [--people a,b]   add the crew's missing people, their keys into creds.json (people.mjs, below)
     crew publish <slug> <branch> <title> <msg-file> <pr-file>   the merger's one command: squash a branch onto a fresh base, check the merged tree, push, open the pull request (publish.mjs, below)
     crew <who> browser goto|shot|eval|console|tabs|close-tab|done   the shared browser (browser.mjs)

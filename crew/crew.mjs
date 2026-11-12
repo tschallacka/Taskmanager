@@ -17,7 +17,7 @@
 //   crew restart-brief         after crew up: each standing member's open cards and last update, for Pia to start them fresh (restart-brief.mjs)
 //   crew dev-copies            after crew up: restarts the dev copies a Verify UX or Verify QA card needs, one line each (dev-copies.mjs)
 //   crew totp <file>           the current authenticator code for a dev copy's two-factor secret (totp.mjs)
-//   crew setup                 make the crew by hand through the crew API (setup.mjs)
+//   crew setup                 make one new crew for a board in one go, with the board's management token (setup.mjs)
 //   crew people add [--people a,b]   add the crew's missing people; the token comes from TASKMANAGER_MANAGEMENT_TOKEN (people.mjs)
 //   crew channel <who>         the Claude Code channel server for one person (channel.mjs)
 //   crew <who> browser goto|shot|eval|console|tabs|close-tab|done   the shared browser, one context per person (browser.mjs)
