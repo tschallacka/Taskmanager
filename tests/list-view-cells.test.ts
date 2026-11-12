@@ -82,14 +82,30 @@ test('the board time endpoint sums each task\'s entries for the board, from ever
   assert.doesNotMatch(route, /getQuery|parseRange/, 'no day range from the query')
 })
 
-test('the table has a header row over the cells, in the design order: Task, Assignee, Due, Labels, Time', () => {
-  assert.match(list, /data-list-header\b/, 'the header row is there, on a wide screen')
-  const order = ['assignee', 'due', 'labels', 'time'].map(cell => list.indexOf(`data-list-header-cell="${cell}"`))
-  assert.ok(order.every(index => index > 0), 'each cell has its header')
-  assert.deepEqual(order, [...order].sort((a, b) => a - b), 'the header names come in the design order')
-  const cells = ['data-list-assign', 'data-list-due', 'data-list-labels', 'data-list-time']
-  const rowOrder = cells.map(cell => meta.indexOf(cell))
-  assert.deepEqual(rowOrder, [...rowOrder].sort((a, b) => a - b), 'the row cells come in the same order as the header')
+test('the table has exactly one header row, on a wide screen', () => {
+  assert.equal(list.match(/^\s*data-list-header$/gm)?.length, 1, 'one header row, not two')
+})
+
+test('the header and the row read the same columns: the same order and the same widths, for every choice of optional columns', async () => {
+  const { metaColumns, fieldColumns, LIST_CELL_WIDTH, META_ORDER } = await import('../app/utils/listColumns')
+  const all = { assignee: true, due: true, labels: true, time: true }
+  // The row draws the cells in the order of its markers; the header is built from the same list, so they agree.
+  const rowMarkers: Record<string, string> = { assignee: 'data-list-assign', due: 'data-list-due', labels: 'data-list-labels', time: 'data-list-time' }
+  const rowOrder = META_ORDER.map(key => meta.indexOf(rowMarkers[key]!))
+  assert.deepEqual(rowOrder, [...rowOrder].sort((a, b) => a - b), 'the row draws the cells in META_ORDER')
+  for (let mask = 0; mask < 16; mask++) {
+    const shown = { assignee: !!(mask & 1), due: !!(mask & 2), labels: !!(mask & 4), time: !!(mask & 8) }
+    const header = metaColumns(shown)
+    const expected = META_ORDER.filter(key => shown[key])
+    assert.deepEqual(header.map(col => col.key), expected, 'the header names the shown cells in row order')
+    for (const col of header) assert.equal(col.width, LIST_CELL_WIDTH[col.key], 'the header and the cell share one width')
+  }
+  assert.deepEqual(metaColumns(all).map(col => col.key), ['assignee', 'due', 'labels', 'time'], 'the design order: Assignee, Due, Labels, Time')
+  const fields = [{ id: 'f1', name: 'Priority', type: 'select' }, { id: 'f2', name: 'Estimate', type: 'number' }]
+  const withFields = fieldColumns(fields)
+  assert.deepEqual(withFields.map(col => col.label), ['Priority', 'Estimate'], 'the custom field names come before the optional columns')
+  assert.equal(withFields[0]!.width, 'w-28')
+  assert.equal(withFields[1]!.width, 'w-20')
 })
 
 test('the assignee cell shows the person by name as well as the avatar, so a person is visible in the table', () => {

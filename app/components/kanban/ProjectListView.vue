@@ -2,6 +2,7 @@
 import { columnDotAttrs } from '~/utils/tagColors'
 import type { ProjectTask } from '~/composables/useProjects'
 import { errorMessage, untypedFetch } from '~/utils/untypedFetch'
+import { FIELD_WIDTH, fieldColumns, metaColumns } from '~/utils/listColumns'
 
 const emit = defineEmits<{ openTask: [taskId: string] }>()
 
@@ -10,8 +11,6 @@ const { boardColumns, visibleColumnTasks, subtasksOf, personById, updateTask, is
 // A column per custom field, each cell editable in place.
 const toast = useToast()
 const { fields, valueOf, setValues } = useCustomFields(activeProjectId)
-
-const FIELD_WIDTH: Record<string, string> = { select: 'w-28', number: 'w-20', date: 'w-28', text: 'w-32' }
 
 async function setField(taskId: string, fieldId: string, value: string | null) {
   try {
@@ -168,19 +167,30 @@ function subtaskProgress(taskId: string) {
 
 <template>
   <div class="h-full overflow-y-auto px-4 pb-10 lg:px-6">
+    <!-- The table's one header row, on a wide screen. Its names sit over the cells, which read the same widths
+         (app/utils/listColumns.ts): the task, the custom fields, then the optional columns in row order. -->
     <div
-      v-if="fields.length"
+      v-if="sections.length"
       class="mt-3 hidden items-center gap-3 px-3 text-[0.6875rem] font-medium uppercase tracking-wide text-dimmed md:flex"
       data-list-header
     >
-      <span class="flex-1" />
+      <span class="size-5 shrink-0" />
+      <span class="min-w-0 flex-1">Task</span>
       <span
-        v-for="field in fields"
-        :key="field.id"
+        v-for="col in fieldColumns(fields)"
+        :key="col.key"
         class="shrink-0 truncate px-1"
-        :class="FIELD_WIDTH[field.type]"
-      >{{ field.name }}</span>
-      <span class="w-[6.75rem] shrink-0" />
+        :class="col.width"
+        data-list-header-field
+      >{{ col.label }}</span>
+      <span class="flex shrink-0 items-center gap-2">
+        <span
+          v-for="col in metaColumns(shownColumns)"
+          :key="col.key"
+          :class="[col.width, col.key === 'assignee' ? '' : 'text-right']"
+          :data-list-header-cell="col.key"
+        >{{ col.label }}</span>
+      </span>
     </div>
     <div
       class="mt-3 flex flex-wrap items-center gap-3 px-1"
@@ -226,37 +236,6 @@ function subtaskProgress(taskId: string) {
           <option value="title">Title</option>
         </select>
       </label>
-    </div>
-    <!-- The table's header row, on a wide screen: the widths are the cells' own, so the names sit over their values. -->
-    <div
-      v-if="sections.length && (shownColumns.assignee || shownColumns.due || shownColumns.labels || shownColumns.time)"
-      class="mt-4 hidden items-center gap-3 px-3 text-xs font-medium text-dimmed md:flex"
-      data-list-header
-    >
-      <span class="size-5 shrink-0" />
-      <span class="min-w-0 flex-1">Task</span>
-      <span class="flex shrink-0 items-center gap-2">
-        <span
-          v-if="shownColumns.assignee"
-          class="w-28"
-          data-list-header-cell="assignee"
-        >Assignee</span>
-        <span
-          v-if="shownColumns.due"
-          class="w-28 text-right"
-          data-list-header-cell="due"
-        >Due</span>
-        <span
-          v-if="shownColumns.labels"
-          class="w-40 text-right"
-          data-list-header-cell="labels"
-        >Labels</span>
-        <span
-          v-if="shownColumns.time"
-          class="w-16 text-right"
-          data-list-header-cell="time"
-        >Time</span>
-      </span>
     </div>
     <div
       v-for="section in sections"

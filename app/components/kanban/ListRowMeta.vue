@@ -7,6 +7,7 @@ import { dueDayToMs, isOverdueDay, todayIso } from '~/utils/dueDate'
 import { boardPeople, type ProjectTask } from '~/composables/useProjects'
 import { errorMessage } from '~/utils/untypedFetch'
 import { parseDuration } from '#shared/utils/duration'
+import { LIST_CELL_WIDTH } from '~/utils/listColumns'
 
 const props = defineProps<{
   task: ProjectTask
@@ -117,7 +118,7 @@ function cancelLabels() {
     <span
       v-if="shown.assignee"
       class="flex shrink-0 items-center"
-      :class="layout === 'column' ? 'w-28 min-w-0' : ''"
+      :class="layout === 'column' ? [LIST_CELL_WIDTH.assignee, 'min-w-0'] : ''"
       @click.stop
     >
       <UDropdownMenu
@@ -152,7 +153,7 @@ function cancelLabels() {
     <span
       v-if="shown.due"
       class="shrink-0"
-      :class="layout === 'column' ? 'block w-28 text-right tabular-nums' : 'tabular-nums'"
+      :class="layout === 'column' ? ['block text-right tabular-nums', LIST_CELL_WIDTH.due] : 'tabular-nums'"
       @click.stop
     >
       <input
@@ -174,7 +175,7 @@ function cancelLabels() {
     <span
       v-if="shown.labels"
       class="flex min-w-0 items-center gap-1"
-      :class="layout === 'column' ? 'w-40 justify-end' : ''"
+      :class="layout === 'column' ? [LIST_CELL_WIDTH.labels, 'justify-end'] : ''"
       @click.stop
     >
       <input
@@ -211,7 +212,7 @@ function cancelLabels() {
     <span
       v-if="shown.time"
       class="shrink-0 tabular-nums"
-      :class="layout === 'column' ? 'block w-16 text-right' : ''"
+      :class="layout === 'column' ? ['block text-right', LIST_CELL_WIDTH.time] : ''"
       @click.stop
     >
       <input
