@@ -1,13 +1,18 @@
 <script setup lang="ts">
 import { countdownText, managementPrompt, refusalLink } from '~/utils/managementPrompt'
+import { crewManagePrompt } from '~/utils/crewManagePrompt'
 
-// "Get AI management token": makes the 10-minute token for one board and shows it once, with the copy-paste prompt
-// for the agent. The token lives only in this component: it is cleared when the dialog closes or the time runs out.
+// "Put an AI crew to work on this board": makes the 10-minute token for one board and shows it once, with the copy-paste
+// prompt for the agent. On a crew's own board ("Manage this crew", card mwdd9d2vtgqhfr6izq) the token reaches only that
+// crew, and there are two prompts: recover the keys, add the missing people. The token lives only in this component.
 
 const props = defineProps<{
   open: boolean
-  board: { id: string, name: string } | null
+  board: { id: string, name: string, crewSlug?: string | null } | null
 }>()
+
+// A crew's own board is the one with a crew slug.
+const isCrewBoard = computed(() => Boolean(props.board?.crewSlug))
 
 const emit = defineEmits<{
   'update:open': [open: boolean]
@@ -106,7 +111,9 @@ async function make() {
     issued.value = {
       token: made.token,
       expiresAt,
-      prompt: managementPrompt({ origin, boardId: made.board.id, boardName: made.board.name, token: made.token, expiresAt })
+      prompt: isCrewBoard.value && board.crewSlug
+        ? ['recover', 'people'].map(job => crewManagePrompt({ origin, slug: board.crewSlug as string, boardName: made.board.name, token: made.token, expiresAt, job: job as 'recover' | 'people' })).join('\n\n----------\n\n')
+        : managementPrompt({ origin, boardId: made.board.id, boardName: made.board.name, token: made.token, expiresAt })
     }
     phase.value = 'issued'
     now.value = Date.now()

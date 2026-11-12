@@ -6,10 +6,11 @@
 import { and, eq } from 'drizzle-orm'
 import { createError } from 'h3'
 import { db } from '../db'
-import { agentAudit, apiKeys, crewBoards, crews } from '../db/schema'
+import { agentAudit, apiKeys, crewBoards, crews, member, projects } from '../db/schema'
 import type { Crew } from '../db/schema'
 import { generateApiKey } from './api-keys'
 import { storeBoardScopes } from './connectTokens'
+import { isCrewUser } from './crewAccounts'
 import { boardToBind } from './crewBoards'
 import { crewPermissionRefusal, isInstanceAdmin } from './crewPermission'
 import { chargeRateLimit, limitsFor, scopeOfBoard } from './rateLimits'
@@ -113,6 +114,11 @@ export async function requireCreateOnOwnBoard(caller: CrewCaller, slug: string, 
  * A management token reaches a crew only when the crew is bound to its board. Other crews read as not found.
  */
 export async function requireCrewOnOwnBoard(caller: CrewCaller, crew: Crew): Promise<void> {
+  // A crew-scoped token reaches its own crew only (card mwdd9d2vtgqhfr6izq); any other crew gets the board sentence.
+  if (caller.crewId) {
+    if (crew.id !== caller.crewId) throw createError({ statusCode: 403, message: 'This token works on its own board only.' })
+    return
+  }
   if (caller.crewOwner) {
     // A crew owner's own key reaches the crews its owner created, and no other person's.
     if (crew.createdBy !== caller.userId) throw createError({ statusCode: 404, message: 'No crew of yours with that slug.' })
@@ -122,6 +128,81 @@ export async function requireCrewOnOwnBoard(caller: CrewCaller, crew: Crew): Pro
   const [link] = await db.select({ id: crewBoards.id }).from(crewBoards)
     .where(and(eq(crewBoards.crewId, crew.id), eq(crewBoards.projectId, caller.boardId)))
   if (!link) throw createError({ statusCode: 404, message: 'No crew of yours with that slug.' })
+}
+
+/**
+ * The 10-minute token of ONE crew, made on that crew's own (shadow) board (card mwdd9d2vtgqhfr6izq). It reaches only the
+ * crew's keys and people routes: the crew gate and requireCrewOnOwnBoard enforce that. Only the instance admin, the
+ * crew's creator, or an owner or admin of the crew's team may make it; a crew's own accounts never. Additive: the new
+ * key carries crew_id; every other key is unchanged.
+ */
+export async function issueCrewToken(userId: string, shadowProjectId: unknown, now = Date.now()) {
+  if (typeof shadowProjectId !== 'string' || !shadowProjectId) throw createError({ statusCode: 400, message: 'Name the crew\'s board.' })
+  if (await isCrewUser(userId)) throw createError({ statusCode: 403, message: 'A crew\'s own account cannot make a crew token.' })
+  const [row] = await db.select({
+    crewId: crews.id,
+    crewName: crews.name,
+    createdBy: crews.createdBy,
+    teamId: crews.teamId,
+    disabledAt: crews.disabledAt,
+    shadowName: projects.name
+  }).from(crewBoards)
+    .innerJoin(crews, eq(crews.id, crewBoards.crewId))
+    .innerJoin(projects, eq(projects.id, crewBoards.shadowProjectId))
+    .where(eq(crewBoards.shadowProjectId, shadowProjectId))
+  if (!row || row.disabledAt) throw createError({ statusCode: 404, message: 'No such board.' })
+
+  const admin = await isInstanceAdmin(userId)
+  const roles = await db.select({ role: member.role }).from(member)
+    .where(and(eq(member.userId, userId), eq(member.organizationId, row.teamId)))
+  const teamAdmin = roles.some(r => r.role === 'owner' || r.role === 'admin')
+  if (!admin && row.createdBy !== userId && !teamAdmin) {
+    throw createError({ statusCode: 403, message: 'Only the instance admin, the crew\'s creator, or an owner or admin of its team can make this token.' })
+  }
+  const refusal = await crewPermissionRefusal(userId, shadowProjectId)
+  if (refusal) throw createError({ statusCode: 403, message: refusal })
+
+  const generated = generateApiKey()
+  const keyId = genId()
+  const name = `crew token: ${row.crewName}`.slice(0, 60)
+  await db.transaction(async (tx) => {
+    await tx.insert(apiKeys).values({
+      id: keyId,
+      userId,
+      teamId: row.teamId,
+      customerId: null,
+      projectId: shadowProjectId,
+      crewId: row.crewId,
+      name,
+      keyHash: generated.hash,
+      keyPrefix: generated.displayPrefix,
+      scopes: [MANAGEMENT_SCOPE],
+      expiresAt: now + MANAGEMENT_TOKEN_MS,
+      createdAt: now,
+      allBoards: false,
+      boardReachSet: false,
+      kind: 'management'
+    })
+    await storeReach(tx, keyId, { allBoards: false, workspaceTeamIds: [], boardIds: [shadowProjectId] }, now)
+    await storeBoardScopes(tx, keyId, { [shadowProjectId]: [MANAGEMENT_SCOPE] }, now)
+    await tx.insert(agentAudit).values({
+      id: genId(),
+      userId,
+      apiKeyId: keyId,
+      keyName: name,
+      tool: 'crew_token_issued',
+      toolTitle: 'Crew API',
+      projectId: shadowProjectId,
+      projectName: row.shadowName,
+      summary: 'made a 10-minute token for this crew',
+      createdAt: now
+    })
+  })
+  return {
+    token: generated.token,
+    key: { id: keyId, name, keyPrefix: generated.displayPrefix, expiresAt: now + MANAGEMENT_TOKEN_MS },
+    board: { id: shadowProjectId, name: row.shadowName }
+  }
 }
 
 /**

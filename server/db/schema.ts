@@ -827,7 +827,10 @@ export const apiKeys = pgTable(
     // Management tokens (the 10-minute crew token) are kept apart from access tokens. Access is the default.
     kind: text('kind').$type<'access' | 'management'>().notNull().default('access'),
     // True once the per-board scopes are stored in api_key_board_scopes. Until then the key's scopes apply to every board.
-    boardScopesSet: boolean('board_scopes_set').notNull().default(false)
+    boardScopesSet: boolean('board_scopes_set').notNull().default(false),
+    // A crew-scoped management token (card mwdd9d2vtgqhfr6izq): the id of the one crew it reaches, for its keys and people
+    // routes only. NULL for every other key, which then behaves as before. Plain text, no reference, no index (additive).
+    crewId: text('crew_id')
   },
   table => [index('api_keys_user_idx').on(table.userId)]
 )
