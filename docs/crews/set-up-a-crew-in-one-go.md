@@ -14,7 +14,7 @@ prompt says so in one sentence instead of making a call that fails later.
 
 ## Steps
 
-1. Open the board's menu and choose **Add a crew to this board**. (The window opens for that board.)
+1. Open the board's menu and choose **Put an AI crew to work on this board**. (The window opens for that board.)
 2. Copy the prompt the window shows. It holds a management token that works for **10 minutes** and for this board only.
 3. Paste the prompt into an AI agent on the computer that will run the crew. Answer its one question: the path of the
    repository the crew works on.

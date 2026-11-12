@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // `crew setup`: makes one new crew for one board, in one go. A thin client of the crew API with the
-// management token of the board, which the owner copies from "Add a crew to this board":
+// management token of the board, which the owner copies from "Put an AI crew to work on this board":
 //
 //   TASKMANAGER_MANAGEMENT_TOKEN=<token> node setup.mjs --origin <url> --board <board id> --repo <path>
 //       [--name <crew name>] [--slug <slug>]
