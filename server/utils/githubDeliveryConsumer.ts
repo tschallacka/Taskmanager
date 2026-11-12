@@ -90,13 +90,39 @@ export interface LimitTimer {
   clear: (handle: unknown) => void
 }
 
+// The limit timers that are armed and not yet fired or cleared, so dispose can clear them all (see disposeConsumer).
+const liveLimitTimers = new Set<ReturnType<typeof setTimeout>>()
+
 const REAL_TIMER: LimitTimer = {
   set: (fire, ms) => {
-    const handle = setTimeout(fire, ms)
+    const handle: ReturnType<typeof setTimeout> = setTimeout(() => {
+      liveLimitTimers.delete(handle)
+      fire()
+    }, ms)
     ;(handle as { unref?: () => void }).unref?.()
+    liveLimitTimers.add(handle)
     return handle
   },
-  clear: handle => clearTimeout(handle as ReturnType<typeof setTimeout>)
+  clear: (handle) => {
+    liveLimitTimers.delete(handle as ReturnType<typeof setTimeout>)
+    clearTimeout(handle as ReturnType<typeof setTimeout>)
+  }
+}
+
+/**
+ * Test support only: clears every limit timer still armed and releases the shared delivery queue, so a test file can end
+ * with nothing pending. Calling it twice is safe. Production code does not call it; the timers and the queue are unchanged.
+ */
+export async function disposeConsumer(): Promise<number> {
+  let cleared = 0
+  for (const handle of liveLimitTimers) {
+    clearTimeout(handle)
+    cleared += 1
+  }
+  liveLimitTimers.clear()
+  const { closeDeliveryQueue } = await import('./githubDeliveryQueue')
+  await closeDeliveryQueue()
+  return cleared
 }
 
 /** The timer a database limit is armed with. The run's budget and deadlines stay on the real clock; only the limit moves. */

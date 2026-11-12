@@ -19,6 +19,7 @@ import {
 } from '../server/utils/githubTags'
 import type { LinkedCard, TagCard, TagGithub, TagRepoLink, TagStore } from '../server/utils/githubTags'
 import { closeDeliveryQueue, getDeliveryQueue } from '../server/utils/githubDeliveryQueue'
+import { disposeConsumer } from '../server/utils/githubDeliveryConsumer'
 import type { MemoryDeliveryQueue } from '../server/utils/githubDeliveryQueueMemory'
 import webhook from '../server/api/github/webhook.post'
 import { db } from '../server/db'
@@ -888,5 +889,6 @@ test('the webhook queues pull_request, check_run and workflow_run deliveries', a
 
 after(async () => {
   await db.$client.end({ timeout: 1 })
-  await closeDeliveryQueue()
+  // Clears the consumer's armed limit timers and releases the shared queue, so nothing is left pending at the end.
+  await disposeConsumer()
 })
