@@ -25,14 +25,69 @@ async function setField(taskId: string, fieldId: string, value: string | null) {
 
 const collapsed = ref(new Set<string>())
 
-const sections = computed(() =>
-  boardColumns.value
+// Group and sort are chosen in the header and remembered per board in this browser (the choice is a view setting, not
+// board data, so it is not sent to the server).
+type GroupBy = 'column' | 'assignee'
+type SortBy = 'due' | 'title'
+const groupBy = ref<GroupBy>('column')
+const sortBy = ref<SortBy>('due')
+const VIEW_KEY = (boardId: string | null) => `tm-list-view:${boardId ?? ''}`
+
+function loadView() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(VIEW_KEY(activeProjectId.value)) ?? 'null')
+    if (raw?.groupBy === 'column' || raw?.groupBy === 'assignee') groupBy.value = raw.groupBy
+    if (raw?.sortBy === 'due' || raw?.sortBy === 'title') sortBy.value = raw.sortBy
+  } catch { /* no storage here: the defaults stand */ }
+}
+
+function saveView() {
+  try {
+    localStorage.setItem(VIEW_KEY(activeProjectId.value), JSON.stringify({ groupBy: groupBy.value, sortBy: sortBy.value }))
+  } catch { /* the choice lasts this visit */ }
+}
+
+onMounted(loadView)
+watch(activeProjectId, loadView)
+watch([groupBy, sortBy], saveView)
+
+/** Tasks in the chosen order: by due day (none last) or by title. */
+function sorted(tasks: ProjectTask[]): ProjectTask[] {
+  const copy = [...tasks]
+  if (sortBy.value === 'title') return copy.sort((a, b) => a.title.localeCompare(b.title))
+  // A task with no due day sorts after every dated one.
+  return copy.sort((a, b) => {
+    if (!a.dueOn || !b.dueOn) return a.dueOn ? -1 : b.dueOn ? 1 : 0
+    return a.dueOn.localeCompare(b.dueOn)
+  })
+}
+
+const sections = computed(() => {
+  if (groupBy.value === 'assignee') {
+    // One section per person who has tasks, then the unassigned. Tasks come from every column.
+    const all = boardColumns.value.filter(column => !isTrashed(column)).flatMap(column => visibleColumnTasks(column.id))
+      .filter(task => !isTrashed(task))
+    const people = new Map<string, { id: string, label: string, tasks: ProjectTask[] }>()
+    for (const task of all) {
+      const key = task.assigneeId ?? ''
+      const person = task.assigneeId ? personById(task.assigneeId) : undefined
+      const label = person ? (person.name || person.email || 'Someone') : 'Unassigned'
+      if (!people.has(key)) people.set(key, { id: `person:${key}`, label, tasks: [] })
+      people.get(key)!.tasks.push(task)
+    }
+    return [...people.values()]
+      .sort((a, b) => (a.id === 'person:' ? 1 : b.id === 'person:' ? -1 : a.label.localeCompare(b.label)))
+      .map(group => ({ id: group.id, name: group.label, tasks: sorted(group.tasks) }))
+  }
+  return boardColumns.value
     .filter(column => !isTrashed(column))
     .map(column => ({
+      id: column.id,
+      name: column.name,
       column,
-      tasks: visibleColumnTasks(column.id).filter(task => !isTrashed(task))
+      tasks: sorted(visibleColumnTasks(column.id).filter(task => !isTrashed(task)))
     }))
-)
+})
 
 function toggleSection(id: string) {
   const next = new Set(collapsed.value)
@@ -78,35 +133,63 @@ function subtaskProgress(taskId: string) {
       <span class="w-[6.75rem] shrink-0" />
     </div>
     <div
-      v-for="{ column, tasks } in sections"
-      :key="column.id"
+      class="mt-3 flex flex-wrap items-center gap-3 px-1"
+      data-list-controls
+    >
+      <label class="flex items-center gap-1.5 text-xs text-muted">
+        Group by
+        <select
+          v-model="groupBy"
+          class="rounded-md border border-default bg-default px-2 py-1 text-xs text-default"
+          data-list-group
+        >
+          <option value="column">Column</option>
+          <option value="assignee">Assignee</option>
+        </select>
+      </label>
+      <label class="flex items-center gap-1.5 text-xs text-muted">
+        Sort
+        <select
+          v-model="sortBy"
+          class="rounded-md border border-default bg-default px-2 py-1 text-xs text-default"
+          data-list-sort
+        >
+          <option value="due">Due date</option>
+          <option value="title">Title</option>
+        </select>
+      </label>
+    </div>
+    <div
+      v-for="section in sections"
+      :key="section.id"
       class="mt-4"
     >
       <button
         class="flex w-full items-center gap-2 rounded-md px-1 py-1.5 text-left transition-colors hover:bg-elevated"
-        @click="toggleSection(column.id)"
+        @click="toggleSection(section.id)"
       >
         <UIcon
           name="i-lucide-chevron-down"
           class="size-4 text-dimmed transition-transform duration-200"
-          :class="collapsed.has(column.id) ? '-rotate-90' : ''"
+          :class="collapsed.has(section.id) ? '-rotate-90' : ''"
         />
         <span
+          v-if="groupBy === 'column' && section.column"
           class="size-2 rounded-full"
-          :class="columnDotAttrs(column).class"
-          :style="columnDotAttrs(column).style"
+          :class="columnDotAttrs(section.column).class"
+          :style="columnDotAttrs(section.column).style"
         />
-        <span class="text-sm font-semibold text-default">{{ column.name }}</span>
-        <span class="text-xs tabular-nums text-dimmed">{{ tasks.length }}</span>
+        <span class="text-sm font-semibold text-default">{{ section.name }}</span>
+        <span class="text-xs tabular-nums text-dimmed">{{ section.tasks.length }}</span>
       </button>
 
       <Transition name="list-fold">
         <ul
-          v-if="!collapsed.has(column.id)"
+          v-if="!collapsed.has(section.id)"
           class="mt-1 overflow-hidden rounded-xl border border-default bg-default"
         >
           <li
-            v-for="task in tasks"
+            v-for="task in section.tasks"
             :key="task.id"
             data-list-row
             class="group flex cursor-pointer items-center gap-3 border-b border-default px-3 py-2 transition-colors last:border-b-0 hover:bg-elevated/60"
@@ -188,7 +271,7 @@ function subtaskProgress(taskId: string) {
           </li>
 
           <li
-            v-if="!tasks.length"
+            v-if="!section.tasks.length"
             class="px-3 py-3 text-xs text-dimmed"
           >
             Nothing here yet.
