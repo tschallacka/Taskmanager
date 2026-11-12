@@ -61,3 +61,13 @@ test('row 2 has New task at its right end, on the board view, opening the first 
   assert.match(board, /function newTask\(\) \{\s*const first = liveColumns\.value\[0\]\s*if \(first\) startCompose\(first\.id\)/)
   assert.match(board, /defineExpose\(\{ newTask \}\)/)
 })
+
+test('search in this board: a box in row 2 narrows the cards by title, and counts as a filter', () => {
+  assert.match(page, /data-board-search/)
+  assert.match(page, /@input="setSearchText\(\(\$event\.target as HTMLInputElement\)\.value\)"/)
+  const composable = readFileSync(join(process.cwd(), 'app', 'composables', 'useProjects.ts'), 'utf8')
+  assert.match(composable, /const _searchText = ref\(''\)/)
+  assert.match(composable, /return needle \? byLabel\.filter\(t => t\.title\.toLowerCase\(\)\.includes\(needle\)\) : byLabel/)
+  const board = readFileSync(join(process.cwd(), 'app', 'components', 'kanban', 'KanbanBoard.vue'), 'utf8')
+  assert.match(board, /const isFiltering = computed\(\(\) => activeTags\.value\.length > 0 \|\| searchText\.value\.trim\(\) !== ''\)/)
+})

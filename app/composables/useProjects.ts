@@ -222,6 +222,8 @@ const _activity = ref<TaskActivityItem[]>([])
 // workstream, …) rather than group boards, so they act as a board-level filter
 // and reset whenever another board is opened.
 const _activeTags = ref<string[]>([])
+// The board's search: the cards whose title has this text (any case). Empty shows every card.
+const _searchText = ref('')
 
 // Whether the open board is drawing its trash. Off by default and per board:
 // opening another one starts clean, the same way the label filter does.
@@ -741,10 +743,16 @@ export function useProjects() {
   // A task must carry every selected label, so stacking labels narrows down.
   function visibleColumnTasks(columnId: string) {
     const selected = _activeTags.value
+    const needle = _searchText.value.trim().toLowerCase()
     const tasks = columnTasks(columnId)
-    return selected.length === 0
+    const byLabel = selected.length === 0
       ? tasks
       : tasks.filter(t => selected.every(tag => t.tags.includes(tag)))
+    return needle ? byLabel.filter(t => t.title.toLowerCase().includes(needle)) : byLabel
+  }
+
+  function setSearchText(text: string) {
+    _searchText.value = text
   }
 
   function toggleTagFilter(tag: string) {
@@ -1131,6 +1139,8 @@ export function useProjects() {
     visibleColumnTasks,
     commentCount,
     activeTags: _activeTags,
+    searchText: _searchText,
+    setSearchText,
     boardTagCounts,
     toggleTagFilter,
     clearTagFilter,

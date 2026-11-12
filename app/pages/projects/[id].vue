@@ -23,6 +23,8 @@ const {
   updateProjectSharing,
   unarchiveProject,
   activeTags,
+  searchText,
+  setSearchText,
   boardTagCounts,
   toggleTagFilter,
   clearTagFilter,
@@ -732,13 +734,24 @@ useSeoMeta({
       >
         The office shows the crew of this board at work: every task is a folder that moves between the desks as the board changes. On a board with more than one crew, the menu picks which crew to watch.
       </HelpHint>
+      <!-- Search in this board: the cards whose title matches, on the board view. -->
+      <input
+        v-if="view === 'board'"
+        :value="searchText"
+        type="search"
+        placeholder="Search this board"
+        aria-label="Search this board"
+        class="ml-auto w-40 min-w-0 shrink rounded-md border border-default bg-default px-2 py-1 text-xs text-default outline-none placeholder:text-dimmed focus:border-primary"
+        data-board-search
+        @input="setSearchText(($event.target as HTMLInputElement).value)"
+      >
       <!-- New task, at the right end of the view row, on the board view. It opens the composer in the first column. -->
       <UButton
         v-if="view === 'board' && !isReadOnlyBoard && !isCustomerView"
         label="New task"
         icon="i-lucide-plus"
         size="xs"
-        class="ml-auto shrink-0"
+        class="shrink-0"
         data-new-task
         @click="boardRef?.newTask()"
       />

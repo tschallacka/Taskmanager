@@ -19,6 +19,7 @@ const {
   visibleColumnTasks,
   commentCount,
   activeTags,
+  searchText,
   isTrashed,
   createTask,
   moveTask,
@@ -493,7 +494,7 @@ async function submitColumn() {
   if (name) await addColumn(props.projectId, name)
 }
 
-const isFiltering = computed(() => activeTags.value.length > 0)
+const isFiltering = computed(() => activeTags.value.length > 0 || searchText.value.trim() !== '')
 
 // The Done column gets the dashed drop slot when it is empty: finished work lands here.
 const isDoneColumn = (column: { name: string }) => isDoneColumnName(column.name)
