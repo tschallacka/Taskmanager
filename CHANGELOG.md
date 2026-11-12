@@ -2,6 +2,12 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.18.0 - 2026-11-12
+
+- **The redesigned shell: a 240 px sidebar that collapses to a 64 px rail, one top bar on every page, and the Planning and Team groups.** The account menu holds Profile, Settings and Help and one Appearance row (System, Dark, Light); Settings keeps no second colour-mode control, and its section list jumps to each section. The browse page is called **All projects** in the sidebar and on its page, and the help pages say so. Pinned boards cap at eight (a ninth pin says so). Each board in the list shows its kind icon (board, customer board, crew home, crew board) and its open count, tinted by health; the rail shows the pinned boards as icons. Sprocket's first opening says what it needs and offers one setup link. `app/layouts/app.vue`, `app/components/AppSidebar.vue`, `app/components/ProjectsListPanel.vue`, `app/pages/settings/index.vue`, `app/pages/projects/browse.vue`, `docs/`, `tests/sidebar-shell.test.ts`.
+
+- **The List tab is the redesign's list: rows grouped by column or by person, and every cell edits in place.** Click a title to rename it, a person to change the assignee, a date to pick one, the labels to type them, or the time to log time (`1h 30m`). Group by, sort and the Columns toggles (Assignee, Due, Labels, Time) are remembered per board in this browser, and on a phone the cells sit under each title. `app/components/kanban/ProjectListView.vue`, `app/components/kanban/ListRowMeta.vue`, `server/api/projects/[id]/task-time.get.ts`, `docs/basics/boards-and-columns.md`.
+
 ## 0.17.0 - 2026-11-12
 
 - **Set up a crew in one go: `crew setup`.** One kit command makes the crew for a board: it creates the crew bound to the board, fetches its keys once into the crew home's `creds.json` (mode 600, nothing printed), writes `crew.json` with the crew's shadow board as the work board (by id and url) and the real board as read-only context, and runs `init` so the agent types exist. The management token comes from `TASKMANAGER_MANAGEMENT_TOKEN` or stdin, never from the command line. A taken slug stops with a 409 and nothing is rotated. The crew home defaults to `~/crew-<slug>` (set `CREW_HOME` to choose another), and the files written in it (`creds.json`, `crew.json`) are created at mode 600. A crew home that already holds `creds.json` stops the command before any call, with nothing changed. `crew/setup.mjs`, `crew/setup.test.mjs`, `crew/crew.mjs`, `crew/README.md`, `app/utils/managementPrompt.ts`, `tests/management-prompt.test.ts`.
