@@ -107,7 +107,7 @@ const name = args.name ?? `${boardName} crew`
 // the command with nothing changed.
 const home = process.env.CREW_HOME || join(homedir(), `crew-${slug}`)
 if (existsSync(join(home, 'creds.json'))) {
-  console.error(`Stopped: the crew home ${home} already holds creds.json. Nothing was changed. Point CREW_HOME at a new folder, or move that one away first.`)
+  console.error(`Stopped: ${home} already holds creds.json, so nothing was changed; use another --slug or CREW_HOME.`)
   process.exit(1)
 }
 
