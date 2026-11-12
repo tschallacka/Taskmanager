@@ -1,6 +1,6 @@
 // The person keys were renamed (w1..w4 to wren, wick, wynn, wade; pietje to usher; pm to pia; nitpicker
 // to nina). A crew home made before that is moved to the new keys. Run: cd crew && node --test keys.test.mjs
-import { test } from 'node:test'
+import { after, test } from 'node:test'
 import assert from 'node:assert/strict'
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -8,8 +8,14 @@ import { join } from 'node:path'
 import { RENAMED_KEYS, migrateCrewHome, renameKeys } from './keys.mjs'
 
 const scratch = process.env.TMPDIR || tmpdir()
+// Every folder this file makes is listed here and removed after the last test, even when a test fails before its own cleanup.
+const made = []
+after(() => {
+  for (const dir of made) rmSync(dir, { recursive: true, force: true })
+})
 const homeWith = (files) => {
   const dir = mkdtempSync(join(scratch, 'crew-keys-'))
+  made.push(dir)
   for (const [path, body] of Object.entries(files)) {
     mkdirSync(join(dir, path, '..'), { recursive: true })
     writeFileSync(join(dir, path), body)
