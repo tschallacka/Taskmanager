@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.17.0 - 2026-11-12
+
+- **Set up a crew in one go: `crew setup`.** One kit command makes the crew for a board: it creates the crew bound to the board, fetches its keys once into the crew home's `creds.json` (mode 600, nothing printed), writes `crew.json` with the crew's shadow board as the work board (by id and url) and the real board as read-only context, and runs `init` so the agent types exist. The management token comes from `TASKMANAGER_MANAGEMENT_TOKEN` or stdin, never from the command line. A taken slug stops with a 409 and nothing is rotated. The crew home defaults to `~/crew-<slug>` (set `CREW_HOME` to choose another), and the files written in it (`creds.json`, `crew.json`) are created at mode 600. A crew home that already holds `creds.json` stops the command before any call, with nothing changed. `crew/setup.mjs`, `crew/setup.test.mjs`, `crew/crew.mjs`, `crew/README.md`, `app/utils/managementPrompt.ts`, `tests/management-prompt.test.ts`.
+
 ## 0.16.0 - 2026-11-12
 
 - **The instance admin can load a backup into a crew's board.** A crew's shadow board, reached through the real board it works for, was read-only for everyone, so an admin could not restore it. The grey crew-board line now has **Load a backup into this board** for the instance admin, which opens the usual import dialog (file, dry-run report, confirm). Only `POST /api/projects/:id/import` lets the instance admin write to such a board; every other change is still refused, and nobody else sees the button. `server/utils/projects.ts`, `server/utils/boardImportRequest.ts`, `app/pages/projects/[id].vue`, `docs/team/board-import.md`, `tests/crew-board-access.test.ts`.
