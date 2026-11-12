@@ -1,7 +1,7 @@
 ---
 title: All projects and pin boards
 summary: Find a project in the full list, see how much of it is open, and pin the boards you use most to the sidebar
-topics: browse projects, projects, pin, pinned boards, sidebar, archived, unarchive
+topics: all projects, projects, pin, pinned boards, sidebar, archived, unarchive
 order: 50
 ---
 
