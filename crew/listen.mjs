@@ -14,6 +14,7 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { config, here, loadCreds } from './config.mjs'
+import { takeNotes } from './listen-notes.mjs'
 
 const creds = loadCreds()
 const [who, secs] = process.argv.slice(2)
@@ -34,7 +35,7 @@ const boardId = me.boardId ?? creds.board.id
 
 mkdirSync(`${here}.listen`, { recursive: true })
 const statePath = `${here}.listen/${who}.json`
-const state = existsSync(statePath) ? JSON.parse(readFileSync(statePath, 'utf8')) : { joined: false, notes: [], tasks: null }
+const state = existsSync(statePath) ? JSON.parse(readFileSync(statePath, 'utf8')) : { joined: false, notes: {}, tasks: null }
 
 function chat(args) {
   if (!CHAT) return ''
@@ -107,14 +108,14 @@ function readChat() {
 async function readBoard() {
   const out = []
   const inbox = await mcp('list_notifications', {})
-  for (const n of inbox?.notifications ?? []) {
-    if (n.read || state.notes.includes(n.id)) continue
-    state.notes.push(n.id)
-    // A fork is a member of its own crew board only, so everything in its inbox is about that board.
-    if (!me.role && n.board !== creds.board.name) continue
+  // A fork is a member of its own crew board only, so everything in its inbox is about that board.
+  const forMe = (inbox?.notifications ?? []).filter(n => me.role || n.board === creds.board.name)
+  // Notes kept by first-seen time and dropped by age (see listen-notes.mjs), so an old note is never announced again.
+  const taken = takeNotes(state.notes, forMe, Date.now())
+  state.notes = taken.notes
+  for (const n of taken.announce) {
     out.push(`BOARD ${n.type} on task ${n.taskId ?? '?'}: ${n.title} - ${String(n.body ?? '').slice(0, 160)}`)
   }
-  state.notes = state.notes.slice(-300)
 
   const mine = await mcp('my_tasks', {})
   const now = {}
@@ -133,5 +134,6 @@ for (let round = 0; ; round++) {
   if (found.length || Date.now() >= deadline) break
   await new Promise(r => setTimeout(r, 5000))
 }
+// The state is saved before anything is printed, so a note announced here is never announced again.
 writeFileSync(statePath, JSON.stringify(state))
 console.log(found.length ? found.join('\n') : 'quiet')
