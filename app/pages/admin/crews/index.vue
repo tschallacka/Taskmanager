@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { format } from 'date-fns'
+import { approvalSetupPrompt } from '~/utils/approvalSetupPrompt'
+import { setupBoardProblem } from '~/utils/approvalSetupBoard'
 
 definePageMeta({ layout: 'app' })
 
@@ -7,6 +9,36 @@ useSeoMeta({ title: 'Crews' })
 
 const { isInstanceAdmin, isPending: sessionPending } = useAuth()
 const toast = useToast()
+
+// "Set up a crew" (card mwdd5q94mmq78py1ntp, option b): the admin types a board id and name. The id is checked against the
+// boards this admin can open (GET /api/projects, an existing session endpoint) before the prompt is copied.
+const setupOpen = ref(false)
+const setupBoardId = ref('')
+const setupBoardName = ref('')
+const setupProblem = ref<string | null>(null)
+const setupBusy = ref(false)
+
+async function copySetupPrompt() {
+  setupProblem.value = setupBoardProblem({ boardId: setupBoardId.value, boardName: setupBoardName.value })
+  if (setupProblem.value) return
+  setupBusy.value = true
+  try {
+    const id = setupBoardId.value.trim()
+    const boards = await $fetch<{ id: string, name: string }[]>('/api/projects')
+    const board = boards.find(item => item.id === id)
+    if (!board) {
+      setupProblem.value = 'No board you can open has that id. Copy the id from the board\'s address (the part after /projects/).'
+      return
+    }
+    await navigator.clipboard.writeText(approvalSetupPrompt({ origin: window.location.origin, boardId: board.id, boardName: board.name }))
+    toast.add({ title: 'Setup prompt copied', description: 'Paste it into the agent that runs the crew.', icon: 'i-lucide-check' })
+    setupOpen.value = false
+  } catch {
+    setupProblem.value = 'Could not check the board or copy the prompt. Try again.'
+  } finally {
+    setupBusy.value = false
+  }
+}
 
 function errMsg(e: unknown): string | undefined {
   return (e as { data?: { message?: string } })?.data?.message
@@ -248,14 +280,69 @@ function cancelPurge() {
             Agent teams, made here or through the crew API. Only the instance admin sees this page.
           </p>
         </div>
-        <UButton
+        <div
           v-if="isInstanceAdmin"
-          to="/admin/crews/new"
-          label="New crew"
-          icon="i-lucide-plus"
-          size="sm"
-        />
+          class="flex flex-wrap items-center gap-2"
+        >
+          <UButton
+            label="Set up a crew"
+            icon="i-lucide-clipboard-copy"
+            size="sm"
+            variant="soft"
+            data-setup-crew
+            @click="setupOpen = !setupOpen"
+          />
+          <UButton
+            to="/admin/crews/new"
+            label="New crew"
+            icon="i-lucide-plus"
+            size="sm"
+          />
+        </div>
       </div>
+
+      <form
+        v-if="isInstanceAdmin && setupOpen"
+        class="mb-4 space-y-3 rounded-xl border border-default p-4"
+        data-setup-crew-form
+        @submit.prevent="copySetupPrompt"
+      >
+        <p class="text-sm text-muted">
+          Type the board's id and name. The id is in the board's address: the part after <span class="font-mono">/projects/</span>.
+          The prompt it copies sets up a crew for that board by an approval in the browser, with no token in it.
+        </p>
+        <div class="grid gap-3 sm:grid-cols-2">
+          <UFormField label="Board id">
+            <UInput
+              v-model="setupBoardId"
+              placeholder="e.g. mw7vn0cp9pspxfvjru"
+              data-setup-board-id
+            />
+          </UFormField>
+          <UFormField label="Board name">
+            <UInput
+              v-model="setupBoardName"
+              placeholder="e.g. Launch board"
+              data-setup-board-name
+            />
+          </UFormField>
+        </div>
+        <p
+          v-if="setupProblem"
+          class="text-sm text-error"
+          data-setup-problem
+        >
+          {{ setupProblem }}
+        </p>
+        <UButton
+          type="submit"
+          label="Copy the setup prompt"
+          icon="i-lucide-clipboard-copy"
+          :loading="setupBusy"
+          :disabled="setupBusy"
+          data-setup-copy
+        />
+      </form>
 
       <!-- Until the session is known, nothing of the admin's UI is drawn. -->
       <div
