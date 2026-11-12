@@ -58,7 +58,25 @@ export function storeImageUpload(dir: string, filePart: MultiPartData | undefine
   return filename
 }
 
-/** Drops every file a task uploaded. Called wherever the row is removed for good. */
+/**
+ * Removes one uploaded file of a task and nothing else. The name must be a
+ * plain stored name (no path parts); anything else, or a file that is not in
+ * the folder, is refused. Returns false when there was no such file.
+ */
+export function deleteTaskAttachment(dir: string, filename: string): boolean {
+  if (!SAFE_FILENAME.test(filename)) throw createError({ statusCode: 400, message: 'Not an attachment name' })
+  const file = join(dir, filename)
+  if (!existsSync(file)) return false
+  rmSync(file, { force: true })
+  return true
+}
+
+/** The wording when a task is full: how many there are, and how to free one. */
+export function attachmentLimitMessage(count: number) {
+  return `${count} of ${MAX_ATTACHMENTS} attachments: delete one first`
+}
+
+/** Drops every file a task uploaded. Called wherever the row is removed for good. */ Called wherever the row is removed for good. */
 export function removeTaskAttachments(taskIds: string[]) {
   for (const id of taskIds) {
     const dir = taskAttachmentDir(id)
