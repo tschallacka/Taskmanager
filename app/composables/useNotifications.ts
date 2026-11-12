@@ -1,5 +1,6 @@
 import { onNotification, realtimeHeaders } from '~/composables/useRealtime'
 import { errorMessage, untypedFetch } from '~/utils/untypedFetch'
+import { taskLink } from '~/utils/taskLink'
 
 export interface NotificationItem {
   id: string
@@ -14,6 +15,8 @@ export interface NotificationItem {
   taskTitle: string | null
   /** For a message or a reply: the conversation's first message. Older notifications have none. */
   messageId?: string | null
+  /** For a comment or a reply on a task: the comment, so the card opens scrolled to it. Older notifications have none. */
+  commentId?: string | null
   title: string
   body: string
   createdAt: number
@@ -42,8 +45,8 @@ const announced = new Set<string>()
 let started = false
 
 /** Where a notification leads: the task it is about, or the conversation. */
-export function notificationLink(item: Pick<NotificationItem, 'type' | 'projectId' | 'taskId' | 'messageId'>): string {
-  if (item.taskId) return `/projects/${item.projectId}?task=${item.taskId}`
+export function notificationLink(item: Pick<NotificationItem, 'type' | 'projectId' | 'taskId' | 'messageId' | 'commentId'>): string {
+  if (item.taskId) return taskLink(item.projectId, item.taskId, item.commentId)
   if (item.messageId) return `/projects/${item.projectId}?view=messages&message=${item.messageId}`
   if (item.type === 'message' || item.type === 'reply') return `/projects/${item.projectId}?view=messages`
   return `/projects/${item.projectId}`

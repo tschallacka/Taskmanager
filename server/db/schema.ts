@@ -534,6 +534,9 @@ export const notifications = pgTable(
     // For a message or a reply: the conversation it belongs to (the first message), so the
     // inbox opens that conversation.
     messageId: text('message_id').references((): AnyPgColumn => projectMessages.id, { onDelete: 'cascade' }),
+    // For a comment or a reply on a task: the comment itself, so the inbox opens the card scrolled to it. Nullable: older
+    // notifications have none, and they open the card at the top.
+    commentId: text('comment_id'),
     // For a guest request: the invitation waiting for a decision, so the inbox can approve it in place.
     invitationId: text('invitation_id').references((): AnyPgColumn => projectGuestInvitations.id, { onDelete: 'cascade' }),
     actorId: text('actor_id').references(() => user.id, { onDelete: 'set null' }),

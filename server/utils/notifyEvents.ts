@@ -39,7 +39,7 @@ async function tellAssigned(project: Project, task: Task, actorId: string | null
 }
 
 /** An update was posted on a task: its assignee and the others who have written on it hear. */
-export async function notifyComment(project: Project, task: Task, actorId: string | null, body: string, internal: boolean, replyToId: string | null = null) {
+export async function notifyComment(project: Project, task: Task, actorId: string | null, body: string, internal: boolean, replyToId: string | null = null, commentId: string | null = null) {
   const writers = await db.select({ id: taskComments.id, userId: taskComments.userId, body: taskComments.body }).from(taskComments).where(eq(taskComments.taskId, task.id))
   // Someone the comment names gets a mention in the inbox, kept whether or not an agent of theirs is
   // listening, and is not also told it as a plain comment. Only people on the board can be named: the
@@ -53,6 +53,7 @@ export async function notifyComment(project: Project, task: Task, actorId: strin
     task,
     actorId,
     type: 'comment',
+    ...(commentId ? { commentId } : {}),
     recipients,
     staffOnly: internal,
     title: `${from} commented on "${task.title}"`,

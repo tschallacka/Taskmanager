@@ -120,6 +120,10 @@ async function open(item: NotificationItem) {
         return
       }
       openTaskId.value = item.taskId
+      // The card opens on its comment: the comments list scrolls to it and highlights it, as it does for a shared link.
+      if (item.commentId) {
+        await router.replace({ query: { ...route.query, task: item.taskId, comment: item.commentId } })
+      }
     } else if (item.type === 'message' || item.type === 'reply') {
       openThread.value = { projectId: item.projectId, projectName: item.projectName, threadId: item.messageId ?? null }
     } else {
