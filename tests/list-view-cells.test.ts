@@ -81,3 +81,17 @@ test('the board time endpoint sums each task\'s entries for the board, from ever
   assert.match(route, /eq\(timeEntries\.projectId, project\.id\)/, 'the board, not a range of days')
   assert.doesNotMatch(route, /getQuery|parseRange/, 'no day range from the query')
 })
+
+test('the table has a header row over the cells, in the design order: Task, Assignee, Due, Labels, Time', () => {
+  assert.match(list, /data-list-header\b/, 'the header row is there, on a wide screen')
+  const order = ['assignee', 'due', 'labels', 'time'].map(cell => list.indexOf(`data-list-header-cell="${cell}"`))
+  assert.ok(order.every(index => index > 0), 'each cell has its header')
+  assert.deepEqual(order, [...order].sort((a, b) => a - b), 'the header names come in the design order')
+  const cells = ['data-list-assign', 'data-list-due', 'data-list-labels', 'data-list-time']
+  const rowOrder = cells.map(cell => meta.indexOf(cell))
+  assert.deepEqual(rowOrder, [...rowOrder].sort((a, b) => a - b), 'the row cells come in the same order as the header')
+})
+
+test('the assignee cell shows the person by name as well as the avatar, so a person is visible in the table', () => {
+  assert.match(meta, /v-if="personById\(task\.assigneeId\)"\s+class="truncate"/)
+})

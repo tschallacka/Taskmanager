@@ -227,6 +227,37 @@ function subtaskProgress(taskId: string) {
         </select>
       </label>
     </div>
+    <!-- The table's header row, on a wide screen: the widths are the cells' own, so the names sit over their values. -->
+    <div
+      v-if="sections.length && (shownColumns.assignee || shownColumns.due || shownColumns.labels || shownColumns.time)"
+      class="mt-4 hidden items-center gap-3 px-3 text-xs font-medium text-dimmed md:flex"
+      data-list-header
+    >
+      <span class="size-5 shrink-0" />
+      <span class="min-w-0 flex-1">Task</span>
+      <span class="flex shrink-0 items-center gap-2">
+        <span
+          v-if="shownColumns.assignee"
+          class="w-28"
+          data-list-header-cell="assignee"
+        >Assignee</span>
+        <span
+          v-if="shownColumns.due"
+          class="w-28 text-right"
+          data-list-header-cell="due"
+        >Due</span>
+        <span
+          v-if="shownColumns.labels"
+          class="w-40 text-right"
+          data-list-header-cell="labels"
+        >Labels</span>
+        <span
+          v-if="shownColumns.time"
+          class="w-16 text-right"
+          data-list-header-cell="time"
+        >Time</span>
+      </span>
+    </div>
     <div
       v-for="section in sections"
       :key="section.id"

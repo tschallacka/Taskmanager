@@ -117,7 +117,7 @@ function cancelLabels() {
     <span
       v-if="shown.assignee"
       class="flex shrink-0 items-center"
-      :class="layout === 'column' ? 'w-6 justify-center' : ''"
+      :class="layout === 'column' ? 'w-28 min-w-0' : ''"
       @click.stop
     >
       <UDropdownMenu
@@ -142,7 +142,8 @@ function cancelLabels() {
             class="size-4 text-dimmed"
           />
           <span
-            v-if="layout === 'fold' && personById(task.assigneeId)"
+            v-if="personById(task.assigneeId)"
+            class="truncate"
           >{{ personById(task.assigneeId)!.name || personById(task.assigneeId)!.email }}</span>
         </button>
       </UDropdownMenu>
@@ -168,34 +169,6 @@ function cancelLabels() {
         data-list-due
         @change="setDue(($event.target as HTMLInputElement).value)"
       >
-    </span>
-
-    <span
-      v-if="shown.time"
-      class="shrink-0 tabular-nums"
-      :class="layout === 'column' ? 'block w-16 text-right' : ''"
-      @click.stop
-    >
-      <input
-        v-if="editingTime"
-        v-model="timeDraft"
-        data-list-time-input
-        placeholder="1h 30m"
-        class="w-20 rounded bg-default px-1.5 py-0.5 text-xs text-default outline-none ring-1 ring-primary"
-        @keydown.enter.prevent="commitTime"
-        @keydown.escape="editingTime = false"
-        @blur="commitTime"
-      >
-      <button
-        v-else
-        class="rounded px-1 py-0.5 text-xs transition-colors hover:bg-elevated"
-        :class="minutes ? 'text-default' : 'text-dimmed'"
-        :aria-label="minutes ? `Time logged: ${formatMinutes(minutes)}. Log more` : 'No time logged. Log some'"
-        data-list-time
-        @click.stop="startTime"
-      >
-        {{ minutes ? formatMinutes(minutes) : '+ time' }}
-      </button>
     </span>
 
     <span
@@ -231,6 +204,35 @@ function cancelLabels() {
           v-if="!task.tags.length"
           class="text-dimmed"
         >No labels</span>
+      </button>
+    </span>
+
+    <!-- The time cell comes after the labels, as the design's List has it: Task, Assignee, Due, Labels, Time. -->
+    <span
+      v-if="shown.time"
+      class="shrink-0 tabular-nums"
+      :class="layout === 'column' ? 'block w-16 text-right' : ''"
+      @click.stop
+    >
+      <input
+        v-if="editingTime"
+        v-model="timeDraft"
+        data-list-time-input
+        placeholder="1h 30m"
+        class="w-20 rounded bg-default px-1.5 py-0.5 text-xs text-default outline-none ring-1 ring-primary"
+        @keydown.enter.prevent="commitTime"
+        @keydown.escape="editingTime = false"
+        @blur="commitTime"
+      >
+      <button
+        v-else
+        class="rounded px-1 py-0.5 text-xs transition-colors hover:bg-elevated"
+        :class="minutes ? 'text-default' : 'text-dimmed'"
+        :aria-label="minutes ? `Time logged: ${formatMinutes(minutes)}. Log more` : 'No time logged. Log some'"
+        data-list-time
+        @click.stop="startTime"
+      >
+        {{ minutes ? formatMinutes(minutes) : '+ time' }}
       </button>
     </span>
   </div>
