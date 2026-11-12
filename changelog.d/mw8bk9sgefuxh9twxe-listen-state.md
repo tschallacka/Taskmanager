@@ -1,1 +1,0 @@
-- **The crew kit's listener no longer crashes on a state file without a notes list.** `listen.mjs` reads a state file with no notes list as empty and carries on. `crew/listen-state.mjs`, `crew/listen.mjs`, `crew/listen-state.test.mjs`.
