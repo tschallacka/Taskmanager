@@ -56,6 +56,8 @@ export interface ConnectPromptInput {
   allBoards?: { scopes: readonly string[] }
   /** A reconnect: the prompt removes the server that is already there before it adds it again. */
   replacing?: boolean
+  /** What the agent does once the server is added, said last: the next step for the person, when the tools are not live yet. */
+  afterAdd?: string
 }
 
 /**
@@ -130,7 +132,7 @@ ${replace}Then add the MCP server, exactly as written (the single quotes matter)
 Never echo, print, log or paste the key anywhere else, and never send it to another service.
 
 If a call is refused with 401 and a message, stop. Do not retry with this key. Report that message to your main agent, so they can ask me for a new connection.
-If a board is not in the list above, you have no access to it, and you should not try.`
+If a board is not in the list above, you have no access to it, and you should not try.${input.afterAdd ? `\n\n${input.afterAdd}` : ''}`
 }
 
 /** A board the window can pick from: the boards the person can open. */
@@ -207,6 +209,7 @@ export function keyPrompt(input: KeyPromptInput): string {
     boards: input.reach.boards,
     allBoards: input.reach.allBoards,
     replacing: true,
-    access
+    access,
+    afterAdd: 'The new server is not live in this session yet, so its tools do not load here. When the add has worked, tell me to start a new Claude Code session (or to run /mcp reconnect in this one). Claude Code reads TASKMANAGER_API_KEY from the shell that starts it, so the new session must start from a shell where that variable is set (the export above, in the same shell); otherwise the server answers 401. Once the new session is up, ask me which board you should work on, and use only the tools of the new server.'
   })
 }
