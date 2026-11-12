@@ -2,6 +2,12 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.13.1 - 2026-11-12
+
+- **The crew comes back after a restart of Boss's session.** `crew up` brings the parts in the `up` list of crew.json back in order (already running, started, or failed and why), and is safe to run twice. `crew/detach.sh` keeps Pia's session and the dev services in a detached tmux session, so they outlive the session that started them. `crew restart-brief` lists each standing member's open cards and last update for Pia to start them fresh, and stops with the reason when a board call fails. `crew dev-copies` restarts, after `crew up`, the dev copy of each worker whose card waits in Verify UX or Verify QA, from crew.json "devCopies", one line each. Files: `crew/up.mjs`, `crew/detach.sh`, `crew/restart-brief.mjs`, `crew/dev-copies.mjs`, `crew/board-call.mjs`, `crew/janet.mjs`, `crew/crew.mjs`, `crew/PROMPTS.md.tmpl`, `crew/SKILL.md`, `crew/kit-files.txt`.
+
+- **The crew kit's listener no longer crashes on a state file without a notes list.** `listen.mjs` reads a state file with no notes list as empty and carries on. `crew/listen-state.mjs`, `crew/listen.mjs`, `crew/listen-state.test.mjs`.
+
 ## 0.13.0 - 2026-11-12
 
 - **The redesigned shell: a 240 px sidebar that collapses to a 64 px rail, one top bar on every page, and the Planning and Team groups.** The account menu holds Profile, Settings and Help and one Appearance row (System, Dark, Light); Settings keeps no second colour-mode control, and its section list jumps to each section. The browse page is called **All projects** in the sidebar and on its page, and the help pages say so. Pinned boards cap at eight (a ninth pin says so). Each board in the list shows its kind icon (board, customer board, crew home, crew board) and its open count, tinted by health; the rail shows the pinned boards as icons. Sprocket's first opening says what it needs and offers one setup link. `app/layouts/app.vue`, `app/components/AppSidebar.vue`, `app/components/ProjectsListPanel.vue`, `app/pages/settings/index.vue`, `app/pages/projects/browse.vue`, `docs/`, `tests/sidebar-shell.test.ts`.
