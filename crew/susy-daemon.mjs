@@ -221,11 +221,29 @@ export function statusLines(home, now = Date.now()) {
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 
+/**
+ * The part for crew.json's "up" list (crew/up.mjs): `check` exits 0 while the daemon's heartbeat is fresh, `start`
+ * starts the loop in its detached session (with --live when asked). Printed by `crew susy-daemon up-part`; Boss puts it
+ * in crew.json, the kit does not edit crew.json.
+ */
+export function upPart({ home, kit, live = false, node = process.execPath }) {
+  const daemon = join(kit, 'susy-daemon.mjs')
+  return {
+    name: live ? 'susy daemon (live)' : 'susy daemon (dry-run)',
+    check: `CREW_HOME=${JSON.stringify(home)} ${JSON.stringify(node)} ${JSON.stringify(daemon)} status | grep -q fresh`,
+    start: `CREW_HOME=${JSON.stringify(home)} ${JSON.stringify(node)} ${JSON.stringify(daemon)} start${live ? ' --live' : ''}`
+  }
+}
+
 async function main(argv) {
   const home = crewHome()
   const [command, ...rest] = argv
   if (command === 'status') {
     console.log(statusLines(home).join('\n'))
+    return 0
+  }
+  if (command === 'up-part') {
+    console.log(JSON.stringify(upPart({ home, kit: dirname(fileURLToPath(import.meta.url)), live: rest.includes('--live') }), null, 2))
     return 0
   }
   const kit = dirname(fileURLToPath(import.meta.url))

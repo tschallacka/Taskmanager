@@ -5,7 +5,10 @@ import assert from 'node:assert/strict'
 import { mkdtempSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { tick, pendingKey, postBody, postFresh, runOnce, statusLines, heartbeatAgeMinutes, heartbeatFresh, daemonCommand, SESSION } from './susy-daemon.mjs'
+import { tick, pendingKey, postBody, postFresh, runOnce, statusLines, heartbeatAgeMinutes, heartbeatFresh, daemonCommand, SESSION, upPart } from './susy-daemon.mjs'
+import { spawnSync } from 'node:child_process'
+import { dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const MIN = 60000
 const T0 = Date.parse('2026-11-12T10:00:00.000Z')
@@ -141,4 +144,19 @@ test('start puts the dry-run loop in its own detached session through detach.sh;
   assert.equal(stopFile, 'tmux')
   assert.deepEqual(stopArgs, ['-S', '/crew/home/tmux.sock', 'kill-session', '-t', SESSION])
   assert.throws(() => daemonCommand('/crew/home', 'restart', { kit: '/kit' }), /no such action/)
+})
+
+test('the up part: its check passes on a fresh heartbeat and fails on a stale one; only the live part starts with --live', () => {
+  const kit = dirname(fileURLToPath(import.meta.url))
+  const home = mkdtempSync(join(tmpdir(), 'susy-up-'))
+  mkdirSync(join(home, '.listen'), { recursive: true })
+  const part = upPart({ home, kit })
+  const writeAt = minutesAgo => writeFileSync(join(home, '.listen', 'susy-daemon.json'), JSON.stringify({ time: new Date(Date.now() - minutesAgo * MIN).toISOString(), mode: 'dry-run', ticks: 1, lastTick: { ok: true }, pending: 0 }))
+  writeAt(0)
+  assert.equal(spawnSync('sh', ['-c', part.check], { encoding: 'utf8' }).status, 0, 'fresh: the check passes')
+  writeAt(10)
+  assert.notEqual(spawnSync('sh', ['-c', part.check], { encoding: 'utf8' }).status, 0, 'stale: the check fails')
+  assert.doesNotMatch(part.start, /--live/)
+  assert.match(upPart({ home, kit, live: true }).start, / start --live$/)
+  assert.equal(upPart({ home, kit, live: true }).name, 'susy daemon (live)')
 })
