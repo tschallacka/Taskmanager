@@ -157,6 +157,9 @@ const drawerTask = computed<ProjectTask | null>(() =>
   drawerTaskId.value ? board.value?.tasks.find(t => t.id === drawerTaskId.value) ?? null : null
 )
 
+// A task URL whose task is not on this board (or cannot be read here): the board opens with no panel, and says so.
+const unknownTask = computed(() => Boolean(drawerTaskId.value && board.value && !drawerTask.value))
+
 // ─── Project name (inline rename) ──────────────────────────
 
 const renaming = ref(false)
@@ -664,6 +667,13 @@ useSeoMeta({
 
     <!-- Board -->
     <div class="min-h-0 flex-1">
+      <p
+        v-if="unknownTask"
+        role="status"
+        class="px-4 pt-3 text-sm text-muted"
+      >
+        That task is not on this board, or you cannot open it here. The board is shown without it.
+      </p>
       <div
         v-if="loadFailed"
         class="flex h-full flex-col items-center justify-center gap-3 px-6 text-center"
