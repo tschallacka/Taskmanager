@@ -1,7 +1,7 @@
 # Crew mail
 
-A crew's people send each other short mails (`crew/mailbox.mjs send <to> <text>`). The mail is kept by the app until the
-recipient's mailer has delivered it. The mailer runs on the person's own machine and pulls, once a minute, because the
+A crew's people send each other short mails from the crew kit's mailbox (its `mailbox.mjs send <to> <text>`, in the crew
+home's `bin/`). The mail is kept by the app until the recipient's mailer has delivered it. The mailer runs on the person's own machine and pulls, once a minute, because the
 server cannot push to a machine.
 
 ## The routes
@@ -22,6 +22,9 @@ than 30 sends a minute from one sender is 429. More than 500 undelivered for one
 ## Retention
 
 Delivered mail is deleted after 7 days; undelivered mail after 30 days. The cleanup runs on a write, at most once a day.
+
+The per-minute limit and the pending cap are soft limits, against runaway loops rather than attackers: each is a check and
+then an insert, with no transaction, so a parallel burst may pass by a few.
 
 ## The mailer
 

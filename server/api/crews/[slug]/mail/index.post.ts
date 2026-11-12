@@ -43,6 +43,8 @@ export default defineEventHandler(async (event) => {
     return { id }
   }
 
+  // The per-minute limit and the pending cap are SOFT limits, against runaway loops, not attackers: each is a check and then
+  // an insert, with no transaction, so a parallel burst may pass by a few.
   const now = Date.now()
   if ((await sendsInLastMinute(caller.crew.id, caller.key, now)) >= MAIL_SENDS_PER_MINUTE) {
     setHeader(event, 'Retry-After', 60)

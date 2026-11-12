@@ -22,6 +22,7 @@ Object.assign(globalThis, { createError, defineEventHandler, getHeader, getQuery
 const { db } = await import('../server/db')
 const { apiKeys, crewBoards, crewMail, crews, member, organization, projects, user } = await import('../server/db/schema')
 const { createOrRotateCrew, purgeCrew } = await import('../server/utils/crewProvisioning')
+const { cleanupMailOnWrite } = await import('../server/utils/crewMail')
 const postMail = (await import('../server/api/crews/[slug]/mail/index.post')).default
 const getMail = (await import('../server/api/crews/[slug]/mail/index.get')).default
 const ackMail = (await import('../server/api/crews/[slug]/mail/[id]/ack.post')).default
@@ -184,4 +185,25 @@ test('an ack of an unknown id is 404, and an ack of another crew\'s mail is 404 
   assert.equal(other.status, 404, 'crew B cannot see or ack crew A\'s mail')
   const stillPending = await call('GET', `/api/crews/${slugA}/mail?to=wick`, keys.A.wick)
   assert.equal(stillPending.body.mail.some((m: any) => m.id === id(97)), true, 'the mail is still pending for wick')
+})
+
+test('retention: delivered mail older than 7 days and undelivered mail older than 30 days are deleted on the next write; newer mail is kept', async () => {
+  const [crewA] = await db.select().from(crews).where(eq(crews.slug, slugA))
+  const day = 86400_000
+  // The cleanup runs at most once a day, so the test asks for a time three days on, which is past the last run.
+  const T = Date.now() + 3 * day
+  const row = (fields: any) => ({ id: randomBytes(16).toString('hex'), crewId: crewA.id, fromKey: 'rita', toKey: 'quincy', text: 'retention', created: T - day, delivered: null, ...fields })
+  const oldDelivered = row({ created: T - 9 * day, delivered: T - 8 * day })
+  const oldUndelivered = row({ created: T - 31 * day })
+  const newDelivered = row({ created: T - 7 * day, delivered: T - 6 * day })
+  const newUndelivered = row({ created: T - 29 * day })
+  const all = [oldDelivered, oldUndelivered, newDelivered, newUndelivered]
+  await db.insert(crewMail).values(all)
+  await cleanupMailOnWrite(T)
+  const left = await db.select({ id: crewMail.id }).from(crewMail).where(inArray(crewMail.id, all.map(r => r.id)))
+  const kept = new Set(left.map(r => r.id))
+  assert.equal(kept.has(oldDelivered.id), false, 'delivered over 7 days is deleted')
+  assert.equal(kept.has(oldUndelivered.id), false, 'undelivered over 30 days is deleted')
+  assert.equal(kept.has(newDelivered.id), true, 'delivered under 7 days is kept')
+  assert.equal(kept.has(newUndelivered.id), true, 'undelivered under 30 days is kept')
 })
