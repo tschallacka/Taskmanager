@@ -1,37 +1,30 @@
 ---
-title: Give a board a crew
-summary: Link one of your boards to a crew you made, step by step, and take it off again
+title: Add a crew to this board
+summary: Make a new crew for one of your boards in a few steps, with an AI agent and a 10-minute token
 requires: team-admin
-topics: crew, give a board a crew, attach, link, wizard, shadow board
+topics: crew, add a crew, give a board a crew, management token, shadow board
 order: 30
 ---
 
-Giving a board a crew links one of your team's boards to a crew. The crew gets a board of its own for it, in the
-crew's team, and can read your real board from then on. Read [What a crew is](/help/crews/what-is-a-crew) first if
-you are not sure what that means.
+Adding a crew to a board makes a **new** crew for it. The crew gets a board of its own, in its own team, and reads your
+real board from then on. It never changes your board. Read [What a crew is](/help/crews/what-is-a-crew) first if you are
+not sure what that means.
 
-You must be an **owner or admin** of the team, and you can give only a **crew you made yourself**. Only the instance
-admin makes crews (on the Crews page in Settings), so in practice the person who gives a board a crew is an instance
-admin who is also an owner or admin of this team. If you see "You have not made a crew", you have none to give.
+You must be an **owner or admin** of the team, and crews must be allowed for this team and for this board. An admin of
+the instance turns crews on for the instance first. If a switch is off, the window says so in one sentence.
 
-## With the guided steps
+## The steps
 
-1. Open **Team** in the workspace menu, then **Crews**. (Or open a board's menu in the sidebar and choose
-   **Give it a crew**, which opens the same steps with that board already picked.)
-2. Press **Step by step**.
-3. **Board and crew.** Pick the crew and the board, then **Give the board a crew**. This makes the crew board and the
-   link. If the crew already works on that board, the button says **Continue** instead.
-4. **Fork the members.** Choose whether the crew's members work for the whole crew, or get agents of their own for
-   this board. See [Fork a crew for a board](/help/crews/fork-a-crew). If the crew works on this one board, press
-   **Skip: the crew works as one**. If the members are already forked for this board, this step offers **Make new
-   keys** instead, which replaces the old keys at once.
-5. **Hand over the keys** (only when the members are forked). The steps show what to give whoever runs the crew.
-6. **Check it.** The last step shows what to expect and has an **Open the crew board** link.
+1. Open the board's menu in the sidebar and choose **Add a crew to this board**. Or open **Team**, then **Crews**, pick
+   the board and press **Add a crew to this board**.
+2. The window shows a token for 10 minutes and a prompt. Copy both. The token works for this board only.
+3. Give the prompt to an AI agent. It makes the crew through the crews API, then saves the crew's keys to a file in the
+   crew home on that computer. The keys are never shown on screen.
+4. When the agent says it is done, close the window. The crew is listed on **Team**, then **Crews**, with a **Crew
+   board** button.
 
-## Without them
-
-On **Team**, then **Crews**, the **Give a board a crew** form does the first step in one go: pick a crew, pick a
-board, press **Give it a crew**.
+The token stops after 10 minutes. If it expires before the agent is done, press **Add a crew to this board** again for
+a new token. Do not reuse the old one.
 
 ## What you get
 
@@ -39,13 +32,13 @@ The Crews list shows each link as *crew name, works on board name*. Next to it:
 
 - **Crew board** opens the crew board. If you belong to the crew's team you land in that workspace with full access;
   otherwise it opens read only.
-- The **x** takes the crew off the board. Every owner and admin of the team sees it, not only the person who made
-  the crew.
-- A **disabled** tag means the instance admin switched the crew off. It cannot be forked or given new keys until it
-  is enabled again.
+- The **x** takes the crew off the board. Every owner and admin of the team sees it.
+- A **disabled** tag means the instance admin switched the crew off.
+- **Forked members already on this board** lists the members forked for this board before forking was switched off,
+  one badge each, with its agent type. Forking is no longer offered; these stay until the crew is taken
+  off the board (see [Fork a crew](/help/crews/fork-a-crew)).
 
-Anyone else on the team sees the list and the **Crew board** button, but not the form, **Step by step**, the **x** or
-the fork buttons.
+Anyone else on the team sees the list and the **Crew board** button, but not the add button or the **x**.
 
 ## Taking the crew off
 
@@ -55,13 +48,12 @@ The **x** next to a link asks you to confirm with **Take it off**. Taking a crew
 - removes any forked members and their keys;
 - does not touch your real board.
 
-It cannot be undone, but you can give the board a crew again; that makes a new crew board.
+It cannot be undone. To give the board a crew again, add a new crew to it; that makes a new crew board.
 
 ## If something goes wrong
 
-- **"You have not made a crew."** Only a crew you made yourself can be given, and only the instance admin makes
-  crews. If someone else made it, ask them to give the board the crew.
-- **The crew is already on this board.** Each crew can be linked to a board once. Use **Continue** to carry on with
-  it.
-- **Not every board can take the crew.** A crew's own work board, and the crew board it keeps, cannot be given that crew: it would work on itself. Every other board of your team can, including one in the crew's own team.
-- **No Step by step button.** It needs at least one crew you made, and the owner or admin role.
+- **A sentence says crews are not allowed.** The team's or the board's switch is off, or the instance does not allow
+  crews. The owner or admin of the team, or the board's settings, turn it on. The window links to the switch.
+- **The token expired.** Press **Add a crew to this board** again for a new token.
+- **The agent does not find the keys file.** It is in the crew home folder of the computer the agent runs on. Ask the
+  agent for the file name it saved; it names the file, never the keys.
