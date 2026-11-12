@@ -12,7 +12,7 @@
 //   crew publish <slug> <branch> <title> <msg-file> <pr-file>   the merger's one command: squash onto a fresh base, check, push, open the PR (publish.mjs)
 //   crew up                    brings the crew's parts back in order after a restart, one line each, from crew.json "up" (up.mjs)
 //   crew restart-brief         after crew up: each standing member's open cards and last update, for Pia to start them fresh (restart-brief.mjs)
-//   crew dev-copies            after crew up: restarts the dev copies a Verify UX or Verify QA card needs, one line each (dev-copies.mjs)
+//   crew dev-copies            after crew up: whether each Verify UX or Verify QA card's copy answers; asks Boss for each that does not, starts nothing (dev-copies.mjs)
 //   crew totp <file>           the current authenticator code for a dev copy's two-factor secret (totp.mjs)
 //   crew setup                 make the crew by hand through the crew API (setup.mjs)
 //   crew channel <who>         the Claude Code channel server for one person (channel.mjs)

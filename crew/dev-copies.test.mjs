@@ -1,54 +1,47 @@
-// crew dev-copies: which workers need a copy restarted, and what is done for each. The probe and the start are
-// injected, so no real dev copy is touched. Run:
+// crew dev-copies: for each card in Verify UX or Verify QA, whether its owner's copy answers, and one line asking Boss
+// for each copy that does not. The probe is injected, so no real port is touched and nothing is started. Run:
 //   node --test crew/dev-copies.test.mjs
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { needingCopies, copyPlan } from './dev-copies.mjs'
+import { qaCards, branchOf, copyLines } from './dev-copies.mjs'
 
-const CONFIG = {
-  wren: { port: 3101, worktree: '/w/wren' },
-  wick: { port: 3102, worktree: '/w/wick' }
-}
-
-test('only a worker with a card in Verify UX or Verify QA needs a copy', () => {
+test('only a card in Verify UX or Verify QA is checked', () => {
   const briefs = [
-    { who: 'wren', blocks: [{ column: 'Verify QA' }] },
-    { who: 'wick', blocks: [{ column: 'In progress' }] },
-    { who: 'wynn', blocks: [{ column: 'Verify UX' }, { column: 'To do' }] },
-    { who: 'wade', blocks: [{ column: 'Verify PM' }] }
+    { who: 'wren', blocks: [{ id: 'c1', title: 'A', column: 'Verify QA' }] },
+    { who: 'wick', blocks: [{ id: 'c2', title: 'B', column: 'In progress' }] },
+    { who: 'wynn', blocks: [{ id: 'c3', title: 'C', column: 'Verify UX' }, { id: 'c4', title: 'D', column: 'To do' }] },
+    { who: 'wade', blocks: [{ id: 'c5', title: 'E', column: 'Verify PM' }] }
   ]
-  assert.deepEqual(needingCopies(briefs), ['wren', 'wynn'])
+  assert.deepEqual(qaCards(briefs).map(c => c.id), ['c1', 'c3'])
 })
 
-test('a copy that already answers is left alone; one that is down is started and checked again', () => {
-  const started = []
-  let up = new Set([3101])
-  const result = copyPlan(['wren', 'wick'], {
-    config: CONFIG,
-    probe: port => up.has(port),
-    start: (who) => {
-      started.push(who)
-      up = new Set([...up, 3102])
-      return { ok: true }
-    }
-  })
-  assert.deepEqual(started, ['wick'])
-  assert.deepEqual(result.lines, ['wren: already answering on :3101', 'wick: started on :3102'])
+test('the branch comes from the card\'s linked GitHub item', () => {
+  assert.equal(branchOf({ github: [{ branch: 'wren/x' }] }), 'wren/x')
+  assert.equal(branchOf({ github: [{ pullRequest: { branch: 'wick/y' } }] }), 'wick/y')
+  assert.equal(branchOf({ github: [] }), null)
+  assert.equal(branchOf({}), null)
+})
+
+test('a copy that answers is reported up; nothing is asked of Boss', () => {
+  const cards = [{ who: 'wren', id: 'c1', column: 'Verify QA' }]
+  const result = copyLines(cards, { probe: port => port === 3101, branches: { c1: 'wren/x' } })
+  assert.deepEqual(result.lines, ['wren: card c1 [Verify QA] branch wren/x on :3101: up'])
   assert.equal(result.ok, true)
 })
 
-test('a start that does not bring the copy up is a failure with its reason', () => {
-  const result = copyPlan(['wick'], {
-    config: CONFIG,
-    probe: () => false,
-    start: () => ({ ok: true })
-  })
+test('a copy that does not answer gets the line asking Boss to start it, and nothing is started', () => {
+  const cards = [{ who: 'wynn', id: 'c3', column: 'Verify UX' }]
+  const result = copyLines(cards, { probe: () => false, branches: { c3: 'wynn/z' } })
   assert.equal(result.ok, false)
-  assert.equal(result.lines[0], 'wick: failed on :3102: it does not answer after the start')
+  assert.equal(result.lines[0], 'wynn: card c3 [Verify UX] branch wynn/z on :3103: not up')
+  assert.equal(result.lines[1], 'no copy: ask Boss: tester-copy.sh start wynn wynn/z')
 })
 
-test('a worker with no copy set in crew.json is reported, not guessed', () => {
-  const result = copyPlan(['usher'], { config: CONFIG, probe: () => true, start: () => ({ ok: true }) })
-  assert.equal(result.ok, false)
-  assert.match(result.lines[0], /usher: not restarted: no dev copy/)
+test('a card with no branch or no port is reported, not guessed', () => {
+  const noBranch = copyLines([{ who: 'wade', id: 'c5', column: 'Verify QA' }], { probe: () => true, branches: {} })
+  assert.equal(noBranch.ok, false)
+  assert.match(noBranch.lines[0], /no branch linked to the card/)
+  const noPort = copyLines([{ who: 'usher', id: 'c6', column: 'Verify UX' }], { probe: () => true, branches: { c6: 'u/q' } })
+  assert.equal(noPort.ok, false)
+  assert.match(noPort.lines[0], /no port for usher/)
 })
