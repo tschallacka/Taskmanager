@@ -7,6 +7,9 @@ definePageMeta({ layout: 'app' })
 
 const route = useRoute()
 const searchOpen = useSearchModal()
+// The instance admin may load a backup into a crew's board, which everyone else only reads (owner, 2026-11-12).
+const { isInstanceAdmin } = useAuth()
+const importOpen = ref(false)
 
 const {
   activeProject,
@@ -309,7 +312,32 @@ useSeoMeta({
       data-readonly-board
     >
       This is a crew's board. You can read it here; only the crew's team changes it.
+      <button
+        v-if="isInstanceAdmin && activeProject"
+        type="button"
+        class="ml-2 rounded border border-default px-2 py-0.5 text-default transition-colors hover:bg-default"
+        data-load-backup
+        @click="importOpen = true"
+      >
+        Load a backup into this board
+      </button>
     </p>
+    <UModal
+      v-if="isInstanceAdmin && isReadOnlyBoard && activeProject"
+      v-model:open="importOpen"
+      title="Load a backup into this board"
+      description="Choose a board backup file. You see what it would add before anything is written."
+      :ui="{ content: 'max-w-lg' }"
+    >
+      <template #body>
+        <div data-load-backup-dialog>
+          <KanbanBoardImport
+            :project-id="activeProject.id"
+            @imported="loadBoard(activeProject.id)"
+          />
+        </div>
+      </template>
+    </UModal>
     <!-- The crew tree: a shadow board links back to the real board it works for -->
     <nav
       v-if="activeProject?.realBoard"

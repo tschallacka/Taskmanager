@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.16.0 - 2026-11-12
+
+- **The instance admin can load a backup into a crew's board.** A crew's shadow board, reached through the real board it works for, was read-only for everyone, so an admin could not restore it. The grey crew-board line now has **Load a backup into this board** for the instance admin, which opens the usual import dialog (file, dry-run report, confirm). Only `POST /api/projects/:id/import` lets the instance admin write to such a board; every other change is still refused, and nobody else sees the button. `server/utils/projects.ts`, `server/utils/boardImportRequest.ts`, `app/pages/projects/[id].vue`, `docs/team/board-import.md`, `tests/crew-board-access.test.ts`.
+
 ## 0.15.0 - 2026-11-12
 
 - **Updating a crew is one command.** `curl -fsSL <host>/crew/update.sh | sh -s -- <crew home>` fetches the kit the instance serves and runs its update, so a crew with no kit folder, an old kit, or a current one all update the same way. The project list's **Update this crew's kit** item copies that line. One kit folder per instance, `crew update --all` updates every crew home, and a crew's owner files (rules, brief, janitor card) are merged, not replaced. `crew/update.mjs`, `crew/update.test.mjs`, `crew/kit.test.mjs`, `server/routes/crew/update.sh.get.ts`, `app/components/ProjectsListPanel.vue`.
