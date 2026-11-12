@@ -4,6 +4,7 @@ import type { Project } from '~/composables/useProjects'
 import type { PinnedBoard } from '~/composables/usePins'
 import { taskCountLabel } from '#shared/utils/board'
 import { crewTreeRows } from '~/utils/crewTreeRows'
+import { countOpenTasks, healthTint, kindIcon, projectKind } from '~/utils/projectKind'
 
 const { ready, projects, allTasks, deleteProject, renameProject } = useProjects()
 const route = useRoute()
@@ -146,14 +147,7 @@ function newProject() {
 // how much is left, and the total is still there behind it.
 const taskCounts = computed(() => {
   const terminal = new Map(projects.value.map(p => [p.id, new Set(p.terminalColumnIds ?? [])]))
-  const counts = new Map<string, { open: number, total: number }>()
-  for (const task of allTasks.value) {
-    const entry = counts.get(task.projectId) ?? { open: 0, total: 0 }
-    entry.total++
-    if (!terminal.get(task.projectId)?.has(task.columnId)) entry.open++
-    counts.set(task.projectId, entry)
-  }
-  return counts
+  return countOpenTasks(allTasks.value, terminal)
 })
 
 function countsFor(project: Project) {
@@ -170,35 +164,9 @@ function countTitle(project: Project) {
   return project.terminalColumnIds?.length ? `${open} open of ${total}` : `${total} in total`
 }
 
-// The kind of a row, shown as its icon: a crew's board, a crew home, a customer's board, or a board.
-function kindOf(project: Project) {
-  if (project.role === 'shadow') return 'crew_board'
-  if (project.role === 'crew_home') return 'crew_home'
-  if (project.customerId) return 'customer_board'
-  return 'board'
-}
-
-const KIND_ICON: Record<string, string> = {
-  crew_board: 'i-lucide-users-round',
-  crew_home: 'i-lucide-house',
-  customer_board: 'i-lucide-building-2',
-  board: 'i-lucide-kanban'
-}
-
-function kindIcon(project: Project) {
-  return KIND_ICON[kindOf(project)] ?? 'i-lucide-kanban'
-}
-
-// The icon and the open count take the board's health (its status) as their tint; the open row is primary.
-const HEALTH_TINT: Record<string, string> = {
-  on_track: 'text-success',
-  at_risk: 'text-warning',
-  off_track: 'text-error'
-}
-
+// The icon and the open count take the board's health as their tint; the open row is primary (projectKind.ts).
 function kindTint(project: Project) {
-  if (activeId.value === project.id) return 'text-primary'
-  return HEALTH_TINT[project.status ?? ''] ?? 'text-dimmed'
+  return healthTint(project, activeId.value === project.id)
 }
 
 // ─── Inline rename / delete ────────────────────────────────
@@ -462,7 +430,7 @@ function menuItems(project: Project) {
           :name="kindIcon(project)"
           class="mt-0.5 size-4 shrink-0"
           :class="kindTint(project)"
-          :data-kind="kindOf(project)"
+          :data-kind="projectKind(project)"
           :data-health="project.status ?? 'unset'"
         />
         <div class="min-w-0 flex-1">

@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull } from 'drizzle-orm'
+import { and, asc, eq, isNull, sql } from 'drizzle-orm'
 import { db } from '../db'
 import { boardPins, customers, organization, projects } from '../db/schema'
 import { hiddenCrewShadows } from './boardTree'
@@ -48,12 +48,17 @@ export async function pinBoard(userId: string, projectId: string) {
   if (!project || (await hiddenCrewShadows(userId, [projectId])).has(projectId)) {
     throw createError({ statusCode: 404, message: 'Project not found' })
   }
-  const pinned = await db.select({ projectId: boardPins.projectId }).from(boardPins).where(eq(boardPins.userId, userId))
-  if (pinned.some(pin => pin.projectId === projectId)) return
-  if (pinned.length >= PIN_LIMIT) {
-    throw createError({ statusCode: 409, message: 'Eight boards are pinned already. Unpin one to pin another.' })
-  }
-  await db.insert(boardPins).values({ userId, projectId, createdAt: Date.now() }).onConflictDoNothing()
+  // Two pins at once would both count seven and both insert. A transaction-scoped advisory lock per person makes
+  // the count and the insert one step for that person; it is released when the transaction ends.
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${'pins:' + userId}))`)
+    const pinned = await tx.select({ projectId: boardPins.projectId }).from(boardPins).where(eq(boardPins.userId, userId))
+    if (pinned.some(pin => pin.projectId === projectId)) return
+    if (pinned.length >= PIN_LIMIT) {
+      throw createError({ statusCode: 409, message: 'Eight boards are pinned already. Unpin one to pin another.' })
+    }
+    await tx.insert(boardPins).values({ userId, projectId, createdAt: Date.now() }).onConflictDoNothing()
+  })
 }
 
 export async function unpinBoard(userId: string, projectId: string) {

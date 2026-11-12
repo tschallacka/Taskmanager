@@ -20,9 +20,13 @@ const byAgent = computed(() => sprocket.value?.provider === 'agent')
 const hasApiKey = computed(() => !!openrouterApiKey.value || !!openrouterApiKeyMasked.value)
 const ready = computed(() => byAgent.value ? !!sprocket.value?.agentKeyId : hasApiKey.value)
 
-// The first time the panel opens in this browser it says what Sprocket needs; after that the short line stays.
+// The first time the panel is open in this browser it says what Sprocket needs. Closing the panel once marks the
+// setup as seen, so the next opening (and every one after) shows the short line. Reactive, so it changes at once.
 const setupSeen = useCookie<boolean>('sprocket-setup-seen', { default: () => false, maxAge: 60 * 60 * 24 * 365 })
-const firstOpen = ref(!setupSeen.value)
+const firstOpen = computed(() => !setupSeen.value)
+watch(open, (isOpen) => {
+  if (!isOpen) setupSeen.value = true
+})
 
 function toggle() {
   open.value = !open.value
@@ -30,7 +34,6 @@ function toggle() {
     // A change on the settings page shows the next time the panel opens.
     loadSprocket(true).catch(() => {})
     nextTick(() => inputEl.value?.focus())
-    setupSeen.value = true
   }
 }
 

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { healthTint, kindIcon } from '~/utils/projectKind'
+
 const props = withDefaults(defineProps<{ collapsed?: boolean }>(), { collapsed: false })
 const emit = defineEmits<{ 'close': [], 'toggle-rail': [] }>()
 const searchOpen = useSearchModal()
@@ -81,15 +83,17 @@ const { switchWorkspace } = useWorkspace()
 onMounted(() => {
   if (!pinsLoaded.value) loadPins().catch(() => {})
 })
+// The kind icon and the health tint come from the shared module, the same as the project list's rows.
 const railPins = computed(() => pins.value.slice(0, 8).map((pin) => {
   const project = projects.value.find(p => p.id === pin.projectId)
-  const kind = project?.role === 'shadow'
-    ? 'i-lucide-users-round'
-    : project?.role === 'crew_home'
-      ? 'i-lucide-house'
-      : project?.customerId ? 'i-lucide-building-2' : 'i-lucide-kanban'
-  const tint = ({ on_track: 'text-success', at_risk: 'text-warning', off_track: 'text-error' } as Record<string, string>)[project?.status ?? ''] ?? 'text-dimmed'
-  return { pin, name: project?.name ?? pin.name, icon: kind, tint }
+  const active = route.params.id === pin.projectId
+  return {
+    pin,
+    name: project?.name ?? pin.name,
+    icon: project ? kindIcon(project) : 'i-lucide-kanban',
+    tint: healthTint(project ?? {}, active),
+    active
+  }
 }))
 
 // A pin in another workspace switches to it first, as the pinned rows of the list do.
@@ -150,10 +154,11 @@ watch(() => route.path, () => emit('close'))
           size="sm"
           color="neutral"
           variant="ghost"
-          :class="[item.tint, route.params.id === item.pin.projectId ? 'bg-elevated text-primary' : '']"
+          :class="item.active ? 'bg-elevated' : ''"
+          :ui="{ leadingIcon: item.tint }"
           :aria-label="item.name"
           :title="item.name"
-          :aria-current="route.params.id === item.pin.projectId ? 'page' : undefined"
+          :aria-current="item.active ? 'page' : undefined"
           :data-rail-project="item.pin.projectId"
           @click="openRailPin(item.pin)"
         />

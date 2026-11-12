@@ -135,3 +135,19 @@ test('a person has at most eight pins: a ninth is refused with 409, and re-pinni
     await db.delete(projects).where(inArray(projects.id, extra))
   }
 })
+
+test('nine pins sent at the same moment leave eight: the cap holds under concurrency', async () => {
+  const racers = Array.from({ length: PIN_LIMIT + 1 }, (_, i) => id(`race-${i}`))
+  await db.insert(projects).values(racers.map(pid => ({ id: pid, userId: me, teamId: null, name: pid.slice(-12), createdAt: now, updatedAt: now })))
+  try {
+    await db.delete(boardPins).where(eq(boardPins.userId, me))
+    const results = await Promise.allSettled(racers.map(pid => pinBoard(me, pid)))
+    const refused = results.filter(r => r.status === 'rejected')
+    assert.equal((await listPins(me)).length, PIN_LIMIT, 'exactly eight pins are kept')
+    assert.equal(refused.length, 1, 'the one pin over the cap is refused')
+    assert.ok(refused.every(r => (r as PromiseRejectedResult).reason?.statusCode === 409))
+  } finally {
+    await db.delete(boardPins).where(eq(boardPins.userId, me))
+    await db.delete(projects).where(inArray(projects.id, racers))
+  }
+})
