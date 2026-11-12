@@ -71,3 +71,11 @@ test('search in this board: a box in row 2 narrows the cards by title, and count
   const board = readFileSync(join(process.cwd(), 'app', 'components', 'kanban', 'KanbanBoard.vue'), 'utf8')
   assert.match(board, /const isFiltering = computed\(\(\) => activeTags\.value\.length > 0 \|\| searchText\.value\.trim\(\) !== ''\)/)
 })
+
+test('the Filter button holds the labels and Show deleted, and opens with the trash or a label present', () => {
+  assert.match(page, /<span class="hidden sm:inline">Filter<\/span>/)
+  assert.match(page, /v-if="boardTagCounts\.length \|\| trashedCount > 0 \|\| showTrashed"/)
+  assert.match(page, /data-show-deleted/)
+  assert.match(page, /@click="toggleShowTrashed"/)
+  assert.match(page, /<span>Show deleted<\/span>/)
+})

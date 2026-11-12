@@ -517,9 +517,9 @@ useSeoMeta({
             data-board-avatars-more
           >+{{ boardPeople.length - 4 }}</span>
         </span>
-        <!-- Label filter -->
+        <!-- Filter: labels, and Show deleted (the trash, which the design puts here too). -->
         <UPopover
-          v-if="boardTagCounts.length"
+          v-if="boardTagCounts.length || trashedCount > 0 || showTrashed"
           :content="{ align: 'end', sideOffset: 6 }"
         >
           <UButton
@@ -528,7 +528,7 @@ useSeoMeta({
             :color="activeTags.length ? 'primary' : 'neutral'"
             :variant="activeTags.length ? 'soft' : 'ghost'"
           >
-            <span class="hidden sm:inline">Labels</span>
+            <span class="hidden sm:inline">Filter</span>
             <!-- Active filters show as chips inside the button: the first two by name, then a count. -->
             <!-- The chip takes the label's own colour, as LabelChip draws it everywhere else. -->
             <span
@@ -576,6 +576,24 @@ useSeoMeta({
                 />
                 <span class="shrink-0 text-xs tabular-nums text-dimmed">{{ count }}</span>
               </button>
+              <div
+                v-if="trashedCount > 0 || showTrashed"
+                class="mt-1 border-t border-default pt-1.5"
+              >
+                <button
+                  class="flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left text-xs transition-colors hover:bg-elevated"
+                  data-show-deleted
+                  @click="toggleShowTrashed"
+                >
+                  <UIcon
+                    :name="showTrashed ? 'i-lucide-square-check' : 'i-lucide-square'"
+                    class="size-3.5 shrink-0"
+                    :class="showTrashed ? 'text-primary' : 'text-dimmed'"
+                  />
+                  <span>Show deleted</span>
+                  <span class="ml-auto shrink-0 tabular-nums text-dimmed">{{ trashedCount }}</span>
+                </button>
+              </div>
             </div>
           </template>
         </UPopover>
