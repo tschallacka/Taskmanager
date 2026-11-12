@@ -96,6 +96,10 @@ const openTaskId = ref<string | null>(null)
 const drawerTask = computed(() => (openTaskId.value ? board.value?.tasks.find(t => t.id === openTaskId.value) ?? null : null))
 // threadId null shows the board's whole conversation list: older notifications did not keep the message.
 const openThread = ref<{ projectId: string, projectName: string, threadId: string | null } | null>(null)
+// "Open board" from the message panel: the board's Messages, at this conversation (or the whole list when none is open).
+const messageBoardLink = computed(() => openThread.value
+  ? notificationLink({ type: 'message', projectId: openThread.value.projectId, taskId: null, messageId: openThread.value.threadId })
+  : '/projects')
 const opening = ref<string | null>(null)
 
 function isOpen(item: NotificationItem) {
@@ -591,6 +595,20 @@ async function sendTest() {
       @update:open="(value: boolean) => { if (!value) openThread = null }"
     >
       <template #body>
+        <div
+          v-if="openThread"
+          class="flex justify-end px-4 pt-3"
+        >
+          <UButton
+            label="Open board"
+            icon="i-lucide-external-link"
+            size="xs"
+            color="neutral"
+            variant="ghost"
+            :to="messageBoardLink"
+            data-open-board
+          />
+        </div>
         <KanbanProjectMessagesView
           v-if="openThread"
           :project-id="openThread.projectId"

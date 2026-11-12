@@ -683,6 +683,18 @@ const menuItems = computed(() => [[
               aria-label="Task options"
             />
           </UDropdownMenu>
+          <!-- On a phone the card is full screen: a back arrow returns to the Inbox list (closing the panel). -->
+          <UButton
+            v-if="openOnBoardTo"
+            icon="i-lucide-arrow-left"
+            size="xs"
+            color="neutral"
+            variant="ghost"
+            aria-label="Back to the inbox"
+            class="md:hidden"
+            data-inbox-back
+            @click="emit('close')"
+          />
           <UButton
             v-if="openOnBoardTo"
             label="Open on board"

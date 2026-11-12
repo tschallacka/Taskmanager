@@ -22,6 +22,15 @@ test('the comment route passes the new comment id to the notification, and the n
   assert.match(read('server/db/schema.ts'), /commentId: text\('comment_id'\)/)
 })
 
+test('the message panel offers Open board to the conversation, and the phone card has a back arrow to the Inbox', () => {
+  const inbox = read('app/pages/projects/inbox.vue')
+  assert.match(inbox, /data-open-board/)
+  assert.match(inbox, /notificationLink\(\{ type: 'message', projectId: openThread\.value\.projectId, taskId: null, messageId: openThread\.value\.threadId \}\)/)
+  const drawer = read('app/components/kanban/TaskDrawer.vue')
+  assert.match(drawer, /data-inbox-back/)
+  assert.match(drawer, /icon="i-lucide-arrow-left"[\s\S]*?class="md:hidden"/, 'the back arrow shows only on a phone')
+})
+
 test('the task panel offers Open on board from the Inbox, to the card at the comment', () => {
   const drawer = read('app/components/kanban/TaskDrawer.vue')
   assert.match(drawer, /import \{ taskLink \} from '~\/utils\/taskLink'/)
