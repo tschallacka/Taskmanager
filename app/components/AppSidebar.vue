@@ -150,9 +150,10 @@ watch(() => route.path, () => emit('close'))
           size="sm"
           color="neutral"
           variant="ghost"
-          :class="item.tint"
+          :class="[item.tint, route.params.id === item.pin.projectId ? 'bg-elevated text-primary' : '']"
           :aria-label="item.name"
           :title="item.name"
+          :aria-current="route.params.id === item.pin.projectId ? 'page' : undefined"
           :data-rail-project="item.pin.projectId"
           @click="openRailPin(item.pin)"
         />
