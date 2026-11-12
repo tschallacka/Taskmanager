@@ -1,8 +1,8 @@
 import { and, asc, eq, isNull } from 'drizzle-orm'
-import { db } from '../../../../db'
-import { crewMail } from '../../../../db/schema'
-import { isMailRecipient, mailError, requireMailCaller } from '../../../../utils/crewMail'
-import { MAIL_FETCH_LIMIT, MAIL_READER_KEY } from '../../../../utils/crewMailRules'
+import { db } from '../../../db'
+import { crewMail } from '../../../db/schema'
+import { isMailRecipient, mailError, requireMailCaller } from '../../../utils/crewMail'
+import { MAIL_FETCH_LIMIT, MAIL_READER_KEY } from '../../../utils/crewMailRules'
 
 /**
  * The undelivered mail for one recipient, oldest first, at most 50 a call: ?to=<key>. A member reads only its own mail;

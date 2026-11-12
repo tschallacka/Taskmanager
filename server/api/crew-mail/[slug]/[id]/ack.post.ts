@@ -1,8 +1,8 @@
 import { and, eq, isNull } from 'drizzle-orm'
-import { db } from '../../../../../db'
-import { crewMail } from '../../../../../db/schema'
-import { mailError, requireMailCaller } from '../../../../../utils/crewMail'
-import { mailIdProblem } from '../../../../../utils/crewMailRules'
+import { db } from '../../../../db'
+import { crewMail } from '../../../../db/schema'
+import { mailError, requireMailCaller } from '../../../../utils/crewMail'
+import { mailIdProblem } from '../../../../utils/crewMailRules'
 
 /**
  * Marks one mail delivered. Only the recipient can ack it: another person's ack is 403, not a silent no-op. Acking a
