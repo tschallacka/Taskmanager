@@ -42,6 +42,18 @@ async function waitUntil(check: () => boolean | Promise<boolean>, what: string, 
 
 const never = (): Promise<Disposition> => new Promise<Disposition>(() => {})
 
+// decide() times out on a timer it does not keep alive (a handler that never answers must not hold the process). Nothing
+// else holds the event loop in a test, so Node would drain it while the await waits, and the runner would cancel the test
+// and the rest of the file. This keeps the loop alive for the one call, and clears it after.
+async function decideAlive(...args: Parameters<typeof decide>): Promise<Disposition> {
+  const keepAlive = setInterval(() => {}, 1_000)
+  try {
+    return await decide(...args)
+  } finally {
+    clearInterval(keepAlive)
+  }
+}
+
 /** Consumes; the handler for each delivery (n counts from 1) decides. Returns what it received and the stop function. */
 // void is the handler that returns nothing: the adapter fails that delivery.
 // eslint-disable-next-line @typescript-eslint/no-invalid-void-type
@@ -466,18 +478,18 @@ describe('decide: every outcome becomes a disposition', () => {
   const deliver = { deliveryId: 'decide-1', event: 'issues', attempt: 0, body: Buffer.from('{}'), redelivered: false, deliveries: 1 }
   const options = { timeoutMs: 1_000, maxBodyBytes: MAX_BODY_BYTES }
   test('ack, retry and fail pass through; a bad answer, a throw and a timeout fail', async () => {
-    assert.equal(await decide(() => 'ack', deliver, options, quiet), 'ack')
-    assert.deepEqual(await decide(() => ({ retry: 'retry2m', reason: 'x' }), deliver, options, quiet), { retry: 'retry2m', reason: 'x' })
-    assert.deepEqual(await decide(() => ({ fail: 'y' }), deliver, options, quiet), { fail: 'y' })
-    assert.deepEqual(await decide(() => undefined, deliver, options, quiet), { retry: 'retry30s', reason: 'handler error' })
-    assert.deepEqual(await decide(() => ({ nonsense: true }) as unknown as Disposition, deliver, options, quiet), { retry: 'retry30s', reason: 'handler error' })
+    assert.equal(await decideAlive(() => 'ack', deliver, options, quiet), 'ack')
+    assert.deepEqual(await decideAlive(() => ({ retry: 'retry2m', reason: 'x' }), deliver, options, quiet), { retry: 'retry2m', reason: 'x' })
+    assert.deepEqual(await decideAlive(() => ({ fail: 'y' }), deliver, options, quiet), { fail: 'y' })
+    assert.deepEqual(await decideAlive(() => undefined, deliver, options, quiet), { retry: 'retry30s', reason: 'handler error' })
+    assert.deepEqual(await decideAlive(() => ({ nonsense: true }) as unknown as Disposition, deliver, options, quiet), { retry: 'retry30s', reason: 'handler error' })
     const thrower = (): never => {
       throw new Error('boom')
     }
-    assert.deepEqual(await decide(thrower, deliver, options, quiet), { retry: 'retry30s', reason: 'handler error' })
-    assert.deepEqual(await decide(() => never(), deliver, { ...options, timeoutMs: 20 }, quiet), { retry: 'retry30s', reason: 'handler timeout' })
+    assert.deepEqual(await decideAlive(thrower, deliver, options, quiet), { retry: 'retry30s', reason: 'handler error' })
+    assert.deepEqual(await decideAlive(() => never(), deliver, { ...options, timeoutMs: 20 }, quiet), { retry: 'retry30s', reason: 'handler timeout' })
     // On the last attempt the same timeout is recorded and failed.
-    assert.deepEqual(await decide(() => never(), { ...deliver, attempt: 2 }, { ...options, timeoutMs: 20 }, quiet), { fail: 'handler timeout' })
+    assert.deepEqual(await decideAlive(() => never(), { ...deliver, attempt: 2 }, { ...options, timeoutMs: 20 }, quiet), { fail: 'handler timeout' })
   })
 
   test('the log names the delivery and the class only, never the message', async () => {
@@ -485,7 +497,7 @@ describe('decide: every outcome becomes a disposition', () => {
     const thrower = (): never => {
       throw new TypeError('secret detail amqp://u:pw@h')
     }
-    await decide(thrower, deliver, options, line => logged.push(line))
+    await decideAlive(thrower, deliver, options, line => logged.push(line))
     assert.equal(logged.length, 1)
     assert.ok(logged[0]!.includes('decide-1') && logged[0]!.includes('TypeError'))
     assert.ok(!logged[0]!.includes('secret detail') && !logged[0]!.includes('pw@'))
