@@ -82,7 +82,8 @@ export async function callerForBoard(event: H3Event, projectId: string): Promise
     }
     project = row
   } else {
-    const row = await requireProject(event, projectId)
+    // The instance admin may load a backup into a crew's board, which every other person only reads (owner, 2026-11-12).
+    const row = await requireProject(event, projectId, { instanceAdminMayWrite: true })
     if (row.readOnly) throw createError({ statusCode: 403, message: 'This is a crew board. You can read it, not change it.' })
     requireStaff(row)
     project = row
