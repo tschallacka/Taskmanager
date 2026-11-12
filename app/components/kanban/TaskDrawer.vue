@@ -617,6 +617,11 @@ const menuItems = computed(() => [[
               class="shrink-0"
               @click="copyTaskNumberLink"
             />
+            <span
+              v-if="linkCopied"
+              role="status"
+              class="shrink-0 text-xs text-success"
+            >Copied</span>
           </span>
 
           <!-- Board and last-edited time, kept to one quiet line; the exact
