@@ -359,7 +359,6 @@ async function finish(planFile) {
   for (const line of lines) console.log(`  ${line}`)
   // The people hint: if the cast shows missing people, the exact command is offered, and nothing is run by itself.
   const people = await import('./people.mjs')
-  const { config } = await import('./config.mjs')
   const missing = await people.missingPeople({
     origin: new URL(config.board.url).origin,
     slug: config.crew?.slug,
