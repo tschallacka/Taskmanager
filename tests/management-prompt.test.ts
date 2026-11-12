@@ -1,4 +1,4 @@
-// The copy-paste prompt of "Get AI management token", the countdown, and the link a crew refusal points to. Pure, no
+// The copy-paste prompt of "Put an AI crew to work on this board", the countdown, and the link a crew refusal points to. Pure, no
 // database. Run:
 //   DATABASE_URL=postgresql://arnotes:arnotes@localhost:5432/arnotes_test node --import tsx --test tests/management-prompt.test.ts
 import { describe, test } from 'node:test'

@@ -1,4 +1,4 @@
-// The "Get AI management token" dialog: the copy-paste prompt an agent is given to manage the crew of one board, and
+// The "Put an AI crew to work on this board" dialog: the copy-paste prompt an agent is given to manage the crew of one board, and
 // the countdown of the 10 minutes the token lives. Pure, so the prompt is tested on its own.
 
 export interface ManagementPromptInput {

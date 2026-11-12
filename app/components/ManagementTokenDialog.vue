@@ -2,9 +2,9 @@
 import { countdownText, managementPrompt, refusalLink } from '~/utils/managementPrompt'
 import { crewManagePrompt } from '~/utils/crewManagePrompt'
 
-// "Put an AI crew to work on this board": makes the 10-minute token for one board and shows it once, with the copy-paste
-// prompt for the agent. On a crew's own board ("Manage this crew", card mwdd9d2vtgqhfr6izq) the token reaches only that
-// crew, and there are two prompts: recover the keys, add the missing people. The token lives only in this component.
+// "Put an AI crew to work on this board": makes the 10-minute token for one board and shows it once, with the copy-paste prompt
+// for the agent. On a crew's own board ("Manage this crew", card mwdd9d2vtgqhfr6izq) the token reaches only that crew, with two
+// prompts: recover the keys, add the missing people. The token lives only in this component.
 
 const props = defineProps<{
   open: boolean
@@ -111,7 +111,7 @@ async function make() {
     issued.value = {
       token: made.token,
       expiresAt,
-      prompt: isCrewBoard.value && board.crewSlug
+      prompt: board.crewSlug
         ? ['recover', 'people'].map(job => crewManagePrompt({ origin, slug: board.crewSlug as string, boardName: made.board.name, token: made.token, expiresAt, job: job as 'recover' | 'people' })).join('\n\n----------\n\n')
         : managementPrompt({ origin, boardId: made.board.id, boardName: made.board.name, token: made.token, expiresAt })
     }
@@ -170,8 +170,8 @@ function close() {
 <template>
   <UModal
     :open="open"
-    title="Add a crew to this board"
-    description="A token for 10 minutes. Give the prompt to an AI agent: it makes a new crew for this board and keeps its keys."
+    :title="isCrewBoard ? 'Manage this crew' : `Put an AI crew to work on ${board?.name ?? 'this board'}`"
+    description="This makes a token for 10 minutes. Paste the prompt below into a new Claude Code session: it sets up a crew (a PM, workers and testers) that works on this board and keeps its own keys."
     :ui="{ footer: 'justify-end' }"
     @update:open="(value: boolean) => emit('update:open', value)"
   >
@@ -195,7 +195,7 @@ function close() {
           </p>
           <UButton
             v-else
-            label="Make the token"
+            label="Get the prompt"
             icon="i-lucide-key-round"
             color="primary"
             :loading="phase === 'working'"
@@ -247,7 +247,7 @@ function close() {
             The token has expired and is no longer shown. Make a new one if the agent still needs to manage the crew.
           </p>
           <UButton
-            label="Make a new token"
+            label="Get a new prompt"
             icon="i-lucide-key-round"
             color="primary"
             data-management-make

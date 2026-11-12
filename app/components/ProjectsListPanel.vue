@@ -206,8 +206,8 @@ const WORKSPACE_LINKS = [
 ]
 
 const deleteTarget = ref<{ id: string, name: string, crewBoard?: boolean } | null>(null)
-// The board whose management token dialog is open ("Get AI management token").
-const managementBoard = ref<{ id: string, name: string } | null>(null)
+// The board whose management token dialog is open ("Put an AI crew to work on this board").
+const managementBoard = ref<{ id: string, name: string, crewSlug?: string | null } | null>(null)
 
 async function confirmDelete() {
   const target = deleteTarget.value
@@ -270,9 +270,10 @@ function menuItems(project: Project) {
       onSelect: () => { void navigateTo({ path: '/connect', query: { board: project.id } }) }
     },
     {
-      label: 'Add a crew to this board',
+      // A crew's own board gets the same window for that crew's token (card mwdd9d2vtgqhfr6izq).
+      label: project.crew?.slug ? 'Manage this crew' : 'Put an AI crew to work on this board',
       icon: 'i-lucide-users-round',
-      onSelect: () => { managementBoard.value = { id: project.id, name: project.name } }
+      onSelect: () => { managementBoard.value = { id: project.id, name: project.name, crewSlug: project.crew?.slug ?? null } }
     },
     {
       label: 'Update this crew\'s kit',
