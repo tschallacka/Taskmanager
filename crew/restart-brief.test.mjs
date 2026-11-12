@@ -22,7 +22,8 @@ function fakeRunner(boards) {
 test('cardsOf reads the list from either shape of my_tasks', () => {
   assert.deepEqual(cardsOf({ tasks: [{ id: 'a', title: 'A' }] }), [{ id: 'a', title: 'A' }])
   assert.deepEqual(cardsOf([{ id: 'b', title: 'B' }]), [{ id: 'b', title: 'B' }])
-  assert.deepEqual(cardsOf(null), [])
+  assert.throws(() => cardsOf(null), /my_tasks answered nothing/)
+  assert.deepEqual(cardsOf({ tasks: [] }), [])
 })
 
 test('lastUpdateOf takes the newest update, collapses its whitespace and caps it at 300 characters', () => {
@@ -54,13 +55,12 @@ test('a person with nothing open is left out of the plan; the rest are listed in
     wick: { cards: [{ id: 'w1', title: 'W', column: 'In progress', updates: [{ body: 'going' }] }] },
     nina: { cards: [{ id: 'n1', title: 'N', column: 'Done', updates: [] }] }
   })
-  const plan = restartBrief(['nina', 'wick', 'pat'], runner)
+  const plan = restartBrief(['nina', 'wick'], runner)
   assert.deepEqual(plan.map(p => p.who), ['wick'])
   assert.equal(plan[0].blocks[0].id, 'w1')
 })
 
-test('a person whose board call fails contributes nothing and does not stop the others', () => {
+test('a failed board call is an error with its reason, never an empty brief', () => {
   const runner = fakeRunner({ wick: { cards: [{ id: 'w1', title: 'W', column: 'To do', updates: [] }] } })
-  const plan = restartBrief(['pat', 'wick'], runner)
-  assert.deepEqual(plan.map(p => p.who), ['wick'])
+  assert.throws(() => restartBrief(['pat', 'wick'], runner), /my_tasks answered nothing/)
 })

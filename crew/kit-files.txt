@@ -21,6 +21,7 @@ SUSY.md.tmpl
 TESS.md.tmpl
 USHER.md.tmpl
 WORKFLOW.md
+board-call.mjs
 browser-driver.mjs
 browser.mjs
 cast.mjs

@@ -11,6 +11,7 @@
 //   crew janet stale plan|run <card> [--dry-run]         the crew's stale worktrees: plan, then run what is granted (janet.mjs)
 //   crew publish <slug> <branch> <title> <msg-file> <pr-file>   the merger's one command: squash onto a fresh base, check, push, open the PR (publish.mjs)
 //   crew up                    brings the crew's parts back in order after a restart, one line each, from crew.json "up" (up.mjs)
+//   crew restart-brief         after crew up: each standing member's open cards and last update, for Pia to start them fresh (restart-brief.mjs)
 //   crew totp <file>           the current authenticator code for a dev copy's two-factor secret (totp.mjs)
 //   crew setup                 make the crew by hand through the crew API (setup.mjs)
 //   crew channel <who>         the Claude Code channel server for one person (channel.mjs)
@@ -27,7 +28,7 @@ const [first, ...rest] = process.argv.slice(2)
 const scripts = { listen: 'listen.mjs', watch: 'watch.mjs', init: 'init.mjs', setup: 'setup.mjs', channel: 'channel.mjs', update: 'update.mjs', mentions: 'mentions.mjs', totp: 'totp.mjs', janet: 'janet.mjs', publish: 'publish.mjs', up: 'up.mjs', 'restart-brief': 'restart-brief.mjs' }
 
 if (!first || first === '-h' || first === '--help') {
-  console.log('usage: crew <who> <command ...> | crew <who> browser <command> | crew browser status|shutdown | crew listen <who> [sec] | crew watch | crew init | crew setup | crew channel <who> | crew mentions [minutes|--follow] | crew publish <slug> <branch> <title> <msg-file> <pr-file> | crew update [--check] [--from <kit folder|kit.tar.gz>] [--kit <folder>]')
+  console.log('usage: crew <who> <command ...> | crew <who> browser <command> | crew browser status|shutdown | crew listen <who> [sec] | crew watch | crew init | crew setup | crew channel <who> | crew mentions [minutes|--follow] | crew publish <slug> <branch> <title> <msg-file> <pr-file> | crew update [--check] [--from <kit folder|kit.tar.gz>] [--kit <folder>] | crew up | crew restart-brief')
   process.exit(first ? 0 : 2)
 }
 
