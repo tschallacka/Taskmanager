@@ -3,8 +3,9 @@
 // minute, for each local recipient: flush the outbox (sends the endpoint did not take), then fetch the pending mail
 // for the recipient, deliver each one locally once, then ack it. Nothing here prints the key.
 //
-// Files under CREW_HOME/mailbox: outbox/<id>.json (a send the endpoint has not taken yet), <to>/seen/<id> (a mail
-// already delivered locally, written BEFORE its ack, so a failed ack is acked again later and never delivered twice),
+// Files under CREW_HOME/mailbox: outbox/<id>.json (a send the endpoint has not taken yet; outbox/bad/ holds the ones that
+// cannot be read), <to>/seen/<id> (a mail already delivered locally, written BEFORE the local delivery, so a mail is
+// delivered at most once; a failed ack is acked again later, never delivered again),
 // <to>/done/ (the old spool, moved as today). The delivered text is always `from <from_key>: <text>`, set here from the
 // row, never from the text (Boss, 2026-11-12).
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs'
@@ -50,20 +51,37 @@ export async function sendMail({ fetch: fetchImpl = fetch, base, slug, key, to, 
     const outbox = join(mailboxDir, 'outbox')
     mkdirSync(outbox, { recursive: true })
     const path = join(outbox, `${mailId}.json`)
-    writeFileSync(path, JSON.stringify({ id: mailId, to, text, base }, null, 1), { mode: 0o600 })
+    // Written to a temporary name and renamed, so a crash never leaves a half-written file for the next flush to read.
+    const temp = `${path}.tmp`
+    writeFileSync(temp, JSON.stringify({ id: mailId, to, text, base }, null, 1), { mode: 0o600 })
+    renameSync(temp, path)
     return { sent: false, id: mailId, outbox: path }
   }
 }
 
-/** Flushes the outbox: each send is posted with its own id (a repeat is harmless), then moved to outbox/done/. */
+/**
+ * Flushes the outbox: each send is posted with its own id (a repeat is harmless), then moved to outbox/done/. A file that
+ * cannot be read or parsed is moved to outbox/bad/ and skipped, so one bad file never stops the rest. A send the app
+ * still refuses stays in the outbox (left). Returns { flushed, left, bad }.
+ */
 export async function flushOutbox({ fetch: fetchImpl = fetch, mailboxDir, key, slug }) {
   const outbox = join(mailboxDir, 'outbox')
-  if (!existsSync(outbox)) return { flushed: 0, left: 0 }
+  if (!existsSync(outbox)) return { flushed: 0, left: 0, bad: 0 }
   let flushed = 0
   let left = 0
+  let bad = 0
   for (const file of readdirSync(outbox).filter(name => name.endsWith('.json'))) {
     const path = join(outbox, file)
-    const item = JSON.parse(readFileSync(path, 'utf8'))
+    let item
+    try {
+      item = JSON.parse(readFileSync(path, 'utf8'))
+      if (!MAIL_ID.test(item.id) || typeof item.base !== 'string') throw new Error('not an outbox mail')
+    } catch {
+      mkdirSync(join(outbox, 'bad'), { recursive: true })
+      renameSync(path, join(outbox, 'bad', file))
+      bad++
+      continue
+    }
     try {
       await call(fetchImpl, endpoint(item.base, slug), { method: 'POST', body: JSON.stringify({ id: item.id, to: item.to, text: item.text }) }, key)
       mkdirSync(join(outbox, 'done'), { recursive: true })
@@ -73,7 +91,7 @@ export async function flushOutbox({ fetch: fetchImpl = fetch, mailboxDir, key, s
       left++
     }
   }
-  return { flushed, left }
+  return { flushed, left, bad }
 }
 
 /** The undelivered mail for one recipient, oldest first (the endpoint answers at most 50 a call). */
@@ -84,9 +102,10 @@ export async function fetchMail({ fetch: fetchImpl = fetch, base, slug, key, to 
 }
 
 /**
- * Delivers one fetched mail locally, at most once, then acks it. `seen` is written before the ack: when the ack fails,
- * the next fetch returns the same mail, it is seen, and it is acked again without a second delivery.
- * `deliver(line)` is the local delivery (terminal paste, wake, the daemon's file).
+ * Delivers one fetched mail locally, at most once, then acks it. The seen record is written BEFORE the local delivery, so
+ * a crash after the record and before the delivery loses that one line (at most once: never a second delivery). When the
+ * ack fails, the next fetch returns the same mail, it is seen, and it is acked again without delivering it again.
+ * `deliver(line, mail)` is the local delivery (terminal paste, wake, the daemon's file).
  */
 export async function deliverOnce({ fetch: fetchImpl = fetch, base, slug, key, mail, to, mailboxDir, deliver }) {
   if (!MAIL_ID.test(mail.id)) return { delivered: false, acked: false, reason: 'bad id' }
@@ -95,8 +114,8 @@ export async function deliverOnce({ fetch: fetchImpl = fetch, base, slug, key, m
   const seenPath = join(seenDir, mail.id)
   const fresh = !existsSync(seenPath)
   if (fresh) {
-    deliver(mailLine(mail), mail)
     writeFileSync(seenPath, `${new Date().toISOString()}\n`)
+    deliver(mailLine(mail), mail)
   }
   try {
     await call(fetchImpl, endpoint(base, slug, `/${mail.id}/ack`), { method: 'POST', body: '{}' }, key)

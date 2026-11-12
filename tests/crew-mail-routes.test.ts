@@ -2,7 +2,8 @@
 // The crew mail routes against a real HTTP server (h3) on the test database: the sender is the caller's own key (a body
 // `from` is ignored), a member reads only its own mail (the boss key reads any), only the recipient acks (a wrong ack is
 // 403), a key of another crew or a customer key is 403, a duplicate id is the same mail (409 when the mail differs),
-// a text over the 1 MB safety stop is 400 with its size, a 100 KB mail round-trips whole, and more than 30 sends a minute
+// a text over the 1 MB safety stop is 413 with its size, a 100 KB mail round-trips whole, the pending cap is 409, an ack of
+// an unknown or another crew's mail is 404, and more than 30 sends a minute
 // from one sender is 429. Needs the scratch test database
 // with the crew tables pushed (sh bin/reset-testdb.sh <key> <tree>).
 // Run:
@@ -19,7 +20,7 @@ import { eq, inArray } from 'drizzle-orm'
 Object.assign(globalThis, { createError, defineEventHandler, getHeader, getQuery, getRequestHeader, getRouterParam, readBody, setHeader, setResponseStatus })
 
 const { db } = await import('../server/db')
-const { apiKeys, crewBoards, crews, member, organization, projects, user } = await import('../server/db/schema')
+const { apiKeys, crewBoards, crewMail, crews, member, organization, projects, user } = await import('../server/db/schema')
 const { createOrRotateCrew, purgeCrew } = await import('../server/utils/crewProvisioning')
 const postMail = (await import('../server/api/crews/[slug]/mail/index.post')).default
 const getMail = (await import('../server/api/crews/[slug]/mail/index.get')).default
@@ -161,4 +162,26 @@ test('more than 30 sends a minute from one sender is 429 with Retry-After', asyn
   }
   assert.equal(last.status, 429)
   assert.equal(last.retryAfter, '60')
+})
+
+test('the pending cap: a recipient with 500 undelivered mails refuses the next one with 409', async () => {
+  const [crewA] = await db.select().from(crews).where(eq(crews.slug, slugA))
+  const rows = Array.from({ length: 500 }, (_, n) => ({
+    id: randomBytes(16).toString('hex'), crewId: crewA.id, fromKey: 'rita', toKey: 'tess', text: `backlog ${n}`, created: now, delivered: null
+  }))
+  await db.insert(crewMail).values(rows)
+  const refused = await call('POST', `/api/crews/${slugA}/mail`, keys.A.wren, { id: id(60), to: 'tess', text: 'one more' })
+  assert.equal(refused.status, 409)
+  assert.match(String(refused.body.message ?? refused.body.data?.error ?? JSON.stringify(refused.body)), /500 undelivered/)
+})
+
+test('an ack of an unknown id is 404, and an ack of another crew\'s mail is 404 too', async () => {
+  const unknown = await call('POST', `/api/crews/${slugA}/mail/${id(98)}/ack`, keys.A.pia, {})
+  assert.equal(unknown.status, 404)
+  const sent = await call('POST', `/api/crews/${slugA}/mail`, keys.A.wren, { id: id(97), to: 'wick', text: 'for wick only' })
+  assert.equal(sent.status, 201)
+  const other = await call('POST', `/api/crews/${slugB}/mail/${id(97)}/ack`, keys.B.wick, {})
+  assert.equal(other.status, 404, 'crew B cannot see or ack crew A\'s mail')
+  const stillPending = await call('GET', `/api/crews/${slugA}/mail?to=wick`, keys.A.wick)
+  assert.equal(stillPending.body.mail.some((m: any) => m.id === id(97)), true, 'the mail is still pending for wick')
 })

@@ -5,6 +5,12 @@ import { eq } from 'drizzle-orm'
 import { cleanupMailOnWrite, isMailRecipient, pendingFor, requireMailCaller, sendsInLastMinute } from '../../../../utils/crewMail'
 import { MAIL_PENDING_LIMIT, MAIL_SENDS_PER_MINUTE, MAIL_TEXT_SAFETY_BYTES, mailIdProblem, mailTextProblem } from '../../../../utils/crewMailRules'
 
+// Postgres' unique violation (23505), as the driver reports it directly or wrapped in its cause.
+function isUniqueViolation(error: unknown): boolean {
+  const e = error as { code?: unknown, cause?: { code?: unknown } } | null
+  return e?.code === '23505' || e?.cause?.code === '23505'
+}
+
 /**
  * Sends one mail to a crew member. Body: { id, to, text }. The sender is the caller's own key; a body field `from` is
  * ignored. The id is made by the sender's client, so a retried send with the same id and text is the same row (201
@@ -45,7 +51,17 @@ export default defineEventHandler(async (event) => {
   if ((await pendingFor(caller.crew.id, to)) >= MAIL_PENDING_LIMIT) {
     throw createError({ statusCode: 409, message: `${to} has ${MAIL_PENDING_LIMIT} undelivered mails; try again later.` })
   }
-  await db.insert(crewMail).values({ id, crewId: caller.crew.id, fromKey: caller.key, toKey: to, text, created: now, delivered: null })
+  try {
+    await db.insert(crewMail).values({ id, crewId: caller.crew.id, fromKey: caller.key, toKey: to, text, created: now, delivered: null })
+  } catch (error) {
+    // A parallel send with the same id won the insert: the same mail is 201, another mail is 409, never a 500.
+    if (!isUniqueViolation(error)) throw error
+    const [row] = await db.select().from(crewMail).where(eq(crewMail.id, id))
+    const same = Boolean(row) && row.crewId === caller.crew.id && row.fromKey === caller.key && row.toKey === to && row.text === text
+    if (!same) throw createError({ statusCode: 409, message: 'That id is already used by another mail.' })
+    setResponseStatus(event, 201)
+    return { id }
+  }
   await cleanupMailOnWrite(now)
   setResponseStatus(event, 201)
   return { id }

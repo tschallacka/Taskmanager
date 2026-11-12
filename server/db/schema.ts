@@ -1459,7 +1459,9 @@ export const crewMail = pgTable(
     delivered: bigint('delivered', { mode: 'number' })
   },
   table => [
-    index('crew_mail_pending_idx').on(table.crewId, table.toKey, table.delivered)
+    index('crew_mail_pending_idx').on(table.crewId, table.toKey, table.delivered),
+    // The per-minute send count (sendsInLastMinute) filters on the sender and the time: without this it scans the crew.
+    index('crew_mail_sender_idx').on(table.crewId, table.fromKey, table.created)
   ]
 )
 

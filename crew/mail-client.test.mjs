@@ -3,7 +3,7 @@
 //   node --test crew/mail-client.test.mjs
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, readdirSync, existsSync, readFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, readdirSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { sendMail, flushOutbox, fetchMail, deliverOnce, tick, mailLine } from './mail-client.mjs'
@@ -124,4 +124,32 @@ test('a 100 KB mail is sent whole and delivered whole: the body carries it, the 
   await tick({ fetch: endpoint.fetchImpl, base: BASE, slug: 'tm', key: 'k1', to: 'pia', mailboxDir: dir, deliver: line => lines.push(line) })
   assert.equal(lines.length, 1)
   assert.equal(lines[0], `from wick: ${big}`, 'the delivered line keeps the whole text')
+})
+
+test('an unreadable outbox file is moved to outbox/bad and skipped; the readable ones still flush', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'mail-client-'))
+  const outbox = join(dir, 'outbox')
+  mkdirSync(outbox, { recursive: true })
+  writeFileSync(join(outbox, `${ID}.json`), '{"id": "0123456789abcdef0123456789abcdef", "to": "pi') // truncated JSON
+  writeFileSync(join(outbox, `${ID2}.json`), JSON.stringify({ id: ID2, to: 'pia', text: 'ok', base: BASE }))
+  const up = fakeEndpoint()
+  const flushed = await flushOutbox({ fetch: up.fetchImpl, mailboxDir: dir, key: 'k1', slug: 'tm' })
+  assert.deepEqual(flushed, { flushed: 1, left: 0, bad: 1 })
+  assert.ok(existsSync(join(outbox, 'bad', `${ID}.json`)), 'the truncated file is in outbox/bad')
+  assert.equal(JSON.parse(up.calls[0].init.body).id, ID2, 'the readable send still went out')
+})
+
+test('a delivery that throws is never repeated: the seen record is written first, so the next tick acks without delivering', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'mail-client-'))
+  const mail = { id: ID, from: 'wick', to: 'pia', text: 'once', created: 1 }
+  const lines = []
+  let fail = true
+  const deliver = line => { if (fail) { fail = false; throw new Error('the terminal is gone') } lines.push(line) }
+  const endpoint = fakeEndpoint({ mail: [mail] })
+  const first = await tick({ fetch: endpoint.fetchImpl, base: BASE, slug: 'tm', key: 'k1', to: 'pia', mailboxDir: dir, deliver })
+  assert.notEqual(first.error, null)
+  const second = await tick({ fetch: endpoint.fetchImpl, base: BASE, slug: 'tm', key: 'k1', to: 'pia', mailboxDir: dir, deliver })
+  assert.equal(second.delivered, 0, 'not delivered a second time')
+  assert.equal(second.acked, 1)
+  assert.deepEqual(lines, [], 'at most once: the line from the failed delivery is not repeated')
 })
