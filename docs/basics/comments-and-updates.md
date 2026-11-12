@@ -6,15 +6,18 @@ topics: comments, updates, reply, activity log, internal comment, share comment,
 order: 70
 ---
 
-Under a task's description is the **Comments** section: the conversation about that task, mixed with a log of what
-happened to it. Agents and other tools call the same thing an **update**: a comment posted over MCP is an update, and
-they show up in the same list.
+Under a task's description is **Activity**, with two tabs. **Comments** is the conversation about that task. **History**
+is the log of what happened to it (see below). Agents and other tools call a comment an **update**: a comment posted
+over MCP is an update, and it shows up in the same list.
+
+On a phone, Activity is a sheet: tap **Activity** under the description to open it, and **Close activity** to go back
+to the task.
 
 ## Write a comment
 
-1. Open the task and scroll to the box at the bottom of the panel.
+1. Open the task and, under its description, stay on the **Comments** tab. The box sits at the bottom of the panel and stays there while the list scrolls.
 2. Type. **Enter** posts the comment; **Shift+Enter** starts a new line. The arrow button posts too.
-3. Before you post, look at the lock beside the box. It decides who reads the comment, see below.
+3. Before you post, look at the **Internal / Customer can see** switch above the box. It decides who reads the comment, see below.
 
 The box is a single line that grows. It understands a little Markdown as you type: `**bold**`, `*italic*`,
 `~~strike~~`, `==highlight==`, `` `code` `` and links. Comments are stored as Markdown text, so an agent reads them
@@ -22,12 +25,12 @@ exactly as you wrote them. A comment shows the author, how long ago it was writt
 
 ## Team only or shared with the customer
 
-The lock button next to the box has two states:
+The switch above the box has two states:
 
-- A lock and the placeholder **Add an internal comment...** mean **Team only**. This is how every comment starts.
-- An eye and **Write to the team and the customer...** mean **Shared with the customer**.
+- **Internal**, with the placeholder **Add an internal comment…**, means **Team only**. This is how every comment starts.
+- **Customer can see**, with the placeholder **Write to the team and the customer…**, means **Shared with the customer**.
 
-Click the button to switch before you post. A Team only comment carries a lock and **Team only** in the list, so it is
+Click the switch to change it before you post. A Team only comment carries a lock and **Team only** in the list, so it is
 easy to see which ones a customer cannot read. When you **reply** to a comment, the reply starts with the visibility of
 the comment you answer, so an answer to an internal note stays internal unless you change it.
 
@@ -55,9 +58,9 @@ A new comment notifies the task's assignee, the person who created the task and 
 the **Inbox**, except you. A Team only comment is only sent to teammates. Mentioning a person with `@Name` also tells
 them if they have an agent connected.
 
-## The activity log
+## The History tab
 
-Between the comments the panel lists what happened to the task, in time order, each line with who did it and when:
+The **History** tab lists what happened to the task, in time order, each line with who did it and when:
 
 - created, marked done, reopened
 - moved from one column to another

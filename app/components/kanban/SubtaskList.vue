@@ -277,6 +277,20 @@ onBeforeUnmount(destroySortable)
             :alt="personById(sub.assigneeId)?.name"
             size="3xs"
           />
+          <UDropdownMenu
+            v-if="!locked"
+            :items="[[{ label: 'Remove subtask', icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: () => removeSubtask(sub.id) }]]"
+            :content="{ align: 'end', collisionPadding: 12 }"
+          >
+            <UButton
+              icon="i-lucide-more-horizontal"
+              size="xs"
+              color="neutral"
+              variant="ghost"
+              aria-label="Subtask options"
+              class="opacity-0 transition-opacity focus-visible:opacity-100 group-hover/sub:opacity-100"
+            />
+          </UDropdownMenu>
           <UButton
             v-if="!locked"
             icon="i-lucide-x"

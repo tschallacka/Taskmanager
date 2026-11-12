@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.19.0 - 2026-11-12
+
+- **Task panel redesign (5/9).** The properties are in two columns in the order Assignee, Due date, Start date, Labels, custom fields, with Time, Blocked by and GitHub as full-width blocks below; on a phone they are rows with a chevron, and a read-only panel shows values only. The description's command row shows while its text has focus. Activity has Comments and History tabs and opens as a sheet on a phone, with the composer at its bottom. The panel's address is /projects/<id>/<task>, and the router now fails loudly if the board route is missing. TaskDrawer.vue is about 980 lines. Files: app/components/RichEditor.vue, app/components/kanban/SubtaskList.vue, app/components/kanban/TaskComments.vue, app/components/kanban/TaskDrawer.vue, app/components/kanban/TaskFields.vue, app/pages/projects/[id].vue, app/router.options.ts, app/utils/copyTaskLink.ts, app/utils/taskPanelUrl.ts, docs/basics/comments-and-updates.md, docs/basics/tasks.md, tests/copy-task-link.test.ts, tests/task-panel-url.test.ts, changelog.d/mwc4jeh2v7fyfk2qi2-task-panel.md.
+
 ## 0.18.0 - 2026-11-12
 
 - **The redesigned shell: a 240 px sidebar that collapses to a 64 px rail, one top bar on every page, and the Planning and Team groups.** The account menu holds Profile, Settings and Help and one Appearance row (System, Dark, Light); Settings keeps no second colour-mode control, and its section list jumps to each section. The browse page is called **All projects** in the sidebar and on its page, and the help pages say so. Pinned boards cap at eight (a ninth pin says so). Each board in the list shows its kind icon (board, customer board, crew home, crew board) and its open count, tinted by health; the rail shows the pinned boards as icons. Sprocket's first opening says what it needs and offers one setup link. `app/layouts/app.vue`, `app/components/AppSidebar.vue`, `app/components/ProjectsListPanel.vue`, `app/pages/settings/index.vue`, `app/pages/projects/browse.vue`, `docs/`, `tests/sidebar-shell.test.ts`.

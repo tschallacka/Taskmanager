@@ -63,6 +63,10 @@ const stream = computed<StreamEntry[]>(() => [
   ...activity.value.map(item => ({ key: `a-${item.id}`, at: item.createdAt, activity: item }))
 ].sort((a, b) => a.at - b.at))
 
+// The Activity tabs: Comments shows the conversation, History shows the changes to the task. Both read the same stream.
+const activityTab = ref<'comments' | 'history'>('comments')
+const shownStream = computed(() => stream.value.filter(entry => activityTab.value === 'history' ? entry.activity : entry.comment))
+
 // An update posted by an agent is signed with the key it came in on, not with
 // the account that owns the key — otherwise a night of agent work reads back as
 // the user's own writing.
@@ -421,32 +425,57 @@ defineExpose({ handleEscape })
 <template>
   <section
     ref="root"
-    class="shrink-0 border-t border-default px-5 pb-4 pt-3"
-    aria-labelledby="task-comments-heading"
+    class="shrink-0 border-t border-default px-5 pb-4 pt-3 max-md:flex max-md:min-h-0 max-md:flex-col max-md:overflow-y-auto"
+    aria-label="Activity"
   >
-    <div class="mb-3 flex items-baseline gap-2">
-      <h3
-        id="task-comments-heading"
-        class="text-xs font-medium text-muted"
+    <!-- Two tabs over one list: the comments first, then the history of changes to the task. -->
+    <div
+      role="tablist"
+      aria-label="Activity"
+      class="mb-3 flex items-center gap-3"
+    >
+      <button
+        id="activity-tab-comments"
+        type="button"
+        role="tab"
+        :aria-selected="activityTab === 'comments'"
+        class="flex items-baseline gap-1.5 text-xs font-medium"
+        :class="activityTab === 'comments' ? 'text-default' : 'text-muted hover:text-default'"
+        @click="activityTab = 'comments'"
       >
         Comments
-      </h3>
-      <span
-        v-if="count"
-        class="text-xs tabular-nums text-dimmed"
-      >{{ count }}</span>
+        <span
+          v-if="count"
+          class="tabular-nums text-dimmed"
+        >{{ count }}</span>
+      </button>
+      <button
+        id="activity-tab-history"
+        type="button"
+        role="tab"
+        :aria-selected="activityTab === 'history'"
+        class="flex items-baseline gap-1.5 text-xs font-medium"
+        :class="activityTab === 'history' ? 'text-default' : 'text-muted hover:text-default'"
+        @click="activityTab = 'history'"
+      >
+        History
+        <span
+          v-if="activity.length"
+          class="tabular-nums text-dimmed"
+        >{{ activity.length }}</span>
+      </button>
     </div>
 
-    <div class="space-y-4">
+    <div class="space-y-4 max-md:flex max-md:min-h-0 max-md:flex-1 max-md:flex-col">
       <p
-        v-if="count === 0"
+        v-if="count === 0 && activityTab === 'comments'"
         class="text-xs text-dimmed"
       >
         No comments yet. Note where this stands: on staging, waiting on feedback, needs more work.
       </p>
 
       <template
-        v-for="entry in stream"
+        v-for="entry in shownStream"
         :key="entry.key"
       >
         <template v-if="entry.comment">
@@ -665,8 +694,9 @@ defineExpose({ handleEscape })
         />
       </div>
 
+      <!-- The composer stays at the bottom of the activity while the list scrolls above it. -->
       <div
-        class="flex cursor-text items-start gap-2"
+        class="sticky bottom-0 z-10 -mx-5 flex cursor-text items-start gap-2 border-t border-default bg-default px-5 pb-3 pt-2 max-md:mt-auto"
         @click="composer?.focus()"
       >
         <UAvatar
@@ -674,32 +704,53 @@ defineExpose({ handleEscape })
           size="2xs"
           class="mt-0.5 shrink-0"
         />
-        <UpdateComposer
-          ref="composer"
-          v-model="draft"
-          :placeholder="readonly || commentVisibility === 'customer' ? 'Write to the team and the customer…' : 'Add an internal comment…'"
-          @submit="send"
-        />
-        <UButton
-          v-if="!readonly"
-          :icon="commentVisibility === 'internal' ? 'i-lucide-lock' : 'i-lucide-eye'"
-          size="xs"
-          :color="commentVisibility === 'internal' ? 'warning' : 'neutral'"
-          variant="ghost"
-          class="shrink-0"
-          :aria-label="commentVisibility === 'internal' ? 'Team only. Click to share with the customer.' : 'Shared with the customer. Click to make it team only.'"
-          :title="commentVisibility === 'internal' ? 'Team only. Click to share with the customer.' : 'Shared with the customer. Click to make it team only.'"
-          @click.stop="commentVisibility = commentVisibility === 'internal' ? 'customer' : 'internal'"
-        />
-        <UButton
-          icon="i-lucide-arrow-up"
-          size="xs"
-          color="primary"
-          class="shrink-0"
-          :disabled="!draft.trim()"
-          aria-label="Add comment"
-          @click="send"
-        />
+        <div class="flex min-w-0 flex-1 flex-col gap-2">
+          <UpdateComposer
+            ref="composer"
+            v-model="draft"
+            :placeholder="readonly || commentVisibility === 'customer' ? 'Write to the team and the customer…' : 'Add an internal comment…'"
+            @submit="send"
+          />
+          <!-- The switch and the send button sit on their own line under the text, so the text has the full width on a phone. -->
+          <div class="flex items-center justify-between gap-2">
+            <!-- Who can see the new comment: two labelled choices, always visible. Contacts never get the switch. -->
+            <div
+              v-if="!readonly"
+              role="group"
+              aria-label="Who can see this comment"
+              class="flex shrink-0 overflow-hidden rounded-md border border-default text-xs"
+            >
+              <button
+                type="button"
+                :aria-pressed="commentVisibility === 'internal' ? 'true' : 'false'"
+                class="px-2 py-1 transition-colors"
+                :class="commentVisibility === 'internal' ? 'bg-warning/15 text-default' : 'text-muted hover:text-default'"
+                @click.stop="commentVisibility = 'internal'"
+              >
+                Internal
+              </button>
+              <button
+                type="button"
+                :aria-pressed="commentVisibility === 'customer' ? 'true' : 'false'"
+                class="border-l border-default px-2 py-1 transition-colors"
+                :class="commentVisibility === 'customer' ? 'bg-primary/15 text-default' : 'text-muted hover:text-default'"
+                @click.stop="commentVisibility = 'customer'"
+              >
+                Customer can see
+              </button>
+            </div>
+            <span v-else />
+            <UButton
+              icon="i-lucide-arrow-up"
+              size="xs"
+              color="primary"
+              class="shrink-0"
+              :disabled="!draft.trim()"
+              aria-label="Add comment"
+              @click="send"
+            />
+          </div>
+        </div>
       </div>
     </div>
 

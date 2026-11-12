@@ -58,12 +58,12 @@ Who may do what, and from where:
 | --- | --- | --- |
 | Instance admin, permanent crews:manage key, unbound | every crew call | the admin's own crews only: read, keys, rotate, people; creating or deleting a crew is refused, a management token is needed |
 | Instance admin, window key | every crew call while the window is open | refused with the plain 404 |
-| Anyone, management token from a board's menu (Add a crew to this board) | not needed | its own board's crew: read, keys, rotate, people; creating a crew too |
+| Anyone, management token from a board's menu (Put an AI crew to work on this board) | not needed | its own board's crew: read, keys, rotate, people; creating a crew too |
 | Crew owner, permanent crews:manage key, unbound, with a live crew | refused | that owner's own crews only: read, keys, rotate; creating or deleting a crew is refused, a management token is needed |
 | Crew owner, same key, with no live crew of their own | refused | 403 with one sentence: the owner has no live crew here, use a management token from the board's sidebar |
 | Any key without crews:manage | refused | the plain 404 |
 
-A **management token** (the board's menu item **Add a crew to this board**) is the other remote key. It works from any machine, through the public address, without opening the window: it lasts 10 minutes, reaches only its own board and carries only the crew permission. Its calls are rate limited per token and per address, with the board's limits for agent calls. A remote call with a management token that has expired or was regenerated answers its own sentence, so the agent can ask for a new token. A remote call with any other key, or no key, still gets the plain 404. The instance admin's window key stays local-only, as before. The instance admin's permanent crews:manage key works from outside for the admin's own crews only, the same as a crew owner's permanent key (see the table above). A remote call with a revoked management token answers the revoked sentence, the same way as an expired or regenerated one.
+A **management token** (the board's menu item **Put an AI crew to work on this board**) is the other remote key. It works from any machine, through the public address, without opening the window: it lasts 10 minutes, reaches only its own board and carries only the crew permission. Its calls are rate limited per token and per address, with the board's limits for agent calls. A remote call with a management token that has expired or was regenerated answers its own sentence, so the agent can ask for a new token. A remote call with any other key, or no key, still gets the plain 404. The instance admin's window key stays local-only, as before. The instance admin's permanent crews:manage key works from outside for the admin's own crews only, the same as a crew owner's permanent key (see the table above). A remote call with a revoked management token answers the revoked sentence, the same way as an expired or regenerated one.
 >
 ### Binding a crew to a board
 
@@ -129,7 +129,7 @@ On the workbench install, make crews against `http://127.0.0.1:3100` directly, n
 <!-- /requires -->
 
 <!-- requires: team-admin -->
-[Add a crew to this board](/help/crews/give-a-board-a-crew) is the step a team's owner or admin takes to make a crew for a board.
+[Put an AI crew to work on this board](/help/crews/give-a-board-a-crew) is the step a team's owner or admin takes to make a crew for a board.
 <!-- /requires -->
 
 ## Related settings
