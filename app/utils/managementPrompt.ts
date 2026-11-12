@@ -1,4 +1,4 @@
-// The "Add a crew to this board" dialog: the copy-paste prompt an agent is given to make one new crew for one board, and
+// The "Put an AI crew to work on this board" dialog: the copy-paste prompt an agent is given to make one new crew for one board, and
 // the countdown of the 10 minutes the token lives. Pure, so the prompt is tested on its own.
 
 export interface ManagementPromptInput {
@@ -19,7 +19,7 @@ export interface ManagementPromptInput {
  */
 export function managementPrompt(input: ManagementPromptInput): string {
   const { origin, boardId, token } = input
-  return `You set up one new crew for the Taskmanager board "${input.boardName}" (board id ${boardId}) at ${origin}.
+  return `You put an AI crew to work on one Taskmanager board. The board is "${input.boardName}" (board id ${boardId}) at ${origin}.
 
 Your management token works for 10 minutes, until ${new Date(input.expiresAt).toISOString()}, and then it stops. It works for this board only. The token, shown once:
 ${token}

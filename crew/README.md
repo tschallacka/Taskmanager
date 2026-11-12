@@ -103,7 +103,7 @@ The workflow's hard rules (the AI text editor for every document, CodeGraph for 
 ## Making the crew by hand
 
 `crew setup` (`setup.mjs`) makes one new crew for one board in one go. It is a thin client of the crew
-API, with the management token that "Add a crew to this board" gives (10 minutes, one board):
+API, with the management token that "Put an AI crew to work on this board" gives (10 minutes, one board):
 
     TASKMANAGER_MANAGEMENT_TOKEN=<token> node setup.mjs --origin <url> --board <board id> --repo <path> [--name <crew name>] [--slug <slug>]
 

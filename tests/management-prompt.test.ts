@@ -1,4 +1,4 @@
-// The copy-paste prompt of "Add a crew to this board", the countdown, and the link a crew refusal points to. Pure, no
+// The copy-paste prompt of "Put an AI crew to work on this board", the countdown, and the link a crew refusal points to. Pure, no
 // database. Run:
 //   DATABASE_URL=postgresql://arnotes:arnotes@localhost:5432/arnotes_test node --import tsx --test tests/management-prompt.test.ts
 import { describe, test } from 'node:test'
@@ -24,7 +24,7 @@ const input = {
 describe('the management prompt: one new crew, in three steps', () => {
   test('names the base URL, the board id and the board name', () => {
     const prompt = managementPrompt(input)
-    assert.match(prompt, /for the Taskmanager board "Launch board" \(board id board-abc\) at https:\/\/taskmanager\.example\./)
+    assert.match(prompt, /one Taskmanager board\. The board is "Launch board" \(board id board-abc\) at https:\/\/taskmanager\.example\./)
     assert.match(prompt, /--board board-abc/)
     assert.match(prompt, /--origin https:\/\/taskmanager\.example/)
   })

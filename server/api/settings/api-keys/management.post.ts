@@ -1,7 +1,7 @@
 import { issueManagementToken } from '../../../utils/managementToken'
 
 /**
- * Makes the 10-minute management token for one board, the one the sidebar link "Get AI management token" asks
+ * Makes the 10-minute management token for one board, the one the sidebar link "Put an AI crew to work on this board" asks
  * for. Body: { projectId }. The caller must have the crew permission and be owner or admin of the board's team.
  * The token and its key are returned once; it stops working after 10 minutes, or when the permission goes.
  */

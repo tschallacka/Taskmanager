@@ -1,5 +1,5 @@
 ---
-title: Add a crew to this board
+title: Put an AI crew to work on this board
 summary: Make a new crew for one of your boards in a few steps, with an AI agent and a 10-minute token
 requires: team-admin
 topics: crew, add a crew, give a board a crew, management token, shadow board
@@ -15,15 +15,15 @@ the instance turns crews on for the instance first. If a switch is off, the wind
 
 ## The steps
 
-1. Open the board's menu in the sidebar and choose **Add a crew to this board**. Or open **Team**, then **Crews**, pick
-   the board and press **Add a crew to this board**.
+1. Open the board's menu in the sidebar and choose **Put an AI crew to work on this board**. Or open **Team**, then **Crews**, pick
+   the board and press **Put an AI crew to work on this board**.
 2. The window shows a token for 10 minutes and a prompt. Copy both. The token works for this board only.
 3. Give the prompt to an AI agent. It makes the crew through the crews API, then saves the crew's keys to a file in the
    crew home on that computer. The keys are never shown on screen.
 4. When the agent says it is done, close the window. The crew is listed on **Team**, then **Crews**, with a **Crew
    board** button.
 
-The token stops after 10 minutes. If it expires before the agent is done, press **Add a crew to this board** again for
+The token stops after 10 minutes. If it expires before the agent is done, press **Put an AI crew to work on this board** again for
 a new token. Do not reuse the old one.
 
 ## What you get
@@ -54,6 +54,6 @@ It cannot be undone. To give the board a crew again, add a new crew to it; that 
 
 - **A sentence says crews are not allowed.** The team's or the board's switch is off, or the instance does not allow
   crews. The owner or admin of the team, or the board's settings, turn it on. The window links to the switch.
-- **The token expired.** Press **Add a crew to this board** again for a new token.
+- **The token expired.** Press **Put an AI crew to work on this board** again for a new token.
 - **The agent does not find the keys file.** It is in the crew home folder of the computer the agent runs on. Ask the
   agent for the file name it saved; it names the file, never the keys.
