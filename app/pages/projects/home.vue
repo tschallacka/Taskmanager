@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { format } from 'date-fns'
-import { dueDayToMs, isOverdueDay } from '~/utils/dueDate'
+import { dueDayToMs, isOverdueDay, todayIso } from '~/utils/dueDate'
+import { homeStats } from '~/utils/homeStats'
 
 definePageMeta({ layout: 'app' })
 
@@ -25,6 +26,16 @@ const upcoming = computed(() =>
     .slice(0, 6)
 )
 const completedCount = computed(() => mine.value.filter(task => task.completedAt != null).length)
+
+// The four numbers (redesign 6/9): counted from the tasks the app has; the timer is the one the person runs now.
+const { timer, load: loadTimer } = useRunningTimer()
+onMounted(() => loadTimer())
+const weekStart = computed(() => {
+  const now = new Date()
+  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7))
+  return monday.getTime()
+})
+const stats = computed(() => homeStats(allTasks.value, session.value?.user.id ?? '', todayIso(), weekStart.value))
 const recent = computed(() => projects.value.slice(0, 6))
 
 function openTask(task: { id: string, projectId: string }) {
@@ -57,6 +68,72 @@ function openTask(task: { id: string, projectId: string }) {
           {{ greeting }}
         </h1>
         <span class="text-sm text-muted">{{ completedCount }} {{ completedCount === 1 ? 'task' : 'tasks' }} completed</span>
+      </div>
+
+      <div
+        class="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4"
+        data-home-stats
+      >
+        <div
+          class="rounded-2xl border border-default bg-default p-4"
+          data-stat="due-today"
+        >
+          <p class="text-xs text-muted">
+            Due today
+          </p>
+          <p class="mt-1 text-2xl font-semibold text-default">
+            {{ stats.dueToday }}
+          </p>
+        </div>
+        <div
+          class="rounded-2xl border border-default bg-default p-4"
+          data-stat="overdue"
+        >
+          <p class="text-xs text-muted">
+            Overdue
+          </p>
+          <p
+            class="mt-1 text-2xl font-semibold"
+            :class="stats.overdue > 0 ? 'text-error' : 'text-default'"
+          >
+            {{ stats.overdue }}
+          </p>
+        </div>
+        <div
+          class="rounded-2xl border border-default bg-default p-4"
+          data-stat="done-this-week"
+        >
+          <p class="text-xs text-muted">
+            Done this week
+          </p>
+          <p class="mt-1 text-2xl font-semibold text-default">
+            {{ stats.doneThisWeek }}
+          </p>
+        </div>
+        <div
+          class="rounded-2xl border border-default bg-default p-4"
+          data-stat="timer"
+        >
+          <p class="text-xs text-muted">
+            Timer
+          </p>
+          <p
+            v-if="timer"
+            class="mt-1 flex min-w-0 items-center gap-2 text-sm text-default"
+          >
+            <span
+              class="size-2 shrink-0 rounded-full bg-primary"
+              aria-hidden="true"
+            />
+            <span class="truncate">{{ timer.taskTitle }}</span>
+          </p>
+          <p
+            v-else
+            class="mt-1 text-sm text-muted"
+          >
+            None running
+          </p>
+        </div>
       </div>
 
       <div class="mt-6 grid gap-4 md:grid-cols-5">
