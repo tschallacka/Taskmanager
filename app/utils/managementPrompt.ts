@@ -16,7 +16,7 @@ export interface ManagementPromptInput {
 /** The copy-paste prompt for the agent. It carries the token once, in the Authorization header, and the crew calls. */
 export function managementPrompt(input: ManagementPromptInput): string {
   const api = `${input.origin}/api`
-  return `You manage the crew of one Taskmanager board. The board is "${input.boardName}" (board id ${input.boardId}) at ${input.origin}.
+  return `You put an AI crew to work on one Taskmanager board. The board is "${input.boardName}" (board id ${input.boardId}) at ${input.origin}.
 
 Your management token is below. It works for 10 minutes, until ${new Date(input.expiresAt).toISOString()}, and then it stops. It works for this board only.
 ${input.token}
@@ -28,7 +28,7 @@ Never paste it anywhere else: not into a file, a log, a task, a comment, a chat 
 The calls you may make, all on ${api}:
 1. See the boards a crew can be bound to: GET ${api}/crews/targets
    The answer lists "teams", each with "userboards". Your board is the userboard with "board_id": "${input.boardId}".
-2. Make a crew for this board: POST ${api}/crews
+2. Set up the AI crew for this board: POST ${api}/crews
    Send JSON: {"slug": "<short name, 2 to 63 characters, a to z, 0 to 9 and hyphens>", "name": "<crew name>", "product": {"name": "<product name>"}, "projectId": "${input.boardId}"}
    Every call makes a new crew. Keep the slug: it names the folder of the keys in step 3. If the slug is already taken the call answers 409: choose another slug and send the call again. Never add "rotate" to this call.
    The answer has the crew's "slug", its people (id, name, role, email and tag, no keys), "keys_url", "keys_note", and these boards, each with "board_id", "board_name" and "url":
@@ -44,7 +44,7 @@ The calls you may make, all on ${api}:
    - If keys.env already exists, do not overwrite it. Save the answer to a new name next to it (keys-2.env, keys-3.env, and so on) and tell the user that name.
    - Each name is TASKMANAGER_CREW_<SLUG>_<PERSON>_API_KEY or TASKMANAGER_CREW_<SLUG>_<PERSON>_PASSWORD, with the slug and the person upper-cased and dashes turned into underscores. The file loads into a shell with: . ~/.config/taskmanager/<slug>/keys.env
    - Every call to keys_url makes new keys, and the old ones stop working at once. Call it once, and again only when the file was lost.
-4. Take a crew off this board: DELETE ${api}/crews/<slug>
+4. Remove the AI crew from this board: DELETE ${api}/crews/<slug>
    The crew's shadow board is archived, and what the crew wrote on it is kept.
 
 Rules:
