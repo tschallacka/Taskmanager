@@ -96,6 +96,7 @@ export function briefOf(entry: ActivityEntry): string {
     case 'visibility': return `Made ${detail.to}`
     case 'blocker_added': return `Waits for ${detail.to}`
     case 'blocker_removed': return `No longer waits for ${detail.from}`
+    case 'attachment_removed': return 'Removed an attachment'
     case 'label': return detail.to ? `Added label ${detail.to}` : `Removed label ${detail.from}`
   }
 }

@@ -70,6 +70,17 @@ Click the round person button at the foot of a card, or **Assignee** in the pane
 **Unassigned**. You can pick the team's members and, if the board is filed under a customer, that customer's contacts,
 who are marked *(customer)*. The person you assign is told, unless it is you.
 
+## Attachments
+
+Paste or drop an image into a task's description and it is kept with the task. A task holds up to 15 images. The
+**Attachments** section of the panel lists them with a thumbnail and the count, such as *3 of 15*.
+
+To free room, a staff member presses the trash button beside an image and then **Delete** to confirm. Only that image
+goes; the others stay, and the task's history records that an attachment was removed. A customer can see the images
+but cannot delete them. An agent can do the same with the `delete_task_attachment` tool.
+
+When a task is full, the upload says *15 of 15 attachments: delete one first*. Deleting the task removes its images.
+
 ## Start and due dates
 
 Pick **Start date** and **Due date** in the panel; the **x** beside a date clears it. A due date turns red on the card

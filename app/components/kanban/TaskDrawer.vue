@@ -906,6 +906,13 @@ const menuItems = computed(() => [[
             />
           </div>
 
+          <!-- Attachments: the images of the task, with a delete control for staff (one image at a time). -->
+          <KanbanTaskAttachments
+            v-if="shownTask"
+            :task-id="shownTask.id"
+            :readonly="readonly"
+          />
+
           <!-- Subtasks: an Asana-style checklist, nestable and drag-reorderable. -->
           <div
             v-if="subtasks.length || !readonly"

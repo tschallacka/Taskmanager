@@ -29,6 +29,7 @@ import { fireRules, newRuleChain } from './ruleEngine'
 import { isCrewBoard, tagAddEntries } from './crewRules'
 import type { TriggerKind } from './ruleSpec'
 import { changesToTask, inboxBriefs, logActivity } from './taskActivity'
+import { deleteTaskAttachment, taskAttachmentDir } from './attachments'
 import { checkFieldValues, describeFieldValues, listFields, loadFieldValues, setFieldValues } from './customFields'
 import { attachReplyPreviews, signedName } from './taskComments'
 import { addBlocker, blockedState, blockedStatesOn, listBlockers, NOT_ON_BOARD, removeBlocker } from './taskDependencyService'
@@ -1552,6 +1553,31 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
         board: { id: board.id, name: board.name },
         restoreWith: 'restore_task'
       }
+    }
+  },
+  {
+    name: 'delete_task_attachment',
+    title: 'Remove one attachment from a task',
+    description: 'Remove one image from a task by its stored name (the last part of its /api/attachments/tasks/<task>/<name> address). The other images stay, and the count drops by one. Use this to free room on a task at its limit of 15 attachments.',
+    scope: 'boards:write',
+    readOnly: false,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'The task id.' },
+        name: { type: 'string', description: 'The stored file name of the attachment, such as 1abc2def.png.' }
+      },
+      required: ['id', 'name']
+    },
+    async handler(args, context) {
+      const { task, board } = await findTask(requireString(args, 'id'), context, { staff: 'removing attachments' })
+      const name = requireString(args, 'name')
+      if (!deleteTaskAttachment(taskAttachmentDir(task.id), name)) {
+        throw new McpToolError('No such attachment on this task.')
+      }
+      await logActivity(task, context.userId, [{ kind: 'attachment_removed' }], 'mcp')
+      await touchBoard(board.id)
+      return { removed: true, id: task.id, name, board: { id: board.id, name: board.name } }
     }
   },
   {
