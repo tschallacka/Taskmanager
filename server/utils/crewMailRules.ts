@@ -1,7 +1,9 @@
 // The crew mail rules that need no database: what an id, a text and a recipient must be, how long mail is kept, and how
 // many mails a person may send a minute. Kept apart from crewMail.ts so the rules can be tested alone.
 
-export const MAIL_TEXT_MAX_BYTES = 4096
+// The one safety stop on a text: 1 MB of UTF-8. Mail has no other size cap. Over it the send is refused with a plain
+// error that states the size; a text is never cut.
+export const MAIL_TEXT_SAFETY_BYTES = 1024 * 1024
 export const MAIL_PENDING_LIMIT = 500
 export const MAIL_FETCH_LIMIT = 50
 export const MAIL_SENDS_PER_MINUTE = 30
@@ -18,11 +20,17 @@ export function mailIdProblem(id: unknown): string | null {
   return null
 }
 
-/** Null when the text is valid: a non-empty string of at most 4096 bytes of UTF-8. */
+/**
+ * Null when the text is valid: a non-empty string of at most 1 MB of UTF-8. Over the safety stop the problem says the
+ * size, so the sender sees why the mail was refused, and nothing is cut.
+ */
 export function mailTextProblem(text: unknown): string | null {
   if (typeof text !== 'string') return 'text must be a string'
   if (!text.trim()) return 'text is empty'
-  if (Buffer.byteLength(text, 'utf8') > MAIL_TEXT_MAX_BYTES) return `text is over ${MAIL_TEXT_MAX_BYTES} bytes`
+  const bytes = Buffer.byteLength(text, 'utf8')
+  if (bytes > MAIL_TEXT_SAFETY_BYTES) {
+    return `text is ${bytes} bytes; the safety limit is ${MAIL_TEXT_SAFETY_BYTES} bytes (1 MB), so the mail is not sent`
+  }
   return null
 }
 

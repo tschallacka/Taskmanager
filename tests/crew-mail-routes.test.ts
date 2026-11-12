@@ -2,7 +2,8 @@
 // The crew mail routes against a real HTTP server (h3) on the test database: the sender is the caller's own key (a body
 // `from` is ignored), a member reads only its own mail (the boss key reads any), only the recipient acks (a wrong ack is
 // 403), a key of another crew or a customer key is 403, a duplicate id is the same mail (409 when the mail differs),
-// a text over 4096 bytes is 400, and more than 30 sends a minute from one sender is 429. Needs the scratch test database
+// a text over the 1 MB safety stop is 400 with its size, a 100 KB mail round-trips whole, and more than 30 sends a minute
+// from one sender is 429. Needs the scratch test database
 // with the crew tables pushed (sh bin/reset-testdb.sh <key> <tree>).
 // Run:
 //   TSX_TSCONFIG_PATH=.nuxt/tsconfig.server.json DATABASE_URL=postgresql://arnotes@localhost:55433/arnotes_test_wick node --import tsx --test --test-force-exit tests/crew-mail-routes.test.ts
@@ -128,11 +129,28 @@ test('the same id with the same text is the same mail (201 again); another text 
   assert.equal(other.status, 409)
 })
 
-test('a bad id, an empty or over-size text, or a recipient that is not a member is 400', async () => {
+test('a bad id, an empty text, a text over the 1 MB safety stop, or a recipient that is not a member is 400, the stop says the size', async () => {
   assert.equal((await call('POST', `/api/crews/${slugA}/mail`, keys.A.pia, { id: 'nope', to: 'wick', text: 'x' })).status, 400)
   assert.equal((await call('POST', `/api/crews/${slugA}/mail`, keys.A.pia, { id: id(5), to: 'wick', text: '   ' })).status, 400)
-  assert.equal((await call('POST', `/api/crews/${slugA}/mail`, keys.A.pia, { id: id(6), to: 'wick', text: 'x'.repeat(4097) })).status, 400)
+  const over = await call('POST', `/api/crews/${slugA}/mail`, keys.A.pia, { id: id(6), to: 'wick', text: 'x'.repeat(1024 * 1024 + 1) })
+  assert.equal(over.status, 400)
+  assert.match(over.body.message ?? over.body.statusMessage ?? JSON.stringify(over.body), /1048577 bytes/)
   assert.equal((await call('POST', `/api/crews/${slugA}/mail`, keys.A.pia, { id: id(7), to: 'customer', text: 'x' })).status, 400)
+})
+
+test('a 100 KB mail is stored, fetched and kept whole: the recipient gets the same text, byte for byte', async () => {
+  const big = `${'0123456789'.repeat(10 * 1024)}END`
+  assert.equal(Buffer.byteLength(big, 'utf8') > 100 * 1024, true)
+  const sent = await call('POST', `/api/crews/${slugA}/mail`, keys.A.pia, { id: id(8), to: 'wynn', text: big })
+  assert.equal(sent.status, 201)
+  const got = await call('GET', `/api/crews/${slugA}/mail?to=wynn`, keys.A.wynn)
+  assert.equal(got.status, 200)
+  const mail = got.body.mail.find((m: any) => m.id === id(8))
+  assert.ok(mail, 'the 100 KB mail is pending for wynn')
+  assert.equal(mail.text.length, big.length)
+  assert.equal(mail.text, big)
+  const acked = await call('POST', `/api/crews/${slugA}/mail/${id(8)}/ack`, keys.A.wynn, {})
+  assert.equal(acked.status, 200)
 })
 
 test('more than 30 sends a minute from one sender is 429 with Retry-After', async () => {

@@ -113,3 +113,15 @@ test('a 5xx falls back the same way; a 401 or 403 stops with the error', async (
   const forbidden = fakeEndpoint({ status: 403 })
   await assert.rejects(sendMail({ fetch: forbidden.fetchImpl, base: BASE, slug: 'tm', key: 'k1', to: 'pia', text: 'e', id: ID2, mailboxDir: dir }), { status: 403 })
 })
+
+test('a 100 KB mail is sent whole and delivered whole: the body carries it, the delivered line keeps every byte', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'mail-client-'))
+  const big = `${'abcdefghij'.repeat(10 * 1024)}TAIL`
+  const endpoint = fakeEndpoint({ mail: [{ id: ID, from: 'wick', to: 'pia', text: big, created: 1 }] })
+  await sendMail({ fetch: endpoint.fetchImpl, base: BASE, slug: 'tm', key: 'k1', to: 'pia', text: big, id: ID2, mailboxDir: dir })
+  assert.equal(JSON.parse(endpoint.calls[0].init.body).text, big, 'the send carries the whole text')
+  const lines = []
+  await tick({ fetch: endpoint.fetchImpl, base: BASE, slug: 'tm', key: 'k1', to: 'pia', mailboxDir: dir, deliver: line => lines.push(line) })
+  assert.equal(lines.length, 1)
+  assert.equal(lines[0], `from wick: ${big}`, 'the delivered line keeps the whole text')
+})

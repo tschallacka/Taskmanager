@@ -16,7 +16,7 @@ All three take the person's own crew key as the Bearer token.
 - `POST /api/crews/<slug>/mail/<id>/ack` marks a mail delivered. Only the recipient can ack it (another person's ack is
   403). Acking a delivered mail again is a no-op.
 
-Refused: a key of another crew, a customer or contact key, or a non-crew key (403). Text over 4096 bytes is 400. More
+Refused: a key of another crew, a customer or contact key, or a non-crew key (403). A text is never cut: the one safety stop is 1 MB of UTF-8, and a text over it is 400 with its size in the message. More
 than 30 sends a minute from one sender is 429. More than 500 undelivered for one recipient is 409.
 
 ## Retention
