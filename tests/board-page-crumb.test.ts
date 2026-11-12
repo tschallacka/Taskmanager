@@ -79,3 +79,11 @@ test('the Filter button holds the labels and Show deleted, and opens with the tr
   assert.match(page, /@click="toggleShowTrashed"/)
   assert.match(page, /<span>Show deleted<\/span>/)
 })
+
+test('the last view chosen on a board opens it again; a link with ?view= still wins; storage refusal is harmless', () => {
+  assert.match(page, /const lastViewKey = \(id: string\) => `tm-last-view:\$\{id\}`/)
+  assert.match(page, /if \(fromLink\) return fromLink/)
+  assert.match(page, /const remembered = projectId\.value \? rememberedView\(projectId\.value\) : null/)
+  assert.match(page, /if \(projectId\.value\) rememberView\(projectId\.value, key\)/)
+  assert.equal((page.match(/catch \{/g) ?? []).length >= 2, true, 'the storage calls catch a refusal')
+})

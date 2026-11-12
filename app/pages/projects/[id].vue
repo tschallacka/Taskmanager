@@ -61,9 +61,33 @@ const visibleViews = computed(() => VIEWS.filter(v => (v.key !== 'office' || cre
 
 const tabViews = computed(() => visibleViews.value.filter(v => v.key !== 'settings'))
 // The office is no panel of this page, so ?view=office falls back to the board instead of showing files.
-const view = computed(() => visibleViews.value.filter(v => v.key !== 'office').find(v => v.key === route.query.view)?.key ?? 'board')
+// The view a person last chose on a board is the one a visit without ?view= opens (the design: remembered per board).
+// It is kept in this browser only; a link that names a view still wins. A browser that refuses storage remembers nothing.
+const lastViewKey = (id: string) => `tm-last-view:${id}`
+function rememberedView(id: string): string | null {
+  try {
+    return localStorage.getItem(lastViewKey(id))
+  } catch {
+    return null
+  }
+}
+function rememberView(id: string, key: string) {
+  try {
+    localStorage.setItem(lastViewKey(id), key)
+  } catch {
+    // Storage refused: the choice is only for this visit.
+  }
+}
+const view = computed(() => {
+  const available = visibleViews.value.filter(v => v.key !== 'office')
+  const fromLink = available.find(v => v.key === route.query.view)?.key
+  if (fromLink) return fromLink
+  const remembered = projectId.value ? rememberedView(projectId.value) : null
+  return available.find(v => v.key === remembered)?.key ?? 'board'
+})
 
 function setView(key: string) {
+  if (projectId.value) rememberView(projectId.value, key)
   navigateTo({ path: route.path, query: queryForView(route.query, key) }, { replace: true })
 }
 
