@@ -116,10 +116,12 @@ const slugify = text => String(text).toLowerCase().normalize('NFKD').replace(/[^
 export { CAST, EXTRA_CAST, forkMemberPlan, forkRole }
 
 // The model each person runs on is the Owner's choice, set per person in crew.json under "models" (README, "Models").
-// The kit fixes no model name: a person with no entry gets "haiku", which is Claude Code's name for the cheap tier of
-// Claude, not a model version. "default" in crew.json applies to everyone who is not named.
+// A person with no entry gets the cheap Claude model by its full id. The bare alias "haiku" is not used: Claude Code stopped
+// accepting it in 2026-11 ("unrecognized model"), which stopped every agent from starting (card mwc5aicfyb9r0fvopvf).
+// "default" in crew.json applies to everyone who is not named.
 export const PROVIDERS = ['claude', 'openrouter', 'ollama']
-const CHEAP_CLAUDE = { provider: 'claude', model: 'haiku' }
+export const CHEAP_CLAUDE_MODEL = 'claude-haiku-5-5'
+const CHEAP_CLAUDE = { provider: 'claude', model: CHEAP_CLAUDE_MODEL }
 const MODEL_NAME = /^[A-Za-z0-9][\w.:/@-]{0,99}$/
 
 /**

@@ -391,10 +391,10 @@ describe('CREW_HOME and the agent types', () => {
       'acme-wade-worker.md', 'acme-wick-worker.md', 'acme-wren-worker.md', 'acme-wynn-worker.md'
     ])
     const pia = readFileSync(join(agents, 'acme-pia-planner.md'), 'utf8')
-    assert.match(pia, /^---\nname: acme-pia-planner\ndescription: ".+"\nmodel: haiku\n---\n/)
+    assert.match(pia, /^---\nname: acme-pia-planner\ndescription: ".+"\nmodel: claude-haiku-5-5\n---\n/)
     assert.ok(pia.includes(`CREW_HOME=${dir} node ${KIT}/`), 'the definition carries the resolved CREW_HOME')
     const prompts = readFileSync(join(dir, 'PROMPTS.md'), 'utf8')
-    assert.match(prompts, /\| `wren` \| Wren Worker \| wren \| `acme-wren-worker` \| claude: haiku \|/)
+    assert.match(prompts, /\| `wren` \| Wren Worker \| wren \| `acme-wren-worker` \| claude: claude-haiku-5-5 \|/)
     assert.ok(prompts.includes(`CREW_HOME=${dir} node ${KIT}/listen.mjs pia 60`), 'commands carry CREW_HOME')
   })
 
@@ -406,12 +406,12 @@ describe('CREW_HOME and the agent types', () => {
       team: 'Acme Crew',
       crew: { slug: 'acme' },
       board: { url: 'http://127.0.0.1:9' },
-      models: { default: 'haiku', usher: 'sonnet', wick: { provider: 'ollama', model: 'small-local' }, pm: { model: 'opus' } }
+      models: { default: 'claude-haiku-5-5', usher: 'sonnet', wick: { provider: 'ollama', model: 'small-local' }, pm: { model: 'opus' } }
     }))
     const out = run(home, 'init.mjs', '~/crew-home/acme')
     const agents = join(home, '.claude', 'agents')
     assert.match(readFileSync(join(agents, 'acme-usher-xander.md'), 'utf8'), /\nmodel: sonnet\n/)
-    assert.match(readFileSync(join(agents, 'acme-wren-worker.md'), 'utf8'), /\nmodel: haiku\n/)
+    assert.match(readFileSync(join(agents, 'acme-wren-worker.md'), 'utf8'), /\nmodel: claude-haiku-5-5\n/)
     assert.match(readFileSync(join(agents, 'acme-pia-planner.md'), 'utf8'), /\nmodel: opus\n/, 'an old key in models is read as the new one')
     assert.ok(!readdirSync(agents).includes('acme-wick-worker.md'), 'no definition for a provider the kit does not start')
     assert.match(out.stdout, /WARN acme-wick-worker is set to ollama \(small-local\)/)
@@ -438,7 +438,7 @@ describe('CREW_HOME and the agent types', () => {
     assert.equal(out.status, 1)
     const agents = join(home, '.claude', 'agents')
     for (const file of ['acme-wren-worker.md', 'acme-quincy-average.md', 'acme-usher-xander.md']) {
-      assert.match(readFileSync(join(agents, file), 'utf8'), /\nmodel: haiku\n/, file)
+      assert.match(readFileSync(join(agents, file), 'utf8'), /\nmodel: claude-haiku-5-5\n/, file)
     }
   })
 
@@ -477,7 +477,7 @@ describe('CREW_HOME and the agent types', () => {
     const stored = join(dir, 'forks', 'forks-acme-internal-tools.json')
     assert.equal(statSync(stored).mode & 0o777, 0o600, 'the file holds passwords and keys: owner only')
     const wren = readFileSync(join(home, '.claude', 'agents', 'internal-tools-wren.md'), 'utf8')
-    assert.match(wren, /^---\nname: internal-tools-wren\ndescription: ".+Internal Tools.+"\nmodel: haiku\n---\n/)
+    assert.match(wren, /^---\nname: internal-tools-wren\ndescription: ".+Internal Tools.+"\nmodel: claude-haiku-5-5\n---\n/)
     assert.ok(wren.includes('crew.mjs internal-tools-wren'), 'the definition tells the agent to sign in as itself')
     assert.ok(!wren.includes('arn_forkone') && !wren.includes('pw-one'), 'no secret goes into an agent definition')
     // The crew's own members are written as before, next to the forks.
