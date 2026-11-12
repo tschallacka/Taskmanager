@@ -2,11 +2,16 @@
 import type { ProjectTask } from '~/composables/useProjects'
 import { taskCountLabel, terminalColumnIds } from '#shared/utils/board'
 import { queryForView } from '~/utils/projectViewQuery'
+import { queryWithoutTask, taskPanelPath } from '~/utils/taskPanelUrl'
 
-definePageMeta({ layout: 'app' })
+// One page for the board and for its task panel addresses: the same key keeps the board mounted while the panel opens.
+definePageMeta({ layout: 'app', key: route => `projects/${route.params.id}` })
 
 const route = useRoute()
 const searchOpen = useSearchModal()
+// The instance admin may load a backup into a crew's board, which everyone else only reads (owner, 2026-11-12).
+const { isInstanceAdmin } = useAuth()
+const importOpen = ref(false)
 
 const {
   activeProject,
@@ -129,21 +134,33 @@ async function switchToHintTeam() {
 
 // ─── Task panel ────────────────────────────────────────────
 
-const drawerTaskId = ref<string | null>(null)
+// The open task is in the path: /projects/<id>/<task>. Opening one pushes an entry, so Back and Forward open and close the
+// panel; closing goes back to the plain board address.
+const drawerTaskId = computed<string | null>(() => {
+  const id = route.params.task
+  return typeof id === 'string' && id ? id : null
+})
 
-// Deep link ?task=<id> (global search) opens the panel.
-watch(() => route.query.task, (taskId) => {
-  drawerTaskId.value = typeof taskId === 'string' && taskId ? taskId : null
-}, { immediate: true })
+function openDrawerTask(taskId: string) {
+  navigateTo({ path: taskPanelPath(String(route.params.id), taskId), query: queryWithoutTask(route.query) })
+}
 
 function closeDrawer() {
-  drawerTaskId.value = null
-  if (route.query.task) navigateTo({ path: route.path, replace: true })
+  navigateTo({ path: taskPanelPath(String(route.params.id)), query: queryWithoutTask(route.query) }, { replace: true })
 }
+
+// The old deep link ?task=<id> (global search and the home list) is rewritten to the path form.
+watch(() => route.query.task, (taskId) => {
+  if (typeof taskId !== 'string' || !taskId) return
+  navigateTo({ path: taskPanelPath(String(route.params.id), taskId), query: queryWithoutTask(route.query) }, { replace: true })
+}, { immediate: true })
 
 const drawerTask = computed<ProjectTask | null>(() =>
   drawerTaskId.value ? board.value?.tasks.find(t => t.id === drawerTaskId.value) ?? null : null
 )
+
+// A task URL whose task is not on this board (or cannot be read here): the board opens with no panel, and says so.
+const unknownTask = computed(() => Boolean(drawerTaskId.value && board.value && !drawerTask.value))
 
 // ─── Project name (inline rename) ──────────────────────────
 
@@ -309,7 +326,32 @@ useSeoMeta({
       data-readonly-board
     >
       This is a crew's board. You can read it here; only the crew's team changes it.
+      <button
+        v-if="isInstanceAdmin && activeProject"
+        type="button"
+        class="ml-2 rounded border border-default px-2 py-0.5 text-default transition-colors hover:bg-default"
+        data-load-backup
+        @click="importOpen = true"
+      >
+        Load a backup into this board
+      </button>
     </p>
+    <UModal
+      v-if="isInstanceAdmin && isReadOnlyBoard && activeProject"
+      v-model:open="importOpen"
+      title="Load a backup into this board"
+      description="Choose a board backup file. You see what it would add before anything is written."
+      :ui="{ content: 'max-w-lg' }"
+    >
+      <template #body>
+        <div data-load-backup-dialog>
+          <KanbanBoardImport
+            :project-id="activeProject.id"
+            @imported="loadBoard(activeProject.id)"
+          />
+        </div>
+      </template>
+    </UModal>
     <!-- The crew tree: a shadow board links back to the real board it works for -->
     <nav
       v-if="activeProject?.realBoard"
@@ -652,6 +694,13 @@ useSeoMeta({
 
     <!-- Board -->
     <div class="min-h-0 flex-1">
+      <p
+        v-if="unknownTask"
+        role="status"
+        class="px-4 pt-3 text-sm text-muted"
+      >
+        That task is not on this board, or you cannot open it here. The board is shown without it.
+      </p>
       <div
         v-if="loadFailed"
         class="flex h-full flex-col items-center justify-center gap-3 px-6 text-center"
@@ -687,19 +736,19 @@ useSeoMeta({
         <KanbanBoard
           v-else-if="view === 'board'"
           :project-id="projectId"
-          @open-task="drawerTaskId = $event"
+          @open-task="openDrawerTask($event)"
         />
         <KanbanProjectListView
           v-else-if="view === 'list'"
-          @open-task="drawerTaskId = $event"
+          @open-task="openDrawerTask($event)"
         />
         <KanbanProjectTimelineView
           v-else-if="view === 'timeline'"
-          @open-task="drawerTaskId = $event"
+          @open-task="openDrawerTask($event)"
         />
         <KanbanProjectCalendarView
           v-else-if="view === 'calendar'"
-          @open-task="drawerTaskId = $event"
+          @open-task="openDrawerTask($event)"
         />
         <KanbanProjectDashboardView v-else-if="view === 'dashboard'" />
         <KanbanProjectMessagesView
@@ -718,7 +767,7 @@ useSeoMeta({
         />
         <KanbanProjectFilesView
           v-else
-          @open-task="drawerTaskId = $event"
+          @open-task="openDrawerTask($event)"
         />
       </template>
     </div>

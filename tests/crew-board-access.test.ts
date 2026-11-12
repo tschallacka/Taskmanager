@@ -154,6 +154,27 @@ test('every request that is not a read is refused on a shadow board', async () =
   }
 })
 
+test('the instance admin may load a backup into a shadow board: only where the route asks for it, and only for the admin', async () => {
+  const refused = (e: { statusCode?: number }) => e.statusCode === 403
+  // A team owner who is not the instance admin is refused even where the import route asks for the exception.
+  await assert.rejects(requireProject(eventOf(boss, realTeam, 'POST'), shadowBoard, { instanceAdminMayWrite: true }), refused)
+  await db.update(user).set({ isInstanceAdmin: true }).where(eq(user.id, boss))
+  try {
+    const opened = await requireProject(eventOf(boss, realTeam, 'POST'), shadowBoard, { instanceAdminMayWrite: true })
+    assert.equal(opened.id, shadowBoard)
+    assert.equal(opened.readOnly, false)
+    assert.equal(opened.audience, 'staff')
+    // Every other route stays closed to the admin too: without the option nothing changes.
+    for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
+      await assert.rejects(requireProject(eventOf(boss, realTeam, method), shadowBoard), refused, method)
+    }
+    // And reading stays read-only.
+    assert.equal((await requireProject(eventOf(boss, realTeam), shadowBoard, { instanceAdminMayWrite: true })).readOnly, true)
+  } finally {
+    await db.update(user).set({ isInstanceAdmin: false }).where(eq(user.id, boss))
+  }
+})
+
 test('a board of the team still opens normally, with full access', async () => {
   const own = await requireProject(eventOf(boss, realTeam, 'POST'), realBoard)
   assert.equal(own.readOnly, false)

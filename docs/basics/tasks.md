@@ -32,13 +32,20 @@ themselves a moment after you stop typing, so there is no Save button.
 
 From top to bottom the panel has:
 
-- **Mark done** and the **column button** (the task's current column) at the top, then the visibility button, the
-  **...** menu and the **X**.
-- The **title**, then the labels.
-- **Assignee**, **Start date** and **Due date**, then any custom fields.
-- **Blocked by**, time tracking and **Subtasks**.
-- The **description**, in a rich editor: see [Write in the editor](/help/basics/the-editor).
-- **Comments**: see [Comments and updates](/help/basics/comments-and-updates).
+- **Mark done** and the **column button** (the task's current column) at the top, then the **Team only** or **Shared
+  with the customer** select, the **...** menu and the **X**.
+- The **title**.
+- Two columns, always in this order: **Assignee**, **Due date**, **Start date**, **Labels**, then any custom fields
+  such as **Priority**. An empty field shows its placeholder; click it to edit in place.
+- Full-width blocks, in this order: **Time** (with **Start timer** and **Log time**), **Blocked by** and **GitHub**.
+- The **description**, in a rich editor. Its command row appears while the text has focus: see
+  [Write in the editor](/help/basics/the-editor).
+- **Subtasks**, with the count of finished ones in the heading. Enter adds a row, Tab and Shift+Tab nest it, and
+  **Remove subtask** is on hover or in the row's menu.
+- **Activity**: the **Comments** and **History** tabs, see [Comments and updates](/help/basics/comments-and-updates).
+
+On a phone the properties are rows, each with a chevron; tap one to edit it. The **Time**, **Blocked by** and
+**GitHub** blocks stack below them at full width.
 
 ## Move a task
 

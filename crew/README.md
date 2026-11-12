@@ -102,14 +102,16 @@ The workflow's hard rules (the AI text editor for every document, CodeGraph for 
 
 ## Making the crew by hand
 
-`setup.mjs` is a thin client of the same crew API, for a person who runs the kit without the
-Taskmanager instance's own automation (run from the kit folder):
+`crew setup` (`setup.mjs`) makes one new crew for one board in one go. It is a thin client of the crew
+API, with the management token that "Put an AI crew to work on this board" gives (10 minutes, one board):
 
-    CREW_ADMIN_KEY=<key> node setup.mjs              # needs "crew": { "slug": "..." } in crew.json
-    CREW_ADMIN_KEY=<key> node setup.mjs --rotate    # the crew exists, creds.json is lost
+    TASKMANAGER_MANAGEMENT_TOKEN=<token> node setup.mjs --origin <url> --board <board id> --repo <path> [--name <crew name>] [--slug <slug>]
 
-The key is read from the environment and is never written to a file. Keys and passwords are shown
-once, in the response that is written to `creds.json`.
+The token comes from `TASKMANAGER_MANAGEMENT_TOKEN`, or from stdin. It is never read from the command line. A
+crews:manage key does not work here: the remote crew API takes a management token. The crew is always new: a taken
+slug stops the command with 409 and nothing is rotated. The crew home is `~/crew-home/<slug>` (or `CREW_HOME`), with
+`creds.json` (mode 600) fetched once, and `crew.json` with the crew's work board, the shadow board, named by its id.
+The command ends with three lines: the crew home, the work board's url, and what to do next.
 
 ## The chat line (optional)
 
@@ -317,7 +319,7 @@ accounts, after which their definitions and the file are yours to delete.
     crew janet clean plan|run <who> <card> [--dry-run] [--worktree <path>]   Janet's cleanup of a finished worker: the plan deletes nothing, run needs cleaning granted (janet.mjs, JANET.md)
     crew mentions [minutes|--follow]   Pia's updates that write @cato, each printed once: since the last check, or every 60 s for a Monitor (mentions.mjs)
     crew update [--check] [--from <kit folder|kit.tar.gz>] [--kit <folder>]   bring the kit folder up to date (update.mjs)
-    crew setup                    make the crew by hand (setup.mjs)
+    crew setup                    make one new crew for a board in one go, with its management token (setup.mjs)
     crew people add [--people a,b]   add the crew's missing people, their keys into creds.json (people.mjs, below)
     crew publish <slug> <branch> <title> <msg-file> <pr-file>   the merger's one command: squash a branch onto a fresh base, check the merged tree, push, open the pull request (publish.mjs, below)
     crew <who> browser goto|shot|eval|console|tabs|close-tab|done   the shared browser (browser.mjs)
