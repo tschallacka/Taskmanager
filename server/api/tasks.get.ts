@@ -3,6 +3,7 @@ import { projects, projectTasks } from '../db/schema'
 import { and, eq, asc, desc, inArray, isNull, or } from 'drizzle-orm'
 import { getProjectAccessFilter } from '../utils/projects'
 import { audienceFor, getUserActiveTeamId } from '../utils/auth-helpers'
+import { memberTeamsOf, realNeighbourIsOpenable, treeNeighbours } from '../utils/boardTree'
 
 // Flat task list across every accessible project — powers global search and
 // deep links into boards without loading each board first.
@@ -19,8 +20,23 @@ export default defineEventHandler(async (event) => {
   // boards every task is theirs to find.
   const userId = event.context.session.user.id
   const teamId = await getUserActiveTeamId(event)
-  const staffProjectIds = visibleProjects
-    .filter(p => audienceFor(userId, teamId, p) === 'staff')
+  // The crew shadow boards the list adds for the real board's staff are read as staff, as on the board page. The real
+  // boards the list shows beside a crew's shadow are label rows only, so their tasks are never served here.
+  // A crew's shadow board the person may not see (hiddenCrewShadows) is not searched either: the same rule as the list.
+  const found = await treeNeighbours(userId, visibleProjects.map(p => p.id))
+  const listed = visibleProjects.filter(p => !found.hidden.has(p.id))
+  // A real board the list shows as an ordinary row (the person belongs to its workspace) is searched too; a label row is not.
+  const memberTeams = await memberTeamsOf(userId)
+  const candidateIds = [...found.shadowIds, ...found.realIds]
+  const candidateRows = candidateIds.length
+    ? await db.select({ id: projects.id, userId: projects.userId, teamId: projects.teamId }).from(projects).where(inArray(projects.id, candidateIds))
+    : []
+  const neighbourRows = candidateRows.filter(row => found.shadowIds.includes(row.id) || realNeighbourIsOpenable(row.teamId, memberTeams))
+  const neighbourIds = new Set(neighbourRows.map(row => row.id))
+  const allProjects = [...listed, ...neighbourRows]
+  if (!allProjects.length) return []
+  const staffProjectIds = allProjects
+    .filter(p => neighbourIds.has(p.id) || audienceFor(userId, teamId, p) === 'staff')
     .map(p => p.id)
 
   return db
@@ -41,8 +57,8 @@ export default defineEventHandler(async (event) => {
     .from(projectTasks)
     .innerJoin(projects, eq(projects.id, projectTasks.projectId))
     .where(and(
-      inArray(projectTasks.projectId, visibleProjects.map(p => p.id)),
-      staffProjectIds.length === visibleProjects.length
+      inArray(projectTasks.projectId, allProjects.map(p => p.id)),
+      staffProjectIds.length === allProjects.length
         ? undefined
         : or(
             staffProjectIds.length ? inArray(projectTasks.projectId, staffProjectIds) : undefined,

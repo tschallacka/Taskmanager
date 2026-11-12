@@ -17,6 +17,8 @@ import { McpToolError, asToolError, asToolErrorAsync, excerpt, idFromReference, 
 import type { McpToolDefinition } from './mcpToolKit'
 import { MAX_PROJECT_DESCRIPTION, PROJECT_STATUSES, parseDueOn, parseProjectStatus } from './taskFields'
 import { projectPeople } from './people'
+import { boardTreeFields, hiddenCrewShadows } from './boardTree'
+import { boardRoleFields, crewRealBoardRefusal, isTakenOff, takenOffRefusal, type BoardRoleFields } from './mcpBoardRoles'
 import { readTaskGithubLinks } from './githubTaskLinks'
 import { notifyAssigned, notifyTaskChange } from './notifyEvents'
 import { tellUnblockedAfterBulk, tellUnblockedOnTrash, unfinishedTasksOn } from './unblockedWatch'
@@ -64,8 +66,12 @@ function agentDeletion(context: ApiKeyContext) {
 
 // The boards a key can reach are the ones its person can open in the browser;
 // see mcpAccess.ts for the rule and for what each audience may do on them.
+// A crew shadow its person may not see is left out here, so every tool that resolves a board reads it as not in the
+// workspace, as the list does (hiddenCrewShadows in boardTree.ts).
 export async function accessibleBoards(context: ApiKeyContext): Promise<Project[]> {
-  return db.select().from(projects).where(await boardFilter(context))
+  const boards = await db.select().from(projects).where(await boardFilter(context))
+  const hidden = await hiddenCrewShadows(context.userId, boards.map(board => board.id))
+  return boards.filter(board => !hidden.has(board.id))
 }
 
 /**
@@ -79,6 +85,9 @@ export async function findBoard(reference: string, context: ApiKeyContext): Prom
     ?? boards.find(board => board.name.toLowerCase() === ref.trim().toLowerCase())
 
   if (!match) {
+    // A real board a crew works on is not in its list as a board to write to: say why, and name the board to use.
+    const refusal = await crewRealBoardRefusal(ref, context)
+    if (refusal) throw new McpToolError(refusal)
     const known = boards.map(board => board.name).join(', ')
     throw new McpToolError(
       `No board "${ref}" in this workspace.`
@@ -92,6 +101,7 @@ export async function findBoard(reference: string, context: ApiKeyContext): Prom
 export async function findStaffBoard(reference: string, context: ApiKeyContext, doing: string): Promise<Project> {
   const board = await findBoard(reference, context)
   requireStaffAudience(context, board, doing)
+  if (isTakenOff(board)) throw new McpToolError(takenOffRefusal(board))
   return board
 }
 
@@ -135,7 +145,11 @@ export async function findTask(
     .select()
     .from(projects)
     .where(and(eq(projects.id, task.projectId), await boardFilter(context)))
-  if (!board) throw new McpToolError(`Task "${id}" is not in this workspace.`)
+  if (!board) {
+    // A real board a crew reads: say why, and name the crew's shadow board to use (mcpBoardRoles.ts).
+    const refusal = await crewRealBoardRefusal(task.projectId, context)
+    throw new McpToolError(refusal ?? `Task "${id}" is not in this workspace.`)
+  }
 
   // What the person cannot see is not there for the agent either: an internal
   // task, or a trashed one, is reported as missing to a customer's contact.
@@ -181,9 +195,13 @@ async function changeBlockers(tx: Tx, board: Project, taskId: string, actor: Act
 
 // ─── people and schedule ──────────────────────────────────────────────────────
 
+// A person with no name is never shown by email here: these strings carry no email field, so the email privacy rule
+// (and a Sprocket run's hideForSprocket) could not take the address out.
+const UNNAMED_PERSON = 'Unnamed person'
+
 /** Who can be named on a board's tasks, by id, so cards can say who has them. */
 export async function peopleNames(board: Project): Promise<Map<string, string>> {
-  return new Map((await projectPeople(board)).map(person => [person.id, person.name || person.email]))
+  return new Map((await projectPeople(board)).map(person => [person.id, person.name || UNNAMED_PERSON]))
 }
 
 /** A person on the board, found by id, email or name as the app shows it. */
@@ -195,7 +213,7 @@ async function findPerson(board: Project, reference: string): Promise<string> {
     ?? people.find(person => (person.name || '').toLowerCase() === needle)
   if (!match) {
     throw new McpToolError(
-      `"${reference}" is not on board "${board.name}". People who can be assigned: ${people.map(person => person.name || person.email).join(', ')}.`
+      `"${reference}" is not on board "${board.name}". People who can be assigned: ${people.map(person => person.name || UNNAMED_PERSON).join(', ')}.`
     )
   }
   return match.id
@@ -270,6 +288,23 @@ function taskSchedule(task: ProjectTask, people?: Map<string, string>) {
     ...(task.startOn ? { startOn: task.startOn } : {}),
     ...(task.assigneeId ? { assignee: people?.get(task.assigneeId) ?? task.assigneeId } : {}),
     ...(task.completedAt ? { completed: true, completedAt: new Date(task.completedAt).toISOString() } : {})
+  }
+}
+
+// The crew tree of a board, as list_boards and get_board answer it: the same fields the board list carries (see
+// boardTree.ts), so an agent and the sidebar read one shape. A board outside any crew tree is a plain board.
+// The role of a board for this caller (mcpBoardRoles.ts): role, the board it works for or the one that works for it,
+// whether this key may write to it, and one sentence for a crew key.
+function roleSummary(fields: BoardRoleFields | undefined) {
+  if (!fields) return { role: 'board' as const, realBoard: null, shadowBoard: null, shadows: [], crew: null, canWrite: false }
+  return {
+    role: fields.role,
+    realBoard: fields.realBoard,
+    shadowBoard: fields.shadowBoard,
+    shadows: fields.shadows,
+    crew: fields.crew,
+    canWrite: fields.canWrite,
+    ...(fields.note ? { note: fields.note } : {})
   }
 }
 
@@ -635,7 +670,7 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
   {
     name: 'list_boards',
     title: 'List boards',
-    description: 'List the kanban boards in the workspace, most recently updated first, with how many columns and tasks each holds. Start here when you do not know which board the user means.',
+    description: 'List the kanban boards in the workspace, most recently updated first, with how many columns and tasks each holds. Each board says its role: board (an ordinary board), crew_home (a crew\'s home board), real (a real board your crew reads, never written by it), shadow (your crew\'s working board for a real board) or taken_off (a detached crew board). canWrite says whether this key may write to it. Start here when you do not know which board the user means.',
     scope: 'boards:read',
     readOnly: true,
     inputSchema: {
@@ -668,19 +703,24 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
         new Map(rows.map(row => [row.projectId, Number(row.total)]))
       const columnCounts = countBy(columns)
       const taskCounts = countBy(tasks)
+      // The crew tree of each board returned: a shadow names its real board, a real board names its shadows the
+      // key may see. Only boards the key can open are named in it.
+      const tree = await boardTreeFields(ids, new Set(boards.map(board => board.id)))
+      const roles = await boardRoleFields(boards.slice(0, limit), tree, context)
 
       return {
         total: boards.length,
-        boards: boards.slice(0, limit).map(board =>
-          boardSummary(board, columnCounts.get(board.id) ?? 0, taskCounts.get(board.id) ?? 0)
-        )
+        boards: boards.slice(0, limit).map(board => ({
+          ...boardSummary(board, columnCounts.get(board.id) ?? 0, taskCounts.get(board.id) ?? 0),
+          ...roleSummary(roles.get(board.id))
+        }))
       }
     }
   },
   {
     name: 'get_board',
     title: 'Read a board',
-    description: 'Read a board the way it is drawn: its columns in order, and in each the tasks with their title, labels and the opening line of the description. Call this before creating or moving tasks so board, column and task names match exactly, then get_task for the full description and updates of the one you care about. Narrow a big board with "columns", and pass detail:"titles" for the cheapest overview. A task that waits for an open blocker reads blocked: true with blockedBy (the open blocker ids, team only); blocked: false means it is ready.',
+    description: 'Read a board the way it is drawn: its columns in order, and in each the tasks with their title, labels and the opening line of the description. The board says its role (board, crew_home, real, shadow or taken_off; see list_boards) and canWrite for this key; a real board is read-only to a crew. Call this before creating or moving tasks so board, column and task names match exactly, then get_task for the full description and updates of the one you care about. Narrow a big board with "columns", and pass detail:"titles" for the cheapest overview. A task that waits for an open blocker reads blocked: true with blockedBy (the open blocker ids, team only); blocked: false means it is ready.',
     scope: 'boards:read',
     readOnly: true,
     inputSchema: {
@@ -694,7 +734,12 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
       required: ['board']
     },
     async handler(args, context) {
-      const board = await findBoard(requireString(args, 'board'), context)
+      const reference = requireString(args, 'board')
+      const board = await findBoard(reference, context)
+      // The crew tree of this board, with the shadow boards the key may see (see boardTree.ts).
+      const visible = await accessibleBoards(context)
+      const tree = await boardTreeFields([board.id], new Set(visible.map(item => item.id)))
+      const roles = await boardRoleFields([board], tree, context)
       const detail = readDetail(args)
       const perColumn = optionalLimit(args, 'limit', DEFAULT_COLUMN_TASKS, MAX_COLUMN_TASKS)
       const requested = optionalStringArray(args, 'columns')
@@ -753,6 +798,7 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
         name: board.name,
         ...(board.status ? { status: board.status } : {}),
         ...(board.description ? { description: board.description } : {}),
+        ...roleSummary(roles.get(board.id)),
         updatedAt: new Date(board.updatedAt).toISOString(),
         taskCount: Number(total?.tasks ?? 0),
         // Say which columns were left out, so a narrowed read does not look like
@@ -1271,6 +1317,7 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
         : null
       if (parent) requireStaffAudience(context, parent.board, 'making a subtask')
       const board = parent ? parent.board : await findBoard(requireString(args, 'board'), context)
+      if (isTakenOff(board)) throw new McpToolError(takenOffRefusal(board))
       const boardRef = optionalString(args, 'board')
       if (parent && boardRef !== undefined && (await findBoard(boardRef, context)).id !== board.id) {
         throw new McpToolError('The parent task is not on that board: it is on ' + board.name + '.')

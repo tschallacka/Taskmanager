@@ -1,6 +1,6 @@
 // Who sits in the office view of a board. A crew's shadow board seats the members forked for it; a
 // crew's own board seats the crew's accounts; anyone else a task is assigned to gets a guest desk.
-import { eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray, isNull } from 'drizzle-orm'
 import { db } from '../db'
 import { crewBoardMembers, crewBoards, crews, user } from '../db/schema'
 import { personKeyOf } from './crewAccounts'
@@ -19,15 +19,32 @@ export async function isCrewBoard(projectId: string): Promise<boolean> {
   return Boolean(own)
 }
 
-/** The office's people for `projectId`, names only (never an address), Pia first and the Boss last. */
-export async function officeCastOf(projectId: string, assigneeIds: string[]): Promise<{ crewName: string | null, cast: OfficePerson[] }> {
+/**
+ * The live crews linked to a real board (a main board), each as {id, name}. A crew of a disabled crew, or a board no
+ * crew is linked to, gives an empty list. The one lookup the office tab, its crew choice and the shadow folder share.
+ */
+export async function crewsOfRealBoard(projectId: string): Promise<{ id: string, name: string }[]> {
+  const links = await db.select({ crewId: crewBoards.crewId }).from(crewBoards).where(eq(crewBoards.projectId, projectId))
+  if (!links.length) return []
+  const rows = await db.select({ id: crews.id, name: crews.name }).from(crews)
+    .where(and(inArray(crews.id, [...new Set(links.map(l => l.crewId))]), isNull(crews.disabledAt)))
+  return rows.sort((a, b) => a.name.localeCompare(b.name))
+}
+
+/**
+ * The office's people for `projectId`, names only (never an address), Pia first and the Boss last. On a real board,
+ * `crewId` picks which of its linked crews sits in the office (see crewsOfRealBoard).
+ */
+export async function officeCastOf(projectId: string, assigneeIds: string[], crewId: string | null = null): Promise<{ crewName: string | null, cast: OfficePerson[] }> {
   const cast: OfficePerson[] = []
   const add = (userId: string, key: string, name: string) => {
     if (OUTSIDE_KEYS.has(key) || cast.some(p => p.userId === userId || p.key === key)) return
     cast.push({ userId, key, name, role: roleOfKey(key) })
   }
 
-  const [link] = await db.select().from(crewBoards).where(eq(crewBoards.shadowProjectId, projectId))
+  const [link] = crewId
+    ? await db.select().from(crewBoards).where(and(eq(crewBoards.projectId, projectId), eq(crewBoards.crewId, crewId)))
+    : await db.select().from(crewBoards).where(eq(crewBoards.shadowProjectId, projectId))
   const [crew] = link
     ? await db.select().from(crews).where(eq(crews.id, link.crewId))
     : await db.select().from(crews).where(eq(crews.boardId, projectId))

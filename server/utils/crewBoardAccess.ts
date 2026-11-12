@@ -7,9 +7,10 @@
 import { and, eq, inArray } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { db } from '../db'
-import { crewBoards, crews, member, projects, user } from '../db/schema'
+import { crewBoards, crews, member, projects } from '../db/schema'
 import type { Project } from '../db/schema'
 import type { ApiKeyContext } from './api-keys'
+import { crewIdOfUser, hiddenCrewShadows } from './boardTree'
 
 /** What a key's grant needs of its context: the person, the key's limit, and the teams the person belongs to. */
 export type GrantContext = Pick<ApiKeyContext, 'userId' | 'teamId' | 'projectId' | 'customerId' | 'memberTeamIds'>
@@ -31,8 +32,11 @@ export function shadowTeamOf(context: Pick<GrantContext, 'teamId' | 'projectId' 
   return context.teamId && !context.projectId && context.memberTeamIds.includes(context.teamId) ? context.teamId : null
 }
 
-/** The shadow boards of several teams, by team: one query for a whole list of keys. */
-export async function shadowBoardsOfTeams(teamIds: string[]): Promise<Map<string, string[]>> {
+/**
+ * The shadow boards of several teams, by team, that `userId` may see: one query for a whole list of keys. A shadow
+ * the person may not see (hiddenCrewShadows, the one rule for crew boards) is left out, so a key never reads it.
+ */
+export async function shadowBoardsOfTeams(teamIds: string[], userId: string): Promise<Map<string, string[]>> {
   const byTeam = new Map<string, string[]>()
   if (!teamIds.length) return byTeam
   const real = alias(projects, 'real_board')
@@ -41,8 +45,9 @@ export async function shadowBoardsOfTeams(teamIds: string[]): Promise<Map<string
     .from(crewBoards)
     .innerJoin(real, eq(real.id, crewBoards.projectId))
     .where(inArray(real.teamId, teamIds))
+  const hidden = await hiddenCrewShadows(userId, rows.map(row => row.id))
   for (const row of rows) {
-    if (row.teamId) byTeam.set(row.teamId, [...(byTeam.get(row.teamId) ?? []), row.id])
+    if (row.teamId && !hidden.has(row.id)) byTeam.set(row.teamId, [...(byTeam.get(row.teamId) ?? []), row.id])
   }
   return byTeam
 }
@@ -77,20 +82,25 @@ export function mayUseReadGrant(tool: { name: string, readOnly: boolean }): bool
 }
 
 /**
- * The shadow boards of a team's boards: the staff of the real board may READ them (Q35a, never
- * writes), and a customer never can, since a customer has no team here.
+ * The shadow boards of a team's boards that `userId` may see. The staff of the real board may READ them (Q35a, never
+ * writes), but only the people hiddenCrewShadows lets in: a plain member of the real board's team gets none. A
+ * customer never can, since a customer has no team here.
  */
-export async function shadowBoardIdsOfTeam(teamId: string): Promise<string[]> {
+export async function shadowBoardIdsOfTeam(teamId: string, userId: string): Promise<string[]> {
   const real = alias(projects, 'real_board')
   const rows = await db
     .select({ id: crewBoards.shadowProjectId })
     .from(crewBoards)
     .innerJoin(real, eq(real.id, crewBoards.projectId))
     .where(eq(real.teamId, teamId))
-  return rows.map(row => row.id)
+  const hidden = await hiddenCrewShadows(userId, rows.map(row => row.id))
+  return rows.map(row => row.id).filter(id => !hidden.has(id))
 }
 
-/** The shadow board `projectId` as a team's staff may read it, or undefined when it is not one of theirs. */
+/**
+ * The shadow board `projectId` as a team's staff may read it, or undefined when it is not one of theirs. The crew rule
+ * is NOT applied here: the caller (requireProject) checks hiddenCrewShadows once, before it asks.
+ */
 export async function shadowBoardForStaff(teamId: string | null, projectId: string): Promise<Project | undefined> {
   if (!teamId) return undefined
   const real = alias(projects, 'real_board')
@@ -119,7 +129,10 @@ export async function isOwnCrewBoard(crewId: string, projectId: string): Promise
   return Boolean(link)
 }
 
-/** Whether `userId` belongs to a team whose board `projectId` is the shadow of: for serving files. */
+/**
+ * Whether `userId` belongs to a team whose board `projectId` is the shadow of: for serving files. The crew rule is NOT
+ * applied here: the attachment route checks hiddenCrewShadows once, before it asks.
+ */
 export async function isStaffOfShadowedBoard(userId: string, projectId: string): Promise<boolean> {
   const real = alias(projects, 'real_board')
   const [row] = await db
@@ -135,15 +148,16 @@ export async function isStaffOfShadowedBoard(userId: string, projectId: string):
  * The boards a key's person may READ through a crew link, beyond its own reach:
  *   - a crew account reads the real boards its crew was given. A key limited to one board (a member
  *     forked for that board) reads only the real board its own shadow board is linked to;
- *   - the staff of a real board read its shadow board, with a key for the whole team.
+ *   - the staff of a real board read its shadow board, with a key for the whole team, when the person is an
+ *     owner or admin of that team or the crew's owner (hiddenCrewShadows).
  * A key limited to a customer gets none, so its reach never widens.
  */
 export async function readGrantedBoardIds(context: GrantContext): Promise<string[]> {
   if (context.customerId) return []
-  const [account] = await db.select({ crewId: user.crewId }).from(user).where(eq(user.id, context.userId))
-  const links = account?.crewId ? await crewLinksOf(account.crewId) : []
+  const crewId = await crewIdOfUser(context.userId)
+  const links = crewId ? await crewLinksOf(crewId) : []
   const shadowTeam = shadowTeamOf(context)
-  const shadowIds = shadowTeam ? await shadowBoardIdsOfTeam(shadowTeam) : []
+  const shadowIds = shadowTeam ? await shadowBoardIdsOfTeam(shadowTeam, context.userId) : []
   const granted = grantedBoardIdsOf(context, links, shadowIds)
   return granted
 }

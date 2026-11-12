@@ -45,6 +45,11 @@ ENV HOST=0.0.0.0
 ENV NODE_ENV=production
 ENV IS_DOCKER=1
 
+# The short commit the image is built from, shown as build by /api/version. Pass it with
+# --build-arg TASKMANAGER_BUILD=$(git rev-parse --short HEAD); unset, it is empty and the server reports null.
+ARG TASKMANAGER_BUILD=
+ENV TASKMANAGER_BUILD=${TASKMANAGER_BUILD}
+
 EXPOSE 3000
 
 USER bun

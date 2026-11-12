@@ -50,10 +50,21 @@ To let a remote machine use it for a short time, open the window:
 
 The window closes after 10 minutes, when you press **Close now**, or at the first refused key. A refused key can be a wrong, expired or non-admin one. A refused key also revokes the temporary key, and the page says why and from where it closed. While the window is open, remote callers may use only the temporary key.
 
-To make a permanent key for crew management, press **Create a crews:manage key**. Only you can hold that permission. A key with it manages crews and reaches no board.
+To make a permanent key for crew management, press **Create a crews:manage key**. You can always hold that permission. Anyone else can hold it when they own at least one live crew: their key then reaches that owner's own crews only, and no others. Anyone else gets a key bound to one board, which reaches that board's crews and nothing else.
 
-A **management token** (the board's menu item **Add a crew to this board**) is the other remote key. It works from any machine, through the public address, without opening the window: it lasts 10 minutes, reaches only its own board and carries only the crew permission. Its calls are rate limited per token and per address, with the board's limits for agent calls. A remote call with a management token that has expired or was regenerated answers its own sentence, so the agent can ask for a new token. A remote call with any other key, or no key, still gets the plain 404. Your permanent crews:manage key and the one from the window stay local-only, as before. A remote call with a revoked management token answers the revoked sentence, the same way as an expired or regenerated one.
+Who may do what, and from where:
 
+| Caller | From this machine | From elsewhere (through the public address) |
+| --- | --- | --- |
+| Instance admin, permanent crews:manage key, unbound | every crew call | the admin's own crews only: read, keys, rotate, people; creating or deleting a crew is refused, a management token is needed |
+| Instance admin, window key | every crew call while the window is open | refused with the plain 404 |
+| Anyone, management token from a board's menu (Add a crew to this board) | not needed | its own board's crew: read, keys, rotate, people; creating a crew too |
+| Crew owner, permanent crews:manage key, unbound, with a live crew | refused | that owner's own crews only: read, keys, rotate; creating or deleting a crew is refused, a management token is needed |
+| Crew owner, same key, with no live crew of their own | refused | 403 with one sentence: the owner has no live crew here, use a management token from the board's sidebar |
+| Any key without crews:manage | refused | the plain 404 |
+
+A **management token** (the board's menu item **Add a crew to this board**) is the other remote key. It works from any machine, through the public address, without opening the window: it lasts 10 minutes, reaches only its own board and carries only the crew permission. Its calls are rate limited per token and per address, with the board's limits for agent calls. A remote call with a management token that has expired or was regenerated answers its own sentence, so the agent can ask for a new token. A remote call with any other key, or no key, still gets the plain 404. The instance admin's window key stays local-only, as before. The instance admin's permanent crews:manage key works from outside for the admin's own crews only, the same as a crew owner's permanent key (see the table above). A remote call with a revoked management token answers the revoked sentence, the same way as an expired or regenerated one.
+>
 ### Binding a crew to a board
 
 A crew can be made on a real board in the same call. The crew always works on a **shadow board**, made in the crew's own team; the real board is for people. Only the key's owner can bind, and only to a board of a team the owner runs as owner or admin.
@@ -92,8 +103,19 @@ chmod 600 crew-keys.env
 
 The first line is a comment that says the file is secret. Each further line is `export TASKMANAGER_CREW_<SLUG>_<PERSON>_API_KEY=...` or `export TASKMANAGER_CREW_<SLUG>_<PERSON>_PASSWORD=...`, with the slug and the person's key upper-cased and dashes turned into underscores. `?format=json` answers the JSON shape the create answer had (the crew, its people with `password` and `apiKey`, the team and the board), for tools that want it. Both answers are `Cache-Control: no-store`. The secrets are never written to the log or to the agent audit.
 
-## Behind a reverse proxy
+## Adding the people a crew lacks
 
+A crew made before a role existed has no account for the roles added since. `POST /api/crews/:slug/people` makes those accounts, each with its seat in the crew's team (a contact joins the customer instead), and gives a key and a password for each new person only. It is the same as the people a create makes, and it never rotates anyone: the keys and sessions of the people who are there keep working.
+
+- With no body, it adds every person the kit has that the crew lacks. A body `{"people": ["susy", "janet"]}` or the query `?people=susy,janet` names who to add. A key the kit does not know is a 400 that names it.
+- Asked again when nobody is missing, it answers 200 with an empty `people` map.
+- The answer has the crew, the team and the board, and `people` with the `password` and `apiKey` of the new people, in the shape of `?format=json` on the keys route. Save them the same way: they are shown once.
+- It takes the same key as the other crew calls, and one line goes to the agent audit per call.
+
+`GET /api/crews/:slug` shows the crew's `cast`: every person the kit has, each with `status` `present` or `missing`. Blaze and the Crews page use it to show the roles a crew can still take.
+
+For each new person the call does what crew create does: the account, the seat in the crew's team (or the customer login for a contact) and the key. It sets no board tags, and it does not fork anyone onto a board: a forked member is made with its own fork call.
+## Behind a reverse proxy
 The gate decides "local" from the connection, and treats any `X-Forwarded-For`, `X-Real-IP` or `Forwarded` header as proof of a proxy. Every proxy location that reaches the app should therefore set `X-Real-IP` and `X-Forwarded-For` to the address of the socket it accepted (`$remote_addr` in nginx), not `$proxy_add_x_forwarded_for`. The repository's README has the full deploy note and a one-line check to run once after installing.
 
 A management token works through the proxy: the gate reads the key from the request, not from the connection, so a proxied call with a management token is accepted and every other proxied call is still a 404.
