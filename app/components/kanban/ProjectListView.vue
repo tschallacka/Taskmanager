@@ -2,7 +2,7 @@
 import { format } from 'date-fns'
 import { columnDotAttrs } from '~/utils/tagColors'
 import { dueDayToMs, isOverdueDay, todayIso } from '~/utils/dueDate'
-import type { ProjectTask } from '~/composables/useProjects'
+import { boardPeople, type ProjectTask } from '~/composables/useProjects'
 import { errorMessage } from '~/utils/untypedFetch'
 
 const emit = defineEmits<{ openTask: [taskId: string] }>()
@@ -21,6 +21,31 @@ async function setField(taskId: string, fieldId: string, value: string | null) {
   } catch (e) {
     toast.add({ title: errorMessage(e, 'Could not save the field'), icon: 'i-lucide-alert-triangle', color: 'error' })
   }
+}
+
+// The cells edit in place: the assignee from a menu (the card's quick-assign choices), the date from a date input.
+// A save that fails says so, and the cell keeps what the server has.
+async function saveCell(taskId: string, patch: { assigneeId?: string | null, dueOn?: string | null }, failed: string) {
+  try {
+    await updateTask(taskId, patch)
+  } catch (e) {
+    toast.add({ title: errorMessage(e, failed), icon: 'i-lucide-alert-triangle', color: 'error' })
+  }
+}
+
+function setDue(taskId: string, value: string) {
+  return saveCell(taskId, { dueOn: value || null }, 'Could not save the due date')
+}
+
+function assignItems(taskId: string) {
+  return [
+    [{ label: 'Unassigned', icon: 'i-lucide-user-x', onSelect: () => saveCell(taskId, { assigneeId: null }, 'Could not change the assignee') }],
+    boardPeople().map(person => ({
+      label: person.kind === 'customer' ? `${person.name || person.email || ''} (customer)` : person.name || person.email || '',
+      avatar: { src: person.image ?? undefined, alt: person.name || person.email || '' },
+      onSelect: () => saveCell(taskId, { assigneeId: person.id }, 'Could not change the assignee')
+    }))
+  ]
 }
 
 const collapsed = ref(new Set<string>())
@@ -94,7 +119,7 @@ const sections = computed(() => {
     }
     return [...people.values()]
       .sort((a, b) => (a.id === 'person:' ? 1 : b.id === 'person:' ? -1 : a.label.localeCompare(b.label)))
-      .map(group => ({ id: group.id, name: group.label, tasks: sorted(group.tasks) }))
+      .map(group => ({ id: group.id, name: group.label, column: null, tasks: sorted(group.tasks) }))
   }
   return boardColumns.value
     .filter(column => !isTrashed(column))
@@ -291,24 +316,53 @@ function subtaskProgress(taskId: string) {
 
             <span
               v-if="shownColumns.assignee"
-              class="flex w-5 shrink-0 justify-center"
+              class="flex w-6 shrink-0 justify-center"
+              @click.stop
             >
-              <UAvatar
-                v-if="personById(task.assigneeId)"
-                :src="personById(task.assigneeId)!.image ?? undefined"
-                :alt="personById(task.assigneeId)!.name || personById(task.assigneeId)!.email || ''"
-                :title="personById(task.assigneeId)!.name || personById(task.assigneeId)!.email || ''"
-                size="2xs"
-                data-list-assignee
-              />
+              <!-- The assignee cell: click to change it, the same choices as the card's quick-assign menu. -->
+              <UDropdownMenu
+                :items="assignItems(task.id)"
+                :content="{ align: 'end', collisionPadding: 12 }"
+              >
+                <button
+                  class="rounded-full ring-primary transition-shadow hover:ring-1 focus-visible:ring-1"
+                  :aria-label="personById(task.assigneeId) ? `Assignee: ${personById(task.assigneeId)!.name || personById(task.assigneeId)!.email || ''}. Change it` : 'Unassigned. Assign someone'"
+                  data-list-assign
+                >
+                  <UAvatar
+                    v-if="personById(task.assigneeId)"
+                    :src="personById(task.assigneeId)!.image ?? undefined"
+                    :alt="personById(task.assigneeId)!.name || personById(task.assigneeId)!.email || ''"
+                    size="2xs"
+                    data-list-assignee
+                  />
+                  <UIcon
+                    v-else
+                    name="i-lucide-user-plus"
+                    class="size-4 text-dimmed"
+                  />
+                </button>
+              </UDropdownMenu>
             </span>
 
             <span
               v-if="shownColumns.due"
-              class="w-16 shrink-0 text-right text-xs tabular-nums"
+              class="w-28 shrink-0 text-right text-xs tabular-nums"
               :class="overdue(task) ? 'font-medium text-error' : 'text-dimmed'"
+              @click.stop
             >
-              {{ task.dueOn ? dueLabel(task.dueOn) : '' }}
+              <!-- The due cell: pick a date in place; clearing it removes the date. -->
+              <input
+                type="date"
+                min="2000-01-01"
+                max="2999-12-31"
+                :value="task.dueOn ?? ''"
+                :aria-label="task.dueOn ? `Due ${dueLabel(task.dueOn)}. Change the date` : 'No due date. Pick one'"
+                class="w-full rounded bg-transparent px-1 py-0.5 text-right text-xs tabular-nums outline-none transition-colors hover:bg-elevated focus:ring-1 focus:ring-primary"
+                :class="overdue(task) ? 'text-error' : task.dueOn ? 'text-default' : 'text-dimmed'"
+                data-list-due
+                @change="setDue(task.id, ($event.target as HTMLInputElement).value)"
+              >
             </span>
           </li>
 
