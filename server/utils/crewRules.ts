@@ -147,9 +147,14 @@ async function subtasksOf(taskId: string) {
     .where(and(eq(projectTasks.parentTaskId, taskId), isNull(projectTasks.deletedAt)))
 }
 
-/** The author of a rule's comment and the rule source for its actions: Pia's account, else the board owner's. */
-async function sourceFor(project: RuleProject, name: string, members: Map<string, string>): Promise<RuleSource> {
-  return { id: `crew:${name}`, name, createdBy: members.get('pia') ?? project.userId, mayChangeVisibility: false }
+/** The author of a crew rule's note: the crew's Boss account, else Pia's. Never the board owner. Null when the board has neither. */
+export function noteAuthorFor(members: Map<string, string>): string | null {
+  return members.get('boss') ?? members.get('pia') ?? null
+}
+
+/** The author of a rule's comment and the rule source for its actions: the crew's Boss account, else Pia's. */
+export async function sourceFor(_project: RuleProject, name: string, members: Map<string, string>): Promise<RuleSource> {
+  return { id: `crew:${name}`, name, createdBy: noteAuthorFor(members), mayChangeVisibility: false }
 }
 
 /** Promotion: a Backlog card whose last open blocker just finished goes to To do. */
