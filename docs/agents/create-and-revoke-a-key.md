@@ -45,7 +45,7 @@ You can also give a key a new secret: see [Regenerate a key's secret](#regenerat
 
 1. Under **Active keys**, open the key and press **Regenerate key**, then **Regenerate** in the box that names it.
 2. The old secret stops working at once. The name, the permissions and the boards stay.
-3. The new secret is shown once, with the setup command that puts it in place. Copy it now.
+3. The new secret is shown once, with the setup command that puts it in place, in the key's own row under its buttons. Copy it now. The row scrolls into view; the box at the top of the page is for a new connection only.
 
 **Show prompt** on an open key shows the same setup command without a secret, with a placeholder. Regenerate the key to
 get a secret to paste.
