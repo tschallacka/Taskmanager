@@ -319,6 +319,15 @@ async function finish(planFile) {
   console.log(`  ${plan.changed.length} file(s) replaced, ${plan.removed.length} removed. Backup: ${plan.backupDir}`)
   if (plan.localEdits.length) console.log(`  local edits to kit files were saved in ${join(plan.backupDir, 'local')}: ${plan.localEdits.join(', ')}`)
   for (const line of lines) console.log(`  ${line}`)
+  // The people hint: if the cast shows missing people, the exact command is offered, and nothing is run by itself.
+  const people = await import('./people.mjs')
+  const { config } = await import('./config.mjs')
+  const missing = await people.missingPeople({
+    origin: new URL(config.board.url).origin,
+    slug: config.crew?.slug,
+    token: process.env.TASKMANAGER_MANAGEMENT_TOKEN
+  })
+  for (const line of people.missingLines(missing)) console.log(`  ${line}`)
   console.log(problems ? '\nNot finished: fix the CONFLICT and FAIL lines above.' : '\nDone. Restart Boss\'s Claude Code session if the agent definitions changed: Claude Code reads them when a session starts.')
   return problems ? 1 : 0
 }
