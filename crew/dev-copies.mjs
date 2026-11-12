@@ -27,12 +27,26 @@ export const GATE_COLUMNS = ['Verify UX', 'Verify QA']
 export const PORTS = { wren: 3101, wick: 3102, wynn: 3103, wade: 3104 }
 
 /**
+ * The working board's id, from crew.json's "board" url (…/projects/<id>). The gate cards sit on this board, not on the
+ * crew-home board in creds.json. Throws when the url has no id, so the command fails loudly.
+ */
+export function workingBoardId(crew) {
+  const match = /\/projects\/([\w-]+)/.exec(crew?.board?.url ?? '')
+  if (!match) throw new Error('crew.json "board" has no url with /projects/<id>: the working board cannot be read')
+  return match[1]
+}
+
+/**
  * The gate cards from one get_board answer, each with its owner's key (or the display name when no key matches), and
  * the gate columns that were cut at the page size. A column whose taskCount is above the tasks it shows is cut.
+ * Throws when the answer has none of the gate columns: a board read that finds no gate column is an error, not "none".
  */
 export function gateCards(board, keyOf) {
   const cards = []
   const cut = []
+  if (!(board?.columns ?? []).some(column => UX_OR_QA_COLUMN.test(column.name))) {
+    throw new Error(`the board read has no ${GATE_COLUMNS.join(' or ')} column (board ${board?.id ?? '?'}, ${board?.name ?? 'no name'})`)
+  }
   for (const column of board?.columns ?? []) {
     if (!UX_OR_QA_COLUMN.test(column.name)) continue
     const shown = (column.tasks ?? []).length
@@ -102,8 +116,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const branches = {}
   try {
     const crew = readJson(join(crewHome, 'crew.json'))
-    const creds = readJson(join(crewHome, 'creds.json'))
-    const board = runner('get_board', { board: creds.board?.id, detail: 'titles', columns: GATE_COLUMNS, limit: CEILING })
+    const board = runner('get_board', { board: workingBoardId(crew), detail: 'titles', columns: GATE_COLUMNS, limit: CEILING })
     ;({ cards, cut } = gateCards(board, keyOfName(crew.people)))
     for (const c of cut) console.log(`page cut: ${c.column} shows ${c.shown} of ${c.total}; ${CEILING} is the ceiling per column, the cards past it are not checked`)
     if (!cards.length) {

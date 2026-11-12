@@ -4,7 +4,17 @@
 //   node --test crew/dev-copies.test.mjs
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { gateCards, branchOf, copyLines } from './dev-copies.mjs'
+import { gateCards, branchOf, copyLines, workingBoardId } from './dev-copies.mjs'
+
+test('the board is the working board from crew.json, not the crew-home board', () => {
+  assert.equal(workingBoardId({ board: { name: 'x', url: 'https://taskmanager.tschallacka.dev/projects/mw7vn0cp9pspxfvjru' } }), 'mw7vn0cp9pspxfvjru')
+  assert.throws(() => workingBoardId({}), /working board cannot be read/)
+  assert.throws(() => workingBoardId({ board: { url: 'https://example.test/nothing' } }), /working board cannot be read/)
+})
+
+test('a board read with no gate column is an error, not an empty list', () => {
+  assert.throws(() => gateCards({ id: 'mw7', name: 'Other', columns: [{ name: 'Done', tasks: [] }] }, keyOf), /no Verify UX or Verify QA column/)
+})
 
 const keyOf = name => ({ 'Wren Worker': 'wren', 'Wynn Worker': 'wynn', 'Wade Worker': 'wade' })[name]
 
