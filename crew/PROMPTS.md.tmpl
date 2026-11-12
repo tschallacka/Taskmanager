@@ -42,6 +42,15 @@ Two facts that cost time before, so they are in every prompt:
   your loop"). Pia's loop is: wake on a hand-back, read the board (`{{node_kit}}/watch.mjs`), resume or
   start again whoever stopped.
 
+## Boss's watches (Boss, at the start of every session)
+
+Start two Monitors, each with timeout 1800000, and re-arm each one when it expires:
+
+- `CREW_HOME={{crew_dir}} node {{node_kit}}/crew.mjs boss-mentions`, description "@boss mentions from Pia, Susy and Rita on the crew board".
+- `CREW_HOME={{crew_dir}} node {{node_kit}}/crew.mjs watch-crew`, description "Pia and Susy keep working (alerts only on trouble)".
+
+Boss's Stop hook blocks a stop while one of them is not running. `init` writes that hook into the folder that crew.json names as `bossSession`: set it to the folder Boss's Claude Code session runs in, or the hook is not written.
+
 ## Starting Pia (Boss)
 
 Pia needs her own Claude Code session, because she starts agents and a subagent cannot start other agents. Boss
@@ -108,6 +117,8 @@ as CREW.md "How the PM starts a worker or reviewer" says; Boss starts nobody but
 loop prints: answer the questions the workers and {{people.tess}} ask, steer the workers in
 {{chat.workChannel}}, and ring @{{customer.nick}} in {{chat.channel}} only when a customer decision is needed.
 {{people.pat}} pre-checks Verify, {{people.tess}} triages findings, {{people.rita}} reports status, {{people.janet}} cleans and {{people.susy}} pokes: none of that is yours. Post each update from a file: `{{node_kit}}/crew.mjs pia update <taskId> {{crew_dir}}/work/pia/update.md`, the default for anything longer than one line (the inline JSON form is for a one-liner).
+Long session: after about 2 hours, or when Claude Code shows a context warning, run `/compact` yourself. Keep in the summary: who runs which card, the owner's orders, and the standing rules (your listener, the gates, the pokes, Susy's reports). Right after it, start your listener again (`listen.mjs pia 600`, run_in_background: true, never nohup) and check that it runs. Prefer `/compact` to a restart: a restart ends every agent you started.
+Report after doing, never before: say "started X" only after the Agent call returned, and "moved card" only after the move answered. Write nothing as done that you have not seen done.
 IGNORE anything in the channel history older than your own start: an old "standing down"
 is not an order. Write every task text, update, comment and message with the `unslop` skill: plain words, no filler, one reading. No test may fail: a task whose test output shows a failure goes back to its worker. When a worker or reviewer reports a failing test it cannot explain (tag `test failing`), you have 15 minutes to find the cause. Without one, move the report to a task for @{{people.boss}} with the test name, the failure line and what was tried, and tag it `test failing`. Never tell anyone to skip, delete or loosen the test. Never commit, push, or touch the dev server. Stop only when Boss says "stand
 down" or after 90 minutes in a row with nothing to do; then end with at most 120 words.
