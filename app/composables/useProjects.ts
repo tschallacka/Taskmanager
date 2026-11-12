@@ -232,6 +232,8 @@ const _ready = ref(false)
 const _comments = ref<TaskComment[]>([])
 const _commentsTaskId = ref<string | null>(null)
 // What is left on each side of the comments shown, when a permalink opened a window (null: the whole thread).
+// The task whose permalink window is shown (null: none). While it is set, a whole-thread load leaves the window alone.
+let windowTaskId: string | null = null
 const _commentWindow = ref<{ hasEarlier: boolean, earlierCount: number, hasLater: boolean, laterCount: number } | null>(null)
 const _activity = ref<TaskActivityItem[]>([])
 // Label filter for the open board. Kanban labels annotate tasks (priority,
@@ -1007,6 +1009,7 @@ export function useProjects() {
   // A permalink's window: the comment with 5 either side (the API counts what is left on each side).
   async function loadCommentWindow(taskId: string, around: string) {
     _commentsTaskId.value = taskId
+    windowTaskId = taskId
     const page = await $fetch<CommentWindowPage>(`/api/tasks/${taskId}/comments`, { query: { around } })
     if (_commentsTaskId.value === taskId) {
       _comments.value = page.comments
@@ -1036,13 +1039,18 @@ export function useProjects() {
   }
 
   async function loadComments(taskId: string) {
-    _commentWindow.value = null
+    // A permalink's window stays for its task: the whole-thread load must not replace it.
+    if (windowTaskId !== taskId) {
+      windowTaskId = null
+      _commentWindow.value = null
+    }
     _commentsTaskId.value = taskId
     const [comments] = await Promise.all([
       $fetch<TaskComment[]>(`/api/tasks/${taskId}/comments`),
       loadActivity(taskId).catch(() => {})
     ])
     if (_commentsTaskId.value === taskId) {
+      if (windowTaskId === taskId) return comments
       _comments.value = comments
       _commentCounts.value = { ..._commentCounts.value, [taskId]: comments.length }
     }
@@ -1093,6 +1101,8 @@ export function useProjects() {
     _comments.value = []
     _activity.value = []
     _commentsTaskId.value = null
+    windowTaskId = null
+    _commentWindow.value = null
   }
 
   // Merged hits for the global search modal: tasks first (title boost), then
