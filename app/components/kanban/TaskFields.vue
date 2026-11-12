@@ -27,7 +27,7 @@ async function change(fieldId: string, value: string | null) {
     <div
       v-for="field in fields"
       :key="field.id"
-      class="grid grid-cols-[6rem_1fr] items-center gap-x-3"
+      class="grid grid-cols-[6rem_1fr] items-center gap-x-3 max-md:grid-cols-[6rem_1fr_1rem] max-md:after:content-['›'] max-md:after:text-lg max-md:after:leading-none max-md:after:text-dimmed"
     >
       <dt class="truncate text-muted">
         {{ field.name }}

@@ -32,6 +32,8 @@ const toast = useToast()
 // The task number is its id. The copy control puts a link to the task on the clipboard, as an html anchor with the
 // number as its text, and the bare number as plain text (utils/copyTaskLink.ts).
 const linkCopied = ref(false)
+// On a phone, the Activity sheet is open (the comments and the composer fill the panel).
+const activityOpen = ref(false)
 async function copyTaskNumberLink() {
   const task = props.task
   if (!task) return
@@ -704,7 +706,7 @@ const menuItems = computed(() => [[
                Start date, Labels, the custom fields (Priority). Time, Blocked by and GitHub are full-width blocks
                below them (redesign card 5/9). -->
           <dl class="grid shrink-0 grid-cols-1 gap-x-6 gap-y-1.5 px-5 pb-3 text-xs md:grid-cols-2">
-            <div class="grid grid-cols-[6rem_1fr] items-center gap-x-3">
+            <div class="grid grid-cols-[6rem_1fr] items-center gap-x-3 max-md:grid-cols-[6rem_1fr_1rem] max-md:after:content-['›'] max-md:after:text-lg max-md:after:leading-none max-md:after:text-dimmed">
               <dt class="text-muted">
                 Assignee
               </dt>
@@ -732,7 +734,7 @@ const menuItems = computed(() => [[
               </dd>
             </div>
 
-            <div class="grid grid-cols-[6rem_1fr] items-center gap-x-3">
+            <div class="grid grid-cols-[6rem_1fr] items-center gap-x-3 max-md:grid-cols-[6rem_1fr_1rem] max-md:after:content-['›'] max-md:after:text-lg max-md:after:leading-none max-md:after:text-dimmed">
               <dt class="text-muted">
                 Due date
               </dt>
@@ -763,7 +765,7 @@ const menuItems = computed(() => [[
               </dd>
             </div>
 
-            <div class="grid grid-cols-[6rem_1fr] items-center gap-x-3">
+            <div class="grid grid-cols-[6rem_1fr] items-center gap-x-3 max-md:grid-cols-[6rem_1fr_1rem] max-md:after:content-['›'] max-md:after:text-lg max-md:after:leading-none max-md:after:text-dimmed">
               <dt class="text-muted">
                 Start date
               </dt>
@@ -795,7 +797,7 @@ const menuItems = computed(() => [[
               </dd>
             </div>
 
-            <div class="grid grid-cols-[6rem_1fr] items-start gap-x-3">
+            <div class="grid grid-cols-[6rem_1fr] items-start gap-x-3 max-md:grid-cols-[6rem_1fr_1rem] max-md:after:content-['›'] max-md:after:text-lg max-md:after:leading-none max-md:after:text-dimmed">
               <dt class="pt-0.5 text-muted">
                 Labels
               </dt>
@@ -883,6 +885,7 @@ const menuItems = computed(() => [[
               v-else
               v-model="editorContent"
               :upload-image="uploadImage"
+              toolbar-on-focus
               placeholder="Add a description… (@ for dates, / for commands)"
               class="min-h-0 flex-1"
             />
@@ -907,14 +910,31 @@ const menuItems = computed(() => [[
             />
           </div>
 
-          <!-- Under the description, in the same scroll body: the conversation and its box. -->
-          <KanbanTaskComments
-            v-if="shownTask"
-            :key="shownTask.id"
-            ref="thread"
-            :task-id="shownTask.id"
-            :readonly="readonly"
-          />
+          <!-- Activity: inline on a wide panel. On a phone it is a sheet opened from its bar, so the
+               description and the composer do not compete for one screen (redesign card 5/9, page 11). -->
+          <div :class="activityOpen ? 'max-md:fixed max-md:inset-0 max-md:z-30 max-md:flex max-md:flex-col max-md:bg-default' : ''">
+            <button
+              type="button"
+              class="flex w-full items-center justify-between border-t border-default px-5 py-2.5 text-left text-xs font-medium text-muted md:hidden"
+              :aria-expanded="activityOpen ? 'true' : 'false'"
+              data-activity-toggle
+              @click="activityOpen = !activityOpen"
+            >
+              {{ activityOpen ? 'Close activity' : 'Activity' }}
+              <UIcon
+                :name="activityOpen ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'"
+                class="size-4"
+              />
+            </button>
+            <KanbanTaskComments
+              v-if="shownTask"
+              :key="shownTask.id"
+              ref="thread"
+              :class="activityOpen ? 'max-md:min-h-0 max-md:flex-1' : 'max-md:hidden'"
+              :task-id="shownTask.id"
+              :readonly="readonly"
+            />
+          </div>
         </div>
       </div>
     </template>
