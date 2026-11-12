@@ -39,6 +39,24 @@ const weekStart = computed(() => {
   const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7))
   return monday.getTime()
 })
+// My tasks in three groups, by due date: Overdue, Today, then Later (undated tasks are Later).
+const taskGroups = computed(() => {
+  const today = todayIso()
+  const overdue: typeof upcoming.value = []
+  const dueToday: typeof upcoming.value = []
+  const later: typeof upcoming.value = []
+  for (const task of upcoming.value) {
+    if (task.dueOn && isOverdueDay(task.dueOn)) overdue.push(task)
+    else if (task.dueOn === today) dueToday.push(task)
+    else later.push(task)
+  }
+  return [
+    { key: 'overdue', label: 'Overdue', tasks: overdue },
+    { key: 'today', label: 'Today', tasks: dueToday },
+    { key: 'later', label: 'Later', tasks: later }
+  ].filter(group => group.tasks.length)
+})
+
 const stats = computed(() => homeStats(allTasks.value, session.value?.user.id ?? '', todayIso(), weekStart.value))
 const latestInbox = computed(() => inboxItems.value.slice(0, 3))
 
@@ -281,34 +299,45 @@ function openTask(task: { id: string, projectId: string }) {
           >
             Nothing assigned to you.
           </p>
-          <ul
+          <div
             v-else
-            class="mt-3 divide-y divide-default"
+            class="mt-3 space-y-4"
           >
-            <li
-              v-for="task in upcoming"
-              :key="task.id"
-              data-home-task
-              class="flex cursor-pointer items-center gap-3 py-2 transition-colors hover:bg-elevated/50"
-              @click="openTask(task)"
+            <div
+              v-for="group in taskGroups"
+              :key="group.key"
+              :data-home-group="group.key"
             >
-              <button
-                class="flex size-5 shrink-0 items-center justify-center rounded-full border border-accented text-transparent transition-colors hover:border-success hover:text-success"
-                aria-label="Mark complete"
-                @click.stop="updateTask(task.id, { completed: true })"
-              >
-                <UIcon
-                  name="i-lucide-check"
-                  class="size-3"
-                />
-              </button>
-              <span class="min-w-0 flex-1 truncate text-sm text-default">{{ task.title }}</span>
-              <span
-                class="shrink-0 text-xs tabular-nums"
-                :class="task.dueOn && isOverdueDay(task.dueOn) ? 'text-error' : 'text-dimmed'"
-              >{{ task.dueOn ? format(dueDayToMs(task.dueOn), 'MMM d') : '' }}</span>
-            </li>
-          </ul>
+              <p class="text-[11px] font-semibold uppercase tracking-wide text-dimmed">
+                {{ group.label }}
+              </p>
+              <ul class="mt-1 divide-y divide-default">
+                <li
+                  v-for="task in group.tasks"
+                  :key="task.id"
+                  data-home-task
+                  class="flex cursor-pointer items-center gap-3 py-2 transition-colors hover:bg-elevated/50"
+                  @click="openTask(task)"
+                >
+                  <button
+                    class="flex size-5 shrink-0 items-center justify-center rounded-full border border-accented text-transparent transition-colors hover:border-success hover:text-success"
+                    aria-label="Mark complete"
+                    @click.stop="updateTask(task.id, { completed: true })"
+                  >
+                    <UIcon
+                      name="i-lucide-check"
+                      class="size-3"
+                    />
+                  </button>
+                  <span class="min-w-0 flex-1 truncate text-sm text-default">{{ task.title }}</span>
+                  <span
+                    class="shrink-0 text-xs tabular-nums"
+                    :class="task.dueOn && isOverdueDay(task.dueOn) ? 'text-error' : 'text-dimmed'"
+                  >{{ task.dueOn ? format(dueDayToMs(task.dueOn), 'MMM d') : '' }}</span>
+                </li>
+              </ul>
+            </div>
+          </div>
         </section>
 
         <div class="flex flex-col gap-4 md:col-span-2">
