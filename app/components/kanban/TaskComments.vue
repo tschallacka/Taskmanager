@@ -425,7 +425,7 @@ defineExpose({ handleEscape })
 <template>
   <section
     ref="root"
-    class="shrink-0 border-t border-default px-5 pb-4 pt-3"
+    class="shrink-0 border-t border-default px-5 pb-4 pt-3 max-md:flex max-md:min-h-0 max-md:flex-col max-md:overflow-y-auto"
     aria-label="Activity"
   >
     <!-- Two tabs over one list: the comments first, then the history of changes to the task. -->
@@ -466,7 +466,7 @@ defineExpose({ handleEscape })
       </button>
     </div>
 
-    <div class="space-y-4">
+    <div class="space-y-4 max-md:flex max-md:min-h-0 max-md:flex-1 max-md:flex-col">
       <p
         v-if="count === 0 && activityTab === 'comments'"
         class="text-xs text-dimmed"
@@ -696,7 +696,7 @@ defineExpose({ handleEscape })
 
       <!-- The composer stays at the bottom of the activity while the list scrolls above it. -->
       <div
-        class="sticky bottom-0 z-10 -mx-5 flex cursor-text items-start gap-2 border-t border-default bg-default px-5 pb-3 pt-2"
+        class="sticky bottom-0 z-10 -mx-5 flex cursor-text items-start gap-2 border-t border-default bg-default px-5 pb-3 pt-2 max-md:mt-auto"
         @click="composer?.focus()"
       >
         <UAvatar
