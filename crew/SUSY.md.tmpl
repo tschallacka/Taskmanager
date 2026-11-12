@@ -1,36 +1,53 @@
-# Susy Secretary
+# Susy Secretary (the daemon)
 
-The secretary who pokes people awake.
+Susy is a daemon: a process with no model in the loop. It wakes the people who have stopped moving work, with one short
+poke each, and says so on the card. It never does anyone's work, never moves a card, never edits code, never runs git,
+never starts anybody, and never answers for Pia. Pia starts people; Susy pokes the people already running.
 
-You are Susy Secretary (key `susy`, chat nick `susy`). Your one job: wake the people who have stopped moving work,
-with one short poke each, and say so on the card. You never do anyone's work, never move a card, never edit code,
-never run git, never start anybody, and never answer for Pia. Pia starts people; you poke the people who are
-already running.
+Why a daemon: a round is almost all script. The check compares the board with the rules; the model only relayed its output
+and posted the markers. A Claude session cost about 3,000 tokens a round, sat idle between rounds, stopped at the account's
+limit, and looped when its credentials were missing. The daemon does none of those things.
 
-Read `{{crew_dir}}/CREW.md` first (the tools, the tags, the rules). Your tools: `{{node_kit}}/crew.mjs susy check`
-(the round) and `{{node_kit}}/crew.mjs susy update <card id> <file.md>` (an internal update on a card, from a file).
-Write every update with the `unslop` skill: plain words, one reading, no filler.
+## Running it
 
-## A round
+- `{{node_kit}}/susy-daemon.mjs once` runs one tick; `loop [sec]` ticks every 60 seconds (or sec).
+- `start` puts the loop in its own detached tmux session (`{{node_kit}}/detach.sh`); `stop` kills that session;
+  `status` prints the heartbeat and whether it is fresh (the last tick within 3 minutes).
+- `up-part` prints the part for crew.json `up`: its check passes while the heartbeat is fresh, and its start runs the loop
+  in the detached session. `crew up` brings it back after a restart.
+- Dry-run is the default: a tick reads the board and logs what it would post, once per new action, to
+  `CREW_HOME/.listen/susy-daemon-dryrun.log`. It posts nothing and sends no mail. `--live` posts each new action on its card
+  as Susy and mails Boss through the app when the board or the key does not answer. Live is started by Boss.
+- Each tick writes `CREW_HOME/.listen/susy-daemon.json`, the heartbeat: the time, the mode, the last tick's result, the
+  pending actions, each person's activity state, and the ages Susy checks Pia by.
 
-1. Run `{{node_kit}}/crew.mjs susy check`. It reads the board as it is now and prints one line per finding:
-   - `poke <to> on <card id> "<title>": <reason> (<n> min; <how>)`: wake this person for this reason.
-   - `clear "<reason>" on <card id> ...`: an earlier poke no longer holds. Close it.
-   - `susy: last round N min ago; ...`: you were not woken in time. Say so to Pia (see below).
-   - `susy: nothing to poke`: nothing this round.
-2. For each `poke` line, do the one thing the line says, then post the marker on the card, as one internal update
-   (`susy update <card id> <file>`, the file holds one line: the `marker` the check printed, for example
-   `poked wynn | in progress, no update | at 2026-11-07T13:00:00.000Z`). The marker is the record of your poke. Without it
-   you poke the same person again next round.
-   - How you wake a person: if the line says `SendMessage to agent <id>`, send that agent one short message with
-     SendMessage (`to` the id, `message` the one thing to do, the card id and title). If it says `no agent id`, or it is
-     `@cato`, post the poke as an internal update on the card instead: `@<key> <the one thing to do>` (for example
-     `@wynn card 3/5 is In progress with no update for 30 min: post what you did or move it back to To do.`). Never more than one thing.
-   - `@cato` (Boss) is written in a card update as `@cato <the one thing>` and Pia raises it with Boss. Boss
-     reads only Pia's `@cato`, so copy the same line to Pia on the same card with `@pia`.
-3. For each `clear` line, post the marker the check printed as one internal update on the card. Nothing else.
-4. Finish the round with one line: how many pokes, how many clears, how many findings you could not send. Keep it to
-   one line. Then wait for the next round.
+## A tick
+
+1. Read the board with Susy's own key. Nothing else is read for the rules.
+2. Run the rules (below) over the cards. Each finding is one action: a poke, or a clear of a poke that no longer holds.
+3. A new action is logged (dry-run) or posted (live): a poke is the marker line the check wrote, then one line that names
+   the person and the one thing to do. A clear is the marker alone.
+4. Write the heartbeat.
+
+If the board does not answer or the key is missing, the tick logs one line and tries again on the next tick. A streak of
+trouble mails Boss once; the first good tick says the board is back. Nothing crashes the loop.
+
+## What counts as working or idle
+
+Each tick sets each worker's state from evidence, never from what the person says: the session (running or gone), the
+newest activity (a post on the board), and a recorded WAITING marker. The states are working (activity in the last 5
+minutes), waiting (a WAITING marker under 45 minutes), idle, and gone (no session).
+
+- A worker with a card in In progress, not blocked, idle for 10 minutes gets a poke, one line, with how long it has been
+  idle and what its last update says. A waiting worker is never poked: the wait is the answer.
+- A worker whose session is gone is not idle. Its card needs a resume: the line goes to Pia at once.
+- Pia has several triggers. Each is named when it is dead, with its own wake step: her listener (3 minutes), her round
+  timer (20 minutes with no round post), her mail (undelivered for 5 minutes), her hand-backs (5 minutes), and the cards in
+  To do with no assignee while a worker is idle (15 minutes).
+- Escalations the other way: a go not given while the load has been under 14 for 10 minutes goes to Pia; a card in a
+  Verify column for 30 minutes goes to Boss; a QUESTION unanswered for 30 minutes goes to Boss.
+
+Evidence that cannot be read is no evidence, and is silent. Nothing is a fault because a source is missing.
 
 ## The reasons, and when each one fires
 
@@ -58,27 +75,25 @@ A card in Done, a completed card, and a card tagged `cleaned` get no poke. Any o
 - The first two pokes for a reason go to the person the reason names.
 - The next two go one step up: to Pia. Then to Boss (`@cato`).
 - After Boss has been poked twice with no change on the card, Susy is quiet on that reason until the card changes.
-- A change on the card (an update by anyone but you, or a move or edit) resets the count. A reason that no longer holds
+- A change on the card (an update by anyone but Susy, or a move or edit) resets the count. A reason that no longer holds
   is cleared, and a reason that holds again starts from zero.
-- Susy keeps no memory of her own. Every round works from the board. The markers on the cards are the only record.
+- Susy keeps no memory of her own. Every tick works from the board. The markers on the cards are the only record.
 
 ## Rules that stay
 
 - **One poke, one thing.** A poke names the card, the title, and the one thing to do. Never a list.
-- **No repeats.** Do not poke the same person for the same reason before the line allows it. The check decides.
-- **Nothing is started by you.** A poke wakes a person who is already running. If a person has no agent id and no
-  board account to be tagged on, say so to Pia on a card (`@pia no agent id for <key>; cannot poke <key> on <card>`).
-- **Your own round must not go stale.** The check writes the time of each round. If the check says the last round was
-  more than five minutes ago, Susy was not woken: post one line on the card `@pia susy was not woken for N min` and stop.
-- **Boss sees only Pia's `@cato`.** Never rely on your own `@cato` reaching Boss. Always copy it to Pia.
-- **Questions only the Owner can answer go to Pia.** You do not ask the customer.
-- **Scratch data:** you create none. If you do, name it `scratch:susy` and delete it.
-- **Never print a key or a password.** Never put one in a card, a message or a log.
+- **No repeats.** Do not poke the same person for the same reason before the rules allow it. The rules decide.
+- **Nothing is started by Susy.** A poke wakes a person who is already running. A person with no agent id and no board
+  account to be tagged on is reported to Pia on a card (`@pia no agent id for <key>; cannot poke <key> on <card>`).
+- **Boss sees only Pia's `@cato`.** A `@cato` line reaches Boss through Pia: it is copied to Pia on the same card.
+- **Questions only the Owner can answer go to Pia.** Susy does not ask the customer.
+- **Never print a key or a password.** Never put one in a card, a mail or a log.
 - **Agent ids** are kept in `CREW_HOME/.listen/susy.json` (key `agents`). Pia writes one with
   `{{node_kit}}/crew.mjs susy agent <key> <agent id>` when she starts or resumes a person, and forgets it with `-`.
-  You do not write that file. The check names the id in the SendMessage line; a person with no id is poked by @mention.
 
 ## When something is wrong
 
-If the check fails (no crew.json, no account, the board does not answer), print the line it gives and stop the round.
-Do not guess. Post one line to Pia on the first card you can reach with `@pia` and wait for the next round.
+- No crew.json, no key, or the board does not answer: the tick logs the line and tries again on the next tick. Nothing is
+  guessed, and nothing is posted for a tick that could not read the board.
+- A post that fails in live mode is tried again on the next tick.
+- A kill switch: `stop`. Susy is then silent until `start`.
