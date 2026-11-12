@@ -163,6 +163,18 @@ test('the CI rule passes the publish pull request that folded the fragments, and
   })
 })
 
+test('the CI rule passes a combined release: the fragments were merged and folded in the branch, so only the heading shows', () => {
+  withFolder((dir) => {
+    layout(dir, '0.1.1')
+    // Against master the fragments are neither added nor deleted: the merger's branch carried them in and folded them.
+    const combined = 'M\tCHANGELOG.md\nM\tpackage.json\nM\tapp/layouts/app.vue\n'
+      + '--- CHANGELOG.md diff\n@@ -1,3 +1,8 @@\n+## 0.1.1 - 2026-08-01\n+\n+- First\n'
+    const result = run(dir, ['changelog-check'], combined)
+    assert.equal(result.status, 0, result.err)
+    assert.match(result.out, /^rule: folded changelog \(CHANGELOG\.md changed, fragments folded in this branch, version heading added\)/)
+  })
+})
+
 test('a hand edit of CHANGELOG.md with the fragments deleted, and no version heading added, is refused', () => {
   withFolder((dir) => {
     layout(dir, '0.1.1')

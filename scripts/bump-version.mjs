@@ -237,12 +237,18 @@ function changelogCheck(input) {
     return
   }
   const deleted = rows.filter(row => row.status === 'D' && /^changelog\.d\/.+\.md$/.test(row.path))
-  if (deleted.length > 0 && rows.some(row => row.status === 'M' && row.path === CHANGELOG)) {
-    if (!VERSION_HEADING_ADDED.test(changelogDiff)) {
-      throw new Refusal(`${CHANGELOG} changed without a new "## <version> - <date>" heading: the fold adds it, a hand edit does not pass`)
-    }
-    console.log(`rule: folded changelog (${CHANGELOG} changed, ${deleted.length} ${deleted.length === 1 ? 'fragment' : 'fragments'} deleted, version heading added)`)
+  const changelogChanged = rows.some(row => row.status === 'M' && row.path === CHANGELOG)
+  if (changelogChanged && VERSION_HEADING_ADDED.test(changelogDiff)) {
+    // A combined release merges the workers' branches and folds their fragments in the same branch, so against master the
+    // fragments were neither added nor deleted: the new version heading is what shows the fold happened.
+    const gone = deleted.length > 0
+      ? `${deleted.length} ${deleted.length === 1 ? 'fragment' : 'fragments'} deleted`
+      : 'fragments folded in this branch'
+    console.log(`rule: folded changelog (${CHANGELOG} changed, ${gone}, version heading added)`)
     return
+  }
+  if (deleted.length > 0 && changelogChanged) {
+    throw new Refusal(`${CHANGELOG} changed without a new "## <version> - <date>" heading: the fold adds it, a hand edit does not pass`)
   }
   // The changelog itself is never "documentation": a hand edit of CHANGELOG.md is not a fold (the rule above needs the heading).
   if (rows.every(row => row.path !== CHANGELOG && NO_CHANGELOG_NEEDED.test(row.path))) {
