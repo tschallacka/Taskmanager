@@ -134,6 +134,18 @@ watch(() => route.path, () => emit('close'))
     <template v-else>
       <div class="flex shrink-0 items-center gap-2 px-3 pb-3 pt-4">
         <AppLogo class="min-w-0 flex-1 text-xl" />
+        <!-- Instance settings: the instance admin only. Everyone else sees no gear. -->
+        <UButton
+          v-if="isInstanceAdmin"
+          to="/admin/settings"
+          icon="i-lucide-settings"
+          size="sm"
+          color="neutral"
+          variant="ghost"
+          aria-label="Instance settings"
+          title="Instance settings"
+          class="shrink-0 rounded-lg"
+        />
         <UButton
           icon="i-lucide-panel-left-close"
           size="sm"

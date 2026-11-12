@@ -76,7 +76,9 @@ watch(railCollapsed, (value) => {
           class="flex shrink-0 items-center gap-2 max-sm:w-full empty:hidden"
         />
       </header>
-      <div class="flex min-w-0 flex-1 overflow-hidden">
+      <!-- The page scrolls here: a page without a scroller of its own (the help pages, Instance settings at a short
+           window) reaches its last line. Horizontal overflow stays clipped, as it was. -->
+      <div class="flex min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
         <slot />
       </div>
     </div>

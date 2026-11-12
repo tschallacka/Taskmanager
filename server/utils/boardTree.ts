@@ -26,6 +26,10 @@ export function labelRowOf(project: { id: string, name: string, updatedAt: numbe
 
 export type BoardRole = 'board' | 'real' | 'shadow' | 'crew_home'
 
+/** The suffix a crew's shadow board carries in its name, and the suffix of one detached from its crew. */
+export const CREW_SHADOW_SUFFIX = ' (crew)'
+export const TAKEN_OFF_SUFFIX = ' (taken off)'
+
 export interface BoardRef {
   id: string
   name: string
@@ -69,6 +73,17 @@ export interface BoardTreeFields {
 
 const PLAIN: BoardTreeFields = { role: 'board', realBoard: null, shadows: [], crew: null }
 
+/** The crew a person is an account of, or null for a person who is no crew account. */
+export async function crewIdOfUser(userId: string): Promise<string | null> {
+  const [account] = await db.select({ crewId: user.crewId }).from(user).where(eq(user.id, userId))
+  return account?.crewId ?? null
+}
+
+/** The tree fields of a board outside any crew tree: an ordinary board. */
+export function plainBoardTreeFields(): BoardTreeFields {
+  return { ...PLAIN, shadows: [] }
+}
+
 /**
  * The crew shadow boards among `boardIds` that `userId` may not see. A crew's board is seen only by the crew's owner,
  * by the owners and admins of the team it lives in (the crew's team) and of the real board's team, and by the crew's
@@ -93,7 +108,8 @@ export async function hiddenCrewShadows(userId: string, boardIds: string[]): Pro
     .innerJoin(realBoard, eq(realBoard.id, crewBoards.projectId))
     .where(inArray(crewBoards.shadowProjectId, boardIds))
   if (!rows.length) return hidden
-  const [account] = await db.select({ crewId: user.crewId, isInstanceAdmin: user.isInstanceAdmin }).from(user).where(eq(user.id, userId))
+  const crewId = await crewIdOfUser(userId)
+  const [account] = await db.select({ isInstanceAdmin: user.isInstanceAdmin }).from(user).where(eq(user.id, userId))
   const adminTeams = new Set((await db
     .select({ teamId: member.organizationId })
     .from(member)
@@ -103,7 +119,7 @@ export async function hiddenCrewShadows(userId: string, boardIds: string[]): Pro
       || row.createdBy === userId
       || (row.shadowTeamId !== null && adminTeams.has(row.shadowTeamId))
       || (row.realTeamId !== null && adminTeams.has(row.realTeamId))
-      || (Boolean(account?.crewId) && account?.crewId === row.crewId)
+      || (Boolean(crewId) && crewId === row.crewId)
     if (!visible) hidden.add(row.shadowId)
   }
   return hidden
@@ -151,7 +167,7 @@ export async function treeNeighbours(userId: string, ownIds: string[]): Promise<
  */
 export async function boardTreeFields(boardIds: string[], shown: Set<string>): Promise<Map<string, BoardTreeFields>> {
   const result = new Map<string, BoardTreeFields>()
-  for (const id of boardIds) result.set(id, { ...PLAIN, shadows: [] })
+  for (const id of boardIds) result.set(id, plainBoardTreeFields())
   if (!boardIds.length) return result
 
   const shadow = alias(projects, 'tree_shadow_board')
