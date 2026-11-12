@@ -33,18 +33,20 @@ async function call(fetchImpl, url, init, key) {
 }
 
 /**
- * Sends one mail. The id is made here, so a retry of the same send is the same row. When the endpoint does not answer
- * (or refuses for a reason that is not the sender's), the mail is written to the outbox and the next tick flushes it.
- * Returns { sent: true } or { sent: false, outbox: <path> }.
+ * Sends one mail. The id is made here, so a retry of the same send is the same row. Only 401 and 403 (the key is refused)
+ * are thrown. Any other failure (404, 405, 5xx, a timeout, a network error) is a fallback: by default the mail is
+ * written to the outbox and the next tick flushes it; with `outbox: false` nothing is written and the caller takes its
+ * own fallback (the local file path). Returns { sent: true, id } or { sent: false, id, outbox: <path or null> }.
  */
-export async function sendMail({ fetch: fetchImpl = fetch, base, slug, key, to, text, id, mailboxDir, makeId }) {
+export async function sendMail({ fetch: fetchImpl = fetch, base, slug, key, to, text, id, mailboxDir, makeId, outbox: useOutbox = true }) {
   const mailId = id ?? makeId()
   if (!MAIL_ID.test(mailId)) throw new Error('a mail id is 32 lowercase hex')
   try {
     await call(fetchImpl, endpoint(base, slug), { method: 'POST', body: JSON.stringify({ id: mailId, to, text }) }, key)
     return { sent: true, id: mailId }
   } catch (error) {
-    if (error.status === 400 || error.status === 409 || error.status === 429) throw error
+    if (error.status === 401 || error.status === 403) throw error
+    if (!useOutbox) return { sent: false, id: mailId, outbox: null }
     const outbox = join(mailboxDir, 'outbox')
     mkdirSync(outbox, { recursive: true })
     const path = join(outbox, `${mailId}.json`)

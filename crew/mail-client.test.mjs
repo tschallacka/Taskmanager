@@ -90,3 +90,26 @@ test('the fetch asks for one recipient, and a failed fetch is reported, not thro
   const result = await tick({ fetch: down.fetchImpl, base: BASE, slug: 'tm', key: 'k1', to: 'pia', mailboxDir: dir, deliver: () => {} })
   assert.notEqual(result.error, null)
 })
+
+test('a 404 (the route is not live yet) falls back to the outbox, silently; with outbox off nothing is written', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'mail-client-'))
+  const notLive = fakeEndpoint({ status: 404 })
+  const withOutbox = await sendMail({ fetch: notLive.fetchImpl, base: BASE, slug: 'tm', key: 'k1', to: 'pia', text: 'a', id: ID, mailboxDir: dir })
+  assert.equal(withOutbox.sent, false)
+  assert.ok(existsSync(withOutbox.outbox))
+  const noOutbox = await sendMail({ fetch: notLive.fetchImpl, base: BASE, slug: 'tm', key: 'k1', to: 'pia', text: 'b', id: ID2, mailboxDir: dir, outbox: false })
+  assert.equal(noOutbox.sent, false)
+  assert.equal(noOutbox.outbox, null)
+  assert.ok(!existsSync(join(dir, 'outbox', `${ID2}.json`)))
+})
+
+test('a 5xx falls back the same way; a 401 or 403 stops with the error', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'mail-client-'))
+  const broken = fakeEndpoint({ status: 503 })
+  const r = await sendMail({ fetch: broken.fetchImpl, base: BASE, slug: 'tm', key: 'k1', to: 'pia', text: 'c', id: ID, mailboxDir: dir, outbox: false })
+  assert.equal(r.sent, false)
+  const refused = fakeEndpoint({ status: 401 })
+  await assert.rejects(sendMail({ fetch: refused.fetchImpl, base: BASE, slug: 'tm', key: 'k1', to: 'pia', text: 'd', id: ID2, mailboxDir: dir }), { status: 401 })
+  const forbidden = fakeEndpoint({ status: 403 })
+  await assert.rejects(sendMail({ fetch: forbidden.fetchImpl, base: BASE, slug: 'tm', key: 'k1', to: 'pia', text: 'e', id: ID2, mailboxDir: dir }), { status: 403 })
+})
