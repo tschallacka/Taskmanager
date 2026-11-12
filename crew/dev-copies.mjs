@@ -10,9 +10,10 @@ import { fileURLToPath } from 'node:url'
 import { boardCall } from './board-call.mjs'
 import { restartBrief, PEOPLE } from './restart-brief.mjs'
 
-export const QA_COLUMN = /^Verify (UX|QA)/i
+export const UX_OR_QA_COLUMN = /^Verify (UX|QA)/i
 
-// The port devserver-worker.sh serves each worker's copy on.
+// The port devserver-worker.sh serves each worker's copy on. devserver-worker.sh's own case table is the source: if a
+// port moves there, change it here in the same commit (and in the test that pins these values).
 export const PORTS = { wren: 3101, wick: 3102, wynn: 3103, wade: 3104 }
 
 // One entry per card in a Verify UX or Verify QA column.
@@ -20,7 +21,7 @@ export function qaCards(briefs) {
   const cards = []
   for (const b of briefs) {
     for (const block of b.blocks) {
-      if (QA_COLUMN.test(block.column)) cards.push({ who: b.who, id: block.id, title: block.title, column: block.column })
+      if (UX_OR_QA_COLUMN.test(block.column)) cards.push({ who: b.who, id: block.id, title: block.title, column: block.column })
     }
   }
   return cards
@@ -77,21 +78,20 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   }
   const kit = dirname(fileURLToPath(import.meta.url))
   const runner = (who, tool, args) => boardCall(who, tool, args, kit)
-  let briefs
+  let cards
+  let branches = {}
   try {
-    briefs = restartBrief(PEOPLE, runner)
+    cards = qaCards(restartBrief(PEOPLE, runner))
+    if (!cards.length) {
+      console.log('dev copies: no card in Verify UX or Verify QA; nothing to check')
+      process.exit(0)
+    }
+    for (const card of cards) {
+      branches[card.id] = branchOf(runner(card.who, 'get_task', { id: card.id }))
+    }
   } catch (error) {
     console.error(`crew dev-copies: ${error.message}`)
     process.exit(1)
-  }
-  const cards = qaCards(briefs)
-  if (!cards.length) {
-    console.log('dev copies: no card in Verify UX or Verify QA; nothing to check')
-    process.exit(0)
-  }
-  const branches = {}
-  for (const card of cards) {
-    branches[card.id] = branchOf(runner(card.who, 'get_task', { id: card.id }))
   }
   const result = copyLines(cards, { probe: probeHttp, branches })
   for (const line of result.lines) console.log(line)
