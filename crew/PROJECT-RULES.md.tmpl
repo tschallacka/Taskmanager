@@ -23,7 +23,16 @@ Replace the examples below with your own facts; delete lines that do not apply.
   drop or retype anything.
 - The schema lives in `<path>`. After you change it, post a task update that starts with
   `SCHEMA CHANGED:` naming the table and columns. Boss applies it with a backup.
-- Nobody but Boss runs migrations or `psql`.
+- Nobody but Boss runs migrations or `psql` on the shared database.
+
+### Your own test and dev databases
+
+Each person has a database of their own (the crew's kit names it in `crew.json`). It is yours, and only yours:
+
+- Before a full test run, reset your own test database: `<reset command, with your own key>`. A reset of another person's database is refused.
+- You may push the schema to your own test and dev databases only: `<push command, with your own database URL>`. Never push it to the shared database, and never to another person's.
+- Before a full test run, stop your own dev copy: `<stop command>`. Start it again after the run.
+- If a command in this section is refused, post the exact refusal on your task and tag Pia (`test failing` if a test is involved). Do not wait in silence, and do not look for another way round the refusal.
 
 ## Secrets
 
