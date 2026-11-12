@@ -318,11 +318,31 @@ accounts, after which their definitions and the file are yours to delete.
     crew mentions [minutes|--follow]   Pia's updates that write @cato, each printed once: since the last check, or every 60 s for a Monitor (mentions.mjs)
     crew update [--check] [--from <kit folder|kit.tar.gz>] [--kit <folder>]   bring the kit folder up to date (update.mjs)
     crew setup                    make the crew by hand (setup.mjs)
+    crew people add [--people a,b]   add the crew's missing people, their keys into creds.json (people.mjs, below)
     crew publish <slug> <branch> <title> <msg-file> <pr-file>   the merger's one command: squash a branch onto a fresh base, check the merged tree, push, open the pull request (publish.mjs, below)
     crew <who> browser goto|shot|eval|console|tabs|close-tab|done   the shared browser (browser.mjs)
     crew browser status|shutdown  the shared browser for everyone
 
 The old file names (`tm.mjs`, `listen.mjs`, ...) still work.
+
+## Adding missing people (`crew people add`)
+
+A crew made before a role existed (susy, janet, pat, tess, rita) is missing that person's account and key. To add
+them, run `crew people add` (or `crew people add --people susy,janet` for only some). It asks the board for the missing
+people and writes only their new keys into `CREW_HOME/creds.json` (mode 0600). Existing entries are never changed, no key
+or password is printed, and it runs `init` afterwards so the new people get their agent types.
+
+- The token: put the crew's management token in `TASKMANAGER_MANAGEMENT_TOKEN`. It is never taken from the command
+  line; a token-looking argument is refused. Or use the crew owner's crews:manage key in the same variable. A crew
+  member's key cannot add people, and the command says so in one sentence.
+- Nobody missing: it prints "nothing to add" and the cast, and changes nothing.
+- `crew update` ends by checking the cast when a management token is set: if people are missing it prints the command to
+  run, and runs nothing by itself. Without a token it says how to check.
+- It prints the names it added and the cast (`present` or `missing`), then "tell Pia: new people ...".
+- If the keys were made on the board but could not be written to `creds.json` (a full disk, say), the command says
+  those keys are lost. They cannot be fetched again: the board only makes missing people. Ask Boss for a recovery path.
+
+The board's answer is checked by `crew/people.test.mjs` and `crew/people-route.test.mjs` (a fake board, no network).
 
 ## Publish (the merger's one command)
 
@@ -349,6 +369,8 @@ An empty command skips its step and prints `skipped: publish.<setting> is empty`
 The exit codes: 0 published; 1 a git or setup failure; 2 usage; 3 a merge conflict, which prints the conflicted files and keeps the worktree for a hand merge; 4 a check failed, and nothing was pushed. `FORCE=1` goes on past a failed check and pushes anyway, and says so in the summary. Every command gets `DATABASE_URL` from `scratchDatabase` only; one from the environment is never passed on.
 
 `crew.mjs` runs it as `publish.mjs`; `publish.test.mjs` runs it against throwaway git repositories in a folder under the kit's own folder, removed after each run.
+
+**Changelog fragments (Taskmanager).** A change adds `changelog.d/<card-id>-<slug>.md` instead of a line in `CHANGELOG.md` (CONTRIBUTING.md, "Changelog"). The publish that bumps the version folds them in: `node scripts/bump-version.mjs changelog` puts them under the new version heading, deletes them, and must run on the merged tree before the version commit is made, with `changelog.d` and `CHANGELOG.md` staged with it. The kit's own publish does not run that fold: it is a step of the repository's publish script, and a worker never runs it or edits `CHANGELOG.md`.
 
 Post long text from a file, not inline JSON: write the Markdown to a file and run `crew wren update <taskId> body.md`. An update is internal (staff only) unless `--customer` is given; a customer contact's update is customer-visible whatever the flag says, because the server decides. The board prints `posted as internal` or `posted as customer`. An empty body, a file over 200 KB, invalid UTF-8 or NUL bytes exit 65; a missing file, a symlink or a non-file exits 66; an unknown flag exits 64; a board that cannot be reached exits 69 (try again). The one-line form is `crew wren mcp post_task_update`, with a JSON object holding the id and the body.
 
