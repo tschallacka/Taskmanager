@@ -6,7 +6,6 @@ import { queryForView } from '~/utils/projectViewQuery'
 definePageMeta({ layout: 'app' })
 
 const route = useRoute()
-const { sidebarOpen } = useSidebar()
 const searchOpen = useSearchModal()
 
 const {
@@ -337,88 +336,88 @@ useSeoMeta({
       <span aria-hidden="true">›</span>
       <span class="px-1">(shadow)</span>
     </nav>
-    <!-- Board header -->
-    <header class="flex shrink-0 items-center gap-2 border-b border-default px-4 py-3 lg:px-6">
-      <UButton
-        icon="i-lucide-panel-left"
-        color="neutral"
-        variant="ghost"
-        size="sm"
-        class="lg:hidden"
-        aria-label="Open sidebar"
-        @click="sidebarOpen = true"
-      />
+    <!-- Board header: the name, the crew and customer badges and the task count go into the shared top bar's title;
+         the label filter, settings, share and options go into its actions. -->
+    <Teleport
+      defer
+      to="#app-topbar-title"
+    >
+      <div class="flex min-w-0 flex-1 items-center gap-2">
+        <input
+          v-if="renaming"
+          ref="nameEl"
+          v-model="nameDraft"
+          class="min-w-0 max-w-80 flex-1 rounded bg-elevated px-2 py-1 text-base font-semibold text-default outline-none ring-1 ring-primary"
+          @keydown.enter.prevent="commitRename"
+          @keydown.escape="renaming = false"
+          @blur="commitRename"
+        >
+        <button
+          v-else
+          class="min-w-0 flex-1 rounded px-1 py-0.5 text-left text-base font-semibold text-default transition-colors lg:truncate"
+          :class="[isCustomerView ? 'cursor-default' : 'hover:bg-elevated', /\s/.test(activeProject?.name ?? '') ? 'max-lg:line-clamp-2 max-lg:break-normal' : 'max-lg:truncate']"
+          :title="activeProject?.name"
+          @click="startRename"
+        >
+          {{ activeProject?.name ?? 'Board' }}
+        </button>
 
-      <input
-        v-if="renaming"
-        ref="nameEl"
-        v-model="nameDraft"
-        class="min-w-0 max-w-80 flex-1 rounded bg-elevated px-2 py-1 text-base font-semibold text-default outline-none ring-1 ring-primary"
-        @keydown.enter.prevent="commitRename"
-        @keydown.escape="renaming = false"
-        @blur="commitRename"
-      >
-      <button
-        v-else
-        class="min-w-0 flex-1 rounded px-1 py-0.5 text-left text-base font-semibold text-default transition-colors lg:truncate"
-        :class="[isCustomerView ? 'cursor-default' : 'hover:bg-elevated', /\s/.test(activeProject?.name ?? '') ? 'max-lg:line-clamp-2 max-lg:break-normal' : 'max-lg:truncate']"
-        :title="activeProject?.name"
-        @click="startRename"
-      >
-        {{ activeProject?.name ?? 'Board' }}
-      </button>
+        <UDropdownMenu
+          v-if="activeProject?.shadows?.length"
+          :items="shadowMenu"
+          :content="{ align: 'start' }"
+        >
+          <UButton
+            size="sm"
+            color="neutral"
+            variant="soft"
+            icon="i-lucide-users-round"
+            class="min-h-11 shrink-0"
+            data-shadow-entry
+          >
+            Shadow boards ({{ activeProject.shadows.length }})
+          </UButton>
+        </UDropdownMenu>
 
-      <UDropdownMenu
-        v-if="activeProject?.shadows?.length"
-        :items="shadowMenu"
-        :content="{ align: 'start' }"
-      >
-        <UButton
+        <UDropdownMenu
+          v-if="canPickCustomer"
+          :items="customerMenu"
+          :content="{ align: 'start' }"
+        >
+          <UButton
+            size="xs"
+            color="neutral"
+            variant="soft"
+            :icon="activeProject?.customerId ? 'i-lucide-building-2' : 'i-lucide-lock'"
+            class="shrink-0"
+          >
+            {{ activeProject?.customerName ?? 'Team only' }}
+          </UButton>
+        </UDropdownMenu>
+        <UBadge
+          v-else-if="activeProject?.customerName"
           size="sm"
           color="neutral"
           variant="soft"
-          icon="i-lucide-users-round"
-          class="min-h-11 shrink-0"
-          data-shadow-entry
-        >
-          Shadow boards ({{ activeProject.shadows.length }})
-        </UButton>
-      </UDropdownMenu>
-
-      <UDropdownMenu
-        v-if="canPickCustomer"
-        :items="customerMenu"
-        :content="{ align: 'start' }"
-      >
-        <UButton
-          size="xs"
-          color="neutral"
-          variant="soft"
-          :icon="activeProject?.customerId ? 'i-lucide-building-2' : 'i-lucide-lock'"
+          icon="i-lucide-building-2"
           class="shrink-0"
         >
-          {{ activeProject?.customerName ?? 'Team only' }}
-        </UButton>
-      </UDropdownMenu>
-      <UBadge
-        v-else-if="activeProject?.customerName"
-        size="sm"
-        color="neutral"
-        variant="soft"
-        icon="i-lucide-building-2"
-        class="shrink-0"
-      >
-        {{ activeProject.customerName }}
-      </UBadge>
+          {{ activeProject.customerName }}
+        </UBadge>
 
-      <span
-        class="shrink-0 text-xs text-dimmed max-sm:hidden"
-        :title="taskCountTitle"
-      >
-        {{ taskCountText }} {{ taskCount === 1 ? 'task' : 'tasks' }}
-      </span>
-
-      <div class="ml-auto flex shrink-0 items-center gap-1">
+        <span
+          class="shrink-0 text-xs text-dimmed max-sm:hidden"
+          :title="taskCountTitle"
+        >
+          {{ taskCountText }} {{ taskCount === 1 ? 'task' : 'tasks' }}
+        </span>
+      </div>
+    </Teleport>
+    <Teleport
+      defer
+      to="#app-topbar-actions"
+    >
+      <div class="flex shrink-0 items-center gap-1">
         <!-- Label filter -->
         <UPopover
           v-if="boardTagCounts.length"
@@ -519,7 +518,7 @@ useSeoMeta({
           />
         </UDropdownMenu>
       </div>
-    </header>
+    </Teleport>
 
     <!-- Archived: out of the lists and its rules are paused; the board itself stays usable -->
     <div
@@ -735,14 +734,6 @@ useSeoMeta({
       class="fixed bottom-0 left-0 right-0 z-20 flex items-center justify-around border-t border-default bg-default/95 px-8 backdrop-blur-sm lg:hidden"
       style="padding-top: 0.5rem; padding-bottom: max(0.5rem, env(safe-area-inset-bottom))"
     >
-      <UButton
-        icon="i-lucide-panel-left"
-        color="neutral"
-        variant="ghost"
-        size="md"
-        aria-label="Open sidebar"
-        @click="sidebarOpen = true"
-      />
       <UButton
         icon="i-lucide-search"
         color="neutral"

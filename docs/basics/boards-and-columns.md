@@ -55,7 +55,7 @@ from the columns, not from the done mark:
 - A board with a single column has no ending, so it shows the plain total.
 
 Tasks in an ending column are not counted as open. The same count is shown under each board's name in the sidebar.
-The *Browse projects* page counts differently: it counts a task as open until it has the **done mark**.
+The *All projects* page counts differently: it counts a task as open until it has the **done mark**.
 
 ## Good to know
 

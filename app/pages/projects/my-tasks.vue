@@ -5,7 +5,6 @@ import type { TaskSearchRow } from '~/composables/useProjects'
 
 definePageMeta({ layout: 'app' })
 
-const { sidebarOpen } = useSidebar()
 useSeoMeta({ title: 'My tasks' })
 
 const { session } = useAuth()
@@ -47,20 +46,19 @@ function setView(next: 'list' | 'board') {
 
 <template>
   <div class="flex min-w-0 flex-1 flex-col">
-    <header class="flex shrink-0 items-center gap-2 border-b border-default px-4 py-3 lg:px-6">
-      <UButton
-        icon="i-lucide-panel-left"
-        color="neutral"
-        variant="ghost"
-        size="sm"
-        class="lg:hidden"
-        aria-label="Open sidebar"
-        @click="sidebarOpen = true"
-      />
+    <Teleport
+      defer
+      to="#app-topbar-title"
+    >
       <h1 class="text-base font-semibold text-default">
         My tasks
       </h1>
-      <div class="ml-auto flex items-center gap-0.5 rounded-lg bg-elevated p-0.5">
+    </Teleport>
+    <Teleport
+      defer
+      to="#app-topbar-actions"
+    >
+      <div class="flex items-center gap-0.5 rounded-lg bg-elevated p-0.5">
         <button
           v-for="option in (['list', 'board'] as const)"
           :key="option"
@@ -76,7 +74,7 @@ function setView(next: 'list' | 'board') {
           {{ option }}
         </button>
       </div>
-    </header>
+    </Teleport>
 
     <MyTasksBoard
       v-if="view === 'board'"
