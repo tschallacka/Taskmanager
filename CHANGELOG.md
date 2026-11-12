@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.15.0 - 2026-11-12
+
+- **Updating a crew is one command.** `curl -fsSL <host>/crew/update.sh | sh -s -- <crew home>` fetches the kit the instance serves and runs its update, so a crew with no kit folder, an old kit, or a current one all update the same way. The project list's **Update this crew's kit** item copies that line. One kit folder per instance, `crew update --all` updates every crew home, and a crew's owner files (rules, brief, janitor card) are merged, not replaced. `crew/update.mjs`, `crew/update.test.mjs`, `crew/kit.test.mjs`, `server/routes/crew/update.sh.get.ts`, `app/components/ProjectsListPanel.vue`.
+
 ## 0.14.0 - 2026-11-12
 
 - **Pia's wake checklist: waiting work is never "nothing to do".** On every wake the PM runs five steps in order (answer open questions, move the gate's cards, name who unblocks each Blocked card, restart anyone who stopped with work, then "nothing needs action"), and a card waiting in To do or Verify, or an idle worker with a next step, is named in her round. `crew/PROMPTS.md.tmpl`, `crew/CREW.md.tmpl`.
