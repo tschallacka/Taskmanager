@@ -2,7 +2,7 @@
 import { format, formatDistanceToNowStrict } from 'date-fns'
 import { dueDayToMs, isOverdueDay, todayIso } from '~/utils/dueDate'
 import { homeStats } from '~/utils/homeStats'
-import { gettingStartedSteps, projectRows, taskGroups } from '~/utils/homeView'
+import { gettingStartedSteps, projectNameOf, projectRows, taskGroups } from '~/utils/homeView'
 import { healthTint, kindIcon } from '~/utils/projectKind'
 
 definePageMeta({ layout: 'app' })
@@ -317,6 +317,11 @@ function openTask(task: { id: string, projectId: string }) {
                     />
                   </button>
                   <span class="min-w-0 flex-1 truncate text-sm text-default">{{ task.title }}</span>
+                  <span
+                    v-if="projectNameOf(task.projectId, projects)"
+                    class="max-w-[9rem] shrink truncate rounded-full bg-elevated px-2 py-0.5 text-xs text-muted"
+                    data-task-project
+                  >{{ projectNameOf(task.projectId, projects) }}</span>
                   <span
                     class="shrink-0 text-xs tabular-nums"
                     :class="task.dueOn && isOverdueDay(task.dueOn) ? 'text-error' : 'text-dimmed'"

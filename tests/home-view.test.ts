@@ -2,7 +2,14 @@
 // Pure: no browser. Run: node --import tsx --test tests/home-view.test.ts
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { gettingStartedSteps, projectRows, taskGroups } from '../app/utils/homeView'
+import { gettingStartedSteps, projectNameOf, projectRows, taskGroups } from '../app/utils/homeView'
+
+test('projectNameOf: the chip on a My tasks row names the task\'s project, and nothing when the project is not listed', () => {
+  const projects = [{ id: 'p1', name: 'Website' }, { id: 'p2', name: 'Launch' }]
+  assert.equal(projectNameOf('p2', projects), 'Launch')
+  assert.equal(projectNameOf('gone', projects), null)
+  assert.equal(projectNameOf('p1', []), null)
+})
 
 // Thursday 12 November 2026, noon: the day the tests are about.
 const NOW = new Date(2026, 10, 12, 12)

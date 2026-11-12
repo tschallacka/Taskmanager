@@ -56,6 +56,11 @@ export function gettingStartedSteps(facts: StepFacts): GettingStartedStep[] {
   ]
 }
 
+/** The name of the project a task belongs to, for the chip on a My tasks row. Null when the project is not in the list. */
+export function projectNameOf(projectId: string, projects: readonly { id: string, name: string }[]): string | null {
+  return projects.find(project => project.id === projectId)?.name ?? null
+}
+
 export interface ProgressTask {
   projectId: string
   completedAt?: number | null
