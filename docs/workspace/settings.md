@@ -28,8 +28,10 @@ totals.
 Your picture, name and email, and **Member since** with the month and year you joined. **Sign out** ends your session
 on this device.
 
-This section only shows these details: it has no field for changing your name or picture. The **Profile** page links
-here with **Edit profile in settings**, and that link opens this page.
+Under the account details you change your own picture and display name. **Change picture** (or click the picture) uploads a
+PNG, JPEG, WebP or SVG picture of up to 2 MB; it is cropped to a square and kept at 256 pixels. **Remove picture** goes back
+to your initials, on a colour that stays the same for you everywhere. Click your name to edit it: 1 to 60 characters, then
+**Save** or **Cancel**. The **Profile** page links here with **Edit profile in settings**, and that link opens this page.
 
 ## Security
 
