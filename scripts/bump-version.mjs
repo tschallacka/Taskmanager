@@ -1,10 +1,13 @@
 // Bumps the Taskmanager version in package.json and in every literal copy of it, or tags the release.
+// It also folds the changelog fragments (changelog.d/*.md) into CHANGELOG.md under the new version.
 //   node scripts/bump-version.mjs <patch|feature|breaking> [--dry-run]
+//   node scripts/bump-version.mjs changelog [--dry-run]     folds under the version package.json already has
+//   (git diff --name-status origin/master...HEAD; echo "--- CHANGELOG.md diff"; git diff origin/master...HEAD -- CHANGELOG.md) | node scripts/bump-version.mjs changelog-check   (the CI rule)
 //   node scripts/bump-version.mjs tag [--ref <commit>] [--push] [--dry-run]
-// Plain node, no dependencies. Bump mode never runs git, npm or the network. Tag mode runs git only:
+// Plain node, no dependencies. Bump and changelog mode never run git, npm or the network. Tag mode runs git only:
 // it fetches origin master, creates one annotated tag and, with --push, pushes that one tag.
 // Exit 0 on success, 1 when refused, 2 on a usage error.
-import { readFileSync, writeFileSync, existsSync } from 'node:fs'
+import { readFileSync, writeFileSync, existsSync, readdirSync, rmSync } from 'node:fs'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { join, dirname } from 'node:path'
@@ -21,8 +24,16 @@ const VERSION_COPIES = [
   { file: 'server/api/mcp/index.post.ts', pattern: /(\bSERVER_VERSION = ')(\d+\.\d+\.\d+)(')/g }
 ]
 
+// A change adds one fragment, changelog.d/<card-id>-<slug>.md, holding its entry: text that starts with a bullet,
+// as the entries in CHANGELOG.md do. The fold writes the fragments under `## <version> - <date>`, above the
+// release headings already there, in file-name order, and deletes them. Nobody else edits CHANGELOG.md.
+const CHANGELOG = 'CHANGELOG.md'
+const FRAGMENTS = 'changelog.d'
+
 const KINDS = ['patch', 'feature', 'breaking']
 const USAGE = 'usage: bump-version.mjs <patch|feature|breaking> [--dry-run]\n'
+  + '       bump-version.mjs changelog [--dry-run]\n'
+  + '       bump-version.mjs changelog-check   (name-status lines on stdin)\n'
   + '       bump-version.mjs tag [--ref <commit>] [--push] [--dry-run]'
 
 // A refusal: the reason is printed and nothing is written. Exit 1.
@@ -50,6 +61,61 @@ function nextVersion([x, y, z], kind) {
 
 const format = version => version.join('.')
 const escapeRegExp = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+// The fragments in changelog.d, in file-name order, each as its trimmed text. Only *.md counts. A fragment that
+// does not start with a bullet is refused, so nothing unfolded can reach CHANGELOG.md.
+function readFragments() {
+  const dir = join(ROOT, FRAGMENTS)
+  if (!existsSync(dir)) return []
+  return readdirSync(dir)
+    .filter(name => name.endsWith('.md'))
+    .sort()
+    .map((name) => {
+      const path = join(dir, name)
+      const text = readFileSync(path, 'utf8').trim()
+      if (!text.startsWith('- ')) {
+        throw new Refusal(`${FRAGMENTS}/${name}: a fragment is an entry that starts with a bullet ("- **...** ..."); nothing folded`)
+      }
+      return { path, text }
+    })
+}
+
+// CHANGELOG.md with the fragments under `## <version> - <date>`, above the release headings that are there.
+// Refused when that version already has a heading, so a fold can never be made twice.
+function foldChangelog(version, fragments, date) {
+  const path = join(ROOT, CHANGELOG)
+  if (!existsSync(path)) throw new Refusal(`${CHANGELOG} is missing; nothing folded`)
+  const before = readFileSync(path, 'utf8')
+  if (new RegExp(`^## ${escapeRegExp(version)}(?: |$)`, 'm').test(before)) {
+    throw new Refusal(`${CHANGELOG} already has a heading for ${version}; nothing folded`)
+  }
+  const section = `## ${version} - ${date}\n\n${fragments.map(fragment => fragment.text).join('\n\n')}\n\n`
+  const at = before.search(/^## /m)
+  const after = at === -1
+    ? `${before.trimEnd()}\n\n${section.trimEnd()}\n`
+    : `${before.slice(0, at)}${section}${before.slice(at)}`
+  return { path, before, after }
+}
+
+// The fold as one write and the fragments to delete, or null when there are no fragments.
+function planFold(version) {
+  const fragments = readFragments()
+  if (fragments.length === 0) return null
+  const date = new Date().toISOString().slice(0, 10)
+  return {
+    write: foldChangelog(version, fragments, date),
+    removals: fragments.map(fragment => fragment.path),
+    line: `${FRAGMENTS}: ${fragments.length} ${fragments.length === 1 ? 'fragment' : 'fragments'} folded into ${CHANGELOG} under ${version} (${date})`
+  }
+}
+
+// Writes what was computed in memory, then deletes the folded fragments.
+function applyWrites(writes, removals) {
+  for (const write of writes) {
+    if (write.after !== write.before) writeFileSync(write.path, write.after)
+  }
+  for (const path of removals) rmSync(path)
+}
 
 function bumpRelease(kind, args) {
   let dryRun = false
@@ -110,14 +176,80 @@ function bumpRelease(kind, args) {
   // In beta (major 0) breaking and feature give the same number; the kind is kept in this line and in the tag.
   const held = kind === 'breaking' && oldVersion[0] === 0
   lines.push(`version: ${oldText} -> ${newText} (${kind}${held ? ', held at 0.x: beta' : ''})`)
+
+  // The fragments fold in under the new version, in the same write as the bump. Refused before anything is written.
+  const fold = planFold(newText)
+  if (fold) {
+    writes.push(fold.write)
+    lines.push(fold.line)
+  }
   if (dryRun) {
     lines.push('dry run: nothing written')
   } else {
-    for (const write of writes) {
-      if (write.after !== write.before) writeFileSync(write.path, write.after)
-    }
+    applyWrites(writes, fold ? fold.removals : [])
   }
   console.log(lines.join('\n'))
+}
+
+// The changelog fold alone, under the version package.json already has. publish.sh runs it after `npm version`.
+function changelogFold(args) {
+  let dryRun = false
+  for (const arg of args) {
+    if (arg === '--dry-run') dryRun = true
+    else throw new Usage(`unknown argument: ${arg}\n${USAGE}`)
+  }
+  const packageText = readFileSync(join(ROOT, 'package.json'), 'utf8')
+  const version = format(parseSemver(JSON.parse(packageText).version, 'package.json'))
+  const fold = planFold(version)
+  if (!fold) {
+    console.log(`${FRAGMENTS}: no fragments; ${CHANGELOG} left as it is`)
+    return
+  }
+  if (dryRun) {
+    console.log(`${fold.line}\ndry run: nothing written`)
+    return
+  }
+  applyWrites([fold.write], fold.removals)
+  console.log(fold.line)
+}
+
+// The CI rule for a pull request. Reads on stdin the name-status lines of `git diff --name-status origin/master...HEAD`,
+// then a line `--- CHANGELOG.md diff`, then `git diff origin/master...HEAD -- CHANGELOG.md`. It passes when one rule
+// holds, printing which one: a worker's change adds a fragment; the merger's publish pull request carries the folded
+// CHANGELOG.md instead (CHANGELOG.md changed, its fragments deleted, and the diff adds a `## <version> - <date>` heading,
+// so a hand edit of CHANGELOG.md does not pass); a change touching only documentation or dependency hashes needs none.
+// Anything else is refused.
+const NO_CHANGELOG_NEEDED = /(\.md$|^docs\/|^nix\/hashes\.json$|^flake\.lock$)/
+const CHANGELOG_DIFF_MARK = '--- CHANGELOG.md diff'
+const VERSION_HEADING_ADDED = /^\+## \d+\.\d+\.\d+ - \d{4}-\d{2}-\d{2}\s*$/m
+
+function changelogCheck(input) {
+  const cut = input.indexOf(`\n${CHANGELOG_DIFF_MARK}`)
+  const text = cut < 0 ? input : input.slice(0, cut)
+  const changelogDiff = cut < 0 ? '' : input.slice(cut + CHANGELOG_DIFF_MARK.length + 2)
+  const rows = text.split('\n').filter(Boolean).map((line) => {
+    const fields = line.split('\t')
+    return { status: fields[0][0], path: fields[fields.length - 1] }
+  })
+  const added = rows.filter(row => row.status === 'A' && /^changelog\.d\/.+\.md$/.test(row.path))
+  if (added.length > 0) {
+    console.log(`rule: fragment added (${added.map(row => row.path).join(', ')})`)
+    return
+  }
+  const deleted = rows.filter(row => row.status === 'D' && /^changelog\.d\/.+\.md$/.test(row.path))
+  if (deleted.length > 0 && rows.some(row => row.status === 'M' && row.path === CHANGELOG)) {
+    if (!VERSION_HEADING_ADDED.test(changelogDiff)) {
+      throw new Refusal(`${CHANGELOG} changed without a new "## <version> - <date>" heading: the fold adds it, a hand edit does not pass`)
+    }
+    console.log(`rule: folded changelog (${CHANGELOG} changed, ${deleted.length} ${deleted.length === 1 ? 'fragment' : 'fragments'} deleted, version heading added)`)
+    return
+  }
+  // The changelog itself is never "documentation": a hand edit of CHANGELOG.md is not a fold (the rule above needs the heading).
+  if (rows.every(row => row.path !== CHANGELOG && NO_CHANGELOG_NEEDED.test(row.path))) {
+    console.log('rule: not needed (only documentation or dependency hashes changed)')
+    return
+  }
+  throw new Refusal('this change adds no changelog fragment: add changelog.d/<card-id>-<slug>.md with one bullet (CONTRIBUTING.md, Changelog)')
 }
 
 // Only git's own environment for the repository this script sits in; a GIT_DIR from a hook must not redirect it.
@@ -207,6 +339,8 @@ function tagRelease(args) {
 try {
   const [command, ...rest] = process.argv.slice(2)
   if (command === 'tag') tagRelease(rest)
+  else if (command === 'changelog') changelogFold(rest)
+  else if (command === 'changelog-check') changelogCheck(readFileSync(0, 'utf8'))
   else if (KINDS.includes(command)) bumpRelease(command, rest)
   else throw new Usage(USAGE)
 } catch (error) {
