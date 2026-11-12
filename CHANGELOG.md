@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.20.1 - 2026-11-12
+
+- **The mail routes moved out of the crew gate.** A member's mail was unreachable from a remote machine: the crew gate answers every `/api/crews/*` path with a 404 to a member key, and the mail routes were under `/api/crews`. They are now `/api/crew-mail/<slug>` (send and fetch) and `/api/crew-mail/<slug>/<id>/ack`, and the mailer client uses them. The rules are unchanged. A regression test pins that the mail paths are not crew API paths and that no mail route is left under `/api/crews`. Files: `server/api/crew-mail/[slug]/`, `crew/mail-client.mjs`, `tests/crew-mail-path.test.ts`, `docs/crews/crew-mail.md`.
+
 ## 0.20.0 - 2026-11-12
 
 - **Crew rule notes are written by the crew's Boss account, never the board owner.** The built-in crew rules (promotion, gate routing, the time-log check, the failing-test clock) posted their notes as the board owner when no Pia account was on the board, so every reply landed in the owner's inbox. They now post as the Boss account (Pia's if there is none), and a rule with neither skips the note and logs why. A new crew's Boss account is named Cato. `server/utils/crewRules.ts`, `server/utils/ruleActions.ts`, `server/utils/crewProvisioning.ts`, `tests/crew-rule-note-author.test.ts`, `tests/crew-provisioning-boss-name.test.ts`, `tests/crew-server-rules.test.ts`, `docs/crews/crew-rule-notes.md`.
