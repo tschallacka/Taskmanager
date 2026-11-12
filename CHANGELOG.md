@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.12.1 - 2026-11-12
+
+- **The crew's secretary (Susy) does not count her own pokes as card changes.** A poke moved the card's update time, so each poke counted as a change, the count reset, and the next check poked the same person again: the ladder (person, Pia, Boss, then quiet) never climbed. Her own posts no longer count; a change by anyone else, a move or an edit still does. `crew/susy.mjs`, `crew/susy.test.mjs`.
+
 ## 0.12.0 - 2026-11-12
 
 - **`crew people add`: a crew made before a role existed gets the new person from the kit.** The kit command `crew <who> people add` calls `POST /api/crews/:slug/people` and merges the answer into `creds.json` and `crew.json` without printing a key; `crew update` offers it after an update. `crew/people.mjs`, `crew/people.test.mjs`, `crew/people-route.test.mjs`, `crew/crew.mjs`, `crew/update.mjs`, `crew/kit-files.txt`, `crew/README.md`.
