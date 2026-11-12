@@ -23,18 +23,17 @@ async function copySetupPrompt() {
   if (setupProblem.value) return
   setupBusy.value = true
   try {
+    // The server decides: an unknown board, or one this admin cannot open, answers 404 (or 403); nothing is copied then.
     const id = setupBoardId.value.trim()
-    const boards = await $fetch<{ id: string, name: string }[]>('/api/projects')
-    const board = boards.find(item => item.id === id)
-    if (!board) {
-      setupProblem.value = 'No board you can open has that id. Copy the id from the board\'s address (the part after /projects/).'
-      return
-    }
+    const board = await $fetch<{ id: string, name: string }>(`/api/projects/${encodeURIComponent(id)}`)
     await navigator.clipboard.writeText(approvalSetupPrompt({ origin: window.location.origin, boardId: board.id, boardName: board.name }))
     toast.add({ title: 'Setup prompt copied', description: 'Paste it into the agent that runs the crew.', icon: 'i-lucide-check' })
     setupOpen.value = false
-  } catch {
-    setupProblem.value = 'Could not check the board or copy the prompt. Try again.'
+  } catch (error) {
+    const status = (error as { statusCode?: number, status?: number } | null)?.statusCode ?? (error as { status?: number } | null)?.status
+    setupProblem.value = status === 404 || status === 403
+      ? 'No board you can open has that id. Copy the id from the board\'s address (the part after /projects/).'
+      : 'Could not check the board or copy the prompt. Try again.'
   } finally {
     setupBusy.value = false
   }
