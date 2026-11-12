@@ -31,7 +31,9 @@ export const RESTING = ['Backlog', 'Blocked', 'Ready for live', 'Done']
 export const STUCK_FACTOR = 3
 const MIN = 60000
 const STALE_ROUND_MINUTES = 5
-const LEDGER = /^(poked|cleared) (\S+) \| (.+?) \| at (\S+)\s*$/
+// Her markers: `poked <to> | <reason> | at <time>`, or `cleared ...`. Since card mwcytequ3yduaddw3o4 each also carries
+// `| was <time>`: the card's time as she read it before her post, so a move with no update of its own is not lost.
+const LEDGER = /^(poked|cleared) (\S+) \| (.+?) \| at (\S+)(?: \| was (\S+))?\s*$/
 const AGENT_ID = /^[\w.-]{1,80}$/
 
 /** Thresholds in minutes: the defaults, with any valid number from crew.json's "susy" block. */
@@ -95,16 +97,29 @@ function ledgerOf(card) {
 // The board moves a card's updatedAt when anyone posts on it, Susy included. Her own posts are within this slack of it.
 const OWN_POST_SLACK = 2000
 
+/** The card's time as Susy read it before her post, from a `| was <time>` at the end of her update, or NaN. */
+function wasOf(update) {
+  const match = /\| was (\S+)\s*$/.exec(String(update.body).trim())
+  return match ? Date.parse(match[1]) : NaN
+}
+
 /**
- * Every time the card changed by someone other than Susy: each update by anyone but her, and the card's own time (a move,
- * an edit) unless her own post is what moved it. Her pokes and markers never count (card mwcytequ3yduaddw3o4).
+ * Every time the card changed by someone other than Susy: each update by anyone but her; a move or an edit (the card's own
+ * time, which leaves no update); and the card time her post replaced (`was`), which a later post of hers would hide. Her own
+ * posts never count as a change (card mwcytequ3yduaddw3o4).
  */
 function changeTimes(card) {
   const updates = card.updates ?? []
-  const susyAt = updates.filter(update => authorKey(update.author) === 'susy').map(update => Date.parse(update.at))
+  const susy = updates.filter(update => authorKey(update.author) === 'susy')
+  const susyAt = susy.map(update => Date.parse(update.at))
+  const mine = t => susyAt.some(s => Math.abs(s - t) <= OWN_POST_SLACK)
   const times = updates.filter(update => authorKey(update.author) !== 'susy').map(update => Date.parse(update.at))
+  for (const update of susy) {
+    const was = wasOf(update)
+    if (Number.isFinite(was) && !mine(was)) times.push(was)
+  }
   const own = card.updatedAt
-  if (Number.isFinite(own) && !susyAt.some(t => Math.abs(t - own) <= OWN_POST_SLACK)) times.push(own)
+  if (Number.isFinite(own) && !mine(own)) times.push(own)
   return times.filter(Number.isFinite)
 }
 
@@ -172,12 +187,17 @@ export function evaluate(card, c, now, ctx) {
   return actions
 }
 
+/** The ` | was <time>` tail of her marker: the card's time as she read it, before this post moves it. */
+function wasPart(card) {
+  return Number.isFinite(card.updatedAt) ? ` | was ${new Date(card.updatedAt).toISOString()}` : ''
+}
+
 function clearAction(card, last, reason, now) {
   return {
     kind: 'clear',
     cardId: card.id,
     reason,
-    marker: `cleared ${last.to} | ${reason} | at ${new Date(now).toISOString()}`,
+    marker: `cleared ${last.to} | ${reason} | at ${new Date(now).toISOString()}${wasPart(card)}`,
     text: `clear "${reason}" on ${card.id} "${card.title}": the card changed or the reason ended`
   }
 }
@@ -193,7 +213,7 @@ function pokeAction(card, c, to, now, ctx) {
     to,
     reason: c.reason,
     cardId: card.id,
-    marker: `poked ${to} | ${c.reason} | at ${new Date(now).toISOString()}`,
+    marker: `poked ${to} | ${c.reason} | at ${new Date(now).toISOString()}${wasPart(card)}`,
     text: `poke ${who} on ${card.id} "${card.title}": ${c.reason} (${minutes} min; ${how}). Say: ${say}`
   }
 }
@@ -411,8 +431,11 @@ async function main() {
   for (const column of board?.columns ?? []) {
     for (const task of column.tasks ?? []) {
       if (!Number(task.updates)) continue
-      const full = await call('get_task', { id: task.id, order: 'oldest', limit: 200 })
-      updatesOf[task.id] = (full?.updates ?? []).map(update => ({ id: update.id, author: update.author, body: update.body, at: update.at }))
+      // The newest 200, then put in time order: a card over 200 updates keeps its latest changes and her latest pokes.
+      const full = await call('get_task', { id: task.id, order: 'newest', limit: 200 })
+      updatesOf[task.id] = (full?.updates ?? [])
+        .map(update => ({ id: update.id, author: update.author, body: update.body, at: update.at }))
+        .sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
     }
   }
   const cards = cardsFrom(board, updatesOf)

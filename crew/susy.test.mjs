@@ -320,3 +320,44 @@ test('a later update by another person resets the ladder: the open poke is clear
   assert.equal(later.length, 1)
   assert.equal(later[0].to, 'wynn', 'after the reset the ladder starts again at the worker')
 })
+
+test('a move with no update, then her post: the move still counts, so the ladder restarts from the move', () => {
+  // Wynn's update 40 min ago; a poke 35 min ago; Pia moves the card 20 min ago (no update, only the card time); Susy pokes
+  // 10 min ago, and her marker says the card read 20 min ago before it. The move is the last change: one poke since it.
+  const updates = [
+    update(agent('wynn'), 'Started.', 40),
+    poke('wynn', 'in progress, no update', 35),
+    update(agent('susy'), `poked wynn | in progress, no update | at ${at(10)} | was ${at(20)}`, 10)
+  ]
+  const c = card('move1', { column: 'In progress', assignee: 'Wynn Worker', updatedAt: NOW - 10 * MIN, updates })
+  const pokes = run([c]).actions.filter(a => a.kind === 'poke')
+  assert.equal(pokes.length, 1)
+  assert.equal(pokes[0].to, 'wynn', 'counted from the move, the next poke is still the worker, not Pia')
+})
+
+// Her told-pia posts (SUSY.md) are hers too: they move the card time, and must not reset or climb the ladder.
+const told = minutesAgo => update(agent('susy'), `told pia | wynn stuck | at ${at(minutesAgo)}`, minutesAgo)
+
+test('told-pia posts between her pokes: the count holds, the ladder climbs, a later update by another person resets it', () => {
+  for (let done = 0; done <= LADDER_STEPS.length; done++) {
+    const updates = []
+    for (let i = 0; i < done; i++) {
+      const minutes = 11 * (done - i)
+      updates.push(poke(LADDER_STEPS[i], 'in progress, no update', minutes), told(minutes - 2))
+    }
+    const updatedAt = done ? NOW - 9 * MIN : NOW - 60 * MIN
+    const c = card(`told${done}`, { column: 'In progress', assignee: 'Wynn Worker', updatedAt, updates })
+    const pokes = run([c]).actions.filter(a => a.kind === 'poke')
+    if (done === LADDER_STEPS.length) assert.equal(pokes.length, 0, 'after the last rung the card is quiet')
+    else {
+      assert.equal(pokes.length, 1, `told-pia poke ${done + 1}`)
+      assert.equal(pokes[0].to, LADDER_STEPS[done], `told-pia poke ${done + 1} goes to ${LADDER_STEPS[done]}`)
+    }
+  }
+  const reset = [...[44, 33, 22, 11].map((m, i) => poke(LADDER_STEPS[i], 'in progress, no update', m)), update(agent('wynn'), 'Working on it.', 5)]
+  const c = card('told-reset', { column: 'In progress', assignee: 'Wynn Worker', updatedAt: NOW - 5 * MIN, updates: reset })
+  assert.equal(run([c]).actions.filter(a => a.kind === 'clear').length, 1, 'the open poke closes at the change')
+  const later = run([c], { now: NOW + 6 * MIN }).actions.filter(a => a.kind === 'poke')
+  assert.equal(later.length, 1)
+  assert.equal(later[0].to, 'wynn', 'the ladder starts again at the worker')
+})
