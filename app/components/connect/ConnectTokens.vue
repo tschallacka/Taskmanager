@@ -71,7 +71,7 @@ async function saveEdit(token: ConnectTokenRow) {
         boards: Object.entries(state.grants).map(([projectId, scopes]) => ({ projectId, scopes }))
       }
     })
-    toast.add({ title: 'Connection saved', description: 'The key stays the same. The change applies to its next call.', icon: 'i-lucide-check', duration: 3000 })
+    noteRow(token.id, 'Connection saved. The key stays the same; the change applies to its next call.')
     editing.value = null
     emit('changed')
   } catch (e) {
@@ -129,7 +129,7 @@ async function submitAdd(token: ConnectTokenRow) {
   }
   try {
     await $fetch(`/api/settings/connect-tokens/${token.id}/boards`, { method: 'POST', body })
-    toast.add({ title: `Added ${boardsNamed(state.projectId)}`, icon: 'i-lucide-check', duration: 2500 })
+    noteRow(token.id, `Added ${boardsNamed(state.projectId)} to this connection.`)
     adding.value = null
     emit('changed')
   } catch (e) {
@@ -141,6 +141,15 @@ async function submitAdd(token: ConnectTokenRow) {
 function toggleAddScope(scope: string, on: boolean) {
   if (!adding.value) return
   adding.value.scopes = on ? [...adding.value.scopes, scope] : adding.value.scopes.filter(item => item !== scope)
+}
+
+// A confirmation for a row's own action (Edit boards, Add a board): it shows in that row, not in a toast elsewhere.
+// It stays until another confirmation replaces it on any row.
+const rowNote = ref<{ tokenId: string, text: string } | null>(null)
+
+function noteRow(tokenId: string, text: string) {
+  rowNote.value = { tokenId, text }
+  nextTick(() => document.getElementById(`connect-row-${tokenId}`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }))
 }
 
 // ─── Regenerate: a new secret, shown once, or a pairing code for it ───
@@ -478,6 +487,18 @@ const permissions = computed(() => CONNECT_PERMISSIONS.filter(permission => prop
           data-connect-row-result
           @dismiss="issuedRow = null"
         />
+        <p
+          v-if="rowNote && rowNote.tokenId === token.id"
+          class="flex items-center gap-1.5 text-xs text-success"
+          role="status"
+          data-connect-row-note
+        >
+          <UIcon
+            name="i-lucide-check"
+            class="size-3.5 shrink-0"
+          />
+          {{ rowNote.text }}
+        </p>
       </li>
     </ul>
   </div>

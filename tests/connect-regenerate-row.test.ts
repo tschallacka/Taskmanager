@@ -31,3 +31,17 @@ test('the page banner is still set by a new connection only', () => {
   const onIssuedSource = page.slice(page.indexOf('function onIssued('), page.indexOf('function onIssued(') + 120)
   assert.match(onIssuedSource, /issued\.value = connection/)
 })
+
+test('Edit boards and Add a board confirm in their own row, not in a toast elsewhere', () => {
+  const saveEdit = tokens.slice(tokens.indexOf('async function saveEdit('), tokens.indexOf('function boardsNamed('))
+  const submitAdd = tokens.slice(tokens.indexOf('async function submitAdd('), tokens.indexOf('function toggleAddScope('))
+  assert.match(saveEdit, /noteRow\(token\.id, 'Connection saved/, 'the save confirms in the row')
+  assert.doesNotMatch(saveEdit, /toast\.add\(\{ title: 'Connection saved'/, 'no success toast for the save')
+  assert.match(submitAdd, /noteRow\(token\.id, `Added /, 'the add confirms in the row')
+  assert.doesNotMatch(submitAdd, /toast\.add\(\{ title: `Added /, 'no success toast for the add')
+  assert.match(tokens, /data-connect-row-note/, 'the row shows the confirmation')
+})
+
+test('the row confirmation scrolls its row into view', () => {
+  assert.match(tokens, /function noteRow\([\s\S]*?scrollIntoView/)
+})
