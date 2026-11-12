@@ -167,31 +167,6 @@ function subtaskProgress(taskId: string) {
 
 <template>
   <div class="h-full overflow-y-auto px-4 pb-10 lg:px-6">
-    <!-- The table's one header row, on a wide screen. Its names sit over the cells, which read the same widths
-         (app/utils/listColumns.ts): the task, the custom fields, then the optional columns in row order. -->
-    <div
-      v-if="sections.length"
-      class="mt-3 hidden items-center gap-3 px-3 text-[0.6875rem] font-medium uppercase tracking-wide text-dimmed md:flex"
-      data-list-header
-    >
-      <span class="size-5 shrink-0" />
-      <span class="min-w-0 flex-1">Task</span>
-      <span
-        v-for="col in fieldColumns(fields)"
-        :key="col.key"
-        class="shrink-0 truncate px-1"
-        :class="col.width"
-        data-list-header-field
-      >{{ col.label }}</span>
-      <span class="flex shrink-0 items-center gap-2">
-        <span
-          v-for="col in metaColumns(shownColumns)"
-          :key="col.key"
-          :class="[col.width, col.key === 'assignee' ? '' : 'text-right']"
-          :data-list-header-cell="col.key"
-        >{{ col.label }}</span>
-      </span>
-    </div>
     <div
       class="mt-3 flex flex-wrap items-center gap-3 px-1"
       data-list-controls
@@ -236,6 +211,31 @@ function subtaskProgress(taskId: string) {
           <option value="title">Title</option>
         </select>
       </label>
+    </div>
+    <!-- The table's one header row, under the controls, on a wide screen. Its names sit over the cells, which read the
+         same widths (app/utils/listColumns.ts): the task, the custom fields, then the optional columns in row order. -->
+    <div
+      v-if="sections.length"
+      class="mt-4 hidden items-center gap-3 px-3 text-[0.6875rem] font-medium uppercase tracking-wide text-dimmed md:flex"
+      data-list-header
+    >
+      <span class="size-5 shrink-0" />
+      <span class="min-w-0 flex-1">Task</span>
+      <span
+        v-for="col in fieldColumns(fields)"
+        :key="col.key"
+        class="shrink-0 truncate px-1"
+        :class="col.width"
+        data-list-header-field
+      >{{ col.label }}</span>
+      <span class="flex shrink-0 items-center gap-2">
+        <span
+          v-for="col in metaColumns(shownColumns)"
+          :key="col.key"
+          :class="[col.width, col.key === 'assignee' ? '' : 'text-right']"
+          :data-list-header-cell="col.key"
+        >{{ col.label }}</span>
+      </span>
     </div>
     <div
       v-for="section in sections"
