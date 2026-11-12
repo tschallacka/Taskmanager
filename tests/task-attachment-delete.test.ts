@@ -1,12 +1,15 @@
-// Deleting one attachment of a task: only the named file goes, the count drops by one, and the limit message says how
-// many there are and how to free one. Written, not run yet.
-// Run: node --import tsx --test tests/task-attachment-delete.test.ts
+// Deleting one attachment of a task: only the named file goes, the count drops by one, a name that is not a stored
+// name is refused, the limit message says how many there are and how to free one, and the removal reads as a line in
+// the activity. The route's own permissions (staff only; a crew's read-only shadow board refused through requireProject)
+// need the database test harness and are not in this file. Written, not run yet.
+// Run: TSX_TSCONFIG_PATH=.nuxt/tsconfig.server.json DATABASE_URL=postgresql://arnotes@localhost:55433/arnotes_test_<key> node --import tsx --test tests/task-attachment-delete.test.ts
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtempSync, mkdirSync, readdirSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { SAFE_FILENAME, attachmentLimitMessage, deleteTaskAttachment, countAttachments } from '../server/utils/attachments.ts'
+import { briefOf } from '../server/utils/taskActivity.ts'
 
 function folderWith(names: string[]) {
   const dir = mkdtempSync(join(tmpdir(), 'attach-delete-'))
@@ -47,4 +50,8 @@ test('only plain stored names pass the name rule; a path or a traversal is refus
 
 test('a full task says how many there are and how to free one', () => {
   assert.equal(attachmentLimitMessage(15), '15 of 15 attachments: delete one first')
+})
+
+test('a removal reads as a plain activity line that names no file', () => {
+  assert.equal(briefOf({ kind: 'attachment_removed' }), 'Removed an attachment')
 })
