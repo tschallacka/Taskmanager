@@ -5,7 +5,11 @@ import type { RouterConfig } from '@nuxt/schema'
 export default <RouterConfig>{
   routes: (routes) => {
     const board = routes.find(route => route.path === '/projects/:id()')
-    if (!board) return routes
+    // Without the board route the task path would silently 404. A Nuxt change that renames the route must fail
+    // loudly here, not leave every task link on the not-found page.
+    if (!board) {
+      throw new Error('router.options: no /projects/:id() route found, so /projects/:id/:task cannot be registered')
+    }
     return [
       ...routes,
       { ...board, path: '/projects/:id()/:task()/:comment?', name: 'projects-id-task' }
