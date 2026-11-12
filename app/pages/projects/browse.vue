@@ -59,7 +59,7 @@ const rows = computed(() => {
       to="#app-topbar-title"
     >
       <h1 class="text-base font-semibold text-default">
-        Browse projects
+        Projects
       </h1>
     </Teleport>
 
