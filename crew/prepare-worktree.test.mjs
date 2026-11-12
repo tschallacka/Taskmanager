@@ -3,7 +3,16 @@
 // for the script, so no git, dependency or database work runs here.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { parseResultLine, prepareWorktree, slugOf } from './prepare-worktree.mjs'
+import { parseResultLine, prepareWorktree, removePlan, slugOf } from './prepare-worktree.mjs'
+
+test('a worktree is removed only when it is clean and its branch is on origin with nothing ahead', () => {
+  assert.equal(removePlan({ dirty: false, branchPushed: true, aheadOfRemote: 0 }).ok, true)
+  assert.equal(removePlan({ dirty: true, branchPushed: true, aheadOfRemote: 0 }).ok, false, 'uncommitted changes refuse')
+  assert.equal(removePlan({ dirty: false, branchPushed: false, aheadOfRemote: 0 }).ok, false, 'a branch not on origin refuses')
+  const ahead = removePlan({ dirty: false, branchPushed: true, aheadOfRemote: 2 })
+  assert.equal(ahead.ok, false)
+  assert.match(ahead.message, /2 commit\(s\) ahead of origin/)
+})
 
 const config = { scripts: { prepareWorktree: '/home/boss/work/boss/prepare-worktree.sh' } }
 

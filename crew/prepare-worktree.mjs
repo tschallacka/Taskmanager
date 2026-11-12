@@ -49,6 +49,17 @@ export function prepareWorktree({ who, taskId, title, config, runner = runScript
   return { ok: true, ...result, line: `worktree ${result.path} branch ${result.branch} db ${result.db}` }
 }
 
+/**
+ * Whether a worktree may be removed. Only a clean one whose branch is on origin with nothing ahead of it: removing
+ * anything else would lose work. `facts` is read from git by the caller.
+ */
+export function removePlan({ dirty, branchPushed, aheadOfRemote }) {
+  if (dirty) return { ok: false, message: 'The worktree has uncommitted changes; it is not removed.' }
+  if (!branchPushed) return { ok: false, message: 'The branch is not on origin; push it first. It is not removed.' }
+  if (aheadOfRemote > 0) return { ok: false, message: `The branch is ${aheadOfRemote} commit(s) ahead of origin; push them first. It is not removed.` }
+  return { ok: true, message: 'The worktree is clean and its branch is on origin; it can be removed.' }
+}
+
 /** The real runner: runs the script with no shell, so the arguments are never interpreted. */
 export function runScript(script, args) {
   const child = spawnSync(script, args, { encoding: 'utf8', timeout: 30 * 60 * 1000 })
