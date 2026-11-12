@@ -5,8 +5,9 @@
 // answers there. A card with no copy answering gets one more line: `no copy: ask Boss: tester-copy.sh start <owner> <branch>`.
 // It never starts anything: Boss starts the copy. Read only.
 //
-// The read is one get_board call on the crew's board (limit 50 per column, so the answer fits one message), then one
-// get_task per gate card for its branch. A gate column cut at 50 is printed as cut: its cards past 50 are not checked.
+// The read is one get_board call on the crew's board, for the two gate columns only, at most 200 cards per column (the
+// board's ceiling per column: get_board has no cursor). Then one get_task per gate card for its branch. A gate column
+// over the ceiling is printed as cut with the ceiling, its cards past it are not checked, and the command exits 1.
 import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -17,7 +18,9 @@ import { keyOfName } from './susy.mjs'
 export const UX_OR_QA_COLUMN = /^Verify (UX|QA)/i
 // The member whose board read this is: a reader, not a worker, so Pia's key.
 export const READER = 'pia'
-export const PAGE = 50
+// The board's ceiling of cards per column in one get_board answer.
+export const CEILING = 200
+export const GATE_COLUMNS = ['Verify UX', 'Verify QA']
 
 // The port devserver-worker.sh serves each worker's copy on. devserver-worker.sh's own case table is the source: if a
 // port moves there, change it here in the same commit (and in the test that pins these values).
@@ -93,16 +96,16 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   }
   const kit = dirname(fileURLToPath(import.meta.url))
   const readJson = path => (existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : {})
-  const crew = readJson(join(crewHome, 'crew.json'))
-  const creds = readJson(join(crewHome, 'creds.json'))
   const runner = (tool, args) => boardCall(READER, tool, args, kit)
   let cards
   let cut
   const branches = {}
   try {
-    const board = runner('get_board', { board: creds.board?.id, detail: 'titles', limit: PAGE })
+    const crew = readJson(join(crewHome, 'crew.json'))
+    const creds = readJson(join(crewHome, 'creds.json'))
+    const board = runner('get_board', { board: creds.board?.id, detail: 'titles', columns: GATE_COLUMNS, limit: CEILING })
     ;({ cards, cut } = gateCards(board, keyOfName(crew.people)))
-    for (const line of cut.map(c => `page cut: ${c.column} shows ${c.shown} of ${c.total}; the cards past ${PAGE} are not checked`)) console.log(line)
+    for (const c of cut) console.log(`page cut: ${c.column} shows ${c.shown} of ${c.total}; ${CEILING} is the ceiling per column, the cards past it are not checked`)
     if (!cards.length) {
       console.log('dev copies: no card in Verify UX or Verify QA; nothing to check')
       process.exit(0)
