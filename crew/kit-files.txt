@@ -30,6 +30,7 @@ config.mjs
 crew.config.example.json
 crew.mjs
 detach.sh
+dev-copies.mjs
 fonts.conf.tmpl
 guard.sh
 home.mjs
