@@ -17,7 +17,8 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { crewHome } from './home.mjs'
 import { DEFAULT_CLEANER, findPokes, keyOfName, makeCall, readBoardCards } from './susy.mjs'
-import { collectActivity, listenerRunning, newActivityLines, readLoad, readSessions } from './susy-collector.mjs'
+import { collectActivity, listenerRunning, newActivityLines, readLoad } from './susy-collector.mjs'
+import { projectsRoot, readWorkerRows, workerStates } from './susy-workers.mjs'
 
 export const TICK_SECONDS = 60
 
@@ -140,8 +141,11 @@ export async function runOnce(home, now = Date.now(), { live = false } = {}) {
   // The activity checks: evidence from the cards already read, the session list, the mail folders, the listener's sampled
   // heartbeat and the load. A condition is logged when it starts, not on every tick it holds (newActivityLines). Logged in
   // both modes; live mode does not act on them yet. A source that cannot be read is silent.
+  // The workers are read from their own transcripts (Pia's project folder: CREW_PROJECTS, or crew.json "activity", or the
+  // folder of the crew home). A missing folder or an unreadable transcript is no evidence.
+  const workerRows = result.ok ? readWorkerRows({ root: projectsRoot({ crewHome: home, crew }), now }) : new Map()
   const activity = result.ok
-    ? collectActivity({ now, home, cards: result.cards ?? [], sessions: readSessions(), load: readLoad(), state, keyOf: keyOfName(crew?.people), listenerRunning: listenerRunning() })
+    ? collectActivity({ now, home, cards: result.cards ?? [], rows: workerRows, load: readLoad(), state, keyOf: keyOfName(crew?.people), listenerRunning: listenerRunning() })
     : null
   const repeats = newActivityLines(activity?.lines ?? [], state.activity)
   result.state.activity = repeats.pending
@@ -175,6 +179,8 @@ export async function runOnce(home, now = Date.now(), { live = false } = {}) {
     pending: Object.keys(result.state.pending).length,
     state: result.state,
     // Requirement 1: each person's activity state, for Boss's watch and the office view.
+    // Boss's names for each worker (working, running, listening, ended, handedback, silent), from the transcripts.
+    workers: result.ok ? workerStates({ rows: workerRows }) : undefined,
     people: activity ? activity.people.map(p => ({ key: p.key, state: p.state, idleMinutes: p.idleMs === null ? null : Math.floor(p.idleMs / 60000) })) : undefined,
     ages: activity?.ages
   }

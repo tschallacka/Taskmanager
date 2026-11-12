@@ -6,7 +6,8 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { authorKey } from './susy.mjs'
-import { MIN, personState, workerLines, piaTriggerLines, escalationLines } from './susy-activity.mjs'
+import { MIN, workerLines, piaTriggerLines, escalationLines } from './susy-activity.mjs'
+import { workerPeople } from './susy-workers.mjs'
 
 export const LOAD_LIMIT = 14
 export const WORKERS = ['wren', 'wick', 'wynn', 'wade']
@@ -123,26 +124,12 @@ export function readLoad(path = '/proc/loadavg') {
  * The evidence for one tick, then the lines. `state.loadUnderSince` is kept across ticks: the time load has been under the
  * limit (reset when it goes over). `cards` are the cards the daemon already read; `keyOf` maps a display name to a key.
  */
-export function collectActivity({ now, home, cards, sessions, load, state = {}, keyOf, listenerRunning: running = null }) {
+export function collectActivity({ now, home, cards, rows = new Map(), load, state = {}, keyOf, listenerRunning: running = null }) {
   const lastPost = lastPostByPerson(cards)
   const loadUnderSince = load !== null && load < LOAD_LIMIT ? (state.loadUnderSince ?? now) : null
-  const people = WORKERS.map(key => {
-    const session = sessionFor(key, sessions)
-    const last = lastPost.get(key)
-    const lastActivityMs = last ?? null
-    const card = cards.find(c => c.column === 'In progress' && keyOf(c.assignee) === key) ?? null
-    const state2 = personState({ session: session ?? 'running', lastActivityMs, waiting: false, now })
-    return {
-      key,
-      card: card ? { id: card.id, title: card.title } : null,
-      blocked: Boolean(card?.blocked),
-      state: session === null ? 'unknown' : state2,
-      idleMs: lastActivityMs === null ? null : now - lastActivityMs,
-      lastUpdate: card?.updates?.at(-1)?.body ?? null
-    }
-  }).filter(p => p.state !== 'unknown')
+  // The workers are judged from their own transcripts (susy-workers.mjs): no transcript in the window is no evidence.
+  const people = workerPeople({ rows, cards, keyOf, now })
 
-  const pia = sessionFor('pia', sessions)
   const heartbeat = listenerHeartbeat({ running, lastSeenAt: state.listenerSeenAt ?? null, now })
   const ages = {
     listener: heartbeat.age,
@@ -168,5 +155,5 @@ export function collectActivity({ now, home, cards, sessions, load, state = {}, 
       questionMinutes: null
     })
   ]
-  return { lines, people, ages, loadUnderSince, listenerSeenAt: heartbeat.seenAt, pia }
+  return { lines, people, ages, loadUnderSince, listenerSeenAt: heartbeat.seenAt }
 }

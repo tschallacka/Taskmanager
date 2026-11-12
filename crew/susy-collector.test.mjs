@@ -33,19 +33,23 @@ test('the last post per person comes from the author of each update', () => {
   assert.equal(last.get('wick'), NOW - 3 * MIN)
 })
 
-test('a worker with a card idle for 12 minutes is poked, from the cards and the session list alone', () => {
-  const sessions = [{ name: 'wick-session' }]
-  const result = collectActivity({ now: NOW, home: '/nowhere', cards: [wickCard(12)], sessions, load: 9, state: {}, keyOf })
-  assert.ok(result.lines.includes('poke wick on c1: idle 12 min; last update: started the parser'))
+// A transcript row, as activity.mjs gives it: the state in Boss's names, minutes since the last step.
+const row = (key, state, mins) => [key, { key, state, mins, what: 'the last step', agent: 'x', task: '', mtime: NOW - mins * MIN }]
+
+test('a listening worker with a card for 12 minutes is poked, from its transcript row', () => {
+  const rows = new Map([row('wick', 'listening', 12)])
+  const result = collectActivity({ now: NOW, home: '/nowhere', cards: [wickCard(12)], rows, load: 9, state: {}, keyOf })
+  assert.ok(result.lines.some(line => /^poke wick on c1: idle 12 min/.test(line)))
 })
 
-test('a worker whose session is gone with a card in progress is needs resume to Pia', () => {
-  const result = collectActivity({ now: NOW, home: '/nowhere', cards: [wickCard(12)], sessions: [], load: 9, state: {}, keyOf })
-  assert.ok(result.lines.some(line => /^to pia: needs resume: wick has c1/.test(line)))
+test('an ended worker with a card in progress is needs resume to Pia', () => {
+  const rows = new Map([row('wick', 'ended', 12)])
+  const result = collectActivity({ now: NOW, home: '/nowhere', cards: [wickCard(12)], rows, load: 9, state: {}, keyOf })
+  assert.ok(result.lines.some(line => /^to pia: needs resume: wick has c1 .* and is ended/.test(line)))
 })
 
-test('with no session list, no person is judged (no evidence is not a fault)', () => {
-  const result = collectActivity({ now: NOW, home: '/nowhere', cards: [wickCard(12)], sessions: null, load: 9, state: {}, keyOf })
+test('with no transcript row for a worker, no person is judged (no evidence is not a fault)', () => {
+  const result = collectActivity({ now: NOW, home: '/nowhere', cards: [wickCard(12)], rows: new Map(), load: 9, state: {}, keyOf })
   assert.deepEqual(result.people, [])
   assert.equal(result.lines.filter(line => /poke|needs resume/.test(line)).length, 0)
 })

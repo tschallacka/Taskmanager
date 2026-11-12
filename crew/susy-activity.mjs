@@ -45,7 +45,8 @@ export function workerLines(people) {
   for (const person of people) {
     if (!person.card || person.blocked) continue
     if (person.state === 'gone') {
-      lines.push(`to pia: needs resume: ${person.key} has ${person.card.id} "${person.card.title}" in progress and its session is gone; resume that agent`)
+      const how = person.reason === 'handedback' ? 'handed back' : person.reason === 'ended' ? 'ended' : 'gone'
+      lines.push(`to pia: needs resume: ${person.key} has ${person.card.id} "${person.card.title}" in progress and is ${how}; resume that agent`)
     } else if (person.state === 'idle' && person.idleMs >= IDLE_MINUTES * MIN) {
       const minutes = Math.floor(person.idleMs / MIN)
       lines.push(`poke ${person.key} on ${person.card.id}: idle ${minutes} min; last update: ${String(person.lastUpdate ?? '(none)').slice(0, 120)}`)

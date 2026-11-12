@@ -36,7 +36,7 @@ test('a worker whose session is gone is needs resume, sent to Pia at once; not a
   const gone = { key: 'wren', card, blocked: false, state: 'gone', idleMs: 0, lastUpdate: 'x' }
   const lines = workerLines([gone])
   assert.equal(lines.length, 1)
-  assert.match(lines[0], /^to pia: needs resume: wren has c1 "Build" in progress and its session is gone/)
+  assert.match(lines[0], /^to pia: needs resume: wren has c1 "Build" in progress and is gone/)
 })
 
 test('Pia\'s dead triggers are named one by one, each with its own wake step', () => {
