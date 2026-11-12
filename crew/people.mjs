@@ -80,7 +80,10 @@ export async function addPeople({ origin, slug, home, token, people = null, fetc
   const headers = { 'authorization': `Bearer ${token}`, 'content-type': 'application/json' }
   const res = await fetchImpl(`${base}/people`, { method: 'POST', headers, body: JSON.stringify(people ? { people } : {}) })
   if (res.status === 401 || res.status === 403) {
-    log(REFUSED)
+    // Where crews are off the board says why in one sentence: the same sentence the add-a-crew window shows. Without one,
+    // the plain refusal.
+    const body = await res.json().catch(() => ({}))
+    log(typeof body?.message === 'string' && body.message !== '' ? body.message : REFUSED)
     return 3
   }
   if (!res.ok) {

@@ -34,7 +34,7 @@ before(async () => {
         res.end(JSON.stringify(json))
       }
       board.lastAuth = req.headers.authorization ?? null
-      if (board.refuse) return send(board.refuse, { message: 'refused' })
+      if (board.refuse) return send(board.refuse, board.refuseBody ?? {})
       if (req.method === 'POST' && req.url === '/api/crews/acme/people') {
         board.postAuth = req.headers.authorization ?? null
         board.lastBody = body ? JSON.parse(body) : {}
@@ -125,6 +125,20 @@ describe('crew people add: through the entry point, against a fake board', () =>
     const out = await runAdd(home, [])
     board.refuse = null
     assert.match(out.stdout, /The board refused this token/)
+    assert.equal(out.status, 3)
+    assert.equal(readFileSync(join(home, 'creds.json'), 'utf8'), before)
+  })
+
+  test('crews off: the board\'s one sentence is printed, the same one the add-a-crew window shows, and nothing is written', async () => {
+    board.missing = ['susy']
+    board.refuse = 403
+    board.refuseBody = { message: 'Your admin has not allowed crews on this instance.' }
+    const home = crewHome('crews-off')
+    const before = readFileSync(join(home, 'creds.json'), 'utf8')
+    const out = await runAdd(home, [])
+    board.refuse = null
+    board.refuseBody = undefined
+    assert.match(out.stdout, /Your admin has not allowed crews on this instance\./)
     assert.equal(out.status, 3)
     assert.equal(readFileSync(join(home, 'creds.json'), 'utf8'), before)
   })
