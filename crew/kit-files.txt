@@ -52,6 +52,7 @@ publish.mjs
 restart-brief.mjs
 session-hooks.mjs
 setup.mjs
+susy-daemon.mjs
 susy.mjs
 tm.mjs
 totp.mjs

@@ -362,6 +362,38 @@ export function cardsFrom(board, updatesOf) {
   })))
 }
 
+/** One JSON-RPC tool call to the board's /api/mcp with Susy's key. Throws on an HTTP error or a failed call. */
+export function makeCall(base, key) {
+  let id = 1
+  return async (name, args) => {
+    const res = await fetch(`${base}/api/mcp`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'accept': 'application/json, text/event-stream', 'authorization': `Bearer ${key}` },
+      body: JSON.stringify({ jsonrpc: '2.0', id: id++, method: 'tools/call', params: { name, arguments: args } }),
+      signal: AbortSignal.timeout(30000)
+    })
+    if (!res.ok) throw new Error(`${name} answered HTTP ${res.status}`)
+    return rpcResult(name, await res.json())
+  }
+}
+
+/** The board's cards with their updates, read the way `crew susy check` reads them. `call` is makeCall's function. */
+export async function readBoardCards(call, boardId) {
+  const board = await call('get_board', { board: boardId, detail: 'titles', limit: 200 })
+  const updatesOf = {}
+  for (const column of board?.columns ?? []) {
+    for (const task of column.tasks ?? []) {
+      if (!Number(task.updates)) continue
+      // The newest 200, then put in time order: a card over 200 updates keeps its latest changes and her latest pokes.
+      const full = await call('get_task', { id: task.id, order: 'newest', limit: 200 })
+      updatesOf[task.id] = (full?.updates ?? [])
+        .map(update => ({ id: update.id, author: update.author, body: update.body, at: update.at }))
+        .sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
+    }
+  }
+  return cardsFrom(board, updatesOf)
+}
+
 function readJson(path, fallback) {
   try {
     return existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : fallback
@@ -407,17 +439,7 @@ async function main() {
     return 65
   }
   const boardId = creds.board?.id
-  let id = 1
-  const call = async (name, args) => {
-    const res = await fetch(`${creds.base}/api/mcp`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'accept': 'application/json, text/event-stream', 'authorization': `Bearer ${key}` },
-      body: JSON.stringify({ jsonrpc: '2.0', id: id++, method: 'tools/call', params: { name, arguments: args } }),
-      signal: AbortSignal.timeout(30000)
-    })
-    if (!res.ok) throw new Error(`${name} answered HTTP ${res.status}`)
-    return rpcResult(name, await res.json())
-  }
+  const call = makeCall(creds.base, key)
 
   const statePath = `${home}/.listen/susy.json`
   const state = readJson(statePath, {})
@@ -426,19 +448,7 @@ async function main() {
   const stale = state.lastRound ? staleRoundLine(state.lastRound, now) : null
   if (stale) lines.push(stale)
 
-  const board = await call('get_board', { board: boardId, detail: 'titles', limit: 200 })
-  const updatesOf = {}
-  for (const column of board?.columns ?? []) {
-    for (const task of column.tasks ?? []) {
-      if (!Number(task.updates)) continue
-      // The newest 200, then put in time order: a card over 200 updates keeps its latest changes and her latest pokes.
-      const full = await call('get_task', { id: task.id, order: 'newest', limit: 200 })
-      updatesOf[task.id] = (full?.updates ?? [])
-        .map(update => ({ id: update.id, author: update.author, body: update.body, at: update.at }))
-        .sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
-    }
-  }
-  const cards = cardsFrom(board, updatesOf)
+  const cards = await readBoardCards(call, boardId)
   const keyOf = keyOfName(crew.people)
   const cleaner = crew.susy?.cleaner ?? DEFAULT_CLEANER
   const round = findPokes(cards, { now, thresholds: crew.susy, keyOf, cleaner, agents: state.agents })
