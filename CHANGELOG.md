@@ -2,6 +2,12 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.14.0 - 2026-11-12
+
+- **Pia's wake checklist: waiting work is never "nothing to do".** On every wake the PM runs five steps in order (answer open questions, move the gate's cards, name who unblocks each Blocked card, restart anyone who stopped with work, then "nothing needs action"), and a card waiting in To do or Verify, or an idle worker with a next step, is named in her round. `crew/PROMPTS.md.tmpl`, `crew/CREW.md.tmpl`.
+
+- **Home shows what is yours today, in one place.** Under the greeting: four numbers (due today, overdue, done this week, and the running timer with its task), a **Getting started** card for a new person (five steps with a progress bar; **Hide**; it leaves when all five are done), My tasks in three groups by due date (Overdue, Today, Later), an **Inbox** panel with the unread count and the latest three items, and the project cards with their health, progress and last change, and a dashed **New project** row. Every number counts only what the app already has for you. `app/pages/projects/home.vue`, `app/utils/homeStats.ts`, `tests/home-stats.test.ts`, `docs/workspace/your-workspace.md`.
+
 ## 0.13.1 - 2026-11-12
 
 - **The crew comes back after a restart of Boss's session.** `crew up` brings the parts in the `up` list of crew.json back in order (already running, started, or failed and why), and is safe to run twice. `crew/detach.sh` keeps Pia's session and the dev services in a detached tmux session, so they outlive the session that started them. `crew restart-brief` lists each standing member's open cards and last update for Pia to start them fresh, and stops with the reason when a board call fails. `crew dev-copies` restarts, after `crew up`, the dev copy of each worker whose card waits in Verify UX or Verify QA, from crew.json "devCopies", one line each. Files: `crew/up.mjs`, `crew/detach.sh`, `crew/restart-brief.mjs`, `crew/dev-copies.mjs`, `crew/board-call.mjs`, `crew/janet.mjs`, `crew/crew.mjs`, `crew/PROMPTS.md.tmpl`, `crew/SKILL.md`, `crew/kit-files.txt`.
