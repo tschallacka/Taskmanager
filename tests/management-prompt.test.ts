@@ -34,7 +34,7 @@ describe('the management prompt', () => {
     assert.match(prompt, /It works for 10 minutes, until 2026-11-07T22:40:00\.000Z, and then it stops\./)
   })
 
-  test('lists the crew endpoints: targets, create or rotate, and delete', () => {
+  test('lists the crew endpoints: targets, create, and delete', () => {
     const prompt = managementPrompt(input)
     assert.match(prompt, /GET https:\/\/taskmanager\.example\/api\/crews\/targets/)
     assert.match(prompt, /POST https:\/\/taskmanager\.example\/api\/crews$/m)
@@ -102,9 +102,11 @@ describe('the management prompt: the one-time keys', () => {
     assert.match(prompt, /Every call to keys_url makes new keys, and the old ones stop working at once\. Call it once, and again only when the file was lost\./)
   })
 
-  test('a taken slug answers 409, and "rotate": true makes new keys for that crew', () => {
+  test('a taken slug answers 409, the agent picks another slug, and never rotates', () => {
     const prompt = managementPrompt(input)
-    assert.match(prompt, /If the slug is already taken the call answers 409\. Then send the same call again with "rotate": true, which makes new keys for that crew\./)
+    assert.match(prompt, /Every call makes a new crew\./)
+    assert.match(prompt, /If the slug is already taken the call answers 409: choose another slug and send the call again\. Never add "rotate" to this call\./)
+    assert.doesNotMatch(prompt, /"rotate": true/)
   })
 
   test('the crew\'s own board is not the work board: the shadow board is', () => {

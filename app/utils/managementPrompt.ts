@@ -30,7 +30,7 @@ The calls you may make, all on ${api}:
    The answer lists "teams", each with "userboards". Your board is the userboard with "board_id": "${input.boardId}".
 2. Make a crew for this board: POST ${api}/crews
    Send JSON: {"slug": "<short name, 2 to 63 characters, a to z, 0 to 9 and hyphens>", "name": "<crew name>", "product": {"name": "<product name>"}, "projectId": "${input.boardId}"}
-   Keep the slug: it names the folder of the keys in step 3. If the slug is already taken the call answers 409. Then send the same call again with "rotate": true, which makes new keys for that crew.
+   Every call makes a new crew. Keep the slug: it names the folder of the keys in step 3. If the slug is already taken the call answers 409: choose another slug and send the call again. Never add "rotate" to this call.
    The answer has the crew's "slug", its people (id, name, role, email and tag, no keys), "keys_url", "keys_note", and these boards, each with "board_id", "board_name" and "url":
    - "real_board": the board of the people. Do not write to it.
    - "shadow_board": the crew's work board. Give the crew this board's "url" as its work board.

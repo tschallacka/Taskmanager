@@ -38,6 +38,7 @@ init.mjs
 janet.mjs
 keys.mjs
 listen.mjs
+people.mjs
 mentions.mjs
 package.json
 pia-listener-hook.sh
