@@ -35,7 +35,7 @@ export default defineEventHandler(async (event) => {
 
   const now = Date.now()
   if ((await sendsInLastMinute(caller.crew.id, caller.key, now)) >= MAIL_SENDS_PER_MINUTE) {
-    setHeader(event, 'Retry-After', '60')
+    setHeader(event, 'Retry-After', 60)
     throw createError({ statusCode: 429, message: `At most ${MAIL_SENDS_PER_MINUTE} mails a minute per sender.` })
   }
   if ((await pendingFor(caller.crew.id, to)) >= MAIL_PENDING_LIMIT) {

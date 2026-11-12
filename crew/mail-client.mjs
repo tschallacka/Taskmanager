@@ -93,7 +93,7 @@ export async function deliverOnce({ fetch: fetchImpl = fetch, base, slug, key, m
   const seenPath = join(seenDir, mail.id)
   const fresh = !existsSync(seenPath)
   if (fresh) {
-    deliver(mailLine(mail))
+    deliver(mailLine(mail), mail)
     writeFileSync(seenPath, `${new Date().toISOString()}\n`)
   }
   try {
