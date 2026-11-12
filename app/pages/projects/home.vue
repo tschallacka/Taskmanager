@@ -2,6 +2,8 @@
 import { format, formatDistanceToNowStrict } from 'date-fns'
 import { dueDayToMs, isOverdueDay, todayIso } from '~/utils/dueDate'
 import { homeStats } from '~/utils/homeStats'
+import { gettingStartedSteps, projectRows, taskGroups } from '~/utils/homeView'
+import { healthTint, kindIcon } from '~/utils/projectKind'
 
 definePageMeta({ layout: 'app' })
 
@@ -38,46 +40,22 @@ const weekStart = computed(() => {
   const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7))
   return monday.getTime()
 })
-// My tasks in three groups, by due date: Overdue, Today, then Later (undated tasks are Later).
-const taskGroups = computed(() => {
-  const today = todayIso()
-  const overdue: typeof upcoming.value = []
-  const dueToday: typeof upcoming.value = []
-  const later: typeof upcoming.value = []
-  for (const task of upcoming.value) {
-    if (task.dueOn && isOverdueDay(task.dueOn)) overdue.push(task)
-    else if (task.dueOn === today) dueToday.push(task)
-    else later.push(task)
-  }
-  return [
-    { key: 'overdue', label: 'Overdue', tasks: overdue },
-    { key: 'today', label: 'Today', tasks: dueToday },
-    { key: 'later', label: 'Later', tasks: later }
-  ].filter(group => group.tasks.length)
-})
+// My tasks in three groups, by due date (the rule is in utils/homeView.ts).
+const myGroups = computed(() => taskGroups(upcoming.value, todayIso(), new Date()))
 
 const stats = computed(() => homeStats(allTasks.value, session.value?.user.id ?? '', todayIso(), weekStart.value))
 const latestInbox = computed(() => inboxItems.value.slice(0, 3))
 
 // Projects: each with its own tasks' progress and the latest change on them.
-const HEALTH: Record<string, { label: string, cls: string }> = {
-  on_track: { label: 'On track', cls: 'bg-success/15 text-success' },
-  at_risk: { label: 'At risk', cls: 'bg-warning/15 text-warning' },
-  off_track: { label: 'Off track', cls: 'bg-error/15 text-error' }
-}
-const projectRows = computed(() => projects.value.slice(0, 6).map((project) => {
-  const tasks = allTasks.value.filter(task => task.projectId === project.id)
-  const done = tasks.filter(task => task.completedAt != null).length
-  const latest = tasks.reduce((max, task) => Math.max(max, task.updatedAt ?? 0), 0)
-  return {
-    project,
-    total: tasks.length,
-    done,
-    latest,
-    percent: tasks.length ? Math.round((done / tasks.length) * 100) : 0,
-    health: project.status ? HEALTH[project.status] ?? null : null
-  }
-}))
+// The icon (by kind) and the health tint come from utils/projectKind.ts; only the words are the page's.
+const HEALTH_LABEL: Record<string, string> = { on_track: 'On track', at_risk: 'At risk', off_track: 'Off track' }
+const projectCards = computed(() => projectRows(projects.value, allTasks.value).map(row => ({
+  ...row,
+  icon: kindIcon(row.project),
+  health: row.project.status
+    ? { label: HEALTH_LABEL[row.project.status] ?? row.project.status, tint: healthTint(row.project) }
+    : null
+})))
 
 // Getting started: five steps for a new person. Three come from the data; the other two are marked when the person
 // follows the link (kept on this browser only). The card leaves when all five are done or the person hides it.
@@ -97,13 +75,25 @@ function setFlag(key: string) {
 const gsHidden = ref(readFlag(LS.hidden))
 const inviteDone = ref(readFlag(LS.invite))
 const agentDone = ref(readFlag(LS.agent))
-const steps = computed(() => [
-  { key: 'project', label: 'Create a project', done: projects.value.length > 0, to: '/projects?new=1', mark: null as string | null },
-  { key: 'task', label: 'Add a task', done: allTasks.value.length > 0, to: '/projects/my-tasks', mark: null as string | null },
-  { key: 'finish', label: 'Finish one', done: allTasks.value.some(task => task.completedAt != null), to: '/projects/my-tasks', mark: null as string | null },
-  { key: 'invite', label: 'Invite someone', done: inviteDone.value, to: '/team', mark: LS.invite },
-  { key: 'agent', label: 'Let an agent help', done: agentDone.value, to: '/settings', mark: LS.agent }
-])
+const stepFacts = computed(() => ({
+  hasProject: projects.value.length > 0,
+  hasTask: allTasks.value.length > 0,
+  hasFinishedTask: allTasks.value.some(task => task.completedAt != null),
+  inviteDone: inviteDone.value,
+  agentDone: agentDone.value
+}))
+// Where each step's link goes; the two the person chooses are marked when followed.
+const STEP_LINKS: Record<string, { to: string, mark: string | null }> = {
+  project: { to: '/projects?new=1', mark: null },
+  task: { to: '/projects/my-tasks', mark: null },
+  finish: { to: '/projects/my-tasks', mark: null },
+  invite: { to: '/team', mark: LS.invite },
+  agent: { to: '/settings', mark: LS.agent }
+}
+const steps = computed(() => gettingStartedSteps(stepFacts.value).map((step) => {
+  const link = STEP_LINKS[step.key] ?? { to: '/projects', mark: null }
+  return { ...step, to: link.to, mark: link.mark }
+}))
 const stepsDone = computed(() => steps.value.filter(step => step.done).length)
 const showGettingStarted = computed(() => !gsHidden.value && stepsDone.value < steps.value.length)
 function followStep(step: { to: string, mark: string | null }) {
@@ -301,7 +291,7 @@ function openTask(task: { id: string, projectId: string }) {
             class="mt-3 space-y-4"
           >
             <div
-              v-for="group in taskGroups"
+              v-for="group in myGroups"
               :key="group.key"
               :data-home-group="group.key"
             >
@@ -403,12 +393,12 @@ function openTask(task: { id: string, projectId: string }) {
                 to="/projects/browse"
                 class="text-xs text-primary hover:underline"
               >
-                Browse
+                All projects
               </NuxtLink>
             </div>
             <ul class="mt-3 space-y-2">
               <li
-                v-for="row in projectRows"
+                v-for="row in projectCards"
                 :key="row.project.id"
                 data-home-project
               >
@@ -419,15 +409,15 @@ function openTask(task: { id: string, projectId: string }) {
                   <div class="flex items-center gap-2.5">
                     <span class="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary">
                       <UIcon
-                        name="i-lucide-kanban"
+                        :name="row.icon"
                         class="size-3.5"
                       />
                     </span>
                     <span class="min-w-0 flex-1 truncate text-sm font-medium text-default">{{ row.project.name }}</span>
                     <span
                       v-if="row.health"
-                      class="shrink-0 rounded-full px-2 py-0.5 text-xs"
-                      :class="row.health.cls"
+                      class="shrink-0 rounded-full bg-current/15 px-2 py-0.5 text-xs"
+                      :class="row.health.tint"
                     >{{ row.health.label }}</span>
                   </div>
                   <div

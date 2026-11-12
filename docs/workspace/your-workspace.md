@@ -45,7 +45,7 @@ Home is the page to land on to see what is yours today.
 - **Inbox**: how many items are unread, and the latest three. Click one to open it. **View all** opens the inbox.
 - **Projects**: your six most recently changed projects. Each shows its health (on track, at risk or off track, when
   the project has one), a progress bar of its done tasks, how many are done, and when it last changed. The member
-  avatars of a project card come in a later change (card mwd39fc3xrw3et97ubg). **Browse** opens
+  avatars of a project card come in a later change (card mwd39fc3xrw3et97ubg). **All projects** opens
   the full list. The dashed **New project** row starts a new project.
 
 If nothing is assigned to you, the card says **Nothing assigned to you.**
