@@ -1,3 +1,5 @@
+import type { LocationQuery, LocationQueryRaw } from 'vue-router'
+
 // The address of a board and its task panel (Boss, 2026-11-11):
 //   /projects/<projectId>                        the board
 //   /projects/<projectId>/<taskId>               the board with that task's panel open
@@ -14,6 +16,6 @@ export function taskPanelPath(projectId: string, taskId?: string | null, comment
 
 // The query of the board without the old task parameter, so a view or a filter in the query is kept when the panel opens
 // or closes.
-export function queryWithoutTask(query: Record<string, unknown>): Record<string, unknown> {
-  return Object.fromEntries(Object.entries(query).filter(([key]) => key !== 'task'))
+export function queryWithoutTask(query: LocationQuery): LocationQueryRaw {
+  return Object.fromEntries(Object.entries(query).filter(([key]) => key !== 'task')) as LocationQueryRaw
 }

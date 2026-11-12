@@ -644,7 +644,7 @@ const menuItems = computed(() => [[
             size="xs"
             aria-label="Who sees this task"
             class="shrink-0 w-44"
-            @update:model-value="(v: Visibility) => setTaskVisibility(v)"
+            @update:model-value="(v: string) => setTaskVisibility(v as Visibility)"
           />
 
           <UButton
