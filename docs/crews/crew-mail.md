@@ -14,14 +14,16 @@ server cannot push to a machine.
 
 ## The routes
 
-All three take the person's own crew key as the Bearer token.
+All three take the person's own crew key as the Bearer token. They live under `/api/crew-mail/`, not `/api/crews/`: the crew
+gate answers every `/api/crews/*` path with a 404 to a member key from a remote machine, so mail under `/api/crews` cannot
+reach a member on another machine (live QA, 0.20.0).
 
-- `POST /api/crews/<slug>/mail` with `{ "id", "to", "text" }`. `id` is 32 lowercase hex made by the sender's client, so
+- `POST /api/crew-mail/<slug>` with `{ "id", "to", "text" }`. `id` is 32 lowercase hex made by the sender's client, so
   a retried send is the same mail (201 again). The sender is the caller's own key; a `from` field in the body is
   ignored. `to` is a crew member key (pia, boss, susy, wren, ...).
-- `GET /api/crews/<slug>/mail?to=<key>` returns the undelivered mail for `to`, oldest first, 50 at most. A member reads
+- `GET /api/crew-mail/<slug>?to=<key>` returns the undelivered mail for `to`, oldest first, 50 at most. A member reads
   its own mail; the boss key reads any recipient's.
-- `POST /api/crews/<slug>/mail/<id>/ack` marks a mail delivered. Only the recipient can ack it (another person's ack is
+- `POST /api/crew-mail/<slug>/<id>/ack` marks a mail delivered. Only the recipient can ack it (another person's ack is
   403). Acking a delivered mail again is a no-op.
 
 Refused: a key of another crew, a customer or contact key, or a non-crew key (403). A text is never cut: the one safety stop is 1 MB of UTF-8, and a text over it is 413 with its size in the sentence (in the body's `data.error`, and the status line). More
