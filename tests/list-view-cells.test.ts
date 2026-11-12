@@ -47,6 +47,11 @@ test('a failed save says so in a toast, and the cell keeps what the server has',
   assert.match(meta, /try \{\s*await updateTask\(props\.task\.id, patch\)\s*\} catch \(e\) \{\s*toast\.add\(/)
 })
 
+test('the cell component is used by its Nuxt name, KanbanListRowMeta (a bare ListRowMeta renders as an unknown element)', () => {
+  assert.match(list, /<KanbanListRowMeta\b/)
+  assert.doesNotMatch(list, /<ListRowMeta\b/)
+})
+
 test('phone: the extra cells fold under the title; wide screens show them as columns', () => {
   assert.match(list, /layout="fold"\s+class="mt-0\.5 md:hidden"/)
   assert.match(list, /layout="column"\s+class="hidden md:flex"/)

@@ -299,7 +299,7 @@ function subtaskProgress(taskId: string) {
                 {{ task.title }}
               </span>
               <!-- On a phone the extra columns fold under the title; on a wide screen they are columns of their own. -->
-              <ListRowMeta
+              <KanbanListRowMeta
                 :task="task"
                 :shown="shownColumns"
                 :minutes="taskMinutes[task.id] ?? 0"
@@ -336,7 +336,7 @@ function subtaskProgress(taskId: string) {
             </span>
 
             <!-- The wide-screen cells: the assignee, the due date and the labels, each edited in place. -->
-            <ListRowMeta
+            <KanbanListRowMeta
               :task="task"
               :shown="shownColumns"
               :minutes="taskMinutes[task.id] ?? 0"
