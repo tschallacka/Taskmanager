@@ -141,9 +141,11 @@ watch(projects, async (list) => {
                 class="min-w-0"
               >
                 <span class="flex min-w-0 items-center gap-2.5">
-                  <UAvatar
-                    :src="person.image ?? undefined"
-                    :alt="person.name || person.email || ''"
+                  <UserAvatar
+                    :user-id="person.id"
+                    :name="person.name"
+                    :email="person.email"
+                    :image="person.image"
                     size="sm"
                   />
                   <span class="truncate">{{ person.name || person.email }}</span>
