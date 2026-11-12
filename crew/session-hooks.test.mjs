@@ -9,11 +9,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 
-const ENTRY = '.claude/settings.local.json'
-const root = mkdtempSync(join(tmpdir(), 'session-hooks-test-'))
-
 // session-hooks.mjs loads no crew.json (it imports home.mjs only), so no CREW_HOME is set here.
 import { excludeFromGit, gitExcludeFile } from './session-hooks.mjs'
+
+const ENTRY = '.claude/settings.local.json'
+const root = mkdtempSync(join(tmpdir(), 'session-hooks-test-'))
 
 const git = (cwd, args) => spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd, encoding: 'utf8' })
 
