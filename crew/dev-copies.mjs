@@ -3,28 +3,43 @@
 // dev copy is served on the port devserver-worker.sh gives that worker (wren 3101, wick 3102, wynn 3103, wade 3104).
 // For each such card the check prints the owner, the card, the branch linked to the card, the port, and whether a copy
 // answers there. A card with no copy answering gets one more line: `no copy: ask Boss: tester-copy.sh start <owner> <branch>`.
-// It never starts anything: Boss starts the copy. Read only, apart from the board reads that restart-brief makes.
+// It never starts anything: Boss starts the copy. Read only.
+//
+// The read is one get_board call on the crew's board (limit 50 per column, so the answer fits one message), then one
+// get_task per gate card for its branch. A gate column cut at 50 is printed as cut: its cards past 50 are not checked.
 import { spawnSync } from 'node:child_process'
-import { dirname } from 'node:path'
+import { existsSync, readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { boardCall } from './board-call.mjs'
-import { restartBrief, PEOPLE } from './restart-brief.mjs'
+import { keyOfName } from './susy.mjs'
 
 export const UX_OR_QA_COLUMN = /^Verify (UX|QA)/i
+// The member whose board read this is: a reader, not a worker, so Pia's key.
+export const READER = 'pia'
+export const PAGE = 50
 
 // The port devserver-worker.sh serves each worker's copy on. devserver-worker.sh's own case table is the source: if a
 // port moves there, change it here in the same commit (and in the test that pins these values).
 export const PORTS = { wren: 3101, wick: 3102, wynn: 3103, wade: 3104 }
 
-// One entry per card in a Verify UX or Verify QA column.
-export function qaCards(briefs) {
+/**
+ * The gate cards from one get_board answer, each with its owner's key (or the display name when no key matches), and
+ * the gate columns that were cut at the page size. A column whose taskCount is above the tasks it shows is cut.
+ */
+export function gateCards(board, keyOf) {
   const cards = []
-  for (const b of briefs) {
-    for (const block of b.blocks) {
-      if (UX_OR_QA_COLUMN.test(block.column)) cards.push({ who: b.who, id: block.id, title: block.title, column: block.column })
+  const cut = []
+  for (const column of board?.columns ?? []) {
+    if (!UX_OR_QA_COLUMN.test(column.name)) continue
+    const shown = (column.tasks ?? []).length
+    const total = Number(column.taskCount ?? shown)
+    if (total > shown) cut.push({ column: column.name, shown, total })
+    for (const task of column.tasks ?? []) {
+      cards.push({ who: keyOf(task.assignee) ?? task.assignee ?? null, id: task.id, title: task.title, column: column.name })
     }
   }
-  return cards
+  return { cards, cut }
 }
 
 // The branch a card's linked GitHub items name, or null when none does.
@@ -77,23 +92,27 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     process.exit(2)
   }
   const kit = dirname(fileURLToPath(import.meta.url))
-  const runner = (who, tool, args) => boardCall(who, tool, args, kit)
+  const readJson = path => (existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : {})
+  const crew = readJson(join(crewHome, 'crew.json'))
+  const creds = readJson(join(crewHome, 'creds.json'))
+  const runner = (tool, args) => boardCall(READER, tool, args, kit)
   let cards
-  let branches = {}
+  let cut
+  const branches = {}
   try {
-    cards = qaCards(restartBrief(PEOPLE, runner))
+    const board = runner('get_board', { board: creds.board?.id, detail: 'titles', limit: PAGE })
+    ;({ cards, cut } = gateCards(board, keyOfName(crew.people)))
+    for (const line of cut.map(c => `page cut: ${c.column} shows ${c.shown} of ${c.total}; the cards past ${PAGE} are not checked`)) console.log(line)
     if (!cards.length) {
       console.log('dev copies: no card in Verify UX or Verify QA; nothing to check')
       process.exit(0)
     }
-    for (const card of cards) {
-      branches[card.id] = branchOf(runner(card.who, 'get_task', { id: card.id }))
-    }
+    for (const card of cards) branches[card.id] = branchOf(runner('get_task', { id: card.id }))
   } catch (error) {
     console.error(`crew dev-copies: ${error.message}`)
     process.exit(1)
   }
   const result = copyLines(cards, { probe: probeHttp, branches })
   for (const line of result.lines) console.log(line)
-  process.exit(result.ok ? 0 : 1)
+  process.exit(result.ok && !cut.length ? 0 : 1)
 }

@@ -1,18 +1,40 @@
 // crew dev-copies: for each card in Verify UX or Verify QA, whether its owner's copy answers, and one line asking Boss
-// for each copy that does not. The probe is injected, so no real port is touched and nothing is started. Run:
+// for each copy that does not. The board read and the probe are injected, so no real port is touched and nothing is
+// started. Run:
 //   node --test crew/dev-copies.test.mjs
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { qaCards, branchOf, copyLines } from './dev-copies.mjs'
+import { gateCards, branchOf, copyLines } from './dev-copies.mjs'
 
-test('only a card in Verify UX or Verify QA is checked', () => {
-  const briefs = [
-    { who: 'wren', blocks: [{ id: 'c1', title: 'A', column: 'Verify QA' }] },
-    { who: 'wick', blocks: [{ id: 'c2', title: 'B', column: 'In progress' }] },
-    { who: 'wynn', blocks: [{ id: 'c3', title: 'C', column: 'Verify UX' }, { id: 'c4', title: 'D', column: 'To do' }] },
-    { who: 'wade', blocks: [{ id: 'c5', title: 'E', column: 'Verify PM' }] }
-  ]
-  assert.deepEqual(qaCards(briefs).map(c => c.id), ['c1', 'c3'])
+const keyOf = name => ({ 'Wren Worker': 'wren', 'Wynn Worker': 'wynn', 'Wade Worker': 'wade' })[name]
+
+function board(columns) {
+  return { columns: columns.map(([name, tasks, taskCount]) => ({ name, tasks, taskCount: taskCount ?? tasks.length })) }
+}
+
+test('only the cards in Verify UX or Verify QA are gate cards, each with its owner key', () => {
+  const b = board([
+    ['In progress', [{ id: 'c2', title: 'B', assignee: 'Wick Worker' }]],
+    ['Verify QA', [{ id: 'c1', title: 'A', assignee: 'Wren Worker' }]],
+    ['Verify UX', [{ id: 'c3', title: 'C', assignee: 'Wynn Worker' }]],
+    ['Verify PM', [{ id: 'c5', title: 'E', assignee: 'Wade Worker' }]]
+  ])
+  const { cards, cut } = gateCards(b, keyOf)
+  assert.deepEqual(cards.map(c => [c.id, c.who, c.column]), [['c1', 'wren', 'Verify QA'], ['c3', 'wynn', 'Verify UX']])
+  assert.deepEqual(cut, [])
+})
+
+test('a gate column with more cards than it shows is reported as cut, with its shown and total counts', () => {
+  const b = board([['Verify QA', [{ id: 'c1', title: 'A', assignee: 'Wren Worker' }], 73]])
+  const { cards, cut } = gateCards(b, keyOf)
+  assert.equal(cards.length, 1)
+  assert.deepEqual(cut, [{ column: 'Verify QA', shown: 1, total: 73 }])
+})
+
+test('an owner with no crew key is kept by name, not dropped', () => {
+  const b = board([['Verify UX', [{ id: 'c9', title: 'Z', assignee: 'Nobody Known' }]]])
+  const { cards } = gateCards(b, keyOf)
+  assert.equal(cards[0].who, 'Nobody Known')
 })
 
 test('the branch comes from the card\'s linked GitHub item', () => {
