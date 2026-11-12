@@ -18,14 +18,16 @@ async function change(fieldId: string, value: string | null) {
 </script>
 
 <template>
-  <dl
+  <!-- Contents of the panel's property grid: each field is one label and value pair. -->
+  <div
     v-if="fields.length"
-    class="grid shrink-0 grid-cols-[6rem_1fr] items-center gap-x-3 gap-y-1.5 px-5 pb-3 text-xs"
+    class="contents"
     data-task-fields
   >
-    <template
+    <div
       v-for="field in fields"
       :key="field.id"
+      class="grid grid-cols-[6rem_1fr] items-center gap-x-3"
     >
       <dt class="truncate text-muted">
         {{ field.name }}
@@ -37,6 +39,6 @@ async function change(fieldId: string, value: string | null) {
           @change="change(field.id, $event)"
         />
       </dd>
-    </template>
-  </dl>
+    </div>
+  </div>
 </template>

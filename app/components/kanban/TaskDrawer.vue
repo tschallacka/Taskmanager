@@ -698,143 +698,163 @@ const menuItems = computed(() => [[
               :ui="{ base: 'px-0 py-0 text-lg font-semibold leading-snug resize-none' }"
               @keydown.enter.prevent="($event.target as HTMLTextAreaElement).blur()"
             />
-
-            <div class="mt-2 flex flex-wrap items-center gap-1.5">
-              <KanbanLabelChip
-                v-for="tag in shownTask.tags"
-                :key="tag"
-                :tag="tag"
-                :editable="!readonly"
-                :removable="!readonly"
-                chip-class="text-xs"
-                @remove="removeTag"
-              />
-              <div
-                v-if="!readonly"
-                class="relative min-w-24 flex-1"
-              >
-                <input
-                  v-model="tagDraft"
-                  :placeholder="shownTask.tags.length ? 'Add label…' : 'Add a label…'"
-                  class="w-full bg-transparent py-0.5 text-xs text-default outline-none placeholder:text-dimmed"
-                  @keydown="onTagKeydown"
-                  @focus="tagFocused = true"
-                  @input="tagFocused = true"
-                  @blur="onTagBlur"
-                >
-
-                <!-- The board's own labels. `mousedown.prevent` keeps the field
-                     focused so picking one is not read as blurring away from it. -->
-                <div
-                  v-if="showTagSuggestions"
-                  class="absolute left-0 top-full z-20 mt-1 w-44 rounded-lg border border-default bg-default p-1 shadow-lg"
-                >
-                  <button
-                    v-for="(tag, index) in tagSuggestions"
-                    :key="tag"
-                    class="flex w-full items-center rounded-md px-1 py-1 text-left transition-colors"
-                    :class="index === tagHighlight ? 'bg-elevated' : 'hover:bg-elevated/60'"
-                    @mousedown.prevent="addTagValue(tag)"
-                  >
-                    <KanbanLabelChip
-                      :tag="tag"
-                      chip-class="min-w-0 text-xs"
-                    />
-                  </button>
-                </div>
-              </div>
-            </div>
           </div>
 
-          <!-- Assignee and due date, Asana's two fields every task has. -->
-          <dl class="grid shrink-0 grid-cols-[6rem_1fr] items-center gap-x-3 gap-y-1.5 px-5 pb-3 text-xs">
-            <dt class="text-muted">
-              Assignee
-            </dt>
-            <dd class="min-w-0">
-              <UDropdownMenu
-                v-if="!readonly"
-                :items="assigneeItems"
-                :content="{ align: 'start', collisionPadding: 12 }"
-              >
+          <!-- Properties, two columns on a wide panel and rows on a phone, in this order: Assignee, Due date,
+               Start date, Labels, the custom fields (Priority). Time, Blocked by and GitHub are full-width blocks
+               below them (redesign card 5/9). -->
+          <dl class="grid shrink-0 grid-cols-1 gap-x-6 gap-y-1.5 px-5 pb-3 text-xs md:grid-cols-2">
+            <div class="grid grid-cols-[6rem_1fr] items-center gap-x-3">
+              <dt class="text-muted">
+                Assignee
+              </dt>
+              <dd class="min-w-0">
+                <UDropdownMenu
+                  v-if="!readonly"
+                  :items="assigneeItems"
+                  :content="{ align: 'start', collisionPadding: 12 }"
+                >
+                  <UButton
+                    size="xs"
+                    color="neutral"
+                    variant="ghost"
+                    class="-ml-2 max-w-full"
+                    :avatar="assignee ? { src: assignee.image ?? undefined, alt: assignee.name || assignee.email || '' } : undefined"
+                    :icon="assignee ? undefined : 'i-lucide-user-plus'"
+                    :label="assignee ? (assignee.name || assignee.email || '') : 'No assignee'"
+                    :ui="{ label: assignee ? 'text-default' : 'text-dimmed' }"
+                  />
+                </UDropdownMenu>
+                <span
+                  v-else
+                  class="text-default"
+                >{{ assignee ? (assignee.name || assignee.email) : 'No assignee' }}</span>
+              </dd>
+            </div>
+
+            <div class="grid grid-cols-[6rem_1fr] items-center gap-x-3">
+              <dt class="text-muted">
+                Due date
+              </dt>
+              <dd class="flex min-w-0 items-center gap-1">
+                <input
+                  v-if="!readonly"
+                  type="date"
+                  min="2000-01-01"
+                  max="2999-12-31"
+                  :value="shownTask.dueOn ?? ''"
+                  class="rounded bg-transparent px-0 py-0.5 text-xs outline-none focus:ring-1 focus:ring-primary"
+                  :class="dueOverdue ? 'font-medium text-error' : shownTask.dueOn ? 'text-default' : 'text-dimmed'"
+                  @change="onDueChange"
+                >
+                <span
+                  v-else
+                  :class="dueOverdue ? 'font-medium text-error' : 'text-default'"
+                >{{ shownTask.dueOn ? format(new Date(dueDayToMs(shownTask.dueOn)), 'PP') : 'No due date' }}</span>
                 <UButton
+                  v-if="!readonly && shownTask.dueOn"
+                  icon="i-lucide-x"
                   size="xs"
                   color="neutral"
                   variant="ghost"
-                  class="-ml-2 max-w-full"
-                  :avatar="assignee ? { src: assignee.image ?? undefined, alt: assignee.name || assignee.email || '' } : undefined"
-                  :icon="assignee ? undefined : 'i-lucide-user-plus'"
-                  :label="assignee ? (assignee.name || assignee.email || '') : 'No assignee'"
-                  :ui="{ label: assignee ? 'text-default' : 'text-dimmed' }"
+                  aria-label="Clear due date"
+                  @click="patchTask({ dueOn: null }, 'Could not change the due date')"
                 />
-              </UDropdownMenu>
-              <span
-                v-else
-                class="text-default"
-              >{{ assignee ? (assignee.name || assignee.email) : 'No assignee' }}</span>
-            </dd>
+              </dd>
+            </div>
 
-            <dt class="text-muted">
-              Start date
-            </dt>
-            <dd class="flex min-w-0 items-center gap-1">
-              <input
-                v-if="!readonly"
-                type="date"
-                min="2000-01-01"
-                max="2999-12-31"
-                :value="shownTask.startOn ?? ''"
-                class="rounded bg-transparent px-0 py-0.5 text-xs outline-none focus:ring-1 focus:ring-primary"
-                :class="shownTask.startOn ? 'text-default' : 'text-dimmed'"
-                data-start-input
-                @change="onStartChange"
-              >
-              <span
-                v-else
-                class="text-default"
-              >{{ shownTask.startOn ? format(new Date(dueDayToMs(shownTask.startOn)), 'PP') : 'No start date' }}</span>
-              <UButton
-                v-if="!readonly && shownTask.startOn"
-                icon="i-lucide-x"
-                size="xs"
-                color="neutral"
-                variant="ghost"
-                aria-label="Clear start date"
-                @click="patchTask({ startOn: null }, 'Could not change the start date')"
-              />
-            </dd>
+            <div class="grid grid-cols-[6rem_1fr] items-center gap-x-3">
+              <dt class="text-muted">
+                Start date
+              </dt>
+              <dd class="flex min-w-0 items-center gap-1">
+                <input
+                  v-if="!readonly"
+                  type="date"
+                  min="2000-01-01"
+                  max="2999-12-31"
+                  :value="shownTask.startOn ?? ''"
+                  class="rounded bg-transparent px-0 py-0.5 text-xs outline-none focus:ring-1 focus:ring-primary"
+                  :class="shownTask.startOn ? 'text-default' : 'text-dimmed'"
+                  data-start-input
+                  @change="onStartChange"
+                >
+                <span
+                  v-else
+                  class="text-default"
+                >{{ shownTask.startOn ? format(new Date(dueDayToMs(shownTask.startOn)), 'PP') : 'No start date' }}</span>
+                <UButton
+                  v-if="!readonly && shownTask.startOn"
+                  icon="i-lucide-x"
+                  size="xs"
+                  color="neutral"
+                  variant="ghost"
+                  aria-label="Clear start date"
+                  @click="patchTask({ startOn: null }, 'Could not change the start date')"
+                />
+              </dd>
+            </div>
 
-            <dt class="text-muted">
-              Due date
-            </dt>
-            <dd class="flex min-w-0 items-center gap-1">
-              <input
-                v-if="!readonly"
-                type="date"
-                min="2000-01-01"
-                max="2999-12-31"
-                :value="shownTask.dueOn ?? ''"
-                class="rounded bg-transparent px-0 py-0.5 text-xs outline-none focus:ring-1 focus:ring-primary"
-                :class="dueOverdue ? 'font-medium text-error' : shownTask.dueOn ? 'text-default' : 'text-dimmed'"
-                @change="onDueChange"
-              >
-              <span
-                v-else
-                :class="dueOverdue ? 'font-medium text-error' : 'text-default'"
-              >{{ shownTask.dueOn ? format(new Date(dueDayToMs(shownTask.dueOn)), 'PP') : 'No due date' }}</span>
-              <UButton
-                v-if="!readonly && shownTask.dueOn"
-                icon="i-lucide-x"
-                size="xs"
-                color="neutral"
-                variant="ghost"
-                aria-label="Clear due date"
-                @click="patchTask({ dueOn: null }, 'Could not change the due date')"
-              />
-            </dd>
+            <div class="grid grid-cols-[6rem_1fr] items-start gap-x-3">
+              <dt class="pt-0.5 text-muted">
+                Labels
+              </dt>
+              <dd class="min-w-0">
+                <div class="flex flex-wrap items-center gap-1.5">
+                  <KanbanLabelChip
+                    v-for="tag in shownTask.tags"
+                    :key="tag"
+                    :tag="tag"
+                    :editable="!readonly"
+                    :removable="!readonly"
+                    chip-class="text-xs"
+                    @remove="removeTag"
+                  />
+                  <div
+                    v-if="!readonly"
+                    class="relative min-w-24 flex-1"
+                  >
+                    <input
+                      v-model="tagDraft"
+                      :placeholder="shownTask.tags.length ? 'Add label…' : 'Add a label…'"
+                      class="w-full bg-transparent py-0.5 text-xs text-default outline-none placeholder:text-dimmed"
+                      @keydown="onTagKeydown"
+                      @focus="tagFocused = true"
+                      @input="tagFocused = true"
+                      @blur="onTagBlur"
+                    >
+
+                    <!-- The board's own labels. `mousedown.prevent` keeps the field
+                         focused so picking one is not read as blurring away from it. -->
+                    <div
+                      v-if="showTagSuggestions"
+                      class="absolute left-0 top-full z-20 mt-1 w-44 rounded-lg border border-default bg-default p-1 shadow-lg"
+                    >
+                      <button
+                        v-for="(tag, index) in tagSuggestions"
+                        :key="tag"
+                        class="flex w-full items-center rounded-md px-1 py-1 text-left transition-colors"
+                        :class="index === tagHighlight ? 'bg-elevated' : 'hover:bg-elevated/60'"
+                        @mousedown.prevent="addTagValue(tag)"
+                      >
+                        <KanbanLabelChip
+                          :tag="tag"
+                          chip-class="min-w-0 text-xs"
+                        />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </dd>
+            </div>
+
+            <KanbanTaskFields
+              v-if="!readonly && shownTask"
+              :task-id="shownTask.id"
+            />
           </dl>
 
-          <KanbanTaskFields
+          <KanbanTaskTime
             v-if="!readonly && shownTask"
             :task-id="shownTask.id"
           />
@@ -845,9 +865,10 @@ const menuItems = computed(() => [[
             :readonly="readonly"
           />
 
-          <KanbanTaskTime
-            v-if="!readonly && shownTask"
+          <KanbanTaskGithub
+            v-if="shownTask"
             :task-id="shownTask.id"
+            :readonly="readonly"
           />
 
           <!-- Description (before the subtasks, redesign card 5/9): the rich-text editor, bounded so it keeps its own scroll -->
@@ -885,12 +906,6 @@ const menuItems = computed(() => [[
               :readonly="readonly"
             />
           </div>
-
-          <KanbanTaskGithub
-            v-if="shownTask"
-            :task-id="shownTask.id"
-            :readonly="readonly"
-          />
 
           <!-- Under the description, in the same scroll body: the conversation and its box. -->
           <KanbanTaskComments
