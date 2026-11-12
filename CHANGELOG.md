@@ -2,6 +2,12 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.12.0 - 2026-11-12
+
+- **Add a crew to this board: always a new crew, made by an AI agent with a 10-minute token.** The board's menu and Team > Crews now offer one action, **Add a crew to this board**, which opens the management token window for that board. The "Give it a crew" item, the "Step by step" wizard, picking an existing crew to attach, forking members, the fork file and "Add workers" are gone from the UI; detaching a crew stays. The management prompt never rotates keys: a taken slug answers 409 and the agent picks another slug. The attach and fork routes stay on the server for now, and the help page for forking is now a deprecation line. `app/components/ProjectsListPanel.vue`, `app/components/TeamCrewsPanel.vue`, `app/components/ManagementTokenDialog.vue`, `app/components/CrewBoardWizard.vue` (removed), `docs/crews/give-a-board-a-crew.md`, `docs/crews/fork-a-crew.md`, `docs/crews/what-is-a-crew.md`, `docs/crews/what-a-crew-can-see.md`, `docs/index.md`, `docs/team/leave-remove-transfer-delete.md`, `docs/admin/crews-on-your-instance.md`. The client helpers for attach, fork, the fork file and unfork are deleted from `app/composables/useTeamCrews.ts` (no UI used them); the Forked members badges on a board's crew stay and are named in `docs/crews/give-a-board-a-crew.md`.
+
+- **Adding a crew's people no longer says "address belongs to another account" for a database error.** `POST /api/crews/:slug/people` answered 409 for any failure while it saved a person, so a database error looked like an address clash. Only a real address clash now answers 409; any other failure is reported as the error it is. `server/utils/crewAccounts.ts`, `server/utils/crewProvisioning.ts`, `tests/crew-people-409.test.ts`.
+
 ## 0.11.1 - 2026-11-12
 
 - **A revoked management token answers its sentence over the public URL.** A remote call with a revoked management token now gets 401 with the `token_revoked` sentence, like an expired or regenerated one, instead of the plain 404. Revoking records the secret as `revoked_management` in `api_key_secrets.state` (a text column, so no schema change), which keeps the kind after the key row is deleted. Revoked access tokens and unknown keys still get the plain 404. `server/utils/crewGate.ts`, `server/utils/connectTokens.ts`, `server/utils/api-keys.ts`, `server/db/schema.ts`, `tests/crew-gate-management.test.ts`, `docs/admin/crews-on-your-instance.md`.
