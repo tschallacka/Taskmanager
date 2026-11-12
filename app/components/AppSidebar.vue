@@ -6,11 +6,6 @@ const emit = defineEmits<{ 'close': [], 'toggle-rail': [] }>()
 const searchOpen = useSearchModal()
 const { session, signOut, isInstanceAdmin } = useAuth()
 const colorMode = useColorMode()
-const userInitials = computed(() => {
-  const name = session.value?.user?.name
-  if (!name) return '?'
-  return name.split(' ').map((part: string) => part[0]).join('').slice(0, 2).toUpperCase()
-})
 
 // The three-way Appearance row: System, Dark, Light. The current choice shows a tick.
 const APPEARANCE = [
@@ -172,8 +167,11 @@ watch(() => route.path, () => emit('close'))
           class="mt-auto mb-1 rounded-full"
           aria-label="Account menu"
         >
-          <UAvatar
-            :alt="userInitials"
+          <UserAvatar
+            :user-id="session?.user?.id ?? ''"
+            :name="session?.user?.name"
+            :email="session?.user?.email"
+            :image="session?.user?.image"
             size="xs"
             class="shrink-0"
           />
@@ -289,8 +287,11 @@ watch(() => route.path, () => emit('close'))
           :ui="{ content: 'w-(--reka-dropdown-menu-trigger-width) min-w-48' }"
         >
           <button class="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-sm text-muted transition-colors hover:bg-elevated hover:text-default">
-            <UAvatar
-              :alt="userInitials"
+            <UserAvatar
+              :user-id="session?.user?.id ?? ''"
+              :name="session?.user?.name"
+              :email="session?.user?.email"
+              :image="session?.user?.image"
               size="xs"
               class="shrink-0"
             />
