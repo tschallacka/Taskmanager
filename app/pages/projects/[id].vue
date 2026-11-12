@@ -74,6 +74,21 @@ const officeCrewItems = computed(() => linkedCrews.value.map(crew => ({
   onSelect: () => openOffice(crew.id)
 })))
 
+// The view switcher's row: the five main views as tabs, in the design's order (page 01); every other view sits under More.
+const PRIMARY_VIEWS = ['board', 'list', 'calendar', 'timeline', 'dashboard']
+const primaryViews = computed(() => PRIMARY_VIEWS
+  .map(key => tabViews.value.find(v => v.key === key))
+  .filter((v): v is NonNullable<typeof v> => Boolean(v)))
+const moreViews = computed(() => tabViews.value.filter(v => !PRIMARY_VIEWS.includes(v.key)))
+const moreItems = computed(() => moreViews.value.flatMap((v) => {
+  if (v.key === 'office' && linkedCrews.value.length > 1) return officeCrewItems.value
+  return [{
+    label: v.label,
+    icon: v.icon,
+    onSelect: () => (v.key === 'office' ? openOffice() : setView(v.key))
+  }]
+}))
+
 // The tab row scrolls sideways on a phone. Its edges fade where tabs are cut off,
 // so it is clear that the row goes on.
 const tabsEl = ref<HTMLElement | null>(null)
@@ -651,7 +666,7 @@ useSeoMeta({
       @scroll="updateTabCues"
     >
       <template
-        v-for="v in tabViews"
+        v-for="v in primaryViews"
         :key="v.key"
       >
         <UDropdownMenu
@@ -686,14 +701,35 @@ useSeoMeta({
             :class="view === v.key ? 'opacity-100' : 'opacity-0'"
           />
         </button>
-        <HelpHint
-          v-if="v.key === 'office'"
-          page="agents/office-view"
-          label="About the Office view"
-        >
-          The office shows the crew of this board at work: every task is a folder that moves between the desks as the board changes. On a board with more than one crew, the menu picks which crew to watch.
-        </HelpHint>
       </template>
+      <!-- The other views: Overview, Messages, Time, Files and Office sit under More, so the row stays one line. -->
+      <UDropdownMenu
+        v-if="moreItems.length"
+        :items="moreItems"
+      >
+        <button
+          class="relative flex shrink-0 items-center gap-1.5 px-2.5 py-2 text-sm transition-colors"
+          :class="moreViews.some(v => v.key === view) ? 'font-medium text-default' : 'text-muted hover:text-default'"
+          data-view-more
+        >
+          More
+          <UIcon
+            name="i-lucide-chevron-down"
+            class="size-4"
+          />
+          <span
+            class="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-primary transition-opacity duration-200"
+            :class="moreViews.some(v => v.key === view) ? 'opacity-100' : 'opacity-0'"
+          />
+        </button>
+      </UDropdownMenu>
+      <HelpHint
+        v-if="moreViews.some(v => v.key === 'office')"
+        page="agents/office-view"
+        label="About the Office view"
+      >
+        The office shows the crew of this board at work: every task is a folder that moves between the desks as the board changes. On a board with more than one crew, the menu picks which crew to watch.
+      </HelpHint>
     </nav>
 
     <!-- Trash summary. The board itself draws the deleted columns and cards in

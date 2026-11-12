@@ -40,3 +40,12 @@ test('the board shows its people as avatars: four, then a count; none for a cust
   assert.match(page, />\+\{\{ boardPeople\.length - 4 \}\}</)
   assert.match(page, /data-board-avatars/)
 })
+
+test('row 2 shows the five main views as tabs, in design order, and the rest under More, with the Office help', () => {
+  assert.match(page, /const PRIMARY_VIEWS = \['board', 'list', 'calendar', 'timeline', 'dashboard'\]/)
+  assert.match(page, /v-for="v in primaryViews"/)
+  assert.match(page, /const moreViews = computed\(\(\) => tabViews\.value\.filter\(v => !PRIMARY_VIEWS\.includes\(v\.key\)\)\)/)
+  assert.match(page, /data-view-more/)
+  assert.match(page, /v-if="moreViews\.some\(v => v\.key === 'office'\)"/)
+  assert.match(page, /page="agents\/office-view"/)
+})
