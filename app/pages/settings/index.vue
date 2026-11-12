@@ -6,7 +6,7 @@ definePageMeta({ layout: 'app' })
 
 useSeoMeta({ title: 'Settings' })
 
-const { session, signOut, isInstanceAdmin } = useAuth()
+const { session, signOut, isInstanceAdmin, refreshSession } = useAuth()
 const { primaryColor, neutralColor, PRIMARY_COLORS, NEUTRAL_COLORS, setPrimaryColor, setNeutralColor, openrouterApiKeyMasked, openrouterModel, POPULAR_OPENROUTER_MODELS, setOpenRouterApiKey, setOpenRouterModel } = useUserSettings()
 
 // The settings section list: each entry jumps to a section on this page (or to a settings page).
@@ -137,12 +137,6 @@ async function changeModel(model: string) {
 
 const openrouterDocsUrl = 'https://openrouter.ai/keys'
 
-const userInitials = computed(() => {
-  const name = session.value?.user?.name
-  if (!name) return '?'
-  return name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
-})
-
 const memberSince = computed(() => {
   const date = session.value?.user?.createdAt
   if (!date) return '—'
@@ -265,11 +259,6 @@ function swatchStyle(color: string, selected: boolean) {
                 <span class="text-xs font-semibold text-muted uppercase tracking-wider">Account</span>
               </div>
               <div class="p-5 flex items-center gap-4">
-                <UAvatar
-                  :src="session?.user?.image ?? undefined"
-                  :alt="userInitials"
-                  size="xl"
-                />
                 <div class="min-w-0">
                   <p class="font-semibold truncate">
                     {{ session?.user?.name }}
@@ -291,6 +280,13 @@ function swatchStyle(color: string, selected: boolean) {
                   @click="signOut"
                 />
               </div>
+              <AccountProfileEditor
+                :user-id="session?.user?.id ?? ''"
+                :name="session?.user?.name ?? null"
+                :email="session?.user?.email ?? null"
+                :image="session?.user?.image ?? null"
+                @changed="refreshSession()"
+              />
             </div>
 
             <!-- Passkeys and two-factor -->
