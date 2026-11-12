@@ -37,7 +37,7 @@ const slugB = `cmrb${tag}`
 const slugs = [slugA, slugB]
 let server: Server
 let base = ''
-let keys: { A: Record<string, string>, B: Record<string, string> } = { A: {}, B: {} }
+const keys: { A: Record<string, string>, B: Record<string, string> } = { A: {}, B: {} }
 
 const id = (n: number) => `${tag}${n.toString(16).padStart(2, '0')}`.padEnd(32, '0').slice(0, 32)
 

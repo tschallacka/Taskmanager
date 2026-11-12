@@ -6,7 +6,7 @@ import assert from 'node:assert/strict'
 import { mkdtempSync, mkdirSync, readdirSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { sendMail, flushOutbox, fetchMail, deliverOnce, tick, mailLine } from './mail-client.mjs'
+import { sendMail, flushOutbox, fetchMail, tick, mailLine } from './mail-client.mjs'
 
 const ID = '0123456789abcdef0123456789abcdef'
 const ID2 = 'fedcba9876543210fedcba9876543210'
@@ -144,7 +144,13 @@ test('a delivery that throws is never repeated: the seen record is written first
   const mail = { id: ID, from: 'wick', to: 'pia', text: 'once', created: 1 }
   const lines = []
   let fail = true
-  const deliver = line => { if (fail) { fail = false; throw new Error('the terminal is gone') } lines.push(line) }
+  const deliver = (line) => {
+    if (fail) {
+      fail = false
+      throw new Error('the terminal is gone')
+    }
+    lines.push(line)
+  }
   const endpoint = fakeEndpoint({ mail: [mail] })
   const first = await tick({ fetch: endpoint.fetchImpl, base: BASE, slug: 'tm', key: 'k1', to: 'pia', mailboxDir: dir, deliver })
   assert.notEqual(first.error, null)

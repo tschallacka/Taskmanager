@@ -1,3 +1,11 @@
+---
+title: Crew mail
+summary: How a crew's people send each other short mails, kept by the app until the recipient's mailer has delivered them
+requires: staff
+topics: crew, mail, mailer, agents, boss, pia
+order: 40
+---
+
 # Crew mail
 
 A crew's people send each other short mails from the crew kit's mailbox (its `mailbox.mjs send <to> <text>`, in the crew

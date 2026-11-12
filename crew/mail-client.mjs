@@ -26,7 +26,7 @@ function endpoint(base, slug, path = '') {
 async function call(fetchImpl, url, init, key) {
   const res = await fetchImpl(url, {
     ...init,
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${key}`, ...(init.headers ?? {}) },
+    headers: { 'content-type': 'application/json', 'authorization': `Bearer ${key}`, ...(init.headers ?? {}) },
     signal: AbortSignal.timeout(SEND_TIMEOUT_MS)
   })
   if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status })
