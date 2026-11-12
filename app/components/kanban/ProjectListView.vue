@@ -33,23 +33,40 @@ const groupBy = ref<GroupBy>('column')
 const sortBy = ref<SortBy>('due')
 const VIEW_KEY = (boardId: string | null) => `tm-list-view:${boardId ?? ''}`
 
+// The optional columns of each row. Chosen once per board and remembered; the default shows all three.
+type OptionalColumn = 'assignee' | 'due' | 'labels'
+const OPTIONAL_COLUMNS: { id: OptionalColumn, label: string }[] = [
+  { id: 'assignee', label: 'Assignee' },
+  { id: 'due', label: 'Due' },
+  { id: 'labels', label: 'Labels' }
+]
+const shownColumns = ref<Record<OptionalColumn, boolean>>({ assignee: true, due: true, labels: true })
+
 function loadView() {
   try {
     const raw = JSON.parse(localStorage.getItem(VIEW_KEY(activeProjectId.value)) ?? 'null')
     if (raw?.groupBy === 'column' || raw?.groupBy === 'assignee') groupBy.value = raw.groupBy
     if (raw?.sortBy === 'due' || raw?.sortBy === 'title') sortBy.value = raw.sortBy
+    const cols = raw?.columns
+    if (cols && typeof cols === 'object') {
+      for (const col of OPTIONAL_COLUMNS) if (typeof cols[col.id] === 'boolean') shownColumns.value[col.id] = cols[col.id]
+    }
   } catch { /* no storage here: the defaults stand */ }
 }
 
 function saveView() {
   try {
-    localStorage.setItem(VIEW_KEY(activeProjectId.value), JSON.stringify({ groupBy: groupBy.value, sortBy: sortBy.value }))
+    localStorage.setItem(VIEW_KEY(activeProjectId.value), JSON.stringify({
+      groupBy: groupBy.value,
+      sortBy: sortBy.value,
+      columns: shownColumns.value
+    }))
   } catch { /* the choice lasts this visit */ }
 }
 
 onMounted(loadView)
 watch(activeProjectId, loadView)
-watch([groupBy, sortBy], saveView)
+watch([groupBy, sortBy, shownColumns], saveView, { deep: true })
 
 /** Tasks in the chosen order: by due day (none last) or by title. */
 function sorted(tasks: ProjectTask[]): ProjectTask[] {
@@ -147,6 +164,24 @@ function subtaskProgress(taskId: string) {
           <option value="assignee">Assignee</option>
         </select>
       </label>
+      <div
+        class="flex items-center gap-1 text-xs text-muted"
+        role="group"
+        aria-label="Columns"
+      >
+        <span>Columns</span>
+        <button
+          v-for="col in OPTIONAL_COLUMNS"
+          :key="col.id"
+          class="rounded-md border px-2 py-0.5 transition-colors"
+          :class="shownColumns[col.id] ? 'border-primary bg-primary/10 text-default' : 'border-default text-muted'"
+          :aria-pressed="shownColumns[col.id]"
+          :data-list-column-toggle="col.id"
+          @click="shownColumns[col.id] = !shownColumns[col.id]"
+        >
+          {{ col.label }}
+        </button>
+      </div>
       <label class="flex items-center gap-1.5 text-xs text-muted">
         Sort
         <select
@@ -228,7 +263,10 @@ function subtaskProgress(taskId: string) {
               {{ subtaskProgress(task.id).done }}/{{ subtaskProgress(task.id).total }}
             </span>
 
-            <span class="hidden shrink-0 items-center gap-1 sm:flex">
+            <span
+              v-if="shownColumns.labels"
+              class="hidden shrink-0 items-center gap-1 sm:flex"
+            >
               <KanbanLabelChip
                 v-for="tag in task.tags.slice(0, 2)"
                 :key="tag"
@@ -251,7 +289,10 @@ function subtaskProgress(taskId: string) {
               />
             </span>
 
-            <span class="flex w-5 shrink-0 justify-center">
+            <span
+              v-if="shownColumns.assignee"
+              class="flex w-5 shrink-0 justify-center"
+            >
               <UAvatar
                 v-if="personById(task.assigneeId)"
                 :src="personById(task.assigneeId)!.image ?? undefined"
@@ -263,6 +304,7 @@ function subtaskProgress(taskId: string) {
             </span>
 
             <span
+              v-if="shownColumns.due"
               class="w-16 shrink-0 text-right text-xs tabular-nums"
               :class="overdue(task) ? 'font-medium text-error' : 'text-dimmed'"
             >
