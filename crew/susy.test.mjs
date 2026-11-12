@@ -33,6 +33,15 @@ test('author keys: a crew agent is its key, a person is not', () => {
   assert.equal(authorKey('Maria Pia'), null)
 })
 
+test('a Blocked card with a BLOCKED ON line pokes the named person after the threshold; without a line, nobody is poked for it', () => {
+  const named = card('b1', { column: 'Blocked', updates: [update(agent('pia'), 'BLOCKED ON wynn: push actor_id to arnotes_test_wynn', 30)] })
+  const pokes = run([named]).actions.filter(a => a.kind === 'poke' && a.reason === 'blocked, waiting on wynn')
+  assert.equal(pokes.length, 1)
+  assert.equal(pokes[0].to, 'wynn')
+  const unnamed = card('b2', { column: 'Blocked', updates: [update(agent('pia'), 'waiting', 30)] })
+  assert.equal(run([unnamed]).actions.filter(a => a.kind === 'poke' && a.reason.startsWith('blocked, waiting on')).length, 0)
+})
+
 test('thresholds: defaults, overridden by crew.json, a bad value falls back', () => {
   assert.deepEqual(thresholdsFrom({}), { questionMinutes: 10, idleMinutes: 10, gateMinutes: 15, cleanGrantMinutes: 5, cleanPlanMinutes: 10, cleanDoneMinutes: 15, stuckMinutes: 240 })
   assert.equal(thresholdsFrom({ susy: { questionMinutes: 3, idleMinutes: -1 } }).questionMinutes, 3)
