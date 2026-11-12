@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import { mkdtempSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { tick, pendingKey, runOnce, statusLines } from './susy-daemon.mjs'
+import { tick, pendingKey, postBody, postFresh, runOnce, statusLines } from './susy-daemon.mjs'
 
 const MIN = 60000
 const T0 = Date.parse('2026-11-12T10:00:00.000Z')
@@ -39,7 +39,7 @@ test('a board that does not answer: one line, one would-mail-Boss line for the s
   assert.equal(first.ok, false)
   assert.deepEqual(first.lines, [
     'susy-daemon: get_board answered HTTP 503',
-    'would mail boss once: susy-daemon has no board answer: get_board answered HTTP 503'
+    'mail boss once: susy-daemon has no board answer: get_board answered HTTP 503'
   ])
   const second = await tick({ now: T0 + MIN, crew: CREW, readCards, state: first.state })
   assert.deepEqual(second.lines, ['susy-daemon: get_board answered HTTP 503'])
@@ -57,7 +57,7 @@ test('a good tick after errors says the board is back, and a new error mails Bos
   assert.equal(good.state.errorStreak, undefined)
   fail = true
   const again = await tick({ now: T0 + 2 * MIN, crew: CREW, readCards, state: good.state })
-  assert.ok(again.lines.some(line => line.startsWith('would mail boss once')))
+  assert.ok(again.lines.some(line => line.startsWith('mail boss once')))
 })
 
 test('a pending action that stops being needed drops out of pending, so a later one is logged again', async () => {
@@ -89,4 +89,33 @@ test('the heartbeat and the dry-run log are written by a tick, and status reads 
   assert.match(status[0], /dry-run: tick 1, last 2 min ago/)
   await runOnce(home, T0 + MIN)
   assert.equal(JSON.parse(readFileSync(join(home, '.listen', 'susy-daemon.json'), 'utf8')).ticks, 2)
+})
+
+test('a poke is posted as its marker line, then one line naming the person; a clear is the marker alone', () => {
+  const poke = { kind: 'poke', to: 'wick', reason: 'in progress, no update', cardId: 'c1', marker: 'poked wick | in progress, no update | at 2026-11-12T10:00:00.000Z', text: 'poke @wick on c1 "Build": in progress, no update (30 min; SendMessage to agent x). Say: "post what you did on c1 "Build" or move it back to To do" (to wick)' }
+  const body = postBody(poke)
+  assert.equal(body.split('\n')[0], poke.marker)
+  assert.match(body, /^@wick post what you did on c1/m)
+  const clear = { kind: 'clear', marker: 'cleared wick | in progress, no update | at 2026-11-12T10:20:00.000Z', text: 'clear' }
+  assert.equal(postBody(clear), clear.marker)
+})
+
+test('live posting: a post that works is logged as posted; one that fails is taken back out of pending for the next tick', async () => {
+  const fresh = [
+    { kind: 'clear', cardId: 'c1', reason: 'r', to: undefined, marker: 'cleared x', text: 'clear' },
+    { kind: 'clear', cardId: 'c2', reason: 'r', to: undefined, marker: 'cleared y', text: 'clear' }
+  ]
+  const pending = Object.fromEntries(fresh.map(a => [pendingKey(a), a.text]))
+  const calls = []
+  const call = async (name, args) => {
+    calls.push([name, args.id])
+    if (args.id === 'c2') throw new Error('post_task_update answered HTTP 503')
+    return {}
+  }
+  const lines = await postFresh({ fresh, pending, call })
+  assert.deepEqual(calls.map(c => c[0]), ['post_task_update', 'post_task_update'])
+  assert.equal(lines[0], 'posted: clear c1 r')
+  assert.match(lines[1], /could not post clear on c2, tried again next tick: post_task_update answered HTTP 503/)
+  assert.ok(pendingKey(fresh[0]) in pending, 'the posted action stays pending')
+  assert.ok(!(pendingKey(fresh[1]) in pending), 'the failed one is taken back out')
 })
