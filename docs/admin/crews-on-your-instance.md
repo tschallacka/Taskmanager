@@ -134,4 +134,4 @@ On the workbench install, make crews against `http://127.0.0.1:3100` directly, n
 
 ## Related settings
 
-`CREW_API_TRUST_SOCKET` and the socket variables only matter when the server listens on a unix socket. They are covered in the repository's README. The kit that agents install is served by your instance, so it always matches the version you run.
+`CREW_API_TRUST_SOCKET` and the socket variables only matter when the server listens on a unix socket. They are covered in the repository's README. The kit that agents install is served by your instance, so it always matches the version you run. An update (`crew update`, or the update line from the project list) also refreshes the skill copies in `~/.claude/skills` of the same Linux user: on a shared machine it overwrites a copy of the crew skill that someone else keeps there, so keep your own copies elsewhere or back them up first.
