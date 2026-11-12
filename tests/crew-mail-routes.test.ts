@@ -133,8 +133,8 @@ test('a bad id, an empty text, a text over the 1 MB safety stop, or a recipient 
   assert.equal((await call('POST', `/api/crews/${slugA}/mail`, keys.A.pia, { id: 'nope', to: 'wick', text: 'x' })).status, 400)
   assert.equal((await call('POST', `/api/crews/${slugA}/mail`, keys.A.pia, { id: id(5), to: 'wick', text: '   ' })).status, 400)
   const over = await call('POST', `/api/crews/${slugA}/mail`, keys.A.pia, { id: id(6), to: 'wick', text: 'x'.repeat(1024 * 1024 + 1) })
-  assert.equal(over.status, 400)
-  assert.match(over.body.message ?? over.body.statusMessage ?? JSON.stringify(over.body), /1048577 bytes/)
+  assert.equal(over.status, 413, 'over the safety stop is 413')
+  assert.match(over.body.data?.error ?? '', /1048577 bytes/, 'the size reaches the sender in the body')
   assert.equal((await call('POST', `/api/crews/${slugA}/mail`, keys.A.pia, { id: id(7), to: 'customer', text: 'x' })).status, 400)
 })
 

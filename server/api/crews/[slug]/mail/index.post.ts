@@ -3,7 +3,7 @@ import { db } from '../../../../db'
 import { crewMail } from '../../../../db/schema'
 import { eq } from 'drizzle-orm'
 import { cleanupMailOnWrite, isMailRecipient, pendingFor, requireMailCaller, sendsInLastMinute } from '../../../../utils/crewMail'
-import { MAIL_PENDING_LIMIT, MAIL_SENDS_PER_MINUTE, mailIdProblem, mailTextProblem } from '../../../../utils/crewMailRules'
+import { MAIL_PENDING_LIMIT, MAIL_SENDS_PER_MINUTE, MAIL_TEXT_SAFETY_BYTES, mailIdProblem, mailTextProblem } from '../../../../utils/crewMailRules'
 
 /**
  * Sends one mail to a crew member. Body: { id, to, text }. The sender is the caller's own key; a body field `from` is
@@ -17,7 +17,11 @@ export default defineEventHandler(async (event) => {
   const idProblem = mailIdProblem(body.id)
   if (idProblem) throw createError({ statusCode: 400, message: idProblem })
   const textProblem = mailTextProblem(body.text)
-  if (textProblem) throw createError({ statusCode: 400, message: textProblem })
+  if (textProblem) {
+    // The reason goes to the sender: h3 sends statusMessage and data, not message. Over the safety stop it is 413.
+    const tooLarge = typeof body.text === 'string' && Buffer.byteLength(body.text, 'utf8') > MAIL_TEXT_SAFETY_BYTES
+    throw createError({ statusCode: tooLarge ? 413 : 400, statusMessage: textProblem, data: { error: textProblem } })
+  }
   if (typeof body.to !== 'string' || !isMailRecipient(body.to)) {
     throw createError({ statusCode: 400, message: 'to must be a crew member key (for example pia, boss, susy, wren)' })
   }
