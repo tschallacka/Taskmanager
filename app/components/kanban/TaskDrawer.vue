@@ -34,6 +34,9 @@ const toast = useToast()
 const linkCopied = ref(false)
 // On a phone, the Activity sheet is open (the comments and the composer fill the panel).
 const activityOpen = ref(false)
+// The phone's tap chevron on an editable property row (the grid gets a third column for it). A read-only panel
+// has no chevron: its rows show values only.
+const chevronRow = `max-md:grid-cols-[6rem_1fr_1rem] max-md:after:content-['›'] max-md:after:text-lg max-md:after:leading-none max-md:after:text-dimmed`
 async function copyTaskNumberLink() {
   const task = props.task
   if (!task) return
@@ -706,7 +709,10 @@ const menuItems = computed(() => [[
                Start date, Labels, the custom fields (Priority). Time, Blocked by and GitHub are full-width blocks
                below them (redesign card 5/9). -->
           <dl class="grid shrink-0 grid-cols-1 gap-x-6 gap-y-1.5 px-5 pb-3 text-xs md:grid-cols-2">
-            <div class="grid grid-cols-[6rem_1fr] items-center gap-x-3 max-md:grid-cols-[6rem_1fr_1rem] max-md:after:content-['›'] max-md:after:text-lg max-md:after:leading-none max-md:after:text-dimmed">
+            <div
+              class="grid grid-cols-[6rem_1fr] items-center gap-x-3"
+              :class="readonly ? '' : chevronRow"
+            >
               <dt class="text-muted">
                 Assignee
               </dt>
@@ -734,7 +740,10 @@ const menuItems = computed(() => [[
               </dd>
             </div>
 
-            <div class="grid grid-cols-[6rem_1fr] items-center gap-x-3 max-md:grid-cols-[6rem_1fr_1rem] max-md:after:content-['›'] max-md:after:text-lg max-md:after:leading-none max-md:after:text-dimmed">
+            <div
+              class="grid grid-cols-[6rem_1fr] items-center gap-x-3"
+              :class="readonly ? '' : chevronRow"
+            >
               <dt class="text-muted">
                 Due date
               </dt>
@@ -765,7 +774,10 @@ const menuItems = computed(() => [[
               </dd>
             </div>
 
-            <div class="grid grid-cols-[6rem_1fr] items-center gap-x-3 max-md:grid-cols-[6rem_1fr_1rem] max-md:after:content-['›'] max-md:after:text-lg max-md:after:leading-none max-md:after:text-dimmed">
+            <div
+              class="grid grid-cols-[6rem_1fr] items-center gap-x-3"
+              :class="readonly ? '' : chevronRow"
+            >
               <dt class="text-muted">
                 Start date
               </dt>
@@ -797,7 +809,10 @@ const menuItems = computed(() => [[
               </dd>
             </div>
 
-            <div class="grid grid-cols-[6rem_1fr] items-start gap-x-3 max-md:grid-cols-[6rem_1fr_1rem] max-md:after:content-['›'] max-md:after:text-lg max-md:after:leading-none max-md:after:text-dimmed">
+            <div
+              class="grid grid-cols-[6rem_1fr] items-start gap-x-3"
+              :class="readonly ? '' : chevronRow"
+            >
               <dt class="pt-0.5 text-muted">
                 Labels
               </dt>
