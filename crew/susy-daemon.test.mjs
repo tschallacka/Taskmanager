@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import { mkdtempSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { tick, pendingKey, postBody, postFresh, runOnce, statusLines } from './susy-daemon.mjs'
+import { tick, pendingKey, postBody, postFresh, runOnce, statusLines, heartbeatAgeMinutes, heartbeatFresh, daemonCommand, SESSION } from './susy-daemon.mjs'
 
 const MIN = 60000
 const T0 = Date.parse('2026-11-12T10:00:00.000Z')
@@ -118,4 +118,27 @@ test('live posting: a post that works is logged as posted; one that fails is tak
   assert.match(lines[1], /could not post clear on c2, tried again next tick: post_task_update answered HTTP 503/)
   assert.ok(pendingKey(fresh[0]) in pending, 'the posted action stays pending')
   assert.ok(!(pendingKey(fresh[1]) in pending), 'the failed one is taken back out')
+})
+
+test('the heartbeat is fresh within 3 minutes and stale after; no heartbeat time is not fresh', () => {
+  const now = Date.parse('2026-11-12T12:00:00.000Z')
+  assert.equal(heartbeatFresh({ time: new Date(now - 2 * MIN).toISOString() }, now), true)
+  assert.equal(heartbeatFresh({ time: new Date(now - 3 * MIN).toISOString() }, now), true)
+  assert.equal(heartbeatFresh({ time: new Date(now - 4 * MIN).toISOString() }, now), false)
+  assert.equal(heartbeatFresh({}, now), false)
+  assert.equal(heartbeatAgeMinutes({ time: 'nonsense' }, now), null)
+})
+
+test('start puts the dry-run loop in its own detached session through detach.sh; stop kills that session', () => {
+  const [file, args] = daemonCommand('/crew/home', 'start', { kit: '/kit' })
+  assert.equal(file, 'sh')
+  assert.deepEqual(args.slice(0, 4), ['/kit/detach.sh', 'start', '/crew/home/tmux.sock', SESSION])
+  assert.match(args[4], /susy-daemon\.mjs loop$/)
+  assert.doesNotMatch(args[4], /--live/)
+  const [, liveArgs] = daemonCommand('/crew/home', 'start', { kit: '/kit', live: true })
+  assert.match(liveArgs[4], /loop --live$/)
+  const [stopFile, stopArgs] = daemonCommand('/crew/home', 'stop', { kit: '/kit' })
+  assert.equal(stopFile, 'tmux')
+  assert.deepEqual(stopArgs, ['-S', '/crew/home/tmux.sock', 'kill-session', '-t', SESSION])
+  assert.throws(() => daemonCommand('/crew/home', 'restart', { kit: '/kit' }), /no such action/)
 })

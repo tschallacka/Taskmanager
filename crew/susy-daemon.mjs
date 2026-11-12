@@ -12,7 +12,9 @@
 // Files in CREW_HOME/.listen: susy-daemon.json, susy-daemon-dryrun.log, and susy.json (agent ids and the last round,
 // shared with `crew susy`).
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { pathToFileURL } from 'node:url'
+import { spawnSync } from 'node:child_process'
+import { dirname, join } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { crewHome } from './home.mjs'
 import { DEFAULT_CLEANER, findPokes, keyOfName, makeCall, readBoardCards } from './susy.mjs'
 
@@ -167,12 +169,41 @@ export async function runOnce(home, now = Date.now(), { live = false } = {}) {
   return { ...result, lines }
 }
 
-/** `status`: the heartbeat in one line, and the log's last lines. */
+// Boss's watch alarms when the heartbeat is older than this (card mwdbhbl2, step 3).
+export const STALE_MINUTES = 3
+export const SESSION = 'susy-daemon'
+
+/** Minutes since the heartbeat's last tick, or null when there is no heartbeat time. */
+export function heartbeatAgeMinutes(heartbeat, now = Date.now()) {
+  const at = Date.parse(heartbeat?.time)
+  return Number.isFinite(at) ? Math.floor((now - at) / 60000) : null
+}
+
+/** Fresh when the last tick is within STALE_MINUTES. No heartbeat, or an unreadable one, is not fresh. */
+export function heartbeatFresh(heartbeat, now = Date.now()) {
+  const age = heartbeatAgeMinutes(heartbeat, now)
+  return age !== null && age >= 0 && age <= STALE_MINUTES
+}
+
+/**
+ * The command for start and stop, as argv (not run here): start puts the loop in a detached tmux session through
+ * crew/detach.sh, so it outlives the session that started it; stop kills that session. `kit` is the folder of this file.
+ */
+export function daemonCommand(home, action, { kit, live = false }) {
+  const socket = `${home}/tmux.sock`
+  if (action === 'stop') return ['tmux', ['-S', socket, 'kill-session', '-t', SESSION]]
+  if (action !== 'start') throw new Error(`no such action: ${action}`)
+  const loop = `CREW_HOME=${home} ${process.execPath} ${join(kit, 'susy-daemon.mjs')} loop${live ? ' --live' : ''}`
+  return ['sh', [join(kit, 'detach.sh'), 'start', socket, SESSION, loop]]
+}
+
+/** `status`: the heartbeat in one line, whether it is fresh, and the log's last lines. */
 export function statusLines(home, now = Date.now()) {
   const heartbeat = readJson(heartbeatPath(home), null)
   if (!heartbeat) return ['susy-daemon: no heartbeat yet (it has not run a tick)']
-  const ageMinutes = Math.floor((now - Date.parse(heartbeat.time)) / 60000)
-  const out = [`susy-daemon ${heartbeat.mode}: tick ${heartbeat.ticks}, last ${ageMinutes} min ago, ${heartbeat.pending} pending, last tick ${heartbeat.lastTick?.ok ? 'ok' : `failed: ${heartbeat.lastTick?.error}`}`]
+  const ageMinutes = heartbeatAgeMinutes(heartbeat, now) ?? 0
+  const freshness = heartbeatFresh(heartbeat, now) ? 'fresh' : `STALE (older than ${STALE_MINUTES} min)`
+  const out = [`susy-daemon ${heartbeat.mode}: tick ${heartbeat.ticks}, last ${ageMinutes} min ago (${freshness}), ${heartbeat.pending} pending, last tick ${heartbeat.lastTick?.ok ? 'ok' : `failed: ${heartbeat.lastTick?.error}`}`]
   const logPath = `${home}/.listen/susy-daemon-dryrun.log`
   if (existsSync(logPath)) out.push(...readFileSync(logPath, 'utf8').trimEnd().split('\n').slice(-5))
   return out
@@ -187,8 +218,18 @@ async function main(argv) {
     console.log(statusLines(home).join('\n'))
     return 0
   }
+  const kit = dirname(fileURLToPath(import.meta.url))
+  if (command === 'start' || command === 'stop') {
+    // start: the loop in its own detached session (crew/detach.sh, which keeps it when the calling session ends);
+    // stop: that session is killed. Start is a no-op when the session exists (detach.sh checks it).
+    const [file, args] = daemonCommand(home, command, { kit, live: rest.includes('--live') })
+    const run = spawnSync(file, args, { encoding: 'utf8', timeout: 60000 })
+    const text = `${run.stdout ?? ''}${run.stderr ?? ''}`.trim()
+    console.log(text || `susy-daemon: ${command} done`)
+    return run.status ?? 1
+  }
   if (command !== 'once' && command !== 'loop') {
-    console.error('usage: crew susy-daemon once | loop [sec] | status   (add --live to act on the board)')
+    console.error('usage: crew susy-daemon once | loop [sec] | start | stop | status   (add --live to act on the board)')
     return 64
   }
   const live = rest.includes('--live')
