@@ -41,12 +41,12 @@ package.json
 postbrief.mjs
 publish.mjs
 restart-brief.mjs
-up.mjs
 setup.mjs
 susy.mjs
 tm.mjs
 totp.mjs
 unslop.SKILL.md
+up.mjs
 update.mjs
 watch.mjs
 watchlogs.mjs
