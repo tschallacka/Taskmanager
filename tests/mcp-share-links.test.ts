@@ -74,3 +74,24 @@ test('get_task answers with the task\'s link to share', async () => {
   const answer = await tool.handler({ id: task }, context) as { url?: string }
   assert.equal(answer.url, `${origin}/projects/${board}?task=${task}`)
 })
+
+test('create_task, update_task and move_task answer with the absolute link of the task they touched', async () => {
+  const context = {
+    keyId: 'k',
+    keyName: 'k',
+    userId: owner,
+    teamId: null,
+    customerId: null,
+    projectId: null,
+    scopes: ['boards:read', 'boards:write'] as ('boards:read' | 'boards:write')[],
+    reach: { allBoards: true, workspaceTeamIds: [], boardIds: [] },
+    memberTeamIds: []
+  }
+  const created = await MCP_TOOLS.find(t => t.name === 'create_task')!.handler({ board, column: 'To do', title: 'Made by agent' }, context) as { task: { id: string, url?: string } }
+  assert.equal(created.task.url, `${origin}/projects/${board}?task=${created.task.id}`)
+  const updated = await MCP_TOOLS.find(t => t.name === 'update_task')!.handler({ id: created.task.id, title: 'Renamed' }, context) as { task: { url?: string } }
+  assert.equal(updated.task.url, `${origin}/projects/${board}?task=${created.task.id}`)
+  const moved = await MCP_TOOLS.find(t => t.name === 'move_task')!.handler({ id: created.task.id, column }, context) as { task: { url?: string } }
+  assert.equal(moved.task.url, `${origin}/projects/${board}?task=${created.task.id}`)
+  await db.delete(projectTasks).where(eq(projectTasks.id, created.task.id))
+})

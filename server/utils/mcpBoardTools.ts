@@ -349,6 +349,11 @@ function readDetail(args: Record<string, unknown>): TaskDetail {
  * `column` and `board` are named only where the nesting does not already say so
  * — search results carry them, a board's own columns do not.
  */
+/** The link to a task for a staff caller. A customer's contact gets no staff link: the board's own page is staff's. */
+function staffTaskUrl(task: ProjectTask, board: Project, context: ApiKeyContext): string | undefined {
+  return audienceOf(context, board) === 'staff' ? taskShareUrl(board.id, task.id) : undefined
+}
+
 function taskCard(task: ProjectTask, options: {
   detail?: TaskDetail
   updates?: number
@@ -359,12 +364,15 @@ function taskCard(task: ProjectTask, options: {
   people?: Map<string, string>
   fields?: Record<string, string | number>
   blocked?: BlockedMark
+  // The link to share with a person; only staff get one (see staffTaskUrl).
+  url?: string
 } = {}) {
   const detail = options.detail ?? 'summary'
   const terms = options.terms ?? []
 
   return {
     id: task.id,
+    ...(options.url ? { url: options.url } : {}),
     ...(options.board ? { board: options.board } : {}),
     ...(options.column ? { column: options.column } : {}),
     ...(options.parent ? { parent: options.parent } : {}),
@@ -435,8 +443,8 @@ async function taskDetail(task: ProjectTask, board: Project, context: ApiKeyCont
 
   return {
     id: task.id,
-    // The link to share with a person: it opens this task on its board (shareLinks.ts).
-    url: taskShareUrl(board.id, task.id),
+    // The link to share with a person: it opens this task on its board (shareLinks.ts). Staff only.
+    ...(audience === 'staff' ? { url: taskShareUrl(board.id, task.id) } : {}),
     board: { id: board.id, name: board.name },
     column: column?.name ?? task.columnId,
     title: task.title,
@@ -816,6 +824,7 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
           ...(total > shown.length ? { omitted: total - shown.length } : {}),
           tasks: shown.map(task => taskCard(task, {
             detail,
+            url: staffTaskUrl(task, board, context),
             updates: counts.get(task.id),
             blocked: marks.get(task.id),
             people,
@@ -920,6 +929,7 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
         tasks: matches.slice(0, limit).map(task => taskCard(task, {
           detail,
           terms,
+          url: boardsById.get(task.projectId) ? staffTaskUrl(task, boardsById.get(task.projectId)!, context) : undefined,
           board: boardsById.get(task.projectId)?.name ?? task.projectId,
           column: columnsById.get(task.columnId)?.name ?? task.columnId
         }))
@@ -1383,7 +1393,7 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
       return {
         created: true,
         board: { id: board.id, name: board.name },
-        task: taskCard(task!, { column: column.name, parent: parent?.task.id, people: await peopleNames(board), fields: describeFieldValues(fieldDefs, storedValues), blocked: await blockedFor(task!.id, audienceOf(context, board)) })
+        task: taskCard(task!, { url: staffTaskUrl(task!, board, context), column: column.name, parent: parent?.task.id, people: await peopleNames(board), fields: describeFieldValues(fieldDefs, storedValues), blocked: await blockedFor(task!.id, audienceOf(context, board)) })
       }
     }
   },
@@ -1464,7 +1474,7 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
       return {
         updated: true,
         board: { id: board.id, name: board.name },
-        task: taskCard(updated!, { column: column.name, people: await peopleNames(board), fields: (await describedFields(board, updated!)).fields, blocked: await blockedFor(updated!.id, audienceOf(context, board)) })
+        task: taskCard(updated!, { url: staffTaskUrl(updated!, board, context), column: column.name, people: await peopleNames(board), fields: (await describedFields(board, updated!)).fields, blocked: await blockedFor(updated!.id, audienceOf(context, board)) })
       }
     }
   },
@@ -1525,7 +1535,7 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
         board: { id: board.id, name: board.name },
         from: from.name,
         to: column.name,
-        task: taskCard(updated!, { column: column.name })
+        task: taskCard(updated!, { url: staffTaskUrl(updated!, board, context), column: column.name })
       }
     }
   },
