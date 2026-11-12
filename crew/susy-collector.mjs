@@ -2,7 +2,7 @@
 // the evidence personState and the Pia checks need, and returns the lines from susy-activity.mjs. It is light: it reads
 // the cards the daemon already read (no extra board call), a few file times, the process list of `claude agents`, and
 // /proc/loadavg. Any source that cannot be read is null, which the checks treat as no evidence (never a fault).
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { authorKey } from './susy.mjs'
@@ -57,14 +57,57 @@ export function mailAgeMinutes(home, to, now) {
   }
 }
 
-/** The minutes since the listener last wrote its state (.listen/pia.json), or null when it is not there. */
-export function listenerAgeMinutes(home, now) {
-  const file = join(home, '.listen', 'pia.json')
+/**
+ * Whether Pia's listener process is running now (`pgrep -f "listen.mjs pia"`): true, false, or null when it cannot be asked.
+ * The listener is a process that waits and exits, and is started again, so its presence is the signal, not a file time.
+ */
+export function listenerRunning(run = spawnSync) {
   try {
-    return existsSync(file) ? Math.floor((now - statSync(file).mtimeMs) / MIN) : null
+    const out = run('pgrep', ['-f', 'listen.mjs pia'], { encoding: 'utf8', timeout: 5000 })
+    if (out.status === 0) return true
+    if (out.status === 1) return false
+    return null
   } catch {
     return null
   }
+}
+
+/**
+ * The listener's heartbeat, sampled each tick: running now is age 0 and is the last time seen; not running is the minutes
+ * since it was last seen. Null when it has never been seen or cannot be asked (no evidence, not a fault).
+ */
+export function listenerHeartbeat({ running, lastSeenAt, now }) {
+  if (running === true) return { age: 0, seenAt: now }
+  const seenAt = Number.isFinite(lastSeenAt) ? lastSeenAt : null
+  if (running === null || seenAt === null) return { age: null, seenAt }
+  return { age: Math.floor((now - seenAt) / MIN), seenAt }
+}
+
+/** A stable key for an activity line, so one condition is one key from tick to tick (the minutes in a line change). */
+export function activityKey(line) {
+  let m
+  if ((m = /^poke (\S+) on (\S+):/.exec(line))) return `poke|${m[1]}|${m[2]}`
+  if ((m = /^to pia: needs resume: (\S+) has (\S+)/.exec(line))) return `resume|${m[1]}|${m[2]}`
+  if ((m = /^to pia: (\w+) trigger silent/.exec(line))) return `trigger|${m[1]}`
+  if (/^to pia: a go is waiting/.test(line)) return 'go'
+  if ((m = /^to boss: (\S+) "/.exec(line))) return `verify|${m[1]}`
+  if (/^to boss: a QUESTION/.test(line)) return 'question'
+  return `line|${line}`
+}
+
+/**
+ * The activity lines that are new since the last tick, and the set to keep for the next one. A condition that is still
+ * there is not logged again; a condition that clears is dropped, so a later return is new again.
+ */
+export function newActivityLines(lines, previous = {}) {
+  const pending = {}
+  const fresh = []
+  for (const line of lines) {
+    const key = activityKey(line)
+    pending[key] = line
+    if (!(key in previous)) fresh.push(line)
+  }
+  return { fresh, pending }
 }
 
 /** The one-minute load, from /proc/loadavg, or null when it cannot be read. */
@@ -80,7 +123,7 @@ export function readLoad(path = '/proc/loadavg') {
  * The evidence for one tick, then the lines. `state.loadUnderSince` is kept across ticks: the time load has been under the
  * limit (reset when it goes over). `cards` are the cards the daemon already read; `keyOf` maps a display name to a key.
  */
-export function collectActivity({ now, home, cards, sessions, load, state = {}, keyOf }) {
+export function collectActivity({ now, home, cards, sessions, load, state = {}, keyOf, listenerRunning: running = null }) {
   const lastPost = lastPostByPerson(cards)
   const loadUnderSince = load !== null && load < LOAD_LIMIT ? (state.loadUnderSince ?? now) : null
   const people = WORKERS.map(key => {
@@ -100,8 +143,9 @@ export function collectActivity({ now, home, cards, sessions, load, state = {}, 
   }).filter(p => p.state !== 'unknown')
 
   const pia = sessionFor('pia', sessions)
+  const heartbeat = listenerHeartbeat({ running, lastSeenAt: state.listenerSeenAt ?? null, now })
   const ages = {
-    listener: listenerAgeMinutes(home, now),
+    listener: heartbeat.age,
     roundTimer: lastPost.has('pia') ? Math.floor((now - lastPost.get('pia')) / MIN) : null,
     mailUnread: mailAgeMinutes(home, 'pia', now),
     handback: null,
@@ -124,5 +168,5 @@ export function collectActivity({ now, home, cards, sessions, load, state = {}, 
       questionMinutes: null
     })
   ]
-  return { lines, people, ages, loadUnderSince, pia }
+  return { lines, people, ages, loadUnderSince, listenerSeenAt: heartbeat.seenAt, pia }
 }

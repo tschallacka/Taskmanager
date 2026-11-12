@@ -17,7 +17,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { crewHome } from './home.mjs'
 import { DEFAULT_CLEANER, findPokes, keyOfName, makeCall, readBoardCards } from './susy.mjs'
-import { collectActivity, readLoad, readSessions } from './susy-collector.mjs'
+import { collectActivity, listenerRunning, newActivityLines, readLoad, readSessions } from './susy-collector.mjs'
 
 export const TICK_SECONDS = 60
 
@@ -137,13 +137,17 @@ export async function runOnce(home, now = Date.now(), { live = false } = {}) {
     return readBoardCards(call, creds.board?.id)
   }
   const result = await tick({ now, crew, readCards, state, agents: susyState.agents })
-  // The activity checks: evidence from the cards already read, the session list, the mail folders, the listener file and
-  // the load. Logged in both modes; live mode does not act on them yet. A source that cannot be read is silent.
+  // The activity checks: evidence from the cards already read, the session list, the mail folders, the listener's sampled
+  // heartbeat and the load. A condition is logged when it starts, not on every tick it holds (newActivityLines). Logged in
+  // both modes; live mode does not act on them yet. A source that cannot be read is silent.
   const activity = result.ok
-    ? collectActivity({ now, home, cards: result.cards ?? [], sessions: readSessions(), load: readLoad(), state, keyOf: keyOfName(crew?.people) })
+    ? collectActivity({ now, home, cards: result.cards ?? [], sessions: readSessions(), load: readLoad(), state, keyOf: keyOfName(crew?.people), listenerRunning: listenerRunning() })
     : null
+  const repeats = newActivityLines(activity?.lines ?? [], state.activity)
+  result.state.activity = repeats.pending
   result.state.loadUnderSince = activity?.loadUnderSince ?? undefined
-  const lines = [...result.lines, ...(activity?.lines ?? [])]
+  result.state.listenerSeenAt = activity?.listenerSeenAt ?? undefined
+  const lines = [...result.lines, ...repeats.fresh]
   if (live) {
     lines.push(...await postFresh({ fresh: result.fresh, pending: result.state.pending, call }))
     if (result.mailBoss && key && creds.crew?.slug) {
