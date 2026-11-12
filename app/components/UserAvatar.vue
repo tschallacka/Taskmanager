@@ -8,7 +8,7 @@ const props = withDefaults(defineProps<{
   name?: string | null
   email?: string | null
   image?: string | null
-  size?: '2xs' | 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl'
+  size?: '3xs' | '2xs' | 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl'
 }>(), { size: 'xs' })
 
 const initials = computed(() => initialsOf(props.name, props.email))
@@ -17,7 +17,7 @@ const foreground = computed(() => textOn(background.value))
 const label = computed(() => props.name || props.email || '')
 
 // Pixels per size step, for the initials disc; a picture uses the same size through the avatar component.
-const PX: Record<string, number> = { '2xs': 16, 'xs': 24, 'sm': 32, 'md': 40, 'lg': 48, 'xl': 64, '2xl': 96 }
+const PX: Record<string, number> = { '3xs': 12, '2xs': 16, 'xs': 24, 'sm': 32, 'md': 40, 'lg': 48, 'xl': 64, '2xl': 96, '3xl': 128 }
 const diameter = computed(() => PX[props.size] ?? 24)
 </script>
 
