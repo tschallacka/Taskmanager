@@ -146,6 +146,8 @@ function toggleAddScope(scope: string, on: boolean) {
 // ─── Regenerate: a new secret, shown once, or a pairing code for it ───
 
 const regenerating = ref<{ tokenId: string, method: ConnectMethod, saving: boolean } | null>(null)
+// The one-time result of the last regenerate, shown in that key's row until it is closed.
+const issuedRow = ref<{ tokenId: string, connection: IssuedConnection } | null>(null)
 const methodItems = [
   { label: 'Pairing code (recommended)', value: 'code' },
   { label: 'Show the token itself (fallback)', value: 'token' }
@@ -169,7 +171,9 @@ async function regenerate(token: ConnectTokenRow) {
       access = { kind: 'code', code: code.code, expiresAt: code.expiresAt }
     }
     regenerating.value = null
-    emit('issued', { title: 'New key', tokenName: token.name, boards, access })
+    // The result goes in this key's row, not the page's top banner: the banner is for a new connection only.
+    issuedRow.value = { tokenId: token.id, connection: { title: 'New key', tokenName: token.name, boards, access } }
+    nextTick(() => document.getElementById(`connect-row-${token.id}`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }))
     emit('changed')
   } catch (e) {
     toast.add({ title: 'Could not make a new key', description: errMsg(e), icon: 'i-lucide-alert-triangle', color: 'error' })
@@ -215,6 +219,7 @@ const permissions = computed(() => CONNECT_PERMISSIONS.filter(permission => prop
     >
       <li
         v-for="token in tokens"
+        :id="`connect-row-${token.id}`"
         :key="token.id"
         class="rounded-lg border border-default p-4 space-y-3 min-w-0"
         :data-token="token.id"
@@ -466,6 +471,13 @@ const permissions = computed(() => CONNECT_PERMISSIONS.filter(permission => prop
             @click="revoke(token)"
           />
         </div>
+        <!-- A regenerated key's result sits in its own row, under the buttons that made it, so the owner sees it where they clicked. -->
+        <ConnectResult
+          v-if="issuedRow && issuedRow.tokenId === token.id"
+          :issued="issuedRow.connection"
+          data-connect-row-result
+          @dismiss="issuedRow = null"
+        />
       </li>
     </ul>
   </div>
