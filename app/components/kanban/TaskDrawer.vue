@@ -6,6 +6,7 @@ import type { Visibility, ProjectTask } from '~/composables/useProjects'
 import { dueDayToMs, isOverdueDay } from '~/utils/dueDate'
 import { absoluteUrl, copyTaskLink } from '~/utils/copyTaskLink'
 import { taskPanelPath } from '~/utils/taskPanelUrl'
+import { taskLink } from '~/utils/taskLink'
 
 interface Task {
   id: string
@@ -84,6 +85,14 @@ const open = computed({
 // The panel slides out over ~half a second. It renders the last task it was
 // given rather than the prop, so closing it doesn't empty it mid-animation.
 const shownTask = ref<Task | null>(props.task)
+// Opened from the Inbox, the panel offers "Open on board": the card on its board, at the comment the notification is about.
+const route = useRoute()
+const openOnBoardTo = computed(() => {
+  const task = shownTask.value
+  if (!task || route.path !== '/projects/inbox') return null
+  const comment = typeof route.query.comment === 'string' ? route.query.comment : null
+  return taskLink(task.projectId, task.id, comment)
+})
 
 watch(() => props.task, (task) => {
   if (task) shownTask.value = task
@@ -674,6 +683,16 @@ const menuItems = computed(() => [[
               aria-label="Task options"
             />
           </UDropdownMenu>
+          <UButton
+            v-if="openOnBoardTo"
+            label="Open on board"
+            icon="i-lucide-external-link"
+            size="xs"
+            color="neutral"
+            variant="ghost"
+            :to="openOnBoardTo"
+            data-open-on-board
+          />
           <UButton
             icon="i-lucide-x"
             size="xs"

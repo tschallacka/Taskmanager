@@ -22,6 +22,14 @@ test('the comment route passes the new comment id to the notification, and the n
   assert.match(read('server/db/schema.ts'), /commentId: text\('comment_id'\)/)
 })
 
+test('the task panel offers Open on board from the Inbox, to the card at the comment', () => {
+  const drawer = read('app/components/kanban/TaskDrawer.vue')
+  assert.match(drawer, /import \{ taskLink \} from '~\/utils\/taskLink'/)
+  assert.match(drawer, /route\.path !== '\/projects\/inbox'/, 'only from the Inbox')
+  assert.match(drawer, /return taskLink\(task\.projectId, task\.id, comment\)/)
+  assert.match(drawer, /data-open-on-board/)
+})
+
 test('the inbox opens a comment notification on its card with the comment in the query', () => {
   const inbox = read('app/pages/projects/inbox.vue')
   assert.match(inbox, /if \(item\.commentId\) \{\s*await router\.replace\(\{ query: \{ \.\.\.route\.query, task: item\.taskId, comment: item\.commentId \} \}\)/)
