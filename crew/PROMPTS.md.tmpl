@@ -75,6 +75,17 @@ Boss checks Pia at the start of every turn (the rule is in `WORKFLOW.md`, sectio
 starts her again the same way, posts one line on the task that waited for her, and tells the Owner when she is
 unavailable again after one restart.
 
+**What a restart of Boss's Claude Code session ends.** Pia's session (it runs under Boss's interactive-shell), every
+agent she started, the dev database, Boss's dev copy and the workers' dev copies. A stale `~/.interactive-shell/sockets/pia/term.sock`
+left behind makes a new Pia session start and die at once, silently. Pia's session and the dev services can be kept in
+a detached tmux session (`crew/detach.sh`, named in crew.json's `up` list), so they can outlive the session that started
+them. A reboot of the machine still ends them.
+
+**The one command that recovers: `crew up`.** It brings the parts in crew.json's `up` list back in order, one line per
+part (already running, started, or failed and why), and it is safe to run again. After it, `crew restart-brief` lists,
+for each standing crew member with open cards, the card and its last update: Pia starts each person fresh from that.
+The Pia start command (`claude --continue`, so she keeps her context) belongs in the machine's crew.json.
+
 ## Channel mode: Pia's session
 
 With channels on (see `{{kit_dir}}/README.md`, "Channels"), the PM does not run the listen loop. Her prompt

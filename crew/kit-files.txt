@@ -22,6 +22,7 @@ TESS.md.tmpl
 USHER.md.tmpl
 WORKFLOW.md
 activity.mjs
+board-call.mjs
 boss-session.mjs
 boss-stop-hook.sh
 browser-driver.mjs
@@ -31,6 +32,8 @@ channel.mjs
 config.mjs
 crew.config.example.json
 crew.mjs
+detach.sh
+dev-copies.mjs
 fonts.conf.tmpl
 guard.sh
 home.mjs
@@ -46,12 +49,14 @@ pia-listener-hook.sh
 pia-session.mjs
 postbrief.mjs
 publish.mjs
+restart-brief.mjs
 session-hooks.mjs
 setup.mjs
 susy.mjs
 tm.mjs
 totp.mjs
 unslop.SKILL.md
+up.mjs
 update.mjs
 watch-crew.mjs
 watch.mjs

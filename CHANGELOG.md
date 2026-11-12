@@ -4,6 +4,8 @@ All notable changes to Arnotes are documented in this file.
 
 ## 0.13.1 - 2026-11-12
 
+- **The crew comes back after a restart of Boss's session.** `crew up` brings the parts in the `up` list of crew.json back in order (already running, started, or failed and why), and is safe to run twice. `crew/detach.sh` keeps Pia's session and the dev services in a detached tmux session, so they outlive the session that started them. `crew restart-brief` lists each standing member's open cards and last update for Pia to start them fresh, and stops with the reason when a board call fails. `crew dev-copies` restarts, after `crew up`, the dev copy of each worker whose card waits in Verify UX or Verify QA, from crew.json "devCopies", one line each. Files: `crew/up.mjs`, `crew/detach.sh`, `crew/restart-brief.mjs`, `crew/dev-copies.mjs`, `crew/board-call.mjs`, `crew/janet.mjs`, `crew/crew.mjs`, `crew/PROMPTS.md.tmpl`, `crew/SKILL.md`, `crew/kit-files.txt`.
+
 - **The crew kit's listener no longer crashes on a state file without a notes list.** `listen.mjs` reads a state file with no notes list as empty and carries on. `crew/listen-state.mjs`, `crew/listen.mjs`, `crew/listen-state.test.mjs`.
 
 ## 0.13.0 - 2026-11-12
