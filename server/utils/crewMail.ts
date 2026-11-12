@@ -11,6 +11,14 @@ import { crewBySlug, CREW_PEOPLE } from './crewProvisioning'
 import { personKeyOf } from './crewAccounts'
 import { isMailMemberKey, mailCutoffs } from './crewMailRules'
 
+/**
+ * An error for the mail routes. h3 sends a createError's `message` to no one (the body is {statusCode, stack}), so the
+ * reason goes in statusMessage (the status line) and in data.error (the body). Every mail route refusal uses this.
+ */
+export function mailError(statusCode: number, message: string) {
+  return createError({ statusCode, statusMessage: message, data: { error: message } })
+}
+
 export interface MailCaller {
   crew: Crew
   /** The caller's person key in this crew (pia, wick, boss ...). */
@@ -32,11 +40,11 @@ export async function requireMailCaller(event: H3Event, slug: string): Promise<M
   const crew = await crewBySlug(slug)
   const [account] = await db.select({ crewId: user.crewId, email: user.email }).from(user).where(eq(user.id, context.userId))
   if (!account || account.crewId !== crew.id) {
-    throw createError({ statusCode: 403, message: 'This key is not a member of this crew.' })
+    throw mailError(403, 'This key is not a member of this crew.')
   }
   const key = personKeyOf(crew.slug, account.email)
   if (!isMailMemberKey(key, teamOfKey)) {
-    throw createError({ statusCode: 403, message: 'Only a crew member key can use the crew mail.' })
+    throw mailError(403, 'Only a crew member key can use the crew mail.')
   }
   return { crew, key }
 }

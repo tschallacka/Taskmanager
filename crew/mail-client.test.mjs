@@ -44,7 +44,7 @@ test('the outbox is flushed when the endpoint is back: each send posted with its
   await sendMail({ fetch: down.fetchImpl, base: BASE, slug: 'tm', key: 'k1', to: 'pia', text: 'queued', id: ID, mailboxDir: dir })
   const up = fakeEndpoint()
   const flushed = await flushOutbox({ fetch: up.fetchImpl, mailboxDir: dir, key: 'k1', slug: 'tm' })
-  assert.deepEqual(flushed, { flushed: 1, left: 0 })
+  assert.deepEqual(flushed, { flushed: 1, left: 0, bad: 0 })
   assert.equal(JSON.parse(up.calls[0].init.body).id, ID)
   assert.equal(readdirSync(join(dir, 'outbox')).filter(f => f.endsWith('.json')).length, 0)
   assert.ok(existsSync(join(dir, 'outbox', 'done', `${ID}.json`)))

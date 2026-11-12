@@ -1,8 +1,7 @@
-import { createError } from 'h3'
 import { and, asc, eq, isNull } from 'drizzle-orm'
 import { db } from '../../../../db'
 import { crewMail } from '../../../../db/schema'
-import { isMailRecipient, requireMailCaller } from '../../../../utils/crewMail'
+import { isMailRecipient, mailError, requireMailCaller } from '../../../../utils/crewMail'
 import { MAIL_FETCH_LIMIT, MAIL_READER_KEY } from '../../../../utils/crewMailRules'
 
 /**
@@ -13,9 +12,9 @@ export default defineEventHandler(async (event) => {
   const slug = String(getRouterParam(event, 'slug') ?? '')
   const caller = await requireMailCaller(event, slug)
   const to = String(getQuery(event).to ?? '')
-  if (!isMailRecipient(to)) throw createError({ statusCode: 400, message: 'to must be a crew member key.' })
+  if (!isMailRecipient(to)) throw mailError(400, 'to must be a crew member key.')
   if (to !== caller.key && caller.key !== MAIL_READER_KEY) {
-    throw createError({ statusCode: 403, message: 'You can read only your own mail.' })
+    throw mailError(403, 'You can read only your own mail.')
   }
   const rows = await db.select().from(crewMail)
     .where(and(eq(crewMail.crewId, caller.crew.id), eq(crewMail.toKey, to), isNull(crewMail.delivered)))
