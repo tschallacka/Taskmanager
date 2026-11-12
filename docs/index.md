@@ -13,7 +13,7 @@ permissions.
 
 - [Your workspace](/help/workspace/your-workspace): what each page in the sidebar is for.
 - [Inbox](/help/workspace/inbox), [My tasks](/help/workspace/my-tasks) and [Search](/help/workspace/search).
-- [Browse projects and pins](/help/workspace/browse-projects-and-pins) and [Settings](/help/workspace/settings).
+- [All projects and pins](/help/workspace/browse-projects-and-pins) and [Settings](/help/workspace/settings).
 - [The person card and profiles](/help/basics/person-card-and-profiles): hover a person to see what you share with them.
 - Working with AI: [what agents can do](/help/agents/what-agents-can-do), [Sprocket](/help/agents/sprocket) and
   [connecting Claude Code](/help/agents/connect-claude-code).
