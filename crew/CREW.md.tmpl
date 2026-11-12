@@ -228,6 +228,13 @@ assigned to you, a comment, a move or a question on your tasks), or `quiet`. Run
 - You stop only when the PM or the customer posts "stand down" in `{{chat.workChannel}}`, or after 90
   minutes in a row with nothing to do (then end with one line saying so). Keep your replies
   in the loop to one line; details belong on the task.
+- **Never be without a listener, not even while you wait.** The moment you wait for anything
+  (a background agent, a test run, the next round), first start your listener as a *background*
+  command (`run_in_background: true`): `{{node_kit}}/listen.mjs <you> 600`. It exits as soon as something
+  arrives, and its exit wakes you. Handle what it printed, then start the next one at once. Keep
+  exactly one running: before you end a turn, check that it is there (a tag from the PM or a worker must
+  reach you within a minute, not at your next 20-minute check). A `quiet` exit after 600 seconds is a
+  reason to start it again, not to stop.
 
 The PM, on top of that: steers the workers in `{{chat.workChannel}}`, answers
 `QUESTION:`s, brings workers into a customer meeting when it helps, and keeps the customer
