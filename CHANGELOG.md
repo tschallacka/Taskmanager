@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.13.0 - 2026-11-12
+
+- **The redesigned shell: a 240 px sidebar that collapses to a 64 px rail, one top bar on every page, and the Planning and Team groups.** The account menu holds Profile, Settings and Help and one Appearance row (System, Dark, Light); Settings keeps no second colour-mode control, and its section list jumps to each section. The browse page is called **All projects** in the sidebar and on its page, and the help pages say so. Pinned boards cap at eight (a ninth pin says so). Each board in the list shows its kind icon (board, customer board, crew home, crew board) and its open count, tinted by health; the rail shows the pinned boards as icons. Sprocket's first opening says what it needs and offers one setup link. `app/layouts/app.vue`, `app/components/AppSidebar.vue`, `app/components/ProjectsListPanel.vue`, `app/pages/settings/index.vue`, `app/pages/projects/browse.vue`, `docs/`, `tests/sidebar-shell.test.ts`.
+
 ## 0.12.1 - 2026-11-12
 
 - **The crew's secretary (Susy) does not count her own pokes as card changes.** A poke moved the card's update time, so each poke counted as a change, the count reset, and the next check poked the same person again: the ladder (person, Pia, Boss, then quiet) never climbed. Her own posts no longer count; a change by anyone else, a move or an edit still does. `crew/susy.mjs`, `crew/susy.test.mjs`.
