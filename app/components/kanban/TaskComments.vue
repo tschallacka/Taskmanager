@@ -492,9 +492,10 @@ defineExpose({ handleEscape })
               size="2xs"
               class="mt-0.5 shrink-0"
             />
-            <UAvatar
+            <UserAvatar
               v-else
-              :alt="initials(comment.userName)"
+              :user-id="comment.userId"
+              :name="comment.userName"
               size="2xs"
               class="mt-0.5 shrink-0"
             />

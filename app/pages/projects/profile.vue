@@ -46,9 +46,11 @@ watch(projects, async (list) => {
 
     <div class="mx-auto w-full max-w-4xl px-4 pb-12 pt-6 lg:px-6">
       <div class="flex items-center gap-5">
-        <UAvatar
-          :src="me?.image ?? undefined"
-          :alt="me?.name"
+        <UserAvatar
+          :user-id="me?.id ?? ''"
+          :name="me?.name"
+          :email="me?.email"
+          :image="me?.image"
           size="3xl"
         />
         <div class="min-w-0">
