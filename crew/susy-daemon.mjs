@@ -17,6 +17,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { crewHome } from './home.mjs'
 import { DEFAULT_CLEANER, findPokes, keyOfName, makeCall, readBoardCards } from './susy.mjs'
+import { collectActivity, readLoad, readSessions } from './susy-collector.mjs'
 
 export const TICK_SECONDS = 60
 
@@ -82,7 +83,7 @@ export async function tick({ now, crew, readCards, state = {}, agents = {} }) {
     }
   }
   next.pending = current
-  return { state: next, lines, ok: true, error: null, actions: round.actions.length, fresh, mailBoss: null }
+  return { state: next, lines, ok: true, error: null, actions: round.actions.length, fresh, mailBoss: null, cards }
 }
 
 function readJson(path, fallback) {
@@ -136,7 +137,13 @@ export async function runOnce(home, now = Date.now(), { live = false } = {}) {
     return readBoardCards(call, creds.board?.id)
   }
   const result = await tick({ now, crew, readCards, state, agents: susyState.agents })
-  const lines = [...result.lines]
+  // The activity checks: evidence from the cards already read, the session list, the mail folders, the listener file and
+  // the load. Logged in both modes; live mode does not act on them yet. A source that cannot be read is silent.
+  const activity = result.ok
+    ? collectActivity({ now, home, cards: result.cards ?? [], sessions: readSessions(), load: readLoad(), state, keyOf: keyOfName(crew?.people) })
+    : null
+  result.state.loadUnderSince = activity?.loadUnderSince ?? undefined
+  const lines = [...result.lines, ...(activity?.lines ?? [])]
   if (live) {
     lines.push(...await postFresh({ fresh: result.fresh, pending: result.state.pending, call }))
     if (result.mailBoss && key && creds.crew?.slug) {
@@ -162,7 +169,10 @@ export async function runOnce(home, now = Date.now(), { live = false } = {}) {
     ticks: (stored.ticks ?? 0) + 1,
     lastTick: { at, ok: result.ok, actions: result.actions, error: result.error },
     pending: Object.keys(result.state.pending).length,
-    state: result.state
+    state: result.state,
+    // Requirement 1: each person's activity state, for Boss's watch and the office view.
+    people: activity ? activity.people.map(p => ({ key: p.key, state: p.state, idleMinutes: p.idleMs === null ? null : Math.floor(p.idleMs / 60000) })) : undefined,
+    ages: activity?.ages
   }
   writeHeartbeat(home, heartbeat)
   for (const line of lines) console.log(line)
