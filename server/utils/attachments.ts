@@ -76,7 +76,7 @@ export function attachmentLimitMessage(count: number) {
   return `${count} of ${MAX_ATTACHMENTS} attachments: delete one first`
 }
 
-/** Drops every file a task uploaded. Called wherever the row is removed for good. */ Called wherever the row is removed for good. */
+/** Drops every file a task uploaded. Called wherever the row is removed for good. */
 export function removeTaskAttachments(taskIds: string[]) {
   for (const id of taskIds) {
     const dir = taskAttachmentDir(id)

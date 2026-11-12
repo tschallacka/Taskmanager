@@ -22,7 +22,8 @@ const { db } = await import('../server/db')
 const schema = await import('../server/db/schema')
 const { attachCrew } = await import('../server/utils/crewBoards')
 const { requireProject, requireStaff, requireTask } = await import('../server/utils/projects')
-const { crews, member, organization, projectTasks, projects, user, crewBoards } = schema
+const { allowCrews, clearCrewLevels } = await import('./helpers/crewLevels')
+const { crews, member, organization, projectColumns, projectTasks, projects, user, crewBoards } = schema
 
 function folderWith(names: string[]) {
   const dir = mkdtempSync(join(tmpdir(), 'attach-delete-'))
@@ -83,6 +84,7 @@ const crewTeam = id('crew-team')
 const crewId = id('crew')
 const realBoard = id('real')
 const taskId = id('task')
+const columnId = id('column')
 
 const createdUsers = [staff, boss, outsider]
 const createdOrgs = [realTeam, crewTeam]
@@ -105,14 +107,18 @@ before(async () => {
   ])
   await db.insert(projects).values({ id: realBoard, userId: boss, teamId: realTeam, name: 'Real board', createdAt: now, updatedAt: now })
   await db.insert(crews).values({ id: crewId, slug: `tad-${tag}`, name: 'Attachment crew', teamId: crewTeam, createdBy: boss, createdAt: now })
+  await allowCrews(boss, realTeam, [realBoard])
   const link = await attachCrew({ crew: (await db.select().from(crews).where(eq(crews.id, crewId)))[0]!, projectId: realBoard, teamId: realTeam, userId: boss })
   shadowId = link.shadowProjectId
   createdProjects.push(shadowId)
   // The task lives on the real board; the column is set up by the board's own defaults in the app, so a plain row here.
-  await db.insert(projectTasks).values({ id: taskId, projectId: realBoard, title: 'Attachment check', createdAt: now, updatedAt: now } as never)
+  await db.insert(projectColumns).values({ id: columnId, projectId: realBoard, name: 'To do', position: 0, createdAt: now })
+  await db.insert(projectTasks).values({ id: taskId, projectId: realBoard, columnId, title: 'Attachment check', position: 0, createdAt: now, updatedAt: now })
 })
 
 after(async () => {
+  await clearCrewLevels()
+  await db.delete(projectColumns).where(eq(projectColumns.projectId, realBoard))
   await db.delete(projectTasks).where(eq(projectTasks.projectId, realBoard))
   await db.delete(crewBoards).where(eq(crewBoards.crewId, crewId))
   await db.delete(crews).where(eq(crews.id, crewId))
@@ -142,5 +148,5 @@ test("a crew's read-only shadow board refuses the delete, and still lets staff r
   assert.equal(read.readOnly, true)
 
   await assert.rejects(requireProject(eventAs(boss, realTeam, 'DELETE'), shadowId), (e: { statusCode?: number, message?: string }) =>
-    e.statusCode === 403 && /read, not change/.test(e.message ?? ''))
+    e.statusCode === 403 && /read it, not change it/.test(e.message ?? ''))
 })
