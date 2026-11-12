@@ -1,8 +1,6 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'app' })
 
-const { sidebarOpen } = useSidebar()
-
 const { ready, projects, createProject } = useProjects()
 const route = useRoute()
 
@@ -52,17 +50,12 @@ function cancel() {
 
 <template>
   <div class="flex min-w-0 flex-1 flex-col">
-    <header class="flex shrink-0 items-center gap-2 border-b border-default px-4 py-3 lg:px-6 lg:hidden">
-      <UButton
-        icon="i-lucide-panel-left"
-        color="neutral"
-        variant="ghost"
-        size="sm"
-        aria-label="Open sidebar"
-        @click="sidebarOpen = true"
-      />
+    <Teleport
+      defer
+      to="#app-topbar-title"
+    >
       <span class="text-base font-semibold text-default">Projects</span>
-    </header>
+    </Teleport>
 
     <div
       v-if="!showEmptyState"

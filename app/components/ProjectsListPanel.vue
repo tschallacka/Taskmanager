@@ -4,12 +4,13 @@ import type { Project } from '~/composables/useProjects'
 import type { PinnedBoard } from '~/composables/usePins'
 import { taskCountLabel } from '#shared/utils/board'
 import { crewTreeRows } from '~/utils/crewTreeRows'
+import { countOpenTasks, healthTint, kindIcon, projectKind } from '~/utils/projectKind'
 
 const { ready, projects, allTasks, deleteProject, renameProject } = useProjects()
 const route = useRoute()
 const { unread: inboxUnread } = useNotifications()
 const { pins, pinsLoaded, loadPins, isPinned, pinBoard, unpinBoard } = usePins()
-const { activeTeamId, isTeamAdmin } = useTeams()
+const { activeTeamId } = useTeams()
 const { switchWorkspace } = useWorkspace()
 const toast = useToast()
 
@@ -129,8 +130,10 @@ async function openPin(pin: PinnedBoard) {
 async function togglePin(projectId: string) {
   try {
     await (isPinned(projectId) ? unpinBoard(projectId) : pinBoard(projectId))
-  } catch {
-    toast.add({ title: 'Could not change the pin', color: 'error' })
+  } catch (error) {
+    // The server answers 409 when eight boards are already pinned; say so in its own words.
+    const message = (error as { data?: { message?: string } })?.data?.message
+    toast.add({ title: message ?? 'Could not change the pin', color: 'error' })
   }
 }
 
@@ -144,14 +147,7 @@ function newProject() {
 // how much is left, and the total is still there behind it.
 const taskCounts = computed(() => {
   const terminal = new Map(projects.value.map(p => [p.id, new Set(p.terminalColumnIds ?? [])]))
-  const counts = new Map<string, { open: number, total: number }>()
-  for (const task of allTasks.value) {
-    const entry = counts.get(task.projectId) ?? { open: 0, total: 0 }
-    entry.total++
-    if (!terminal.get(task.projectId)?.has(task.columnId)) entry.open++
-    counts.set(task.projectId, entry)
-  }
-  return counts
+  return countOpenTasks(allTasks.value, terminal)
 })
 
 function countsFor(project: Project) {
@@ -166,6 +162,11 @@ function countLabel(project: Project) {
 function countTitle(project: Project) {
   const { open, total } = countsFor(project)
   return project.terminalColumnIds?.length ? `${open} open of ${total}` : `${total} in total`
+}
+
+// The icon and the open count take the board's health as their tint; the open row is primary (projectKind.ts).
+function kindTint(project: Project) {
+  return healthTint(project, activeId.value === project.id)
 }
 
 // ─── Inline rename / delete ────────────────────────────────
@@ -196,7 +197,7 @@ const WORKSPACE_LINKS = [
   { to: '/projects/home', label: 'Home', icon: 'i-lucide-house' },
   { to: '/projects/inbox', label: 'Inbox', icon: 'i-lucide-inbox' },
   { to: '/projects/my-tasks', label: 'My tasks', icon: 'i-lucide-circle-check' },
-  { to: '/projects/browse', label: 'Browse projects', icon: 'i-lucide-folder-search' },
+  { to: '/projects/browse', label: 'All projects', icon: 'i-lucide-folder-search' },
   { to: '/projects/goals', label: 'Goals', icon: 'i-lucide-target' },
   { to: '/projects/portfolios', label: 'Portfolios', icon: 'i-lucide-layout-grid' },
   { to: '/projects/timesheet', label: 'Timesheet', icon: 'i-lucide-clock' },
@@ -250,7 +251,7 @@ function menuItems(project: Project) {
     icon: pinned ? 'i-lucide-pin-off' : 'i-lucide-pin',
     onSelect: () => togglePin(project.id)
   }]
-  // The two agent links sit next to the pin: the Connect window for this board, and a 10-minute management token.
+  // The two agent links sit next to the pin: the Connect window for this board, and the one crew action for it.
   const agent = [
     {
       label: 'Connect your Claude',
@@ -258,8 +259,8 @@ function menuItems(project: Project) {
       onSelect: () => { void navigateTo({ path: '/connect', query: { board: project.id } }) }
     },
     {
-      label: 'Get AI management token',
-      icon: 'i-lucide-key-round',
+      label: 'Add a crew to this board',
+      icon: 'i-lucide-users-round',
       onSelect: () => { managementBoard.value = { id: project.id, name: project.name } }
     }
   ]
@@ -269,15 +270,8 @@ function menuItems(project: Project) {
   const manage: { label: string, icon: string, onSelect: () => unknown }[] = [
     { label: 'Rename', icon: 'i-lucide-pencil', onSelect: () => startRename(project) }
   ]
-  // A team's owner or admin gives a board a crew; the Crews section of /team does the attaching.
-  if (isTeamAdmin.value) {
-    manage.push({
-      label: 'Give it a crew',
-      icon: 'i-lucide-users-round',
-      onSelect: () => { void navigateTo({ path: '/team', query: { section: 'crews', board: project.id, wizard: '1' } }) }
-    })
-  }
   // A crew's shadow board this person may delete gets Delete board instead, which confirms and runs the crew route.
+  // "Give it a crew" is gone from the menu: the add-a-crew window on the board replaces it.
   const remove = project.crewDeletable
     ? crewDeleteItem(project)
     : {
@@ -426,9 +420,11 @@ function menuItems(project: Project) {
           @click.stop="toggleTree(project.id)"
         />
         <UIcon
-          :name="project.role === 'shadow' ? 'i-lucide-users-round' : project.role === 'crew_home' ? 'i-lucide-house' : project.customerId ? 'i-lucide-building-2' : 'i-lucide-kanban'"
+          :name="kindIcon(project)"
           class="mt-0.5 size-4 shrink-0"
-          :class="activeId === project.id ? 'text-primary' : 'text-dimmed group-hover:text-muted'"
+          :class="kindTint(project)"
+          :data-kind="projectKind(project)"
+          :data-health="project.status ?? 'unset'"
         />
         <div class="min-w-0 flex-1">
           <p class="truncate text-sm font-medium leading-snug text-default">
@@ -441,6 +437,14 @@ function menuItems(project: Project) {
             {{ rowNote(project) }}
           </p>
         </div>
+        <!-- The open count, in the board's health tint: the design's number at the row's right edge. -->
+        <span
+          v-if="!isLabelRow(project) && countsFor(project).open"
+          class="mt-0.5 shrink-0 text-xs font-semibold tabular-nums"
+          :class="kindTint(project)"
+          :title="countTitle(project)"
+          data-open-count
+        >{{ countsFor(project).open }}</span>
         <!-- The menu keeps its slot even when invisible, so rows never jump on hover. -->
         <UDropdownMenu
           v-if="!isLabelRow(project)"

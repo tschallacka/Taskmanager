@@ -69,6 +69,10 @@ Columns: Backlog, To do, In progress, **Verify PM**, **Verify UX**, **Verify CQ*
 - **Janet cleans up after a worker, and only when asked.** The card gets `ready to clean`, and Pia or Susy start her.
   She makes the plan with `crew janet clean plan` (it deletes nothing), and deletes only after the checker sets
   `cleaning granted` on the plan subtask: `crew janet clean run`. The rules and the tags are in `JANET.md`.
+- **After a restart of Boss's session, run `crew up`.** It brings back Pia's session and the dev services in the order
+  crew.json's `up` list gives, one line each, and is safe to run twice. Then `crew restart-brief` lists each person's
+  open cards and last update, for Pia to start them fresh. What dies on a restart is in `$CREW_HOME/PROMPTS.md`, under
+  "Starting Pia".
 - **Start Pia, and only Pia.** She needs her own Claude Code session (a subagent cannot start other agents), so
   start it in a real terminal with the `interactive-shell` skill, as `$CREW_HOME/PROMPTS.md` says under "Starting
   Pia", and send her prompt as her first message. Pia starts the workers, the reviewers and the log watcher herself
@@ -82,12 +86,16 @@ Columns: Backlog, To do, In progress, **Verify PM**, **Verify UX**, **Verify CQ*
 - **Watch for `@cato`, every minute.** Pia asks Boss things by writing `@cato` in a task update. Only Pia does: the
   workers and reviewers ask Pia, and Pia decides what goes to Boss, so a `@cato` from anyone else is ignored. Boss
   is not a board member, so no notification reaches this session. At the start of a crew session, start
-  `crew mentions --follow` as a `Monitor` (timeout 30 minutes, the most it allows). It checks the boards every 60
-  seconds and prints one line per new mention, and each line wakes you. Re-arm it every time it expires, for as long
-  as the crew runs. Without a `Monitor`, schedule `crew mentions` every minute instead: it prints only what came in
-  since its last check, so nothing is printed twice. Answer a mention before anything else except the Owner. After a
-  restart, run `crew mentions` once: it catches up from its last check (the first time, the last 24 hours). The
-  watch reads updates on main cards only, so tell Pia to put a question for you on the main card, not on a subtask.
+  `crew boss-mentions` as a `Monitor` (timeout 30 minutes, the most it allows). It checks the boards every 60 seconds
+  and prints one line per new @cato mention by Pia, Susy or Rita, and each line wakes you. Re-arm it every time it
+  expires, for as long as the crew runs. Start `crew watch-crew` as a second `Monitor` the same way: it checks Pia
+  (her session, her transcript, her own listener) and Susy every 3 minutes and prints only on trouble, and once when
+  it is fixed. Both are the Boss watches of the kit. A Stop hook in your session (`boss-stop-hook.sh`, written by
+  `init` into the folder `bossSession` in crew.json) blocks you from ending a turn while one of them is not running,
+  and names the Monitor call to make: it is the safety net, not the plan. `init` removes only Stop hooks whose command contains `boss-stop-hook.sh`; a crew's own trial entry (for example `bin/boss-watch-hook.sh`) stays until Boss removes it by hand, and until then two Stop hooks run. Answer a mention before anything else except
+  the Owner. After a restart, run `crew mentions` once: it catches up from its last check (the first time, the last 24
+  hours). The watch reads updates on main cards only, so tell Pia to put a question for you on the main card, not on a
+  subtask.
 - **Chat line.** Start the chat server, join the customer channel as the customer nick, keep a
   presence tail running and arm `guard.sh` as a tracked background task; its exit is the wake for
   an `@<customer nick>` mention. Re-arm it every time. The chat line is optional (off unless `chat.client` is set): without it, meetings and steering go through the board. See `README.md`.
