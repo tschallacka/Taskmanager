@@ -2,9 +2,11 @@
 
 All notable changes to Arnotes are documented in this file.
 
-## 0.25.0 - 2026-11-13
+## 0.25.1 - 2026-11-13
 
-- **Notifications can be archived into a Read box, and the Read box can be emptied.** Every notification in the inbox gets an Archive button, and Archive all takes the shown ones out; archived notifications move to the Read box, where each can be moved back to the inbox. The Read box can be emptied in full or only the notifications archived more than 30 days, 2 months, 6 months or 1 year ago, after the page says how many will go. Emptying deletes for the signed-in person only. A failed archive puts the rows back and says so. Files: `server/utils/notificationBox.ts`, `server/api/notifications/archive.post.ts`, `server/api/notifications/unarchive.post.ts`, `server/api/notifications/empty.post.ts`, `app/pages/projects/inbox.vue`, `app/composables/useNotifications.ts`.
+- **A session that stops on an API error is reported as blocked, and Boss gets one mail.** The daemon reads the last transcript line of each person's session. A line that is an API error (a 403, a login request, or the account limit) shows the session as `blocked: api error` with the error text, not as stuck. Boss gets one mail per distinct error, and a later normal line clears the block. A dry run only reports and never marks a mail as sent.
+
+## 0.25.0 - 2026-11-13
 
 - **Connect a folder or an agent with its own MCP setup, not a shared variable.** The key panel offers two copies. **Copy agent config file** writes a per-agent file, started with `claude --mcp-config <file> --strict-mcp-config`, with a server name unique per instance, board and key. **Copy folder setup** writes only `.mcp.json` and `.claude/settings.local.json` in one folder: the header reads a variable named for the key, and nothing goes to user settings or a shell profile. Both files are excluded from git. The check is `/mcp` inside a session, and a reconnect is a new session (`claude --continue`). A key's name suffix (`-2`, `-3`) and its name slug are stored on its row in two new nullable columns, `api_keys.name_suffix` and `api_keys.name_slug`, with a unique index `api_keys_name_suffix_uidx` on (user, slug, suffix). They are added with `db:push` (the repo keeps no migration SQL). Check on live after deploy: the two columns and the index exist, and the key list returns `nameSuffix`. Files: app/utils/agentConfig.ts, app/components/ApiKeysPanel.vue, docs/agents/create-and-revoke-a-key.md, tests/agent-config-project.test.ts, tests/agent-config-names.test.ts, tests/agent-config.test.ts.
 

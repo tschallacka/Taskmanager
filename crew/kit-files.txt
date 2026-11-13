@@ -62,6 +62,8 @@ prepare-worktree.mjs
 publish.mjs
 restart-brief.mjs
 serve.mjs
+session-errors.mjs
+session-health.mjs
 session-hooks.mjs
 setup.mjs
 susy-activity.mjs
