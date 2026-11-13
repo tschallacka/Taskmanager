@@ -32,8 +32,11 @@ test('every variable the README section names is in the profile', () => {
   for (const v of vars) assert.ok(v in profile.env, `${v} is named in the README but not in the profile`)
 })
 
-test('a session file is a second --settings, after the profile and before the owner arguments', () => {
-  assert.deepEqual(claudeArgs(kit, ['--continue'], '/x/pia-session.settings.json'), ['--settings', profilePath(kit), '--settings', '/x/pia-session.settings.json', '--continue'])
+test('the PM start line passes its hook file as a second --settings, after the profile', () => {
+  const tmpl = readFileSync(join(kit, 'PROMPTS.md.tmpl'), 'utf8')
+  const line = tmpl.split('\n').find((l) => l.startsWith('claude --model {{models.pia.model}}'))
+  assert.ok(line, 'the PM start line is in PROMPTS.md.tmpl')
+  assert.ok(line.indexOf('--settings {{kit_dir}}/claude-long-run.json') < line.indexOf('--settings {{kit_dir}}/pia-session.settings.json'))
 })
 
 test('the wrapper passes the profile first, then the owner arguments', () => {
