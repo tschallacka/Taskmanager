@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.23.1 - 2026-11-13
+
+- **The default model is the full id, not the bare alias.** A person with no entry in `crew.json` `models` now gets `claude-haiku-5-5`: Claude Code no longer accepts `haiku` ("unrecognized model"), which stopped every agent from starting. Pia's process match accepts the full id and the alias. A kit test fails if a bare alias (`model: haiku`, `--model haiku`, `model: 'haiku'`) appears in the kit's sources or templates. The README's examples and defaults are updated. Not yet: the one-word model check in `init` and `crew update`, and the listener message when Pia cannot answer. Files: `crew/config.mjs`, `crew/activity.mjs`, `crew/model-alias.test.mjs`, `crew/kit.test.mjs`, `crew/README.md`.
+
 ## 0.23.0 - 2026-11-13
 
 - **Susy runs as a daemon, with a live mode that acts on the board.** `crew susy-daemon start` puts the loop in its own detached tmux session through `detach.sh`, so it outlives the session that started it; `stop` kills that session; `status` shows the heartbeat. `start --live` (or `loop --live`, or `once --live`) posts Susy's own lines on the board, and mails Boss once per streak when the board gives no answer. Without `--live` the loop only logs what it would post, to `.listen/susy-daemon-dryrun.log`. Each tick writes `.listen/susy-daemon.json`, the heartbeat. A second live loop refuses to start while one runs (pid lock). The start command quotes its paths, so a home or kit folder with spaces or quotes works. The board read in `crew/susy.mjs` is shared with the daemon (`makeCall`, `readBoardCards`). Files: `crew/susy-daemon.mjs`, `crew/susy-daemon.test.mjs`, `crew/kit-imports.test.mjs`, `crew/susy.mjs`, `crew/crew.mjs`, `crew/kit-files.txt`.
