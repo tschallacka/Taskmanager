@@ -327,6 +327,10 @@ accounts, after which their definitions and the file are yours to delete.
 
 The old file names (`tm.mjs`, `listen.mjs`, ...) still work.
 
+**Keeping the machine light.** An idle person can wait with `crew listen <who> 600`: the wait returns early when there is
+news, so a long wait costs almost nothing. A listener may run under `nice -n 10`, which is fine. `tm.mjs` loads Playwright
+only for the commands that open a browser (the `mcp` calls and `update` never load it), so a plain board call starts fast.
+
 ## Adding missing people (`crew people add`)
 
 A crew made before a role existed (susy, janet, pat, tess, rita) is missing that person's account and key. To add

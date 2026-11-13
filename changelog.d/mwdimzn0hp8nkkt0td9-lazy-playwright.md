@@ -1,0 +1,1 @@
+- **`tm.mjs` loads Playwright only when it starts a browser.** A plain board call (`crew <who> mcp ...`) no longer loads Playwright at start, which cut the CPU each call used while the crew shares one server. `crew/tm.mjs`, `crew/tm-lazy.test.mjs`, `crew/README.md`.
