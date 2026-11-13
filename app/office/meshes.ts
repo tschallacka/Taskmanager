@@ -569,12 +569,13 @@ export function buildDeskLamp(at: Partial<P3>): DeskLamp {
   group.add(cyl(0.16, 0.18, 0.04, '#2b2d42', { y: 0.02 }))
   group.add(cyl(0.025, 0.025, 0.5, '#5c677d', { y: 0.27 }))
   group.add(box(0.04, 0.04, 0.3, '#5c677d', { y: 0.52, z: 0.12 }))
-  const shade = cyl(0.04, 0.12, 0.14, '#f4d35e', { y: 0.46, z: 0.26 })
+  // The shade has its own material (the shared colour cache would recolour every shade): lit yellow, dim grey when idle.
+  const shade = cyl(0.04, 0.12, 0.14, new THREE.MeshStandardMaterial({ color: '#f4d35e' }), { y: 0.46, z: 0.26 })
   shade.rotation.x = -Math.PI / 4
   group.add(shade)
   const glow = new THREE.Mesh(
     new THREE.ConeGeometry(0.45, 0.8, 16, 1, true),
-    new THREE.MeshBasicMaterial({ color: '#2a9d43', transparent: true, opacity: 0.2, depthWrite: false })
+    new THREE.MeshBasicMaterial({ color: '#2a9d43', transparent: true, opacity: 0.6, depthWrite: false })
   )
   glow.position.set(0, -0.4, 0.26)
   glow.visible = false

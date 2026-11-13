@@ -282,7 +282,12 @@ export class OfficeScene {
       this.actors.get(person.key)?.setStatus(person.status)
       // The desk lamp glows green only while the person has a card in progress (the shape 'lit').
       const lamp = this.desks.get(person.key)?.lamp
-      if (lamp) lamp.glow.visible = deskLightOf(person.status).shape === 'lit'
+      if (lamp) {
+        // Lit: the yellow shade and the green glow. Otherwise the shade goes dim grey and the glow is off.
+        const lit = deskLightOf(person.status).shape === 'lit'
+        lamp.glow.visible = lit
+        ;(lamp.shade.material as THREE.MeshStandardMaterial).color.set(lit ? '#f4d35e' : '#6b6b70')
+      }
     }
   }
 
