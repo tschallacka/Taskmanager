@@ -2,6 +2,7 @@
 import { format } from 'date-fns'
 import { keyPanelMode } from '~/utils/apiKeyView'
 import { keyPrompt } from '~/utils/connectPrompt'
+import { agentConfigFileText, projectSetupText, serverNameFor } from '~/utils/agentConfig'
 import type { KeyPromptInput } from '~/utils/connectPrompt'
 import type { Ref } from 'vue'
 
@@ -28,6 +29,8 @@ interface ReachedBoardRow {
 interface ApiKeySummary {
   id: string
   name: string
+  /** The stored name suffix: '' for the plain slug, '-2' and so on (server: shared/utils/keyNameSuffix.ts). */
+  nameSuffix: string
   keyPrefix: string
   scopes: string[]
   createdAt: number
@@ -109,6 +112,7 @@ const commandCopied = ref(false)
 // The one prompt a new key gives. The pairing code is the default; the key goes in only when the owner picks it.
 const issuedKeyId = ref<string | null>(null)
 const issuedName = ref('')
+const issuedNameSuffix = ref('')
 const issuedReach = ref<KeyPromptInput['reach']>({ boards: [] })
 const issuedPairing = ref<{ code: string, expiresAt: number } | null>(null)
 const promptMode = ref<'code' | 'token'>('code')
@@ -163,7 +167,7 @@ async function createKey() {
   if (!canCreate.value) return
   creating.value = true
   try {
-    const response = await $fetch<{ token: string, key: { id: string } }>('/api/settings/api-keys', {
+    const response = await $fetch<{ token: string, key: { id: string, nameSuffix: string } }>('/api/settings/api-keys', {
       method: 'POST',
       body: {
         name: newName.value.trim(),
@@ -178,6 +182,7 @@ async function createKey() {
     // The prompt for this key: a pairing code by default, the key only when the owner picks it.
     issuedKeyId.value = response.key.id
     issuedName.value = newName.value.trim()
+    issuedNameSuffix.value = response.key.nameSuffix ?? ''
     issuedReach.value = reachForPrompt(newPick.value)
     issuedPairing.value = await pairingFor(response.key.id)
     promptMode.value = 'code'
@@ -268,6 +273,30 @@ function startEdit(key: ApiKeySummary) {
 async function copyCommand() {
   if (!issuedToken.value) return
   await copyWithFeedback(claudeCommand.value, commandCopied, 'Command copied')
+}
+
+// The per-agent config file (agentConfig.ts): the main path, one file per agent.
+// The server name is unique per board and key: the key's label and the boards it reaches (agentConfig.ts).
+const issuedServerName = computed(() => {
+  const boards = issuedReach.value.allBoards ? 'all boards' : (issuedReach.value.boards.map(board => board.name).join(' ') || 'board')
+  return serverNameFor(boards, issuedName.value, window.location.origin)
+})
+const agentConfigText = computed(() => (issuedToken.value ? agentConfigFileText(window.location.origin, issuedToken.value, issuedServerName.value) : ''))
+const configCopied = ref(false)
+async function copyAgentConfig() {
+  if (!issuedToken.value) return
+  await copyWithFeedback(agentConfigText.value, configCopied, 'Agent config file copied')
+}
+
+// The folder form (one person, always on in one folder): the steps for .mcp.json and .claude/settings.local.json, named
+// for the key. The text holds no key value; the step says where to paste the key.
+// The suffix the server stored for the new key (api-keys.post returns it); it does not change after that.
+const issuedSuffix = computed(() => issuedNameSuffix.value)
+const folderSetupText = computed(() => (issuedName.value ? projectSetupText(window.location.origin, issuedName.value, issuedSuffix.value) : ''))
+const folderCopied = ref(false)
+async function copyFolderSetup() {
+  if (!issuedName.value) return
+  await copyWithFeedback(folderSetupText.value, folderCopied, 'Folder setup copied')
 }
 
 // Revoke and regenerate ask first, inline, under the key's row. The confirmation names the key and its secret prefix and
@@ -623,6 +652,31 @@ function reachLabel(key: ApiKeySummary): string {
                     variant="soft"
                     size="sm"
                     @click="copyCommand"
+                  />
+                </div>
+                <p class="text-xs text-muted pt-1">
+                  The main path, for several agents on one machine: give each agent its own config file, and start it with <code class="font-mono">claude --mcp-config &lt;file&gt; --strict-mcp-config</code>. No shared variable is needed.
+                </p>
+                <div class="flex flex-col sm:flex-row gap-2">
+                  <pre class="flex-1 min-w-0 text-xs font-mono bg-default border border-default rounded-md px-3 py-2 whitespace-pre-wrap break-words">{{ agentConfigText }}</pre>
+                  <UButton
+                    :icon="configCopied ? 'i-lucide-check' : 'i-lucide-copy'"
+                    :label="configCopied ? 'Copied' : 'Copy agent config file'"
+                    color="neutral"
+                    variant="soft"
+                    size="sm"
+                    @click="copyAgentConfig"
+                  />
+                </div>
+                <div class="flex flex-col sm:flex-row gap-2">
+                  <pre class="flex-1 min-w-0 text-xs font-mono bg-default border border-default rounded-md px-3 py-2 whitespace-pre-wrap break-words">{{ folderSetupText }}</pre>
+                  <UButton
+                    :icon="folderCopied ? 'i-lucide-check' : 'i-lucide-copy'"
+                    :label="folderCopied ? 'Copied' : 'Copy folder setup'"
+                    color="neutral"
+                    variant="soft"
+                    size="sm"
+                    @click="copyFolderSetup"
                   />
                 </div>
                 <p class="text-xs text-muted pt-1">
