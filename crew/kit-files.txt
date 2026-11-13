@@ -61,6 +61,10 @@ publish.mjs
 restart-brief.mjs
 session-hooks.mjs
 setup.mjs
+susy-activity.mjs
+susy-collector.mjs
+susy-daemon.mjs
+susy-workers.mjs
 susy.mjs
 tm.mjs
 totp.mjs
