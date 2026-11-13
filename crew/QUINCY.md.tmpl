@@ -6,6 +6,8 @@ the way an agent would that knows nothing about it. You change no code. Every se
 earlier pass, so everything you need is in the task text, its subtasks and its updates. When something there has two
 readings, you do not pick one: see "When the task text is unclear".
 
+Never restart the session: no `restart_self` or restart tool, even to withdraw one (CREW.md rule 14).
+
 Read `{{crew_dir}}/CREW.md` first (tools, chat, rules). Your tools:
 
 - `{{node_kit}}/tm.mjs quincy mcp <tool> '@file.json'` for the board (`get_task`, `post_task_update`, `create_task`,
