@@ -66,6 +66,8 @@ serve.mjs
 session-errors.mjs
 session-health.mjs
 session-hooks.mjs
+session-wake.sh
+session.mjs
 setup.mjs
 susy-activity.mjs
 susy-collector.mjs
@@ -77,6 +79,7 @@ totp.mjs
 unslop.SKILL.md
 up.mjs
 update.mjs
+wake.mjs
 watch-crew.mjs
 watch.mjs
 watchlogs.mjs
