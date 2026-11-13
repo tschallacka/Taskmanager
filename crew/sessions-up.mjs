@@ -6,7 +6,7 @@
 // placeholders W (the key) and NICK (the chat nick) filled in. Only the four workers have a role here; any other key is
 // reported as failed, not started with a guessed role.
 import { spawnSync } from 'node:child_process'
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { liveById, listAgents, readRecord, startSession, stopSession, validSessionId, writeRecord } from './session.mjs'
 import { wakeOnce } from './wake.mjs'
@@ -41,7 +41,27 @@ export function recordedKeys(home) {
 }
 
 /** The wake text after a restart: the person reads their own card, the kit does not name one. */
-export const RESTART_WAKE = 'Crew up: your session was started again. Read your card with my_tasks, carry on with it, and post your next update on the card.'
+/**
+ * The role text of one person's session: the PROMPTS.md worker section, then the CREW.md standing rules (the whole file),
+ * in that order. Pure. A missing CREW.md gives the section alone.
+ */
+export function roleFileText(promptsText, crewText, key) {
+  const section = workerRole(promptsText, key) ?? ''
+  const rules = String(crewText ?? '').trimEnd()
+  return rules ? `${section.trimEnd()}\n\n${rules}\n` : `${section.trimEnd()}\n`
+}
+
+/** Writes one person's role file, CREW_HOME/sessions/<key>.role.md, mode 600. Returns its path. */
+export function writeRoleFile(home, key, text) {
+  if (!/^[a-z][a-z0-9-]{0,31}$/.test(String(key ?? ''))) throw new Error(`no such person key: ${key}`)
+  const dir = join(home, 'sessions')
+  mkdirSync(dir, { recursive: true })
+  const path = join(dir, `${key}.role.md`)
+  writeFileSync(path, text, { mode: 0o600 })
+  return path
+}
+
+export const RESTART_WAKE ='Crew up: your session was started again. Read your card with my_tasks, carry on with it, and post your next update on the card.'
 
 /**
  * `crew up` for the recorded sessions. `deps` are injected for the tests: `listAgents()` (the live list, or null),
@@ -63,12 +83,16 @@ export async function upSessions(home, deps) {
       lines.push(`${key}: already running (${record.id})`)
       continue
     }
-    const role = workerRole(deps.promptsText, key)
-    if (!role) {
+    const section = workerRole(deps.promptsText, key)
+    if (!section) {
       allUp = false
       lines.push(`${key}: failed: no worker role for this key; not started`)
       continue
     }
+    // The role is one file: the PROMPTS.md section and the CREW.md standing rules. It is written before the start, and the
+    // start is given exactly what the file holds.
+    const role = roleFileText(deps.promptsText, deps.crewText, key)
+    writeRoleFile(home, key, role)
     const started = deps.start({ key, folder: record.folder, role })
     if (!started.ok) {
       allUp = false
@@ -138,8 +162,10 @@ export function realWake(home, kit, bin) {
 /** The real dependencies for a crew home: claude from CREW_CLAUDE_BIN or PATH, the kit folder, the PROMPTS.md text. */
 export function realSessionDeps(home, kit, { bin = process.env.CREW_CLAUDE_BIN || 'claude' } = {}) {
   const promptsPath = join(home, 'PROMPTS.md')
+  const crewPath = join(home, 'CREW.md')
   return {
     promptsText: existsSync(promptsPath) ? readFileSync(promptsPath, 'utf8') : '',
+    crewText: existsSync(crewPath) ? readFileSync(crewPath, 'utf8') : '',
     listAgents: () => listAgents({ bin }),
     start: ({ key, folder, role }) => startSession({ home, kit, key, folder, role, bin }),
     stop: ({ key }) => stopSession({ home, key, bin }),

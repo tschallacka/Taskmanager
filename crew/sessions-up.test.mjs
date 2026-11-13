@@ -2,10 +2,13 @@
 //   node --test crew/sessions-up.test.mjs
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { downSessions, recordedKeys, upSessions, workerRole, RESTART_WAKE } from './sessions-up.mjs'
+import { downSessions, recordedKeys, roleFileText, upSessions, workerRole, writeRoleFile, RESTART_WAKE } from './sessions-up.mjs'
+
+// The standing rules a person reads on every start: CREW.md. A marker line stands in for the whole file here.
+const CREW_MD = '# The crew: how we work\n\nSTANDING RULE MARKER: post on the card, never by file.\n'
 
 const PROMPTS = [
   '# Launch prompts',
@@ -121,4 +124,44 @@ test('crew down reports a stop that fails, and a metacharacter id is never stopp
   assert.equal(out.lines[0], 'wick: failed to stop bb000002: claude stop failed')
   assert.match(out.lines[1], /not a session id; stop it by hand/)
   assert.equal(out.ok, false)
+})
+
+// The role a restarted session gets is one file: the person's PROMPTS.md section and the CREW.md standing rules together.
+test('the role file holds the PROMPTS.md worker section and the CREW.md standing rules, and is mode 600', () => {
+  const text = roleFileText(PROMPTS, CREW_MD, 'wren')
+  assert.match(text, /You are a worker \(key `wren`, chat nick `Wren Worker`\)/, 'the PROMPTS.md section is in it')
+  assert.match(text, /STANDING RULE MARKER/, 'the CREW.md standing rules are in it')
+  assert.ok(text.indexOf('You are a worker') < text.indexOf('STANDING RULE MARKER'), 'the section comes first, then the rules')
+  const home = mkdtempSync(join(tmpdir(), 'role-home-'))
+  mkdirSync(join(home, 'sessions'), { recursive: true })
+  const path = writeRoleFile(home, 'wren', text)
+  assert.equal(path, join(home, 'sessions', 'wren.role.md'))
+  assert.equal(statSync(path).mode & 0o777, 0o600)
+  assert.equal(readFileSync(path, 'utf8'), text)
+})
+
+test('the role file is not taken for a session record, so crew up never mistakes it for one', () => {
+  const home = mkdtempSync(join(tmpdir(), 'role-keys-'))
+  mkdirSync(join(home, 'sessions'), { recursive: true })
+  writeFileSync(join(home, 'sessions', 'wren.json'), JSON.stringify({ id: 'aa000001', folder: '/work/wren' }))
+  writeRoleFile(home, 'wren', roleFileText(PROMPTS, CREW_MD, 'wren'))
+  assert.deepEqual(recordedKeys(home), ['wren'])
+})
+
+test('crew up starts a session with the role file, which holds both the section and the standing rules', async () => {
+  const home = mkdtempSync(join(tmpdir(), 'role-up-'))
+  mkdirSync(join(home, 'sessions'), { recursive: true })
+  writeFileSync(join(home, 'sessions', 'wynn.json'), JSON.stringify({ id: DEAD_ID, folder: '/work/wynn' }))
+  writeFileSync(join(home, 'CREW.md'), CREW_MD)
+  let role = null
+  await upSessions(home, {
+    promptsText: PROMPTS,
+    crewText: CREW_MD,
+    listAgents: () => [],
+    start: ({ role: r }) => { role = r; return { ok: true, id: 'cc000005' } },
+    wake: async () => ({ ok: true, reason: 'woke' })
+  })
+  assert.match(role, /chat nick `Wynn Worker`/)
+  assert.match(role, /STANDING RULE MARKER/)
+  assert.equal(readFileSync(join(home, 'sessions', 'wynn.role.md'), 'utf8'), roleFileText(PROMPTS, CREW_MD, 'wynn'))
 })
