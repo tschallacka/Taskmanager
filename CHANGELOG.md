@@ -2,6 +2,14 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.28.1 - 2026-11-13
+
+- **`crew up` starts the crew's background sessions and `crew down` stops them.** `crew up` reads `CREW_HOME/sessions/*.json` and starts every recorded person whose session is not running, with the same strict start as `crew session start` (the role file is the person's PROMPTS section plus the CREW.md standing rules, written to `sessions/<key>.role.md`, mode 600); a person with no card is started idle and waits for mail. `crew down` stops them. The daemon's API-error check now reads each person's session transcript in the session's own folder. Files: `crew/sessions-up.mjs`, `crew/up.mjs`, `crew/down.mjs`, `crew/session.mjs`, `crew/session-errors.mjs`, `crew/kit-files.txt`.
+
+- **The person settings file also carries the long-run profile.** `CREW_HOME/settings/<key>.json` now includes the claude-long-run environment (longer command, MCP and stall timeouts); the person's own `CREW_HOME` is set last, so the profile cannot override it. A change to the profile reaches a session on its next start. Files: `crew/session-settings.mjs`, `crew/session-settings.test.mjs`.
+
+- **`crew init` writes Pia's `CLAUDE.md` from a mechanics-only template.** `crew/PIA-CLAUDE.md.tmpl` says how Pia reads her mail and mentions and where the crew documents are; it grants no authority and names no one. Init writes `pia-session/CLAUDE.md` only when the file does not exist; an existing copy is never changed, and `crew update` never touches it. Files: `crew/PIA-CLAUDE.md.tmpl`, `crew/init.mjs`, `crew/kit-files.txt`.
+
 ## 0.28.0 - 2026-11-13
 
 - **Set up a crew by approval: the setup prompt carries no token.** On the Crews page, an instance admin picks a board and copies a prompt. The agent asks for a connection, the admin approves the link in the browser with one click, and the agent gets its key once. A link that expires is refused with one sentence. The old management-token prompt keeps working for one release. Files: `app/utils/approvalSetupPrompt.ts`, `app/utils/approvalSetupBoard.ts`, `app/pages/admin/crews/index.vue`, `app/utils/connectPrompt.ts`, `app/pages/connect-approve.vue`, `docs/crews/give-a-board-a-crew.md`, `tests/approval-setup-prompt.test.ts`, `tests/approval-setup-board.test.ts`, `tests/connect-permission-wording.test.ts`.
