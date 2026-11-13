@@ -3,17 +3,37 @@
 // or without --settings, keeps Claude Code's own limits. The profile is checked against one Claude Code
 // version (CHECKED_VERSION); a newer or older one may change the limits (see the README, "Claude Code limits").
 import { spawnSync } from 'node:child_process'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 export const CHECKED_VERSION = '2.1.319'
 export const profilePath = (kit) => join(kit, 'claude-long-run.json')
 
-// The argument list for claude: the profile first, then whatever the owner passed.
-// A session file (the PM's hooks, pia-session.settings.json) is passed by the PM's start line in PROMPTS.md
-// as a second --settings, merged with the profile; the profile's env block is the only one.
-export function claudeArgs(kit, args = []) {
-  return ['--settings', profilePath(kit), ...args]
+// Claude Code takes only the last --settings it is given, so two files do not merge. The PM's session needs the
+// profile's env and the PM's hooks in ONE file: this merges them. The env of both is kept (the profile's wins on a
+// name clash); the hooks come from the session file.
+export function mergeSettings(profile, session) {
+  return {
+    ...session,
+    ...profile,
+    env: { ...(session.env ?? {}), ...(profile.env ?? {}) },
+    hooks: { ...(session.hooks ?? {}), ...(profile.hooks ?? {}) },
+  }
+}
+
+// Writes the merged file for a session (the PM's hooks) and returns its path.
+export function writeMergedSettings(kit, sessionFile, outFile) {
+  const profile = JSON.parse(readFileSync(profilePath(kit), 'utf8'))
+  const session = JSON.parse(readFileSync(sessionFile, 'utf8'))
+  writeFileSync(outFile, JSON.stringify(mergeSettings(profile, session), null, 2) + '\n')
+  return outFile
+}
+
+// The argument list for claude: one --settings file, then whatever the owner passed. The file is the profile,
+// or a merged file the PM's start line made with `crew claude merge`.
+export function claudeArgs(kit, args = [], settingsFile = null) {
+  return ['--settings', settingsFile ?? profilePath(kit), ...args]
 }
 
 // A warning when the installed Claude Code is older than the profile was checked against. The version
@@ -41,6 +61,16 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     console.log(text || 'claude --version printed nothing')
     const warn = versionWarning(text)
     if (warn) console.log(`warning: ${warn}`)
+    process.exit(0)
+  }
+  if (first === 'merge') {
+    // crew claude merge <session settings file> <out file>: one merged --settings file for the PM's start line.
+    const [sessionFile, outFile] = rest
+    if (!sessionFile || !outFile) {
+      console.error('usage: crew claude merge <session settings file> <out file>')
+      process.exit(2)
+    }
+    console.log(writeMergedSettings(kit, sessionFile, outFile))
     process.exit(0)
   }
   const args = first === undefined ? [] : [first, ...rest]

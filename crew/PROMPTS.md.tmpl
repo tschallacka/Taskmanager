@@ -60,7 +60,7 @@ real terminal, so never start it headless. In that terminal:
 ```
 export CREW_HOME={{crew_dir}}
 mkdir -p {{crew_dir}}/pia-session && cd {{crew_dir}}/pia-session
-claude --model {{models.pia.model}} --add-dir {{crew_dir}} --add-dir {{kit_dir}} --settings {{kit_dir}}/claude-long-run.json --settings {{kit_dir}}/pia-session.settings.json
+node {{kit_dir}}/claude.mjs merge {{kit_dir}}/pia-session.settings.json {{crew_dir}}/pia-session/settings.merged.json && claude --model {{models.pia.model}} --add-dir {{crew_dir}} --add-dir {{kit_dir}} --settings {{crew_dir}}/pia-session/settings.merged.json
 ```
 
 `--model` is her model from the table above. It applies when her provider is `claude`; for another provider the

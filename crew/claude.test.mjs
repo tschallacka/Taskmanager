@@ -4,7 +4,9 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { CHECKED_VERSION, claudeArgs, profilePath, versionWarning } from './claude.mjs'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { CHECKED_VERSION, claudeArgs, mergeSettings, profilePath, versionWarning, writeMergedSettings } from './claude.mjs'
 
 const kit = dirname(fileURLToPath(import.meta.url))
 const profile = JSON.parse(readFileSync(join(kit, 'claude-long-run.json'), 'utf8'))
@@ -32,11 +34,39 @@ test('every variable the README section names is in the profile', () => {
   for (const v of vars) assert.ok(v in profile.env, `${v} is named in the README but not in the profile`)
 })
 
-test('the PM start line passes its hook file as a second --settings, after the profile', () => {
+test('the merged PM file keeps the profile env and the PM hooks, in one file', () => {
+  const session = JSON.parse(readFileSync(join(kit, 'pia-session.settings.json'), 'utf8'))
+  const merged = mergeSettings(profile, session)
+  assert.deepEqual(merged.env, profile.env, 'every profile env value is in the merged file')
+  assert.deepEqual(merged.hooks, session.hooks, 'the PM hooks are in the merged file')
+  assert.ok(Object.keys(merged.env).length >= 8)
+})
+
+test('claudeArgs passes the one settings file it is given, and the profile when it is given none', () => {
+  assert.deepEqual(claudeArgs(kit, ['--continue'], '/x/settings.merged.json'), ['--settings', '/x/settings.merged.json', '--continue'])
+  assert.deepEqual(claudeArgs(kit, ['--continue']), ['--settings', profilePath(kit), '--continue'])
+})
+
+test('writeMergedSettings writes one file that has both the env and the hooks', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'merged-settings-'))
+  try {
+    const out = writeMergedSettings(kit, join(kit, 'pia-session.settings.json'), join(dir, 'settings.merged.json'))
+    const written = JSON.parse(readFileSync(out, 'utf8'))
+    assert.deepEqual(written.env, profile.env)
+    assert.ok(written.hooks && Object.keys(written.hooks).length > 0, 'the hooks are in the file')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('the PM start line makes one merged file and passes it as the only --settings', () => {
   const tmpl = readFileSync(join(kit, 'PROMPTS.md.tmpl'), 'utf8')
-  const line = tmpl.split('\n').find((l) => l.startsWith('claude --model {{models.pia.model}}'))
+  const line = tmpl.split('\n').find((l) => l.includes('claude --model {{models.pia.model}}'))
   assert.ok(line, 'the PM start line is in PROMPTS.md.tmpl')
-  assert.ok(line.indexOf('--settings {{kit_dir}}/claude-long-run.json') < line.indexOf('--settings {{kit_dir}}/pia-session.settings.json'))
+  assert.equal(line.split('--settings').length - 1, 1, 'Claude Code takes only the last --settings, so there is one')
+  assert.ok(line.includes('--settings {{crew_dir}}/pia-session/settings.merged.json'))
+  assert.ok(line.includes('claude.mjs merge {{kit_dir}}/pia-session.settings.json {{crew_dir}}/pia-session/settings.merged.json'))
+  assert.ok(tmpl.indexOf('claude.mjs merge') < tmpl.indexOf('--settings {{crew_dir}}/pia-session/settings.merged.json'))
 })
 
 test('the wrapper passes the profile first, then the owner arguments', () => {
