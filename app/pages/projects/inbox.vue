@@ -383,9 +383,10 @@ async function sendTest() {
                   class="mt-1.5 size-2 shrink-0 rounded-full"
                   :class="item.readAt ? 'bg-transparent' : 'bg-primary'"
                 />
-                <UAvatar
-                  :src="item.actorImage ?? undefined"
-                  :alt="item.actorName ?? 'Someone'"
+                <UserAvatar
+                  :user-id="item.actorId ?? ''"
+                  :name="item.actorName ?? 'Someone'"
+                  :image="item.actorImage"
                   size="xs"
                   class="mt-0.5"
                 />

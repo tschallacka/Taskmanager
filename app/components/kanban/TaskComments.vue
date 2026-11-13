@@ -42,13 +42,6 @@ function fullDate(ts: number) {
   return format(new Date(ts), 'PPp')
 }
 
-function initials(name: string | null | undefined) {
-  if (!name) return '?'
-  return name.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase()
-}
-
-const userInitials = computed(() => initials(session.value?.user?.name))
-
 // ─── The thread ────────────────────────────────────────────
 
 const ownComments = computed(() => comments.value.filter(c => c.taskId === props.taskId))
@@ -492,9 +485,10 @@ defineExpose({ handleEscape })
               size="2xs"
               class="mt-0.5 shrink-0"
             />
-            <UAvatar
+            <UserAvatar
               v-else
-              :alt="initials(comment.userName)"
+              :user-id="comment.userId"
+              :name="comment.userName"
               size="2xs"
               class="mt-0.5 shrink-0"
             />
@@ -699,8 +693,10 @@ defineExpose({ handleEscape })
         class="sticky bottom-0 z-10 -mx-5 flex cursor-text items-start gap-2 border-t border-default bg-default px-5 pb-3 pt-2 max-md:mt-auto"
         @click="composer?.focus()"
       >
-        <UAvatar
-          :alt="userInitials"
+        <UserAvatar
+          :user-id="session?.user?.id ?? ''"
+          :name="session?.user?.name"
+          :image="session?.user?.image"
           size="2xs"
           class="mt-0.5 shrink-0"
         />
