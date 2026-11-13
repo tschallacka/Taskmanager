@@ -202,16 +202,31 @@ export function useNotifications() {
    * unread count drops with it. The list is taken out of the inbox at once and the server confirms after.
    */
   async function archive(ids: string[]) {
+    const before = { items: _items.value, unread: _unread.value }
     const unread = _items.value.filter(item => ids.includes(item.id) && !item.readAt).length
     _items.value = _items.value.filter(item => !ids.includes(item.id))
     _unread.value = Math.max(0, _unread.value - unread)
-    await request('/api/notifications/archive', { method: 'POST', headers: realtimeHeaders(), body: { ids } })
+    try {
+      await request('/api/notifications/archive', { method: 'POST', headers: realtimeHeaders(), body: { ids } })
+    } catch (error) {
+      // The server did not confirm: the rows go back where they were, and the caller says so.
+      _items.value = before.items
+      _unread.value = before.unread
+      throw error
+    }
   }
 
   async function archiveAll() {
+    const before = { items: _items.value, unread: _unread.value }
     _items.value = []
     _unread.value = 0
-    await request('/api/notifications/archive', { method: 'POST', headers: realtimeHeaders(), body: { all: true } })
+    try {
+      await request('/api/notifications/archive', { method: 'POST', headers: realtimeHeaders(), body: { all: true } })
+    } catch (error) {
+      _items.value = before.items
+      _unread.value = before.unread
+      throw error
+    }
   }
 
   /** Moves archived notifications back to the inbox. They stay read. */

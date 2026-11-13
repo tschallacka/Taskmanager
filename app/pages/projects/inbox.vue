@@ -72,8 +72,15 @@ watch(filter, async (value) => {
   readBox.value = await loadReadBox()
 })
 async function moveBack(item: NotificationItem) {
+  actionError.value = ''
   readBox.value = readBox.value.filter(other => other.id !== item.id)
-  await unarchive([item.id])
+  try {
+    await unarchive([item.id])
+  } catch (error) {
+    // The server did not move it: the Read box is reloaded so it shows the row again.
+    actionError.value = errorText(error, 'Could not move it back to the inbox.')
+    readBox.value = await loadReadBox().catch(() => readBox.value)
+  }
 }
 
 // Emptying the Read box: pick an option, the page counts what it would delete, and only the confirm button deletes.
@@ -87,20 +94,57 @@ const emptyChoices: EmptyChoice[] = [
 ]
 const pendingEmpty = ref<(EmptyChoice & { count: number }) | null>(null)
 const emptying = ref(false)
+// What went wrong with the last action, shown above the list. Empty.
+const actionError = ref('')
+const emptyError = ref('')
+function errorText(error: unknown, fallback: string) {
+  return error instanceof Error && error.message ? error.message : fallback
+}
 async function askEmpty(choice: EmptyChoice) {
-  const { count } = await emptyReadBox({ all: choice.all, olderThanDays: choice.olderThanDays, dryRun: true })
-  pendingEmpty.value = { ...choice, count: count ?? 0 }
+  emptyError.value = ''
+  try {
+    const { count } = await emptyReadBox({ all: choice.all, olderThanDays: choice.olderThanDays, dryRun: true })
+    pendingEmpty.value = { ...choice, count: count ?? 0 }
+  } catch (error) {
+    emptyError.value = errorText(error, 'Could not count the Read box. Nothing was deleted.')
+  }
+}
+function cancelEmpty() {
+  pendingEmpty.value = null
+  emptyError.value = ''
 }
 async function confirmEmpty() {
   const choice = pendingEmpty.value
   if (!choice) return
   emptying.value = true
+  emptyError.value = ''
   try {
     await emptyReadBox({ all: choice.all, olderThanDays: choice.olderThanDays })
     pendingEmpty.value = null
     readBox.value = await loadReadBox()
+  } catch (error) {
+    // The server may have refused or failed: the Read box is shown as the server has it now.
+    emptyError.value = errorText(error, 'Could not empty the Read box. Nothing was deleted.')
+    readBox.value = await loadReadBox().catch(() => readBox.value)
   } finally {
     emptying.value = false
+  }
+}
+// Archive and Archive all take the rows out at once; a failed request puts them back and says so.
+async function tryArchive(ids: string[]) {
+  actionError.value = ''
+  try {
+    await archive(ids)
+  } catch (error) {
+    actionError.value = errorText(error, 'Could not archive. The notification is back in the inbox.')
+  }
+}
+async function tryArchiveAll() {
+  actionError.value = ''
+  try {
+    await archiveAll()
+  } catch (error) {
+    actionError.value = errorText(error, 'Could not archive. The notifications are back in the inbox.')
   }
 }
 
@@ -244,7 +288,7 @@ async function sendTest() {
           color="neutral"
           variant="ghost"
           data-notification-archive-all
-          @click="archiveAll"
+          @click="tryArchiveAll"
         />
         <UButton
           v-if="onAgentTab && auditUnread"
@@ -404,6 +448,54 @@ async function sendTest() {
           </button>
         </div>
 
+        <div v-if="filter === 'readbox' && !onAgentTab" class="mb-3 flex flex-wrap gap-1" data-read-box-empty>
+          <UButton
+            v-for="choice in emptyChoices"
+            :key="choice.label"
+            :label="choice.label"
+            size="xs"
+            color="neutral"
+            variant="ghost"
+            :data-empty-choice="choice.label"
+            @click="askEmpty(choice)"
+          />
+        </div>
+        <div
+          v-if="pendingEmpty"
+          class="mb-3 rounded-xl border border-default p-3 text-sm"
+          role="alertdialog"
+          aria-live="assertive"
+          data-empty-confirm
+        >
+          <p>
+            {{ pendingEmpty.count === 0
+              ? 'Nothing to delete for this choice.'
+              : `This deletes ${pendingEmpty.count} notification${pendingEmpty.count === 1 ? '' : 's'} from your Read box. Only you lose them.` }}
+          </p>
+          <div class="mt-2 flex gap-2">
+            <UButton
+              label="Delete"
+              color="error"
+              size="xs"
+              :disabled="!pendingEmpty.count || emptying"
+              :loading="emptying"
+              data-empty-confirm-button
+              @click="confirmEmpty"
+            />
+            <UButton
+              label="Cancel"
+              color="neutral"
+              variant="ghost"
+              size="xs"
+              :disabled="emptying"
+              data-empty-cancel
+              @click="cancelEmpty"
+            />
+          </div>
+        </div>
+        <p v-if="emptyError" class="mb-3 text-sm text-error" data-empty-error>{{ emptyError }}</p>
+        <p v-if="actionError" class="mb-3 text-sm text-error" data-action-error>{{ actionError }}</p>
+
         <template v-if="!onAgentTab">
           <p
             v-if="loaded && !shown.length"
@@ -469,7 +561,7 @@ async function sendTest() {
                       color="neutral"
                       variant="ghost"
                       data-notification-archive
-                      @click="archive([item.id])"
+                      @click="tryArchive([item.id])"
                     />
                   </div>
                   <div
