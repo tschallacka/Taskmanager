@@ -14,6 +14,12 @@ export function taskPanelPath(projectId: string, taskId?: string | null, comment
   return commentId ? `${task}/${encodeURIComponent(commentId)}` : task
 }
 
+// A comment in the address opens the phone's Activity sheet at first, since the sheet hides the thread until it is open
+// (display:none), and a permalink's window buttons and comment would otherwise have no box.
+export function activityStartsOpen(comment: unknown): boolean {
+  return typeof comment === 'string' && comment !== ''
+}
+
 // The query of the board without the old task parameter, so a view or a filter in the query is kept when the panel opens
 // or closes.
 export function queryWithoutTask(query: LocationQuery): LocationQueryRaw {

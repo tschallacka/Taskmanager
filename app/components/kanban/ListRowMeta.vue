@@ -130,10 +130,12 @@ function cancelLabels() {
           :aria-label="personById(task.assigneeId) ? `Assignee: ${personById(task.assigneeId)!.name || personById(task.assigneeId)!.email || ''}. Change it` : 'Unassigned. Assign someone'"
           data-list-assign
         >
-          <UAvatar
+          <UserAvatar
             v-if="personById(task.assigneeId)"
-            :src="personById(task.assigneeId)!.image ?? undefined"
-            :alt="personById(task.assigneeId)!.name || personById(task.assigneeId)!.email || ''"
+            :user-id="personById(task.assigneeId)!.id"
+            :name="personById(task.assigneeId)!.name"
+            :email="personById(task.assigneeId)!.email"
+            :image="personById(task.assigneeId)!.image"
             size="2xs"
             data-list-assignee
           />

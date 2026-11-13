@@ -12,6 +12,7 @@ import { join } from 'node:path'
 import { CAST, OWNER_FILES, agentNames, config, forkMemberPlan, here, kitDir, loadForks, modelProblems, renderTemplate, templateValues } from './config.mjs'
 import { writePiaHooks } from './pia-session.mjs'
 import { writeBossHooks } from './boss-session.mjs'
+import { withCrewDefaults } from './crew-defaults.mjs'
 
 const ok = m => console.log(`  ok   ${m}`)
 const warn = m => console.log(`  WARN ${m}`)
@@ -267,6 +268,23 @@ else {
     const { file, changed, excluded } = writeBossHooks(config.bossSession, { crewHome: here.replace(/\/$/, ''), kitDir: kitDir.replace(/\/$/, '') })
     ok(`${file} ${changed ? 'written: the watch hook' : 'kept, hook already current'}${excluded ? ' (kept out of git)' : ''}`)
   } catch (error) { fail(error.message) }
+}
+
+// crew.json is an owner file: init (and so `crew update`) never writes it. When "reader" or "devServers" are missing it
+// says so and prints the values setup would have written, from the keys of the crew's people (creds.json).
+try {
+  const crewFile = join(here, 'crew.json')
+  const credsFile = join(here, 'creds.json')
+  if (existsSync(crewFile) && existsSync(credsFile)) {
+    const creds = JSON.parse(readFileSync(credsFile, 'utf8'))
+    const { crew: filled, added } = withCrewDefaults(JSON.parse(readFileSync(crewFile, 'utf8')), Object.keys(creds.people ?? {}))
+    if (added.length) {
+      const suggestion = Object.fromEntries(added.map(field => [field, filled[field]]))
+      warn(`crew.json has no ${added.join(' and ')}: add ${JSON.stringify(suggestion)} (crew.json is yours, init does not change it)`)
+    }
+  }
+} catch (error) {
+  fail(`crew.json defaults: ${error.message}`)
 }
 
 const next = existsSync(`${here}creds.json`)

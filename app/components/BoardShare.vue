@@ -297,9 +297,10 @@ watch(open, (isOpen) => {
           :name="person.name"
           :image="person.image"
         >
-          <UAvatar
-            :src="person.image ?? undefined"
-            :alt="person.name"
+          <UserAvatar
+            :user-id="person.id"
+            :name="person.name"
+            :image="person.image"
             size="2xs"
             class="ring-2 ring-default"
           />
@@ -528,9 +529,10 @@ watch(open, (isOpen) => {
                   :name="person.name"
                   :image="person.image"
                 >
-                  <UAvatar
-                    :src="person.image ?? undefined"
-                    :alt="person.name"
+                  <UserAvatar
+                    :user-id="person.id"
+                    :name="person.name"
+                    :image="person.image"
                     size="sm"
                   />
                 </PersonCard>
@@ -560,9 +562,11 @@ watch(open, (isOpen) => {
                     :name="guest.name"
                     :image="guest.image"
                   >
-                    <UAvatar
-                      :src="guest.image ?? undefined"
-                      :alt="guest.name"
+                    <UserAvatar
+                      :user-id="guest.userId"
+                      :name="guest.name"
+                      :email="guest.email"
+                      :image="guest.image"
                       size="sm"
                     />
                   </PersonCard>
