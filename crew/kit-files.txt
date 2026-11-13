@@ -59,6 +59,7 @@ prepare-worktree-cli.mjs
 prepare-worktree.mjs
 publish.mjs
 restart-brief.mjs
+session-health.mjs
 session-hooks.mjs
 session-wake.sh
 session.mjs
