@@ -45,8 +45,10 @@ test('a Blocked card with a BLOCKED ON line pokes the named person after the thr
 test('a BLOCKED ON line that names no one we know (a typo such as bos) is flagged to the PM, not left silent', () => {
   const typo = card('b3', { column: 'Blocked', updates: [update(agent('pia'), 'BLOCKED ON bos: push actor_id', 30)] })
   const { actions } = run([typo])
-  const flagged = actions.filter(a => a.kind === 'poke' && a.reason === 'blocked, BLOCKED ON names no one known')
+  // The warning names the key: the PM sees the typo in the finding itself.
+  const flagged = actions.filter(a => a.kind === 'poke' && a.reason === 'blocked, BLOCKED ON names no one known: bos')
   assert.equal(flagged.length, 1)
+  assert.match(flagged[0].text, /names no crew member/, 'the suggested message says what to fix')
   assert.equal(flagged[0].to, 'pia')
   assert.equal(actions.filter(a => a.kind === 'poke' && a.reason.startsWith('blocked, waiting on')).length, 0, 'nobody is poked for an unknown name')
 })

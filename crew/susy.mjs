@@ -239,7 +239,9 @@ export function suggestedMessage(reason, card, to) {
     'cleaning granted, cleaner not working': `start cleaning ${card.id} "${card.title}"`,
     'clean done, not checked': `check the clean on ${card.id} "${card.title}"`
   }
-  return `"${ask[reason] ?? `act on ${card.id} "${card.title}"`}" (to ${to})`
+  // A reason with a key after it ("...names no one known: bos") takes the wording of its part before the colon.
+  const known = Object.keys(ask).find(k => reason === k || reason.startsWith(`${k}: `))
+  return `"${ask[known] ?? `act on ${card.id} "${card.title}"`}" (to ${to})`
 }
 
 /** Every reason Susy checks for one card, each with its condition. A reason that does not hold is still listed, so its open poke closes. */
@@ -298,7 +300,8 @@ export function candidatesFor(card, th, ctx) {
   add(`blocked, waiting on ${namedKey}`, namedKey ?? 'pia', lastChange(card), th.idleMinutes, card.column === 'Blocked' && Boolean(namedKey))
   add('blocked, no BLOCKED ON line', 'pia', lastChange(card), th.idleMinutes, card.column === 'Blocked' && !blockedOn)
   // A BLOCKED ON line that names no one we know (a typo such as "bos") is flagged to the PM, not left silent.
-  add('blocked, BLOCKED ON names no one known', 'pia', lastChange(card), th.idleMinutes, card.column === 'Blocked' && Boolean(blockedOn) && !namedKey)
+  // The warning names the key, so the PM sees the typo: "blocked, BLOCKED ON names no one known: bos".
+  add(`blocked, BLOCKED ON names no one known: ${blockedOn?.key ?? ''}`, 'pia', lastChange(card), th.idleMinutes, card.column === 'Blocked' && Boolean(blockedOn) && !namedKey)
   add('clean done, not checked', 'pia', lastChange(card), th.cleanDoneMinutes, tags.includes('clean done') && !tags.includes('cleaned') && !postedBy(card, ['pia'], lastChange(card)))
   return out
 }
