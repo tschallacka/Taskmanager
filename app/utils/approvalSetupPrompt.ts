@@ -42,7 +42,7 @@ Step 2: get the key by browser approval.
   d. When approved, the answer holds the key. Put it only in the environment variable TASKMANAGER_MANAGEMENT_TOKEN for the next command. Do not write it to a file, a log, a task or a chat.
 
 Step 3: make the crew. In the kit folder, with the key in the environment only:
-  cd ~/crew-kit-${host} && TASKMANAGER_MANAGEMENT_TOKEN="$KEY" node setup.mjs --origin ${origin} --board ${boardId} --repo <repository path>
+  cd ~/crew-kit-${host} && TASKMANAGER_MANAGEMENT_TOKEN="$KEY" node setup.mjs --origin ${origin} --board ${boardId} --repo <repository path> --worktree-base <absolute folder the repository is in>
   The crew is always new. If the command says the slug is taken, run it again with --slug <another slug>. Never rotate a crew.
   The crew gets its own home, ~/crew-<slug>. If that folder already holds creds.json, the command stops and changes nothing.
 

@@ -20,6 +20,11 @@ test('it starts a device request for crews:manage on the chosen board, then poll
   assert.match(prompt, /"boardId":"board-1"/)
 })
 
+// setup.mjs on master refuses a run with no --worktree-base (an absolute folder), so the prompt's command must name one.
+test('the setup command names --worktree-base, the folder the repository is in', () => {
+  assert.match(prompt, /node setup\.mjs --origin https:\/\/tm\.example --board board-1 --repo <repository path> --worktree-base <absolute folder the repository is in>/)
+})
+
 test('the key goes only into the environment of the setup command, never into a file or a log', () => {
   assert.match(prompt, /TASKMANAGER_MANAGEMENT_TOKEN="\$KEY" node setup\.mjs/)
   assert.doesNotMatch(prompt, /keys\.env/)
