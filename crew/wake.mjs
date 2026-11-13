@@ -6,10 +6,26 @@
 // The planner (planWake in session.mjs) decides the recorded id. The typing itself is injected (`type`), so the tests
 // run with a fake; the real typer is crew/session-wake.sh, used only on Boss's go.
 import { spawnSync } from 'node:child_process'
+import { randomBytes } from 'node:crypto'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { crewHome } from './home.mjs'
+import { sendMail } from './mail-client.mjs'
 import { liveById, listAgents, readRecord, writeRecord } from './session.mjs'
+
+function readJsonOr(path, fallback) {
+  try {
+    return existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : fallback
+  } catch {
+    return fallback
+  }
+}
+
+/** Mails Boss through the app's mail route (to 'boss'). An unsent mail goes to the outbox, as every mail does. */
+export async function mailBoss({ base, slug, key, mailboxDir, text, makeId, fetch: fetchImpl = fetch }) {
+  return sendMail({ fetch: fetchImpl, base, slug, key, to: 'boss', text, mailboxDir, makeId })
+}
 
 export const IDLE_WAIT_MS = 5 * 60_000
 export const POLL_MS = 15_000
@@ -116,6 +132,24 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   })
   if (record) writeRecord(home, key, { ...record, wake: out.wake })
   console.log(out.reason)
-  if (out.mailBoss) console.log(`MAIL BOSS (not sent by this command): ${out.mailBoss}`)
+  if (out.mailBoss) {
+    // Sent through the app's mail route with the susy key, as the Susy daemon mails Boss (the sender is Susy's job).
+    const creds = readJsonOr(join(home, 'creds.json'), {})
+    const susyKey = creds.people?.susy?.apiKey
+    if (!susyKey || !creds.base || !creds.crew?.slug) {
+      console.log(`could not mail Boss: no susy key or crew slug in creds.json; mail text: ${out.mailBoss}`)
+      process.exit(1)
+    }
+    try {
+      const sent = await mailBoss({
+        base: creds.base, slug: creds.crew.slug, key: susyKey, mailboxDir: join(home, 'mailbox'), text: out.mailBoss,
+        makeId: () => randomBytes(16).toString('hex')
+      })
+      console.log(sent.sent ? 'mailed Boss' : 'mail to Boss queued in the outbox; it is sent on the next flush')
+    } catch (error) {
+      console.log(`could not mail Boss: ${error.message}`)
+      process.exit(1)
+    }
+  }
   process.exit(out.ok ? 0 : 1)
 }

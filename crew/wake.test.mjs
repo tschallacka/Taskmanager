@@ -1,7 +1,33 @@
 // The wake sender's light parts, with fakes (no real session, no real typing). Run: node --test crew/wake.test.mjs
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { logCut, sessionReady, waitForIdle, recordWake, wakeOnce, bossMailText, LOG_CUT, FAILURES_TO_MAIL_BOSS } from './wake.mjs'
+import { logCut, sessionReady, waitForIdle, recordWake, wakeOnce, bossMailText, mailBoss, LOG_CUT, FAILURES_TO_MAIL_BOSS } from './wake.mjs'
+import { spawnSync } from 'node:child_process'
+import { chmodSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const HERE = dirname(fileURLToPath(import.meta.url))
+
+// A fake interactive-shell MCP for session-wake.sh: every tool call answers with a result, except the tools named in
+// `failOn`, which answer with an error. Calls are appended to a log so a test can see the order.
+function fakeMcp(failOn = []) {
+  const dir = mkdtempSync(join(tmpdir(), 'wake-mcp-'))
+  const log = join(dir, 'calls.log')
+  const bin = join(dir, 'mcp')
+  writeFileSync(bin, `#!/usr/bin/env node
+const fs = require('node:fs')
+const lines = fs.readFileSync(0, 'utf8').trim().split('\\n')
+const last = JSON.parse(lines[lines.length - 1])
+const name = last.params && last.params.name
+fs.appendFileSync(${JSON.stringify(log)}, (name || 'init') + '\\n')
+const fail = ${JSON.stringify(failOn)}.includes(name)
+process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: 2, result: fail ? { isError: true, content: [{ type: 'text', text: 'refused' }] } : { content: [{ type: 'text', text: 'ok' }] } }) + '\\n')
+`)
+  chmodSync(bin, 0o755)
+  return { bin, log }
+}
 
 const ID = 'a1b2c3d4'
 const entry = (state, status = 'running', id = ID) => ({ id, name: 'wren', state, status, startedAt: 1 })
@@ -122,4 +148,37 @@ test('three failed wakes in a row for one person give one Boss mail, with the ca
   assert.equal(mails.length, 1, 'Boss gets one mail for the streak')
   assert.match(mails[0], /for wren on card mw8b8is1txcwmtwp7c/)
   assert.equal(record.wake.failures, 4)
+})
+
+test('the Boss mail is sent through the app to boss, with the given text', async () => {
+  const mailboxDir = mkdtempSync(join(tmpdir(), 'wake-mail-'))
+  const sent = []
+  const fetch = async (url, init) => {
+    sent.push({ url, body: JSON.parse(init.body) })
+    return { ok: true, status: 200, json: async () => ({}) }
+  }
+  const text = bossMailText({ key: 'wren', cardId: 'mw8b8is1txcwmtwp7c', lastError: 'paste into session 1f592988 failed' })
+  const out = await mailBoss({ fetch, base: 'https://board.example', slug: 'tm', key: 'k', mailboxDir, text, makeId: () => 'e'.repeat(32) })
+  assert.equal(out.sent, true)
+  assert.equal(sent.length, 1)
+  assert.match(sent[0].url, /\/api\/crew-mail\/tm$/)
+  assert.equal(sent[0].body.to, 'boss')
+  assert.equal(sent[0].body.text, text)
+})
+
+test('session-wake.sh exits 1 when the paste is refused, so the caller counts a failed wake', () => {
+  const mcp = fakeMcp(['paste'])
+  const run = spawnSync('sh', [join(HERE, 'session-wake.sh'), '1f592988', 'hello'], { encoding: 'utf8', env: { ...process.env, SESSION_WAKE_MCP: mcp.bin }, timeout: 120000 })
+  assert.equal(run.status, 1)
+  assert.match(run.stderr, /paste into session 1f592988 failed/)
+  assert.ok(!run.stdout.includes('typed into'), 'nothing reports a typed wake')
+})
+
+test('session-wake.sh exits 0 only when every step answers without an error', () => {
+  const mcp = fakeMcp([])
+  const run = spawnSync('sh', [join(HERE, 'session-wake.sh'), '1f592988', 'hello'], { encoding: 'utf8', env: { ...process.env, SESSION_WAKE_MCP: mcp.bin }, timeout: 120000 })
+  assert.equal(run.status, 0, run.stderr)
+  assert.match(run.stdout, /typed into session 1f592988/)
+  const calls = readFileSync(mcp.log, 'utf8').trim().split('\n')
+  assert.ok(calls.includes('paste') && calls.includes('key'), 'the paste and the Enter were sent')
 })
