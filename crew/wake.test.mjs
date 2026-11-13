@@ -1,7 +1,7 @@
 // The wake sender's light parts, with fakes (no real session, no real typing). Run: node --test crew/wake.test.mjs
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { logCut, sessionReady, waitForIdle, recordWake, wakeOnce, bossMailText, mailBoss, LOG_CUT, FAILURES_TO_MAIL_BOSS } from './wake.mjs'
+import { logCut, sessionReady, waitForIdle, recordWake, wakeOnce, bossMailText, deliverBossMail, LOG_CUT, FAILURES_TO_MAIL_BOSS } from './wake.mjs'
 import { spawnSync } from 'node:child_process'
 import { chmodSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -112,7 +112,7 @@ test('a busy session is never typed into; the failure is counted and the log sta
   })
   assert.equal(typed.length, 0, 'the pane was working, so nothing was typed')
   assert.equal(out.ok, false)
-  assert.equal(out.wake.failures, 1)
+  assert.equal(out.wake.failures, 0, 'a busy timeout is a wait, not a failed wake')
   assert.ok(out.reason.length <= LOG_CUT + 60)
 })
 
@@ -139,8 +139,8 @@ test('three failed wakes in a row for one person give one Boss mail, with the ca
   const mails = []
   for (let i = 0; i < 4; i++) {
     const out = await wakeOnce({
-      record, list: [entry('working')], text: 'z', cardId: 'mw8b8is1txcwmtwp7c', key: 'wren', type: async () => {},
-      readList: () => [entry('working')], now: c.now, sleep: c.sleep, timeoutMs: 1000, pollMs: 500
+      record, list: [], text: 'z', cardId: 'mw8b8is1txcwmtwp7c', key: 'wren', type: async () => {},
+      readList: () => [], now: c.now, sleep: c.sleep, timeoutMs: 1000, pollMs: 500
     })
     if (out.mailBoss) mails.push(out.mailBoss)
     record = { ...record, wake: out.wake }
@@ -150,7 +150,7 @@ test('three failed wakes in a row for one person give one Boss mail, with the ca
   assert.equal(record.wake.failures, 4)
 })
 
-test('the Boss mail is sent through the app to boss, with the given text', async () => {
+test('the Boss mail is sent through the app to boss, with the given text, when the config is there', async () => {
   const mailboxDir = mkdtempSync(join(tmpdir(), 'wake-mail-'))
   const sent = []
   const fetch = async (url, init) => {
@@ -158,12 +158,36 @@ test('the Boss mail is sent through the app to boss, with the given text', async
     return { ok: true, status: 200, json: async () => ({}) }
   }
   const text = bossMailText({ key: 'wren', cardId: 'mw8b8is1txcwmtwp7c', lastError: 'paste into session 1f592988 failed' })
-  const out = await mailBoss({ fetch, base: 'https://board.example', slug: 'tm', key: 'k', mailboxDir, text, makeId: () => 'e'.repeat(32) })
-  assert.equal(out.sent, true)
+  const creds = { base: 'https://board.example', crew: { slug: 'tm' }, people: { susy: { apiKey: 'k' } } }
+  const out = await deliverBossMail({ creds, fetch, mailboxDir, text, makeId: () => 'e'.repeat(32) })
+  assert.equal(out.ok, true)
   assert.equal(sent.length, 1)
   assert.match(sent[0].url, /\/api\/crew-mail\/tm$/)
   assert.equal(sent[0].body.to, 'boss')
   assert.equal(sent[0].body.text, text)
+})
+
+test('with no susy key or slug the Boss mail is written to the outbox, not dropped, and the line is loud', async () => {
+  const mailboxDir = mkdtempSync(join(tmpdir(), 'wake-outbox-'))
+  const text = bossMailText({ key: 'wren', cardId: 'mw8b8is1txcwmtwp7c', lastError: 'paste failed' })
+  const out = await deliverBossMail({ creds: {}, mailboxDir, text, makeId: () => 'f'.repeat(32) })
+  assert.equal(out.ok, false)
+  assert.match(out.line, /^MAIL TO BOSS NOT SENT/)
+  const files = readdirSync(join(mailboxDir, 'outbox'))
+  assert.deepEqual(files, [`${'f'.repeat(32)}.json`], 'the mail is kept in the outbox')
+  const row = JSON.parse(readFileSync(join(mailboxDir, 'outbox', files[0]), 'utf8'))
+  assert.equal(row.to, 'boss')
+  assert.equal(row.text, text)
+})
+
+test('a route that refuses the key still keeps the Boss mail in the outbox, and the line is loud', async () => {
+  const mailboxDir = mkdtempSync(join(tmpdir(), 'wake-refused-'))
+  const creds = { base: 'https://board.example', crew: { slug: 'tm' }, people: { susy: { apiKey: 'k' } } }
+  const fetch = async () => ({ ok: false, status: 403, json: async () => ({}) })
+  const out = await deliverBossMail({ creds, fetch, mailboxDir, text: 'refused mail', makeId: () => '1'.repeat(32) })
+  assert.equal(out.ok, false)
+  assert.match(out.line, /MAIL TO BOSS NOT SENT/)
+  assert.equal(readdirSync(join(mailboxDir, 'outbox')).length, 1)
 })
 
 test('session-wake.sh exits 1 when the paste is refused, so the caller counts a failed wake', () => {

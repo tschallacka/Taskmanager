@@ -22,9 +22,26 @@ function readJsonOr(path, fallback) {
   }
 }
 
-/** Mails Boss through the app's mail route (to 'boss'). An unsent mail goes to the outbox, as every mail does. */
-export async function mailBoss({ base, slug, key, mailboxDir, text, makeId, fetch: fetchImpl = fetch }) {
-  return sendMail({ fetch: fetchImpl, base, slug, key, to: 'boss', text, mailboxDir, makeId })
+/**
+ * Delivers the mail to Boss. With the susy key, the crew slug and the base, it goes to the app's mail route. Without them,
+ * or when the route refuses, it is written to the outbox (sendMail's own outbox), so it is delivered when the route
+ * works; it never just vanishes. Returns { sent, ok, line }: ok is true only when it was sent now.
+ */
+export async function deliverBossMail({ creds = {}, mailboxDir, text, makeId, fetch: fetchImpl = fetch }) {
+  const key = creds.people?.susy?.apiKey ?? ''
+  const base = creds.base ?? ''
+  const slug = creds.crew?.slug ?? ''
+  const refuse = async () => { throw new Error('the mail route is not reachable with this config') }
+  const configured = Boolean(key && base && slug)
+  try {
+    const out = await sendMail({ fetch: configured ? fetchImpl : refuse, base, slug, key, to: 'boss', text, mailboxDir, makeId })
+    if (out.sent) return { sent: true, ok: true, line: 'mailed Boss' }
+    return { sent: false, ok: false, line: `MAIL TO BOSS NOT SENT: written to the outbox (${out.outbox}) until the route works` }
+  } catch (error) {
+    // A refused key (401/403) throws out of sendMail; the mail is still written to the outbox, so it is kept.
+    const kept = await sendMail({ fetch: refuse, base, slug, key, to: 'boss', text, mailboxDir, makeId })
+    return { sent: false, ok: false, line: `MAIL TO BOSS NOT SENT (${error.message}): kept in the outbox (${kept.outbox})` }
+  }
 }
 
 export const IDLE_WAIT_MS = 5 * 60_000
@@ -86,8 +103,8 @@ export async function wakeOnce({ record, list, text, cardId, key, type, readList
   const entry = liveById(list, record.id)
   if (!entry) return finish(false, `recorded session ${record.id} is not live`, record, { key, cardId })
   const waited = await waitForIdle({ id: record.id, readList, now, sleep, timeoutMs, pollMs })
-  // 'unknown' (claude agents did not answer) is not counted as a failed wake: the sender only retries next tick.
-  if (waited !== 'idle') return finish(false, `session ${record.id} was ${waited}, not idle; retry next tick`, record, { key, cardId }, waited !== 'unknown')
+  // Only a session that is gone counts here. Busy (a timeout while working) and unknown (claude agents silent) are waits.
+  if (waited !== 'idle') return finish(false, `session ${record.id} was ${waited}, not idle; retry next tick`, record, { key, cardId }, waited === 'gone')
   try {
     await type({ id: record.id, text })
     return finish(true, `woke ${record.id} with "${logCut(text)}"`, record, { key, cardId })
@@ -132,24 +149,14 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   })
   if (record) writeRecord(home, key, { ...record, wake: out.wake })
   console.log(out.reason)
+  let mailOk = true
   if (out.mailBoss) {
-    // Sent through the app's mail route with the susy key, as the Susy daemon mails Boss (the sender is Susy's job).
-    const creds = readJsonOr(join(home, 'creds.json'), {})
-    const susyKey = creds.people?.susy?.apiKey
-    if (!susyKey || !creds.base || !creds.crew?.slug) {
-      console.log(`could not mail Boss: no susy key or crew slug in creds.json; mail text: ${out.mailBoss}`)
-      process.exit(1)
-    }
-    try {
-      const sent = await mailBoss({
-        base: creds.base, slug: creds.crew.slug, key: susyKey, mailboxDir: join(home, 'mailbox'), text: out.mailBoss,
-        makeId: () => randomBytes(16).toString('hex')
-      })
-      console.log(sent.sent ? 'mailed Boss' : 'mail to Boss queued in the outbox; it is sent on the next flush')
-    } catch (error) {
-      console.log(`could not mail Boss: ${error.message}`)
-      process.exit(1)
-    }
+    const mail = await deliverBossMail({
+      creds: readJsonOr(join(home, 'creds.json'), {}), mailboxDir: join(home, 'mailbox'), text: out.mailBoss,
+      makeId: () => randomBytes(16).toString('hex')
+    })
+    console.log(mail.line)
+    mailOk = mail.ok
   }
-  process.exit(out.ok ? 0 : 1)
+  process.exit(out.ok && mailOk ? 0 : 1)
 }
