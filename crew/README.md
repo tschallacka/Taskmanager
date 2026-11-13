@@ -105,7 +105,9 @@ The workflow's hard rules (the AI text editor for every document, CodeGraph for 
 `crew setup` (`setup.mjs`) makes one new crew for one board in one go. It is a thin client of the crew
 API, with the management token that "Put an AI crew to work on this board" gives (10 minutes, one board):
 
-    TASKMANAGER_MANAGEMENT_TOKEN=<token> node setup.mjs --origin <url> --board <board id> --repo <path> [--name <crew name>] [--slug <slug>]
+    TASKMANAGER_MANAGEMENT_TOKEN=<token> node setup.mjs --origin <url> --board <board id> --repo <path> --worktree-base <absolute folder> [--name <crew name>] [--slug <slug>]
+
+`--worktree-base` is required: the folder the crew's worktrees go in (for example the folder your repository sits in). It is written to crew.json as `worktreeBase`; `/` is refused.
 
 The token comes from `TASKMANAGER_MANAGEMENT_TOKEN`, or from stdin. It is never read from the command line. A
 crews:manage key does not work here: the remote crew API takes a management token. The crew is always new: a taken

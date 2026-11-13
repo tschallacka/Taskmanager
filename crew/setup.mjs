@@ -66,6 +66,7 @@ if (!args.board) usage('--board is required')
 if (!args.repo) usage('--repo is required')
 // The folder the crew's worktrees go in. It is given, never guessed: prepare worktree needs it in crew.json.
 if (!args['worktree-base'] || !args['worktree-base'].startsWith('/')) usage('--worktree-base is required and must be an absolute folder')
+if (args['worktree-base'].replace(/\/+$/, '') === '') usage('--worktree-base cannot be / (the root); give the folder the worktrees go in')
 const origin = args.origin.replace(/\/+$/, '')
 const token = await readToken()
 if (!token) usage('no management token: set TASKMANAGER_MANAGEMENT_TOKEN, or pipe the token on stdin')

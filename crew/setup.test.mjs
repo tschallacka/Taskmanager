@@ -170,4 +170,16 @@ describe('crew setup', () => {
     assert.equal(run.status, 2)
     assert.match(run.stderr, /unknown flag --token/)
   })
+
+  test('--worktree-base is required and cannot be the root; both are refused before any call', () => {
+    const base = ['--origin', 'http://127.0.0.1:1', '--board', 'b', '--repo', '/x']
+    const missing = spawnSync(process.execPath, [SETUP, ...base], { encoding: 'utf8' })
+    assert.equal(missing.status, 2)
+    assert.match(missing.stderr, /--worktree-base is required/)
+    const root = spawnSync(process.execPath, [SETUP, ...base, '--worktree-base', '/'], { encoding: 'utf8' })
+    assert.equal(root.status, 2)
+    assert.match(root.stderr, /cannot be \/ \(the root\)/)
+    const rootSlashes = spawnSync(process.execPath, [SETUP, ...base, '--worktree-base', '///'], { encoding: 'utf8' })
+    assert.equal(rootSlashes.status, 2)
+  })
 })
