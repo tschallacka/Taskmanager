@@ -100,6 +100,21 @@ const describe = e => `${e.name}: ${e.message}`
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 const log = text => console.log(`${new Date().toISOString()} ${text}`)
 
+/**
+ * Turns one CDP domain on for a tab. A call that times out is retried once with twice the wait, because a busy
+ * shared browser answers a domain switch late, not never. A second timeout, or any other error, is the answer.
+ * Enabling a domain twice is harmless, so the retry is safe.
+ */
+export async function enableDomain(browser, method, sessionId) {
+  try {
+    return await browser.call(method, {}, sessionId)
+  } catch (e) {
+    if (!/ timed out after /.test(String(e?.message))) throw e
+    log(`${method} timed out; retrying once with a longer wait`)
+    return browser.call(method, {}, sessionId, browser.callMs * 2)
+  }
+}
+
 // ---------- pure parts (unit-tested) ----------
 
 export function validWho(who) {
@@ -957,7 +972,7 @@ class Pool {
       this.sessions.set(sessionId, tab)
       try {
         for (const method of ['Page.enable', 'Runtime.enable', 'Log.enable']) {
-          await browser.call(method, {}, sessionId)
+          await enableDomain(browser, method, sessionId)
         }
       } catch (e) {
         this.forgetTab(tab)
