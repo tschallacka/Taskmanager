@@ -2,7 +2,7 @@
 import { format } from 'date-fns'
 import { keyPanelMode } from '~/utils/apiKeyView'
 import { keyPrompt } from '~/utils/connectPrompt'
-import { agentConfigFileText, serverNameFor } from '~/utils/agentConfig'
+import { agentConfigFileText, projectSetupText, serverNameFor } from '~/utils/agentConfig'
 import type { KeyPromptInput } from '~/utils/connectPrompt'
 import type { Ref } from 'vue'
 
@@ -282,6 +282,15 @@ const configCopied = ref(false)
 async function copyAgentConfig() {
   if (!issuedToken.value) return
   await copyWithFeedback(agentConfigText.value, configCopied, 'Agent config file copied')
+}
+
+// The folder form (one person, always on in one folder): the steps for .mcp.json and .claude/settings.local.json, named
+// for the key. The text holds no key value; the step says where to paste the key.
+const folderSetupText = computed(() => (issuedName.value ? projectSetupText(window.location.origin, issuedName.value) : ''))
+const folderCopied = ref(false)
+async function copyFolderSetup() {
+  if (!issuedName.value) return
+  await copyWithFeedback(folderSetupText.value, folderCopied, 'Folder setup copied')
 }
 
 // Revoke and regenerate ask first, inline, under the key's row. The confirmation names the key and its secret prefix and
@@ -651,6 +660,17 @@ function reachLabel(key: ApiKeySummary): string {
                     variant="soft"
                     size="sm"
                     @click="copyAgentConfig"
+                  />
+                </div>
+                <div class="flex flex-col sm:flex-row gap-2">
+                  <pre class="flex-1 min-w-0 text-xs font-mono bg-default border border-default rounded-md px-3 py-2 whitespace-pre-wrap break-words">{{ folderSetupText }}</pre>
+                  <UButton
+                    :icon="folderCopied ? 'i-lucide-check' : 'i-lucide-copy'"
+                    :label="folderCopied ? 'Copied' : 'Copy folder setup'"
+                    color="neutral"
+                    variant="soft"
+                    size="sm"
+                    @click="copyFolderSetup"
                   />
                 </div>
                 <p class="text-xs text-muted pt-1">

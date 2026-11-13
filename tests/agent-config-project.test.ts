@@ -5,6 +5,7 @@
 //   node --import tsx --test tests/agent-config-project.test.ts
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { mergeSettingsLocal, projectMcpText, projectServerName, projectSetupText, projectVariableName, settingsLocalText } from '../app/utils/agentConfig'
 
 const ORIGIN = 'https://tm.example.test'
@@ -76,6 +77,12 @@ test('no generated text writes to user scope, to the shell profile, or uses head
   assert.doesNotMatch(text, /mcp add --scope user/, 'no user-scope add')
   assert.doesNotMatch(text, /\.zshrc|\.bashrc|\.profile/, 'no profile edit')
   assert.doesNotMatch(text, /headersHelper/)
+})
+
+test('the key panel offers the folder setup as a copy button, built from the key label', () => {
+  const panel = readFileSync(new URL('../app/components/ApiKeysPanel.vue', import.meta.url), 'utf8')
+  assert.match(panel, /'Copy folder setup'/)
+  assert.match(panel, /projectSetupText\(window\.location\.origin, issuedName\.value\)/)
 })
 
 test('the one remove line is optional, and it is only for an old bare user-scope entry', () => {
