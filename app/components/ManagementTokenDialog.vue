@@ -172,7 +172,9 @@ function close() {
   <UModal
     :open="open"
     :title="isCrewBoard ? 'Manage this crew' : `Put an AI crew to work on ${board?.name ?? 'this board'}`"
-    description="This makes a token for 10 minutes. Paste the prompt below into a new Claude Code session: it sets up a crew (a PM, workers and testers) that works on this board and keeps its own keys."
+    :description="isCrewBoard
+      ? 'This makes a token for 10 minutes that reaches only this crew. Paste the prompt below into a Claude Code session: it recovers the keys or adds the missing people for this crew.'
+      : 'This makes a token for 10 minutes. Paste the prompt below into a new Claude Code session: it sets up a crew (a PM, workers and testers) that works on this board and keeps its own keys.'"
     :ui="{ footer: 'justify-end' }"
     @update:open="(value: boolean) => emit('update:open', value)"
   >
