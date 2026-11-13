@@ -15,8 +15,16 @@ function slug(text: string): string {
 // The server name for one key on one board, on one instance (the origin's host). Unique per instance, board and key; it
 // is never the bare `taskmanager`, so another project's `taskmanager` entry cannot collide with it. The host is in the
 // name so the same person's local dev app and live app get two names (owner's real case, 2026-11-13).
+// A short name for an origin's host: `local` for localhost, else the name just before the top domain
+// (taskmanager.tschallacka.dev reads as tschallacka).
+export function hostShort(origin: string): string {
+  const labels = new URL(origin).hostname.split('.')
+  if (labels[labels.length - 1] === 'localhost') return 'local'
+  return labels.length >= 3 ? labels[labels.length - 2]! : labels[0]!
+}
+
 export function serverNameFor(boardName: string, keyLabel: string, origin = ''): string {
-  const host = origin ? slug(new URL(origin).host) : ''
+  const host = origin ? slug(hostShort(origin)) : ''
   const board = slug(boardName) || 'board'
   const key = slug(keyLabel) || 'key'
   return ['taskmanager', host, board, key].filter(Boolean).join('-')

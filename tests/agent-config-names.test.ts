@@ -17,7 +17,9 @@ test('the same person on two origins (a local dev app and the live app) gets two
 })
 
 test('the server name is unique per board and key, never the bare name', () => {
-  assert.equal(serverNameFor('Seed real board', 'Wynn laptop', ORIGIN), 'taskmanager-tm-example-test-seed-real-board-wynn-laptop')
+  assert.equal(serverNameFor('Seed real board', 'Wynn laptop', ORIGIN), 'taskmanager-example-seed-real-board-wynn-laptop')
+  assert.equal(serverNameFor('Seed board', 'Wynn key', 'http://taskmanager.localhost'), 'taskmanager-local-seed-board-wynn-key', 'a localhost origin reads as local')
+  assert.equal(serverNameFor('Seed board', 'Wynn key', 'https://taskmanager.tschallacka.dev'), 'taskmanager-tschallacka-seed-board-wynn-key', 'the live host reads as its own short name')
   assert.notEqual(serverNameFor('Board A', 'Key 1'), 'taskmanager')
   assert.notEqual(serverNameFor('Board A', 'Key 1'), serverNameFor('Board B', 'Key 1'), 'two boards give two names')
   assert.notEqual(serverNameFor('Board A', 'Key 1'), serverNameFor('Board A', 'Key 2'), 'two keys give two names')
