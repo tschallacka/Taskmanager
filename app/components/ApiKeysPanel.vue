@@ -2,6 +2,7 @@
 import { format } from 'date-fns'
 import { keyPanelMode } from '~/utils/apiKeyView'
 import { keyPrompt } from '~/utils/connectPrompt'
+import { agentConfigFileText } from '~/utils/agentConfig'
 import type { KeyPromptInput } from '~/utils/connectPrompt'
 import type { Ref } from 'vue'
 
@@ -268,6 +269,14 @@ function startEdit(key: ApiKeySummary) {
 async function copyCommand() {
   if (!issuedToken.value) return
   await copyWithFeedback(claudeCommand.value, commandCopied, 'Command copied')
+}
+
+// The per-agent config file (agentConfig.ts): the main path, one file per agent.
+const agentConfigText = computed(() => (issuedToken.value ? agentConfigFileText(window.location.origin, issuedToken.value) : ''))
+const configCopied = ref(false)
+async function copyAgentConfig() {
+  if (!issuedToken.value) return
+  await copyWithFeedback(agentConfigText.value, configCopied, 'Agent config file copied')
 }
 
 // Revoke and regenerate ask first, inline, under the key's row. The confirmation names the key and its secret prefix and
@@ -623,6 +632,20 @@ function reachLabel(key: ApiKeySummary): string {
                     variant="soft"
                     size="sm"
                     @click="copyCommand"
+                  />
+                </div>
+                <p class="text-xs text-muted pt-1">
+                  The main path, for several agents on one machine: give each agent its own config file, and start it with <code class="font-mono">claude --mcp-config &lt;file&gt; --strict-mcp-config</code>. No shared variable is needed.
+                </p>
+                <div class="flex flex-col sm:flex-row gap-2">
+                  <pre class="flex-1 min-w-0 text-xs font-mono bg-default border border-default rounded-md px-3 py-2 whitespace-pre-wrap break-words">{{ agentConfigText }}</pre>
+                  <UButton
+                    :icon="configCopied ? 'i-lucide-check' : 'i-lucide-copy'"
+                    :label="configCopied ? 'Copied' : 'Copy agent config file'"
+                    color="neutral"
+                    variant="soft"
+                    size="sm"
+                    @click="copyAgentConfig"
                   />
                 </div>
                 <p class="text-xs text-muted pt-1">
