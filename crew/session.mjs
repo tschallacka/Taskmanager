@@ -13,6 +13,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { join, dirname } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { crewHome } from './home.mjs'
+import { settingsPath, writeSettingsFile } from './session-settings.mjs'
 
 export const MODEL = 'claude-haiku-5-5'
 export const NO_REMOTE_SETTINGS = JSON.stringify({ remoteControlAtStartup: false })
@@ -83,7 +84,7 @@ export function startArgs({ key, folder, home, kit, role, model = MODEL }) {
     cwd: folder,
     args: [
       '--bg', '-n', checkKey(key), '--model', model,
-      '--setting-sources', 'user', '--settings', NO_REMOTE_SETTINGS,
+      '--setting-sources', 'user', '--settings', settingsPath(home, key),
       '--strict-mcp-config', '--mcp-config', mcpConfigPath(home, key),
       '--permission-mode', 'auto',
       '--add-dir', home, '--add-dir', kit,
@@ -143,6 +144,9 @@ export function startSession({ home, kit, key, folder, role, bin, now = Date.now
   // The session's own mcp config, written before the start, so the strict flag always has a file to read.
   mkdirSync(join(home, 'sessions'), { recursive: true })
   writeFileSync(mcpConfigPath(home, key), `${JSON.stringify(mcpConfig({ key, home, kit }), null, 2)}\n`, { mode: 0o600 })
+  // The person's own settings file (deny rules, own CREW_HOME, remote control off), written before the start: the start
+  // passes that one file as its --settings.
+  writeSettingsFile(home, key)
   const run = runClaude(args, { bin, cwd })
   if (!run.ok) return { ok: false, reason: `claude did not start the session: ${run.stderr || `exit ${run.status}`}` }
   const after = listAgents({ bin }) ?? []

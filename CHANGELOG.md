@@ -2,6 +2,14 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.27.0 - 2026-11-13
+
+- **Every crew session starts with its own settings file.** Each background session gets `CREW_HOME/settings/<key>.json` (mode 600): the `mcp__git__restart_self` tool is denied for every agent, the person's own crew home is set, and remote control is off. The start passes that one file as its `--settings`. Files: `crew/session-settings.mjs`, `crew/session.mjs`, `crew/session.test.mjs`, `crew/session-settings.test.mjs`, `crew/kit-files.txt`.
+
+- **The crew's role texts say it: never restart or reconfigure an agent (CREW.md rule 14).** Every role template, the PROMPTS and the Susy text name the rule, and a kit test pins it, so a crew agent no longer calls `restart_self` by habit. The enforcing deny rule is in the settings file above.
+
+- **The crew's shared browser no longer fails its own tests under load.** It gets a lock so two users do not start it at the same time, one cleanup removes its temporary profile after Chromium has exited (retrying), and a dropped command is retried only when it is read-only (status, tabs, console, shot), never a click or a submit. Files: `crew/browser-driver.mjs`, `crew/browser-driver.test.mjs`.
+
 ## 0.26.0 - 2026-11-13
 
 - **A crew person can run as its own background session.** `crew session start <key> <folder>` starts one person as a `claude --bg` session with remote control off and the crew's own strict mcp config, and records its id in `sessions/<key>.json`; `status`, `list` and `stop` read that record by id. Only the crew kit changes: `crew/session.mjs`, `crew/crew.mjs`, `crew/kit-files.txt`, `crew/session.test.mjs`.
