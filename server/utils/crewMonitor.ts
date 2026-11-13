@@ -23,7 +23,8 @@ export async function boardTasksForMonitor(projectId: string): Promise<MonitorTa
       columnId: projectTasks.columnId,
       assigneeId: projectTasks.assigneeId,
       parentTaskId: projectTasks.parentTaskId,
-      completedAt: projectTasks.completedAt
+      completedAt: projectTasks.completedAt,
+      tags: projectTasks.tags
     })
     .from(projectTasks)
     .where(and(inArray(projectTasks.columnId, columns.map(c => c.id)), isNull(projectTasks.deletedAt)))
@@ -36,7 +37,8 @@ export async function boardTasksForMonitor(projectId: string): Promise<MonitorTa
       column,
       assigneeId: row.assigneeId,
       parentTaskId: row.parentTaskId,
-      completed: row.completedAt !== null
+      completed: row.completedAt !== null,
+      tags: row.tags
     }
   })
 }
