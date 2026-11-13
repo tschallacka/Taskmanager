@@ -68,6 +68,7 @@ session-health.mjs
 session-hooks.mjs
 session-wake.sh
 session.mjs
+sessions-up.mjs
 setup.mjs
 susy-activity.mjs
 susy-collector.mjs

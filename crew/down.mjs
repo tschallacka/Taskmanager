@@ -7,9 +7,10 @@
 import { spawnSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { sendMail } from './mail-client.mjs'
+import { downSessions, realSessionDeps } from './sessions-up.mjs'
 
 export const DEFAULT_TIMEOUT_MS = 5 * 60_000
 
@@ -159,7 +160,11 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const file = join(crewHome, 'crew.json')
   const config = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : {}
   const parts = Array.isArray(config.up) ? config.up : []
-  if (!parts.length) {
+  // The recorded person sessions are stopped by their recorded ids (card mwdblb506deyxnet5i7); a running one is not confirmed by mail here.
+  const kit = dirname(fileURLToPath(import.meta.url))
+  const sessions = downSessions(crewHome, realSessionDeps(crewHome, kit))
+  for (const line of sessions.lines) console.log(line)
+  if (!parts.length && !sessions.lines.length) {
     console.error('crew down: crew.json has no "up" list, so there is nothing to take down')
     process.exit(1)
   }
@@ -177,6 +182,6 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const waitFor = (person, requestId, ms) => waitForConfirmation({ ...mail, person, requestId, timeoutMs: ms })
   downParts(parts, { force, env: process.env, ask, waitFor }).then((result) => {
     for (const line of result.lines) console.log(line)
-    process.exit(result.ok ? 0 : 1)
+    process.exit(result.ok && sessions.ok ? 0 : 1)
   })
 }
