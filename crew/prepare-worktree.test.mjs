@@ -6,15 +6,19 @@ import assert from 'node:assert/strict'
 import { parseResultLine, prepareWorktree, removePlan, reservationFailure, slugOf, worktreeFolder } from './prepare-worktree.mjs'
 
 test('a new worktree whose port cannot be reserved is removed only when it holds nothing; otherwise it is kept and says so', () => {
-  const empty = reservationFailure({ dirty: false, aheadOfBase: 0, error: 'port 3101 is held', who: 'wren', taskId: 'mwdlkxb56xr2ek89g92' })
+  const empty = reservationFailure({ created: true, dirty: false, aheadOfBase: 0, error: 'port 3101 is held', who: 'wren', taskId: 'mwdlkxb56xr2ek89g92' })
   assert.equal(empty.remove, true)
   assert.match(empty.message, /had nothing in it, so it was removed/)
-  const dirty = reservationFailure({ dirty: true, aheadOfBase: 0, error: 'port 3101 is held', who: 'wren', taskId: 'mwdlkxb56xr2ek89g92' })
+  const dirty = reservationFailure({ created: true, dirty: true, aheadOfBase: 0, error: 'port 3101 is held', who: 'wren', taskId: 'mwdlkxb56xr2ek89g92' })
   assert.equal(dirty.remove, false)
   assert.match(dirty.message, /the worktree is kept because it has work in it/)
   assert.match(dirty.message, /crew wren prepare worktree mwdlkxb56xr2ek89g92/)
-  const ahead = reservationFailure({ dirty: false, aheadOfBase: 2, error: 'x', who: 'wren', taskId: 't' })
+  const ahead = reservationFailure({ created: true, dirty: false, aheadOfBase: 2, error: 'x', who: 'wren', taskId: 't' })
   assert.equal(ahead.remove, false, 'commits beyond the default branch keep it')
+  // A folder that was already there is a reused one: never removed, even when it is clean and empty.
+  const reused = reservationFailure({ created: false, dirty: false, aheadOfBase: 0, error: 'x', who: 'wren', taskId: 't' })
+  assert.equal(reused.remove, false, 'a reused folder is kept')
+  assert.match(reused.message, /kept/)
 })
 
 test('the worktree folder comes from crew.json worktreeBase, and a missing or relative one is a clear error', () => {

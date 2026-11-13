@@ -75,12 +75,13 @@ export function removePlan({ dirty, branchPushed, aheadOfRemote }) {
 }
 
 /**
- * What to do with a new worktree whose port could not be reserved. It is removed only when it holds nothing: clean, and
- * no commit beyond the default branch. Anything else is kept, and the message says so and how to go on.
+ * What to do with a worktree whose port could not be reserved. It is removed only when this run created its folder and it
+ * holds nothing: clean, and no commit beyond the default branch. A folder that existed before this run (a reused one) is
+ * kept, and so is anything else; the message says so and how to go on.
  */
-export function reservationFailure({ dirty, aheadOfBase, error, who, taskId }) {
+export function reservationFailure({ created, dirty, aheadOfBase, error, who, taskId }) {
   const why = `the port could not be reserved (${error})`
-  if (!dirty && aheadOfBase === 0) {
+  if (created && !dirty && aheadOfBase === 0) {
     return { remove: true, message: `${why}; the new worktree had nothing in it, so it was removed (its branch is kept)` }
   }
   return {

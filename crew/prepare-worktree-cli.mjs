@@ -70,6 +70,8 @@ try {
   fail(`could not read the card ${taskId}; the board tools said: ${(card.stderr || card.stdout).trim().slice(0, 200)}`)
 }
 
+// Whether this run creates the folder: a folder that is already there (a reused worktree) is never removed on failure.
+const createdHere = !existsSync(worktree)
 const result = prepareWorktree({ who, taskId, title, config })
 if (!result.ok) fail(result.message)
 
@@ -90,6 +92,7 @@ if (port) {
   } catch (error) {
     const base = git(['symbolic-ref', '--short', 'refs/remotes/origin/HEAD']).stdout || 'origin/master'
     const plan = reservationFailure({
+      created: createdHere,
       dirty: git(['status', '--porcelain']).stdout !== '',
       aheadOfBase: Number(git(['rev-list', '--count', `${base}..HEAD`]).stdout || 0),
       error: error.message,
