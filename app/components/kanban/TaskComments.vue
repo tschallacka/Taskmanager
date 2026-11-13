@@ -5,6 +5,7 @@ import type { TaskActivityItem, TaskComment, Visibility } from '~/composables/us
 import { dueDayToMs } from '~/utils/dueDate'
 import { commentLink, replyLineText } from '~/utils/taskComments'
 import { commentAuthorName, isGithubUpdate } from '~/utils/commentAuthor'
+import { activityInWindow } from '~/utils/commentWindowLive'
 
 // The conversation under a task's description: its comments and the log of what
 // happened to the task, oldest first, then the box that adds to them. The drawer
@@ -108,7 +109,7 @@ type StreamEntry
 
 const stream = computed<StreamEntry[]>(() => [
   ...ownComments.value.map(comment => ({ key: `c-${comment.id}`, at: comment.createdAt, comment })),
-  ...activity.value.map(item => ({ key: `a-${item.id}`, at: item.createdAt, activity: item }))
+  ...activityInWindow(activity.value, ownComments.value, commentWindow.value).map(item => ({ key: `a-${item.id}`, at: item.createdAt, activity: item }))
 ].sort((a, b) => a.at - b.at))
 
 // The Activity tabs: Comments shows the conversation, History shows the changes to the task. Both read the same stream.

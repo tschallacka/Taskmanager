@@ -2,6 +2,7 @@ import { computed, ref } from 'vue'
 import type MiniSearch from 'minisearch'
 import { realtimeHeaders } from '~/composables/useRealtime'
 import { mergeCommentPages } from '~/utils/commentMerge'
+import { applyLiveComment } from '~/utils/commentWindowLive'
 
 // A permalink's window as the API returns it (server/utils/commentWindow.ts): the comments and what is left either side.
 interface CommentWindowPage {
@@ -1050,7 +1051,23 @@ export function useProjects() {
       loadActivity(taskId).catch(() => {})
     ])
     if (_commentsTaskId.value === taskId) {
-      if (windowTaskId === taskId) return comments
+      if (windowTaskId === taskId) {
+        // A window stays as it is. A comment newer than the window joins it only when the later side is loaded;
+        // otherwise the Show later count goes up (commentWindowLive.ts).
+        const newest = _comments.value.at(-1)?.createdAt ?? Number.NEGATIVE_INFINITY
+        let shown = _comments.value
+        let state = _commentWindow.value
+        if (state) {
+          for (const live of comments.filter(c => c.createdAt > newest).sort((a, b) => a.createdAt - b.createdAt)) {
+            const next = applyLiveComment(shown, state, live)
+            shown = next.comments
+            state = next.state
+          }
+        }
+        _comments.value = shown
+        _commentWindow.value = state
+        return comments
+      }
       _comments.value = comments
       _commentCounts.value = { ..._commentCounts.value, [taskId]: comments.length }
     }
