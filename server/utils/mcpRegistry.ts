@@ -61,3 +61,21 @@ export function toolsForKey(key: { scopes: ApiKeyScope[], customerId: string | n
   const limited = isNarrowedReach(key.customerId, key.reach)
   return toolsForScopes(key.scopes).filter(tool => !limited || !WORKSPACE_WIDE_TOOLS.has(tool.name))
 }
+
+/**
+ * The tools a Sprocket run is given: exactly the MCP list for the same key, less every sensitive tool. Sprocket never
+ * gets a tool that reads or shows secrets, keys, passwords or private data (mcpToolKit.ts `sensitive`), whatever the
+ * person's rights, so a prompt cannot talk its way to one.
+ */
+export function toolsForSprocket(key: { scopes: ApiKeyScope[], customerId: string | null, reach: KeyReach }): McpToolDefinition[] {
+  return toolsForKey(key).filter(tool => !tool.sensitive)
+}
+
+/**
+ * The refusal for a Sprocket run that calls a sensitive tool by name, or null when the call may go on. The run
+ * key carries no such tool, so this answers the name, not a missing permission.
+ */
+export function sprocketRefusal(tool: Pick<McpToolDefinition, 'name' | 'sensitive'>, context: { sprocketRun?: boolean }): string | null {
+  if (!context.sprocketRun || !tool.sensitive) return null
+  return `Sprocket is never given "${tool.name}": it reads something Sprocket must not see. Ask the person to do this in Taskmanager.`
+}

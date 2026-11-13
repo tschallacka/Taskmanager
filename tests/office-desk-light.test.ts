@@ -1,0 +1,58 @@
+// The office's desk light: what each status shows (shared/office/model.ts deskLightOf) and where the server gets the
+// status for each cast member (server/utils/deskStatus.ts). Pure, no database. Run:
+//   TSX_TSCONFIG_PATH=.nuxt/tsconfig.server.json node --import tsx --test tests/office-desk-light.test.ts
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import { deskLightOf } from '../shared/office/model'
+import type { OfficePerson, PersonStatus } from '../shared/office/model'
+import { deskStatusSource, withDeskStatus } from '../server/utils/deskStatus'
+
+const wren: OfficePerson = { userId: 'u1', key: 'wren', name: 'Wren Worker', role: 'worker' }
+const pia: OfficePerson = { userId: 'u2', key: 'pia', name: 'Pia Planner', role: 'pm' }
+
+test('busy is red and a filled dot, and says what the monitor gives', () => {
+  const light = deskLightOf({ state: 'busy', note: 'Busy: ir9yf review' })
+  assert.deepEqual(light, { state: 'busy', color: '#d62828', shape: 'dot', text: 'Busy: ir9yf review' })
+})
+
+test('idle is green and a ring; with no note it still says idle', () => {
+  assert.deepEqual(deskLightOf({ state: 'idle', note: 'Idle since 21:40' }), { state: 'idle', color: '#2a9d43', shape: 'ring', text: 'Idle since 21:40' })
+  assert.equal(deskLightOf({ state: 'idle', note: '' }).text, 'Idle')
+})
+
+test('no status known is grey and dashed, and never a guess', () => {
+  assert.deepEqual(deskLightOf(undefined), { state: 'unknown', color: '#8e8e93', shape: 'dashed', text: 'No status yet' })
+  assert.deepEqual(deskLightOf({ state: 'unknown', note: '' }), { state: 'unknown', color: '#8e8e93', shape: 'dashed', text: 'No status yet' })
+})
+
+test('the light follows the status field: each change shows in the light', () => {
+  const sequence: PersonStatus[] = [
+    { state: 'unknown', note: '' },
+    { state: 'busy', note: 'Busy' },
+    { state: 'idle', note: 'Idle since 21:40' },
+    { state: 'busy', note: 'Busy' }
+  ]
+  const shapes = sequence.map(s => deskLightOf(s).shape)
+  assert.deepEqual(shapes, ['dashed', 'dot', 'ring', 'dot'])
+  const colors = sequence.map(s => deskLightOf(s).color)
+  assert.deepEqual(colors, ['#8e8e93', '#d62828', '#2a9d43', '#d62828'])
+})
+
+test('the server gives every cast member the unknown light until the monitor reports', async () => {
+  const cast = await withDeskStatus([wren, pia])
+  assert.deepEqual(cast.map(p => p.status), [{ state: 'unknown', note: '' }, { state: 'unknown', note: '' }])
+  assert.equal(await deskStatusSource.statusOf(wren), null)
+})
+
+test('a status source fills the light for the people it knows, and the rest stay unknown', async () => {
+  const source = {
+    async statusOf(person: OfficePerson): Promise<PersonStatus | null> {
+      return person.key === 'wren' ? { state: 'busy', note: 'Busy' } : null
+    }
+  }
+  const cast = await withDeskStatus([wren, pia], source)
+  assert.deepEqual(cast[0]?.status, { state: 'busy', note: 'Busy' })
+  assert.deepEqual(cast[1]?.status, { state: 'unknown', note: '' })
+  // The people themselves are unchanged apart from the status.
+  assert.equal(cast[0]?.name, 'Wren Worker')
+})

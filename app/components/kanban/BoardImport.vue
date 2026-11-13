@@ -95,7 +95,8 @@ function cancel() {
 </script>
 
 <template>
-  <div>
+  <!-- break-words: a name or address with no spaces (an email, a long file name) wraps instead of running past the phone edge. -->
+  <div class="min-w-0 break-words">
     <h3 class="text-sm font-semibold text-default">
       Import a backup
     </h3>
@@ -119,7 +120,7 @@ function cancel() {
     </label>
     <span
       v-if="file"
-      class="ml-2 text-xs text-muted"
+      class="ml-2 break-all text-xs text-muted"
     >{{ file.name }}</span>
 
     <p
@@ -200,7 +201,7 @@ function cancel() {
           </li>
         </ul>
       </div>
-      <div class="mt-3 flex gap-2">
+      <div class="mt-3 flex flex-wrap gap-2">
         <button
           type="button"
           class="rounded-lg bg-primary px-3 py-1.5 text-xs text-white disabled:opacity-50"

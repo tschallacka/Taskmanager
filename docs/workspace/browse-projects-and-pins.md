@@ -1,19 +1,19 @@
 ---
-title: Browse projects and pin boards
+title: All projects and pin boards
 summary: Find a project in the full list, see how much of it is open, and pin the boards you use most to the sidebar
-topics: browse projects, projects, pin, pinned boards, sidebar, archived, unarchive
+topics: all projects, projects, pin, pinned boards, sidebar, archived, unarchive
 order: 50
 ---
 
-Two things help you get to a board quickly: **Browse projects**, which lists every project of your workspace, and
+Two things help you get to a board quickly: **All projects**, which lists every project of your workspace, and
 **pins**, which keep chosen boards at the top of the sidebar.
 
-## Browse projects
+## All projects
 
-Open **Browse projects** in the sidebar. It lists the projects of the workspace you are in, newest change first.
+Open **All projects** in the sidebar. It lists the projects of the workspace you are in, newest change first.
 
 1. Type in **Find a project** to narrow the list. It matches on the project's name.
-2. Read the row: the project's name, a coloured dot when the project has a health status (green on track, amber at
+2. Read the row: the project's name, a coloured dot when the project has a health status (green on track, orange at
    risk, red off track), **Open** (tasks not marked done), **Total** (all its tasks), and **Updated** (how long ago
    it last changed, shown on wider screens).
 3. Click a row to open the board.
@@ -27,7 +27,7 @@ tasks that have not reached a finishing column of the board. The two can disagre
 <!-- requires: staff -->
 ### Archived projects
 
-An archived project leaves every list, so **Browse projects** is the one place to find it again. When there are any,
+An archived project leaves every list, so **All projects** is the one place to find it again. When there are any,
 an **Archived** section appears under the list. Its text explains the effect: archived boards still open, and their
 rules do not run until they are unarchived.
 

@@ -10,8 +10,12 @@ export const CHECKED_VERSION = '2.1.319'
 export const profilePath = (kit) => join(kit, 'claude-long-run.json')
 
 // The argument list for claude: the profile first, then whatever the owner passed.
-export function claudeArgs(kit, args = []) {
-  return ['--settings', profilePath(kit), ...args]
+// The owner's arguments follow. A session file (the PM's hooks, pia-session.settings.json) is a second --settings,
+// merged with the profile; the profile's env block is the only one.
+export function claudeArgs(kit, args = [], sessionFile = null) {
+  const extra = sessionFile ? ['--settings', sessionFile] : []
+  return ['--settings', profilePath(kit), ...extra, ...args]
+
 }
 
 // A warning when the installed Claude Code is older than the profile was checked against. The version

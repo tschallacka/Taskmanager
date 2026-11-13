@@ -1,10 +1,36 @@
 // One person in the office: a rig posed by hand every frame, a queue of errands run one after the
 // other, and a habit of their own while sitting at the desk.
 import * as THREE from 'three'
-import type { Activity, OfficePerson, Role } from '../../shared/office/model'
+import { deskLightOf } from '../../shared/office/model'
+import type { Activity, OfficePerson, PersonStatus, Role } from '../../shared/office/model'
 import type { Heading, P } from './layout'
 import type { Rig } from './meshes'
 import { buildPerson, textSprite } from './meshes'
+
+const LIGHT_RADIUS = 0.28
+
+/**
+ * The desk light: a filled dot for busy, a ring for idle, a dashed ring for unknown. The three shapes differ, so the
+ * light never relies on colour alone. Every piece carries the person's key, so hovering the light finds the person.
+ */
+function buildDeskLight(key: string): { group: THREE.Group, dot: THREE.Mesh, ring: THREE.Mesh, dashed: THREE.Group } {
+  const group = new THREE.Group()
+  const dot = new THREE.Mesh(new THREE.SphereGeometry(LIGHT_RADIUS, 16, 12), new THREE.MeshBasicMaterial())
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(LIGHT_RADIUS * 0.7, LIGHT_RADIUS * 0.28, 8, 24), new THREE.MeshBasicMaterial())
+  const dashed = new THREE.Group()
+  const dashGeometry = new THREE.SphereGeometry(LIGHT_RADIUS * 0.22, 8, 6)
+  const dashMaterial = new THREE.MeshBasicMaterial()
+  for (let i = 0; i < 8; i++) {
+    const dash = new THREE.Mesh(dashGeometry, dashMaterial)
+    dash.position.set(Math.cos(i * Math.PI / 4) * LIGHT_RADIUS * 0.7, Math.sin(i * Math.PI / 4) * LIGHT_RADIUS * 0.7, 0)
+    dashed.add(dash)
+  }
+  group.add(dot, ring, dashed)
+  group.traverse((o) => {
+    o.userData.actorKey = key
+  })
+  return { group, dot, ring, dashed }
+}
 
 // Scratch for levelDrink, shared because only one actor is posed at a time.
 const UPRIGHT = new THREE.Quaternion()
@@ -192,6 +218,9 @@ export class Actor {
   readonly rig: Rig
   readonly person: OfficePerson
   readonly label: THREE.Sprite
+  /** The desk light above the name, and what it says: "Busy: ...", "Idle since ...", or "No status yet". */
+  readonly light: { group: THREE.Group, dot: THREE.Mesh, ring: THREE.Mesh, dashed: THREE.Group }
+  statusText = 'No status yet'
   seat: P
   facing: Heading
   activity: Activity = 'idle'
@@ -255,10 +284,27 @@ export class Actor {
     this.label = textSprite(first, { bg: 'rgba(255,255,255,0.9)', fg: '#1d1d1f', height: 0.62, border: '#00000022' })
     this.label.position.y = 2.95
     this.rig.root.add(this.label)
+    this.light = buildDeskLight(person.key)
+    this.light.group.position.set(0.95, 2.95, 0)
+    this.rig.root.add(this.light.group)
+    this.setStatus(person.status)
     this.rig.root.position.set(seat.x, 0, seat.z)
     this.rig.root.rotation.y = facing
     this.rig.root.traverse((o) => {
       o.userData.actorKey = person.key
+    })
+  }
+
+  /** The desk light follows the status: a dot for busy, a ring for idle, a dashed ring while unknown. */
+  setStatus(status: PersonStatus | undefined): void {
+    const { color, shape, text } = deskLightOf(status)
+    this.statusText = text
+    this.light.dot.visible = shape === 'dot'
+    this.light.ring.visible = shape === 'ring'
+    this.light.dashed.visible = shape === 'dashed'
+    this.light.group.traverse((o) => {
+      const material = (o as THREE.Mesh).material as THREE.MeshBasicMaterial | undefined
+      material?.color.set(color)
     })
   }
 

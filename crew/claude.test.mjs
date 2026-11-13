@@ -32,6 +32,10 @@ test('every variable the README section names is in the profile', () => {
   for (const v of vars) assert.ok(v in profile.env, `${v} is named in the README but not in the profile`)
 })
 
+test('a session file is a second --settings, after the profile and before the owner arguments', () => {
+  assert.deepEqual(claudeArgs(kit, ['--continue'], '/x/pia-session.settings.json'), ['--settings', profilePath(kit), '--settings', '/x/pia-session.settings.json', '--continue'])
+})
+
 test('the wrapper passes the profile first, then the owner arguments', () => {
   assert.deepEqual(claudeArgs(kit, ['--continue']), ['--settings', profilePath(kit), '--continue'])
   assert.deepEqual(claudeArgs(kit), ['--settings', profilePath(kit)])
@@ -52,7 +56,7 @@ test('an unreadable version says so', () => {
 
 test('the PM session file has the profile env and its listener hooks, and nothing else the profile lacks', () => {
   const pia = JSON.parse(readFileSync(join(kit, 'pia-session.settings.json'), 'utf8'))
-  assert.deepEqual(pia.env, profile.env, 'the env block is the same as the profile')
+  assert.equal(pia.env, undefined, 'the env block lives only in claude-long-run.json, passed with the PM file')
   const commands = JSON.stringify(pia.hooks)
   assert.match(commands, /pia-listener-hook\.sh\\" stop/)
   assert.match(commands, /pia-listener-hook\.sh\\" sessionstart/)

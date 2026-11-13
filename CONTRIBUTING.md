@@ -26,6 +26,12 @@ Keep changes focused and preserve compatibility with existing persisted notes. D
 - The import's schema changes are additive: `task_comments.author_label`, `task_activity.author_label` and the `board_imports` table. Tests run against a scratch database, never the shared one.
 - Documentation: [Import a board backup](docs/team/board-import.md) and [Back up a board](docs/team/board-backup.md).
 
+## Changelog
+
+Every change adds one fragment file, `changelog.d/<card-id>-<slug>.md`, holding its entry: one bullet with the bold lead sentence and the detail, as the entries read in `CHANGELOG.md` (for example `- **Title.** Detail.`). Do not edit `CHANGELOG.md` itself: two changes that each add a line at its top conflict on the same lines, and the fragments keep them apart. One change, one file. A fragment that does not start with a bullet is refused by the fold.
+
+The publisher folds the fragments into `CHANGELOG.md` under the new version heading (`## <version> - <date>`, newest version first), deletes them, and commits that together with the version bump. `node scripts/bump-version.mjs changelog --dry-run` shows what would fold. Worker branches carry a fragment. The merger's publish pull request carries the folded `CHANGELOG.md` instead: `CHANGELOG.md` changed and its fragments deleted, because the fold runs before that pull request is opened. The `changelog-fragment` check accepts either, and prints which rule passed (`rule: fragment added`, `rule: folded changelog`, or `rule: not needed` for a change that touches only Markdown, `docs/`, `nix/hashes.json` or `flake.lock`). A hand edit of `CHANGELOG.md` alone, or a code change with no fragment, fails it. The rule itself is `node scripts/bump-version.mjs changelog-check`, which reads `git diff --name-status` lines on stdin.
+
 ## Releases
 
 `scripts/bump-version.mjs` is the one place that changes the version. Pick the kind of change by what it means:

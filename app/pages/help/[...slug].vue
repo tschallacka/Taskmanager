@@ -113,6 +113,14 @@ const crumb = computed(() => (page.value ? groupLabel(docs.value.find(d => d.slu
     class="mx-auto flex w-full max-w-6xl gap-8 px-4 py-6 sm:px-6"
     data-help-page
   >
+    <Teleport
+      defer
+      to="#app-topbar-title"
+    >
+      <h1 class="text-base font-semibold text-default">
+        Help
+      </h1>
+    </Teleport>
     <nav
       class="hidden w-60 shrink-0 space-y-4 lg:block"
       aria-label="Help pages"

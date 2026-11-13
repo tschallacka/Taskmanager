@@ -39,6 +39,16 @@ a task, a message, a chat or a repository.
 ## If you lose a key
 
 There is no way to see it again. Make a new key, put it where the agent reads it, then revoke the old one (below).
+You can also give a key a new secret: see [Regenerate a key's secret](#regenerate-a-keys-secret).
+
+## Regenerate a key's secret
+
+1. Under **Active keys**, open the key and press **Regenerate key**, then **Regenerate** in the box that names it.
+2. The old secret stops working at once. The name, the permissions and the boards stay.
+3. The new secret is shown once, with the setup command that puts it in place, in the key's own row under its buttons. Copy it now. The row scrolls into view; the box at the top of the page is for a new connection only.
+
+**Show prompt** on an open key shows the same setup command without a secret, with a placeholder. Regenerate the key to
+get a secret to paste.
 
 ## Read the list
 
@@ -55,8 +65,9 @@ can lag a little.
 
 ## Revoke a key
 
-1. Under **Active keys**, press the trash icon at the end of the key's row.
-2. The key is deleted at once. Anything still using it stops working on its next request, and gets "Invalid or
+1. Under **Active keys**, press **Revoke** on the key's row. You can also open the key and press **Revoke** there.
+2. The box names the key, its first characters and when it was last used. Press **Revoke** in the box to confirm.
+3. The key is revoked at once. Anything still using it stops working on its next request, and gets "Invalid or
    missing API key".
 
 Revoking cannot be undone. If you revoked the wrong key, make a new one and give it to the agent.

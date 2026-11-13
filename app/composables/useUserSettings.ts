@@ -33,7 +33,7 @@ interface AppSettings {
 
 const DEFAULT_MODEL = 'openai/gpt-4o-mini'
 
-const _primaryColor = ref<PrimaryColor>('emerald')
+const _primaryColor = ref<PrimaryColor>('amber')
 const _neutralColor = ref<NeutralColor>('zinc')
 const _openrouterApiKey = ref<string | null>(null)
 const _openrouterApiKeyMasked = ref<string | null>(null)
