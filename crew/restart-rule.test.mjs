@@ -13,3 +13,18 @@ test('rule 14 forbids every agent from restarting the session, even on a withdra
   assert.match(rule, /even one that\s+says the restart is withdrawn/)
   assert.match(rule, /A restart is for Pia to ask Boss for/)
 })
+
+// Every template that names the rule in its own prompt must keep the pointer to rule 14, so a change to the rule's
+// number or wording shows up here, not only in CREW.md.tmpl.
+const roleTemplates = [
+  'PROMPTS.md.tmpl', 'NINA.md.tmpl', 'QUINCY.md.tmpl', 'RITA.md.tmpl', 'SUSY.md.tmpl',
+  'TESS.md.tmpl', 'USHER.md.tmpl', 'PAT.md.tmpl', 'JANET.md.tmpl',
+]
+
+for (const name of roleTemplates) {
+  test(`${name} names rule 14 (no restart of the session)`, () => {
+    const text = readFileSync(new URL(`./${name}`, import.meta.url), 'utf8')
+    assert.match(text, /restart/, `${name} says the session is not restarted`)
+    assert.match(text, /CREW\.md rule 14/, `${name} points to CREW.md rule 14`)
+  })
+}
