@@ -11,7 +11,9 @@ import { fileURLToPath } from 'node:url'
 const KIT = dirname(fileURLToPath(import.meta.url))
 const SCRATCH = mkdtempSync(join(tmpdir(), 'pia-claude-'))
 const made = [SCRATCH]
-process.on('exit', () => { for (const dir of made) rmSync(dir, { recursive: true, force: true }) })
+process.on('exit', () => {
+  for (const dir of made) rmSync(dir, { recursive: true, force: true })
+})
 
 function crewIn(home) {
   const dir = join(home, 'crew-home', 'acme')

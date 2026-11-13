@@ -61,8 +61,14 @@ test('crew up starts a recorded session that is not running, wakes it once, and 
   const out = await upSessions(home, {
     promptsText: PROMPTS,
     listAgents: () => agents,
-    start: ({ key, folder, role }) => { started.push({ key, folder, role }); return { ok: true, id: 'cc000003' } },
-    wake: async ({ key, id, text }) => { woken.push({ key, id, text }); return { ok: true, reason: 'woke' } }
+    start: ({ key, folder, role }) => {
+      started.push({ key, folder, role })
+      return { ok: true, id: 'cc000003' }
+    },
+    wake: async ({ key, id, text }) => {
+      woken.push({ key, id, text })
+      return { ok: true, reason: 'woke' }
+    }
   })
   assert.deepEqual(out.lines, ['wick: already running (bb000002)', 'wren: started (cc000003), woke once'])
   assert.equal(out.ok, true)
@@ -76,7 +82,10 @@ test('crew up refuses a recorded id that is not a session id, and starts nothing
   const evil = 'a1b2c3d4;touch /tmp/pwned'
   const home = homeWith({ wren: { id: evil, folder: '/work/wren' } })
   let started = 0
-  const out = await upSessions(home, { promptsText: PROMPTS, listAgents: () => [], start: () => { started += 1; return { ok: true } }, wake: async () => ({ ok: true }) })
+  const out = await upSessions(home, { promptsText: PROMPTS, listAgents: () => [], start: () => {
+    started += 1
+    return { ok: true }
+  }, wake: async () => ({ ok: true }) })
   assert.equal(started, 0)
   assert.equal(out.ok, false)
   assert.match(out.lines[0], /not a session id/)
@@ -85,7 +94,10 @@ test('crew up refuses a recorded id that is not a session id, and starts nothing
 test('crew up reports a key with no worker role as failed, and does not start it with a guessed role', async () => {
   const home = homeWith({ pia: { id: DEAD_ID, folder: '/work/pia' } })
   let started = 0
-  const out = await upSessions(home, { promptsText: PROMPTS, listAgents: () => [], start: () => { started += 1; return { ok: true } }, wake: async () => ({ ok: true }) })
+  const out = await upSessions(home, { promptsText: PROMPTS, listAgents: () => [], start: () => {
+    started += 1
+    return { ok: true }
+  }, wake: async () => ({ ok: true }) })
   assert.equal(started, 0)
   assert.equal(out.lines[0], 'pia: failed: no worker role for this key; not started')
   assert.equal(out.ok, false)
@@ -108,7 +120,10 @@ test('crew down stops each running recorded session by its id, and says not runn
   const stopped = []
   const out = downSessions(home, {
     listAgents: () => agents,
-    stop: ({ key }) => { stopped.push(key); return { ok: true, id: LIVE_ID } }
+    stop: ({ key }) => {
+      stopped.push(key)
+      return { ok: true, id: LIVE_ID }
+    }
   })
   assert.deepEqual(stopped, ['wick'])
   assert.deepEqual(out.lines, ['wick: stopped (bb000002)', 'wren: not running'])
@@ -158,7 +173,10 @@ test('crew up starts a session with the role file, which holds both the section 
     promptsText: PROMPTS,
     crewText: CREW_MD,
     listAgents: () => [],
-    start: ({ role: r }) => { role = r; return { ok: true, id: 'cc000005' } },
+    start: ({ role: r }) => {
+      role = r
+      return { ok: true, id: 'cc000005' }
+    },
     wake: async () => ({ ok: true, reason: 'woke' })
   })
   assert.match(role, /chat nick `Wynn Worker`/)
