@@ -1,4 +1,4 @@
-// The 10-minute management token: the crew token a person makes from the sidebar ("Get AI management token").
+// The 10-minute management token: the crew token a person makes from the sidebar ("Put an AI crew to work on this board").
 // It is an API key of kind 'management' bound to ONE board: its team, and crews:manage on that board only.
 // It expires after 10 minutes (expires_at, refused by authenticateApiKey with token_expired), and it never has
 // more rights than its owner has now: the crew permission and the owner-or-admin role of the board's team are

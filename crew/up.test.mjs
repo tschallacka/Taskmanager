@@ -32,7 +32,10 @@ test('a part down is started, and its check passes again', () => {
   const runner = (command) => {
     log.push(command)
     if (command === 'check-pia') return { ok: started, status: started ? 0 : 1, stderr: '' }
-    if (command === 'start-pia') { started = true; return { ok: true, status: 0, stderr: '' } }
+    if (command === 'start-pia') {
+      started = true
+      return { ok: true, status: 0, stderr: '' }
+    }
     return { ok: false, status: 1, stderr: '' }
   }
   const result = upParts([{ name: 'Pia', check: 'check-pia', start: 'start-pia' }], { runner, remove: () => {} })

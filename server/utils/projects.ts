@@ -1,6 +1,6 @@
 import type { H3Event } from 'h3'
 import { db } from '../db'
-import { projects, projectColumns, projectTasks } from '../db/schema'
+import { projects, projectColumns, projectTasks, user } from '../db/schema'
 import { eq, and, asc, isNull } from 'drizzle-orm'
 import { audienceFor, customerIdsOf, getUserActiveTeamId, sessionProjectFilter } from './auth-helpers'
 import type { Audience } from './auth-helpers'
@@ -39,7 +39,10 @@ async function audienceOf(event: H3Event, project: { userId: string, teamId: str
 // One more way in: the staff of a real board may READ the shadow board its crew keeps in another
 // team. That board comes back as `readOnly`, and every request that is not a read is refused here,
 // for every endpoint at once. A customer has no team, so never reaches it.
-export async function requireProject(event: H3Event, projectId: string) {
+//
+// `instanceAdminMayWrite`: the one route that lets the instance admin change a crew's shadow board on top of reading it:
+// loading a backup into it (POST /api/projects/:id/import). Every other write still stops here.
+export async function requireProject(event: H3Event, projectId: string, options: { instanceAdminMayWrite?: boolean } = {}) {
   const filter = await getProjectAccessFilter(event)
   const [project] = await db
     .select()
@@ -53,9 +56,18 @@ export async function requireProject(event: H3Event, projectId: string) {
   const shadow = hidden.has(projectId) ? null : await shadowBoardForStaff(await getUserActiveTeamId(event), projectId)
   if (!shadow) throw createError({ statusCode: 404, message: 'Project not found' })
   if (!['GET', 'HEAD'].includes(event.method)) {
+    if (options.instanceAdminMayWrite && (await isInstanceAdminUser(event.context.session.user.id))) {
+      return { ...shadow, audience: 'staff' as Audience, readOnly: false }
+    }
     throw createError({ statusCode: 403, message: 'This is a crew board. You can read it, not change it.' })
   }
   return { ...shadow, audience: 'staff' as Audience, readOnly: true }
+}
+
+/** Whether the account is the instance admin (read here, because crewPermission imports modules that import this one). */
+async function isInstanceAdminUser(userId: string): Promise<boolean> {
+  const [row] = await db.select({ isInstanceAdmin: user.isInstanceAdmin }).from(user).where(eq(user.id, userId))
+  return Boolean(row?.isInstanceAdmin)
 }
 /**
  * Stops a customer contact at a change only staff may make. Contacts can read

@@ -47,5 +47,5 @@ Taking a crew off a board ends the link. The crew board is archived (and renamed
 recognise), and any forked members are removed. Your real board is not touched.
 
 <!-- requires: team-admin -->
-How to give a board a crew and take it off again: [Give a board a crew](/help/crews/give-a-board-a-crew).
+How to add a crew to a board and take it off again: [Put an AI crew to work on this board](/help/crews/give-a-board-a-crew).
 <!-- /requires -->

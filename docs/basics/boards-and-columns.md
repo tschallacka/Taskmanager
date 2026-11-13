@@ -43,6 +43,26 @@ Under the board's name is a row of tabs. They are different ways of looking at t
 **Settings** is the cog at the top right, next to **Share**. The **...** menu (*Project options*) next to it holds
 *Rename project*, *Settings* and, when something has been deleted, *Show trashed*.
 
+## The List tab
+
+The List tab shows the board's tasks as rows, one section per column (a section collapses when you click its name).
+Above the rows:
+
+- **Group by** puts the rows in their columns, or one section per person (*Assignee*).
+- **Sort** orders each section by due date, or by title.
+- **Columns** shows or hides *Assignee*, *Due*, *Labels* and *Time* for the board. Your choice is remembered in this
+  browser, for this board.
+
+Most cells change in place, with no need to open the task:
+
+- Click a task's **title** to rename it. Press Enter, or click elsewhere, to save; Escape keeps the old title.
+- Click the **person** to change the assignee, or to choose *Unassigned*.
+- Pick a **date** in the due cell. Clear it to remove the due date.
+- Click the **labels** to type them, separated by commas.
+- Click **+ time** (or the logged time) to log time on the task. Type `1h 30m`, `1:30` or `45m`.
+
+On a phone the same cells sit under the title of each row, so nothing is left out.
+
 ## The numbers in the header
 
 The header shows something like **8/47 tasks**: 8 open of 47 in total. Hover it for the words. "Open" is worked out
@@ -55,7 +75,7 @@ from the columns, not from the done mark:
 - A board with a single column has no ending, so it shows the plain total.
 
 Tasks in an ending column are not counted as open. The same count is shown under each board's name in the sidebar.
-The *Browse projects* page counts differently: it counts a task as open until it has the **done mark**.
+The *All projects* page counts differently: it counts a task as open until it has the **done mark**.
 
 ## Good to know
 

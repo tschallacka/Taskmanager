@@ -4,7 +4,7 @@
 // owner can open at that moment.
 import { and, eq, inArray, isNull, or } from 'drizzle-orm'
 import { db } from '../db'
-import { agentAudit, apiKeyBoards, apiKeyWorkspaces, apiKeys, member, organization, projects, user } from '../db/schema'
+import { agentAudit, apiKeyBoards, apiKeyWorkspaces, apiKeys, member, organization, projects } from '../db/schema'
 import type { ApiKey } from '../db/schema'
 import { keyReachOf } from './api-keys'
 import type { KeyReach } from './api-keys'
@@ -14,6 +14,7 @@ import type { GrantContext } from './crewBoardAccess'
 import { guestProjectIdsOf } from './guests'
 import { openBoardScope } from './mcpAccess'
 import { workspaceTopic } from './realtime'
+import { crewIdOfUser } from './boardTree'
 import { genId } from './projects'
 
 /** What the owner picked. A null workspace is the personal workspace. */
@@ -221,11 +222,11 @@ export async function reachedBoardsOf(userId: string, keys: ApiKey[]): Promise<M
   const result = new Map<string, ReachedBoard[]>()
   if (!keys.length) return result
   const keyIds = keys.map(key => key.id)
-  const [workspaces, customerIds, guestIds, [account], keyWorkspaceRows, keyBoardRows] = await Promise.all([
+  const [workspaces, customerIds, guestIds, crewId, keyWorkspaceRows, keyBoardRows] = await Promise.all([
     workspacesOf(userId),
     customerIdsOf(userId),
     guestProjectIdsOf(userId),
-    db.select({ crewId: user.crewId }).from(user).where(eq(user.id, userId)),
+    crewIdOfUser(userId),
     db.select({ keyId: apiKeyWorkspaces.keyId, teamId: apiKeyWorkspaces.teamId }).from(apiKeyWorkspaces).where(inArray(apiKeyWorkspaces.keyId, keyIds)),
     db.select({ keyId: apiKeyBoards.keyId, projectId: apiKeyBoards.projectId }).from(apiKeyBoards).where(inArray(apiKeyBoards.keyId, keyIds))
   ])
@@ -240,7 +241,7 @@ export async function reachedBoardsOf(userId: string, keys: ApiKey[]): Promise<M
     customerId: key.customerId,
     memberTeamIds: owner.memberTeamIds
   })
-  const crewLinks = account?.crewId ? await crewLinksOf(account.crewId) : []
+  const crewLinks = crewId ? await crewLinksOf(crewId) : []
   const shadowTeams = keys.map(key => shadowTeamOf(grantOf(key))).filter((teamId): teamId is string => teamId !== null)
   const shadowsByTeam = await shadowBoardsOfTeams(shadowTeams, userId)
   const crewGranted = new Map<string, string[]>(keys.map((key) => {

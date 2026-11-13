@@ -21,7 +21,10 @@ SUSY.md.tmpl
 TESS.md.tmpl
 USHER.md.tmpl
 WORKFLOW.md
+activity.mjs
 board-call.mjs
+boss-session.mjs
+boss-stop-hook.sh
 browser-driver.mjs
 browser.mjs
 cast.mjs
@@ -37,12 +40,18 @@ home.mjs
 init.mjs
 janet.mjs
 keys.mjs
+listen-state.mjs
 listen.mjs
+mail-client.mjs
 mentions.mjs
 package.json
+people.mjs
+pia-listener-hook.sh
+pia-session.mjs
 postbrief.mjs
 publish.mjs
 restart-brief.mjs
+session-hooks.mjs
 setup.mjs
 susy.mjs
 tm.mjs
@@ -50,5 +59,6 @@ totp.mjs
 unslop.SKILL.md
 up.mjs
 update.mjs
+watch-crew.mjs
 watch.mjs
 watchlogs.mjs

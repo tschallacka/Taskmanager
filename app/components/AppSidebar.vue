@@ -1,7 +1,10 @@
 <script setup lang="ts">
-const emit = defineEmits<{ close: [] }>()
+import { healthTint, kindIcon } from '~/utils/projectKind'
+
+const props = withDefaults(defineProps<{ collapsed?: boolean }>(), { collapsed: false })
+const emit = defineEmits<{ 'close': [], 'toggle-rail': [] }>()
 const searchOpen = useSearchModal()
-const { session, signOut } = useAuth()
+const { session, signOut, isInstanceAdmin } = useAuth()
 const colorMode = useColorMode()
 const userInitials = computed(() => {
   const name = session.value?.user?.name
@@ -9,13 +12,39 @@ const userInitials = computed(() => {
   return name.split(' ').map((part: string) => part[0]).join('').slice(0, 2).toUpperCase()
 })
 
-const isDark = computed(() => colorMode.value === 'dark')
+// The three-way Appearance row: System, Dark, Light. The current choice shows a tick.
+const APPEARANCE = [
+  { value: 'system', label: 'System' },
+  { value: 'dark', label: 'Dark' },
+  { value: 'light', label: 'Light' }
+] as const
+const appearanceNow = computed(() => APPEARANCE.find(a => a.value === colorMode.preference)?.label ?? 'System')
+const appearanceItems = computed(() => APPEARANCE.map(a => ({
+  label: a.label,
+  icon: colorMode.preference === a.value ? 'i-lucide-check' : 'i-lucide-minus',
+  onSelect: () => {
+    colorMode.preference = a.value
+  }
+})))
 
-function toggleColorMode() {
-  colorMode.preference = isDark.value ? 'light' : 'dark'
-}
+// The Planning and Team groups of the sidebar: each link keeps its own route.
+const planningLinks = [
+  { label: 'Goals', icon: 'i-lucide-target', to: '/projects/goals' },
+  { label: 'Portfolios', icon: 'i-lucide-briefcase', to: '/projects/portfolios' },
+  { label: 'Timesheet', icon: 'i-lucide-clock', to: '/projects/timesheet' }
+]
+// Crews and agents is the instance admin's page: nobody else sees the link.
+const teamLinks = computed(() => [
+  { label: 'Members and customers', icon: 'i-lucide-users', to: '/team' },
+  ...(isInstanceAdmin.value ? [{ label: 'Crews and agents', icon: 'i-lucide-bot', to: '/admin/crews' }] : [])
+])
 
 const accountItems = computed(() => [[
+  {
+    label: 'Profile',
+    icon: 'i-lucide-user-round',
+    onSelect: () => navigateTo('/projects/profile')
+  },
   {
     label: 'Settings',
     icon: 'i-lucide-settings',
@@ -25,12 +54,14 @@ const accountItems = computed(() => [[
     label: 'Help',
     icon: 'i-lucide-life-buoy',
     onSelect: () => navigateTo('/help')
-  },
-  {
-    label: isDark.value ? 'Light mode' : 'Dark mode',
-    icon: isDark.value ? 'i-lucide-sun' : 'i-lucide-moon',
-    onSelect: toggleColorMode
   }
+], [
+  {
+    label: `Appearance: ${appearanceNow.value}`,
+    icon: 'i-lucide-sun-moon',
+    type: 'label' as const
+  },
+  ...appearanceItems.value
 ], [
   {
     label: 'Sign out',
@@ -44,6 +75,33 @@ async function newProject() {
   navigateTo('/projects?new=1')
 }
 
+// The rail's project icons: the pinned boards (eight at most), each with its kind icon and health tint.
+// The rail has no project list, so the pins load here.
+const { pins, pinsLoaded, loadPins } = usePins()
+const { projects } = useProjects()
+const { switchWorkspace } = useWorkspace()
+onMounted(() => {
+  if (!pinsLoaded.value) loadPins().catch(() => {})
+})
+// The kind icon and the health tint come from the shared module, the same as the project list's rows.
+const railPins = computed(() => pins.value.slice(0, 8).map((pin) => {
+  const project = projects.value.find(p => p.id === pin.projectId)
+  const active = route.params.id === pin.projectId
+  return {
+    pin,
+    name: project?.name ?? pin.name,
+    icon: project ? kindIcon(project) : 'i-lucide-kanban',
+    tint: healthTint(project ?? {}, active),
+    active
+  }
+}))
+
+// A pin in another workspace switches to it first, as the pinned rows of the list do.
+async function openRailPin(pin: { projectId: string, teamId: string | null }) {
+  await switchWorkspace(pin.teamId)
+  await navigateTo(`/projects/${pin.projectId}`)
+}
+
 const route = useRoute()
 
 // Closes the mobile sidebar drawer once navigation actually lands somewhere.
@@ -51,67 +109,201 @@ watch(() => route.path, () => emit('close'))
 </script>
 
 <template>
-  <div class="flex h-full min-h-0 flex-col overflow-hidden bg-default">
-    <div class="flex shrink-0 items-center gap-3 px-4 pb-3 pt-4">
-      <AppLogo class="min-w-0 flex-1 text-xl" />
+  <div
+    class="flex h-full min-h-0 flex-col overflow-hidden bg-default"
+    :data-rail="props.collapsed ? 'true' : undefined"
+  >
+    <!-- The rail: 64 px, icons only. Every control of the wide sidebar keeps its place here. -->
+    <div
+      v-if="props.collapsed"
+      class="flex min-h-0 flex-1 flex-col items-center gap-2 py-3"
+    >
       <UButton
-        icon="i-lucide-kanban"
+        icon="i-lucide-panel-left-open"
+        size="sm"
+        color="neutral"
+        variant="ghost"
+        aria-label="Expand the sidebar"
+        @click="emit('toggle-rail')"
+      />
+      <UButton
+        icon="i-lucide-plus"
         size="sm"
         color="primary"
-        variant="soft"
-        aria-label="New project"
-        class="shrink-0 rounded-lg"
+        aria-label="New"
+        class="rounded-lg"
         @click="newProject()"
       />
-    </div>
-
-    <div class="shrink-0 space-y-2 px-3 pb-2">
-      <button
-        class="flex w-full items-center gap-2.5 rounded-lg border border-default bg-elevated/40 px-3 py-2 text-sm text-muted transition-colors hover:bg-elevated hover:text-default"
+      <UButton
+        icon="i-lucide-search"
+        size="sm"
+        color="neutral"
+        variant="ghost"
+        aria-label="Search tasks and boards"
         @click="searchOpen = true"
+      />
+      <div
+        v-if="railPins.length"
+        class="flex flex-col items-center gap-1 border-t border-default pt-2"
+        data-rail-projects
       >
-        <UIcon
-          name="i-lucide-search"
-          class="size-4 shrink-0"
-        />
-        <span class="min-w-0 flex-1 truncate text-left">Search tasks and boards…</span>
-        <UKbd
-          value="meta"
+        <UButton
+          v-for="item in railPins"
+          :key="item.pin.projectId"
+          :icon="item.icon"
           size="sm"
+          color="neutral"
+          variant="ghost"
+          :class="item.active ? 'bg-elevated' : ''"
+          :ui="{ leadingIcon: item.tint }"
+          :aria-label="item.name"
+          :title="item.name"
+          :aria-current="item.active ? 'page' : undefined"
+          :data-rail-project="item.pin.projectId"
+          @click="openRailPin(item.pin)"
         />
-        <UKbd
-          value="K"
-          size="sm"
-        />
-      </button>
-    </div>
-
-    <div class="min-h-0 flex-1 overflow-y-auto p-2">
-      <ProjectsListPanel />
-    </div>
-
-    <div class="shrink-0 space-y-1.5 border-t border-default p-2">
-      <TeamSwitcher />
+      </div>
+      <!-- On the rail the avatar opens the same account menu as the wide sidebar's account row. -->
       <UDropdownMenu
         :items="accountItems"
-        :content="{ align: 'start', collisionPadding: 12 }"
-        :ui="{ content: 'w-(--reka-dropdown-menu-trigger-width) min-w-48' }"
+        :content="{ align: 'start', side: 'right', collisionPadding: 12 }"
       >
-        <button class="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-sm text-muted transition-colors hover:bg-elevated hover:text-default">
+        <button
+          class="mt-auto mb-1 rounded-full"
+          aria-label="Account menu"
+        >
           <UAvatar
             :alt="userInitials"
             size="xs"
             class="shrink-0"
           />
-          <span class="min-w-0 flex-1 truncate text-left text-xs">
-            {{ session?.user?.name ?? session?.user?.email }}
-          </span>
-          <UIcon
-            name="i-lucide-chevrons-up-down"
-            class="size-3.5 shrink-0 opacity-50"
-          />
         </button>
       </UDropdownMenu>
     </div>
+
+    <template v-else>
+      <div class="flex shrink-0 items-center gap-2 px-3 pb-3 pt-4">
+        <AppLogo class="min-w-0 flex-1 text-xl" />
+        <!-- Instance settings: the instance admin only. Everyone else sees no gear. -->
+        <UButton
+          v-if="isInstanceAdmin"
+          to="/admin/settings"
+          icon="i-lucide-settings"
+          size="sm"
+          color="neutral"
+          variant="ghost"
+          aria-label="Instance settings"
+          title="Instance settings"
+          class="shrink-0 rounded-lg"
+        />
+        <UButton
+          icon="i-lucide-panel-left-close"
+          size="sm"
+          color="neutral"
+          variant="ghost"
+          aria-label="Collapse the sidebar to a rail"
+          class="shrink-0"
+          @click="emit('toggle-rail')"
+        />
+      </div>
+
+      <div class="shrink-0 space-y-2 px-3 pb-2">
+        <UButton
+          block
+          icon="i-lucide-plus"
+          label="New"
+          color="primary"
+          aria-label="New"
+          class="rounded-lg"
+          @click="newProject()"
+        />
+        <button
+          class="flex w-full items-center gap-2.5 rounded-lg border border-default bg-elevated/40 px-3 py-2 text-sm text-muted transition-colors hover:bg-elevated hover:text-default"
+          @click="searchOpen = true"
+        >
+          <UIcon
+            name="i-lucide-search"
+            class="size-4 shrink-0"
+          />
+          <span class="min-w-0 flex-1 truncate text-left">Search</span>
+          <UKbd
+            value="meta"
+            size="sm"
+          />
+          <UKbd
+            value="K"
+            size="sm"
+          />
+        </button>
+      </div>
+
+      <div class="min-h-0 flex-1 overflow-y-auto p-2">
+        <ProjectsListPanel />
+
+        <section
+          class="mt-3 space-y-0.5"
+          aria-label="Planning"
+        >
+          <h2 class="px-2 pb-1 text-xs font-medium uppercase tracking-wide text-muted">
+            Planning
+          </h2>
+          <UButton
+            v-for="link in planningLinks"
+            :key="link.to"
+            :to="link.to"
+            :icon="link.icon"
+            :label="link.label"
+            variant="ghost"
+            color="neutral"
+            block
+            class="justify-start"
+          />
+        </section>
+
+        <section
+          class="mt-3 space-y-0.5"
+          aria-label="Team"
+        >
+          <h2 class="px-2 pb-1 text-xs font-medium uppercase tracking-wide text-muted">
+            Team
+          </h2>
+          <UButton
+            v-for="link in teamLinks"
+            :key="link.to"
+            :to="link.to"
+            :icon="link.icon"
+            :label="link.label"
+            variant="ghost"
+            color="neutral"
+            block
+            class="justify-start"
+          />
+        </section>
+      </div>
+
+      <div class="shrink-0 space-y-1.5 border-t border-default p-2">
+        <TeamSwitcher />
+        <UDropdownMenu
+          :items="accountItems"
+          :content="{ align: 'start', collisionPadding: 12 }"
+          :ui="{ content: 'w-(--reka-dropdown-menu-trigger-width) min-w-48' }"
+        >
+          <button class="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-sm text-muted transition-colors hover:bg-elevated hover:text-default">
+            <UAvatar
+              :alt="userInitials"
+              size="xs"
+              class="shrink-0"
+            />
+            <span class="min-w-0 flex-1 truncate text-left text-xs">
+              {{ session?.user?.name ?? session?.user?.email }}
+            </span>
+            <UIcon
+              name="i-lucide-chevrons-up-down"
+              class="size-3.5 shrink-0 opacity-50"
+            />
+          </button>
+        </UDropdownMenu>
+      </div>
+    </template>
   </div>
 </template>

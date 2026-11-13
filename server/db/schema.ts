@@ -151,6 +151,12 @@ export const instanceSettings = pgTable('instance_settings', {
   sprocketInstanceDailyCap: integer('sprocket_instance_daily_cap').notNull().default(2000),
   // The site default manner, used when a person has picked none (see sprocketManner.ts).
   sprocketDefaultManner: text('sprocket_default_manner').notNull().default('professional'),
+  // Claude Code for everyone (Instance settings). SPROCKET_CLAUDE_FOR_ALL in the environment still decides when it is set.
+  sprocketClaudeForAll: boolean('sprocket_claude_for_all').notNull().default(false),
+  // Branding (Instance settings): the app name shown next to the logo, and an uploaded logo as SVG text. Null means
+  // the defaults: "Taskmanager" and the logo that ships with the app (public/logo.svg).
+  brandName: text('brand_name'),
+  brandLogoSvg: text('brand_logo_svg'),
   updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
   updatedBy: text('updated_by').references(() => user.id, { onDelete: 'set null' })
 })
@@ -1436,6 +1442,30 @@ export const crewBoards = pgTable(
 )
 
 export type CrewBoard = typeof crewBoards.$inferSelect
+
+// The crew's mail, kept until the recipient's mailer has delivered it (acked). A person's mailer fetches its pending
+// mail once a minute and acks each one it delivered. The sender is never taken from the body: from_key is the
+// sender account's person key. Delivered mail older than 7 days and undelivered older than 30 days are deleted on
+// write (see server/utils/crewMail.ts). No `read` column: not needed (Boss, 2026-11-12).
+export const crewMail = pgTable(
+  'crew_mail',
+  {
+    id: text('id').primaryKey(),
+    crewId: text('crew_id').notNull().references(() => crews.id, { onDelete: 'cascade' }),
+    fromKey: text('from_key').notNull(),
+    toKey: text('to_key').notNull(),
+    text: text('text').notNull(),
+    created: bigint('created', { mode: 'number' }).notNull(),
+    delivered: bigint('delivered', { mode: 'number' })
+  },
+  table => [
+    index('crew_mail_pending_idx').on(table.crewId, table.toKey, table.delivered),
+    // The per-minute send count (sendsInLastMinute) filters on the sender and the time: without this it scans the crew.
+    index('crew_mail_sender_idx').on(table.crewId, table.fromKey, table.created)
+  ]
+)
+
+export type CrewMail = typeof crewMail.$inferSelect
 
 // A member of a crew forked for one board (Q36): its own account and key, named for the board
 // (`internal-tools-wren`), with a key limited to that board's shadow board. The account belongs to the
