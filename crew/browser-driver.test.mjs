@@ -16,8 +16,9 @@ import { join, resolve } from 'node:path'
 import { after, describe, test } from 'node:test'
 import { once } from 'node:events'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { removeWhenUnused } from './browser-cleanup.mjs'
 import {
-  acquireLock, BrowserError, chromeArgs, encodeFrame, findChromium, formatDuration, idleNote, lockDecision, Mutex,
+  acquireLock, acquireLockWaiting, BrowserError, chromeArgs, encodeFrame, retryAfterReattach, findChromium, formatDuration, idleNote, lockDecision, Mutex,
   checkDirectory, checkSendMethod, checkShotPath, keepLock, openDirectory, parseCli, parseRequest, pidAlive, request, releaseLock, sameFolder, serve, shotRoots,
   socketPathFits, splitFrames, validWho, withTimeout
 } from './browser-driver.mjs'
@@ -230,6 +231,119 @@ describe('the lock', () => {
     }
   })
 
+  test('a command whose CDP session is gone re-attaches and repeats, at most twice; other errors are not retried', async () => {
+    // The fake reply is the one Chrome sends when the page was detached under the command.
+    const gone = () => Object.assign(new Error('Session with given id not found.'), { name: 'CdpError' })
+    let calls = 0
+    let reattached = 0
+    const recovered = await retryAfterReattach(async () => {
+      calls++
+      if (calls <= 2) throw gone()
+      return 'ok'
+    }, async () => { reattached++ })
+    assert.equal(recovered, 'ok')
+    assert.equal(calls, 3, 'the command ran, lost its session twice, and ran again')
+    assert.equal(reattached, 2)
+
+    calls = 0
+    reattached = 0
+    await assert.rejects(
+      retryAfterReattach(async () => {
+        calls++
+        throw gone()
+      }, async () => {
+        reattached++
+      }),
+      /Session with given id not found/
+    )
+    assert.equal(calls, 3, 'one run and two repeats, then it gives up')
+    assert.equal(reattached, 2)
+
+    calls = 0
+    reattached = 0
+    await assert.rejects(
+      retryAfterReattach(async () => {
+        calls++
+        throw new Error('something else went wrong')
+      }, async () => {
+        reattached++
+      }),
+      /something else went wrong/
+    )
+    assert.equal(calls, 1, 'an error that is not a lost session is not repeated')
+    assert.equal(reattached, 0)
+  })
+
+  test('a call dropped before its reply is retried; with start false and nothing answering, it is null', async () => {
+    const dir = freshDir()
+    const sock = join(dir, 'pool.sock')
+    let calls = 0
+    const dropFirst = net.createServer((conn) => {
+      calls++
+      if (calls === 1) return conn.destroy()
+      conn.setEncoding('utf8')
+      conn.on('data', () => conn.end(`${JSON.stringify({ ok: true, result: [] })}\n`))
+    })
+    await new Promise(resolve => dropFirst.listen(sock, resolve))
+    try {
+      const reply = await request({ dir, cmd: 'status', start: false })
+      assert.deepEqual(reply.result, [], 'the second try got the answer')
+      assert.equal(calls, 2, 'the first try was dropped and retried once')
+    } finally {
+      await new Promise(resolve => dropFirst.close(resolve))
+    }
+
+    const otherDir = freshDir()
+    const otherSock = join(otherDir, 'pool.sock')
+    const dropAll = net.createServer(conn => conn.destroy())
+    await new Promise(resolve => dropAll.listen(otherSock, resolve))
+    try {
+      assert.equal(await request({ dir: otherDir, cmd: 'status', start: false }), null, 'nothing is running')
+    } finally {
+      await new Promise(resolve => dropAll.close(resolve))
+    }
+  })
+
+  test('a second caller waits for the lock and gets it when the holder lets go', async () => {
+    const dir = freshDir()
+    const sock = join(dir, 'pool.sock')
+    writeFileSync(join(dir, 'pool.lock'), `${process.pid}\n`)
+    const release = setTimeout(() => releaseLock(dir), 400)
+    const started = Date.now()
+    try {
+      assert.equal(await acquireLockWaiting(dir, sock, { timeoutMs: 5000, pollMs: 50 }), true)
+      assert.ok(Date.now() - started >= 300, 'it waited while the holder held the lock')
+    } finally {
+      clearTimeout(release)
+    }
+    assert.equal(readFileSync(join(dir, 'pool.lock'), 'utf8').trim(), String(process.pid), 'now it holds the lock')
+    releaseLock(dir)
+  })
+
+  test('a caller that waits past its limit gets false (busy) while a live driver holds the lock', async () => {
+    const dir = freshDir()
+    const sock = join(dir, 'pool.sock')
+    writeFileSync(join(dir, 'pool.lock'), `${process.pid}\n`)
+    try {
+      assert.equal(await acquireLockWaiting(dir, sock, { timeoutMs: 300, pollMs: 50 }), false, 'busy, try again later')
+    } finally {
+      releaseLock(dir)
+    }
+  })
+
+  test('a holder that crashes without releasing leaves a lock the next caller takes over', async () => {
+    const dir = freshDir()
+    const sock = join(dir, 'pool.sock')
+    const script = `import { acquireLock } from ${JSON.stringify(pathToFileURL(SELF).href)}
+await acquireLock(${JSON.stringify(dir)}, ${JSON.stringify(sock)})
+process.exit(1)`
+    const crashed = spawnSync(process.execPath, ['--input-type=module', '-e', script], { encoding: 'utf8' })
+    assert.equal(crashed.status, 1)
+    assert.ok(existsSync(join(dir, 'pool.lock')), 'the crashed holder left its lock behind')
+    assert.equal(await acquireLock(dir, sock), true, 'the dead holder is taken over')
+    releaseLock(dir)
+  })
+
   test('a second driver start leaves a live driver and its socket alone', async () => {
     const dir = freshDir()
     writeFileSync(join(dir, 'pool.lock'), `${process.pid}\n`)
@@ -435,7 +549,8 @@ describe('the shared browser (real Chromium)', { skip: SKIP }, () => {
   after(async () => {
     for (const dir of dirs) await stopDriver(dir).catch(() => {})
     if (site) await site.close()
-    for (const dir of made) rmSync(dir, { recursive: true, force: true })
+    // Wait until no process still names a folder (Chromium's helpers can outlive it), then remove it.
+    for (const dir of made) await removeWhenUnused(dir)
   })
 
   test('setup: a page server for the tests', async () => {
@@ -662,6 +777,6 @@ test('the request with no Chromium anywhere fails with a plain message', async (
   }
 })
 
-after(() => {
-  for (const dir of made) rmSync(dir, { recursive: true, force: true })
+after(async () => {
+  for (const dir of made) await removeWhenUnused(dir)
 })

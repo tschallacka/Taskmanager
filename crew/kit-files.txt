@@ -37,6 +37,7 @@ config.mjs
 crew-defaults.mjs
 crew.config.example.json
 crew.mjs
+devadmin.mjs
 detach.sh
 dev-copies.mjs
 down.mjs

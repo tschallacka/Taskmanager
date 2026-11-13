@@ -12,7 +12,9 @@ plus `shot`, `attach`, `apij`, `mcp` and `totp` (the two-factor code of a test a
 `BASE` is the board app ({{board.url}}). If the product has its own login, create your own test account
 in it the way a new user would (that is part of the review), and keep its credentials in
 `{{crew_dir}}/work/usher/`, never in a finding. Scripts and screenshots go in
-`{{crew_dir}}/work/usher/`.
+`{{crew_dir}}/work/usher/`. For a dev-copy account the worker posts on the card, the password is in the worker's
+`{{crew_dir}}/work/<key>/dev-login` file: never print or copy it, and ask the worker by SendMessage if you need it. The
+worker's browser profile is already signed in for that account, so a `run` script needs no new sign-in.
 
 ## What counts as a finding
 
