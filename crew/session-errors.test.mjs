@@ -102,3 +102,30 @@ test('a live tick marks the error seen only after the mail is sent', () => {
   const next = sessionErrorReport({ home, root, state: { sessionErrors: after }, live: true })
   assert.equal(next.pending.length, 0, 'the sent error does not mail again')
 })
+
+// A background session writes its transcript under the folder it was started in, not under the daemon's own folder. The
+// check finds it there (the record's folder, encoded) and reads its last line.
+function sessionFixture({ id, folder, lines }) {
+  const home = mkdtempSync(join(tmpdir(), 'errs-sess-home-'))
+  mkdirSync(join(home, 'sessions'), { recursive: true })
+  writeFileSync(join(home, 'sessions', 'wren.json'), JSON.stringify({ id, name: 'wren', folder }))
+  const base = mkdtempSync(join(tmpdir(), 'errs-sess-base-'))
+  const dir = join(base, folder.replace(/[/.]/g, '-'))
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, `${id}-10d2-4bb4-8930-a0f2594d8501.jsonl`), lines.map(text => JSON.stringify({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text }] } })).join('\n') + '\n')
+  return { home, base }
+}
+
+test('a session transcript in its own folder is read: a 403 last line blocks the session, and Boss is mailed once', () => {
+  const { home, base } = sessionFixture({ id: 'b9c43ba3', folder: '/srv/fake/work/wren-card', lines: ['a normal reply', FIXTURE] })
+  const out = sessionErrorReport({ home, root: join(home, 'nope'), base, state: {}, live: true })
+  assert.ok(out.lines.some(l => l === `wren: blocked: api error: ${FIXTURE}`), out.lines.join(' | '))
+  assert.equal(out.pending.length, 1, 'one mail for the new error')
+})
+
+test('a session transcript whose last line is a normal reply is not blocked', () => {
+  const { home, base } = sessionFixture({ id: 'b9c43ba3', folder: '/srv/fake/work/wren-card', lines: [FIXTURE, 'a normal reply'] })
+  const out = sessionErrorReport({ home, root: join(home, 'nope'), base, state: {}, live: true })
+  assert.equal(out.pending.length, 0)
+  assert.ok(!out.lines.some(l => /blocked/.test(l)))
+})

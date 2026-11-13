@@ -11,8 +11,9 @@
 // standing crew. The kit does not start Pia itself on a plain machine; see PROMPTS.md "Starting Pia".
 import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, rmSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { realSessionDeps, upSessions } from './sessions-up.mjs'
 
 // Runs a shell command; true when it exits 0.
 export function shell(command, env) {
@@ -57,11 +58,15 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const file = join(crewHome, 'crew.json')
   const config = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : {}
   const parts = Array.isArray(config.up) ? config.up : []
-  if (!parts.length) {
+  // The recorded person sessions come first: each one that is not running is started and woken once (card mwdblb506deyxnet5i7).
+  const kit = dirname(fileURLToPath(import.meta.url))
+  const sessions = await upSessions(crewHome, realSessionDeps(crewHome, kit))
+  for (const line of sessions.lines) console.log(line)
+  if (!parts.length && !sessions.lines.length) {
     console.error('crew up: crew.json has no "up" list, so there is nothing to bring up')
     process.exit(1)
   }
   const result = upParts(parts)
   for (const line of result.lines) console.log(line)
-  process.exit(result.ok ? 0 : 1)
+  process.exit(result.ok && sessions.ok ? 0 : 1)
 }
