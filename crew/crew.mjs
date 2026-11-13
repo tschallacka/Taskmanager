@@ -16,7 +16,7 @@
 //   crew up                    brings the crew's parts back in order after a restart, one line each, from crew.json "up" (up.mjs)
 //   crew restart-brief         after crew up: each standing member's open cards and last update, for Pia to start them fresh (restart-brief.mjs)
 //   crew dev-copies            after crew up: restarts the dev copies a Verify UX or Verify QA card needs, one line each (dev-copies.mjs)
-//   crew susy-daemon once|loop|status   Susy as a daemon with no model in the loop; dry-run only, posts and mails nothing (susy-daemon.mjs)
+//   crew susy-daemon once|loop|start|stop|status [--live]   Susy as a daemon with no model in the loop; start/stop run the loop in its own tmux session; without --live it only logs what it would post, with --live it posts Susy's lines on the board and mails Boss when the board gives no answer (susy-daemon.mjs)
 //   crew totp <file>           the current authenticator code for a dev copy's two-factor secret (totp.mjs)
 //   crew setup                 make one new crew for a board in one go, with the board's management token (setup.mjs)
 //   crew people add [--people a,b]   add the crew's missing people; the token comes from TASKMANAGER_MANAGEMENT_TOKEN (people.mjs)
