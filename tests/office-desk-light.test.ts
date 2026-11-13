@@ -33,9 +33,9 @@ test('the light follows the status field: each change shows in the light', () =>
     { state: 'busy', note: 'Busy' }
   ]
   const shapes = sequence.map(s => deskLightOf(s).shape)
-  assert.deepEqual(shapes, ['dashed', 'dot', 'ring', 'dot'])
+  assert.deepEqual(shapes, ['dashed', 'lit', 'dim', 'lit'])
   const colors = sequence.map(s => deskLightOf(s).color)
-  assert.deepEqual(colors, ['#8e8e93', '#d62828', '#2a9d43', '#d62828'])
+  assert.deepEqual(colors, ['#8e8e93', '#2a9d43', '#d62828', '#2a9d43'])
 })
 
 test('the server gives every cast member the unknown light until the monitor reports', async () => {
