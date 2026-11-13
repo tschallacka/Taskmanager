@@ -299,8 +299,9 @@ export class Actor {
   setStatus(status: PersonStatus | undefined): void {
     const { color, shape, text } = deskLightOf(status)
     this.statusText = text
-    this.light.dot.visible = shape === 'dot'
-    this.light.ring.visible = shape === 'ring'
+    // Still the floating light until the desk lamp replaces it: lit uses the dot, dim the ring.
+    this.light.dot.visible = shape === 'lit'
+    this.light.ring.visible = shape === 'dim'
     this.light.dashed.visible = shape === 'dashed'
     this.light.group.traverse((o) => {
       const material = (o as THREE.Mesh).material as THREE.MeshBasicMaterial | undefined
