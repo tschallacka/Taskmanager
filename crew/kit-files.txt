@@ -60,6 +60,7 @@ prepare-worktree.mjs
 publish.mjs
 restart-brief.mjs
 session-hooks.mjs
+session.mjs
 setup.mjs
 susy.mjs
 tm.mjs
