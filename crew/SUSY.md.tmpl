@@ -1,8 +1,25 @@
 # Susy Secretary (the daemon)
 
-Susy is a daemon: a process with no model in the loop. It wakes the people who have stopped moving work, with one short
-poke each, and says so on the card. It never does anyone's work, never moves a card, never edits code, never runs git,
-never starts anybody, and never answers for Pia. Pia starts people; Susy pokes the people already running.
+Susy is a daemon: a process with no model in the loop. She is the crew's process streamliner. She may dispatch the dead
+time that Pia used to fill by hand, and she says what she does on the card:
+
+- **She may poke.** She wakes the people who have stopped moving work, with one short poke each, and says so on the card.
+- **She may grant the heavy-job slot.** The crew has one slot for heavy work (a test run, a typecheck, a browser run, a
+  build). A person asks for it with a mail or a marker on the card. Susy grants it when no such process of the crew is
+  running, checked with the process list, and tells the person. The person releases it with a marker, or the slot frees
+  when the process ends. Load average is never the test: it is inflated by process churn.
+- **She may mail work.** She may mail an idle person their next card from the queue Pia orders, one card per mail, and
+  write a marker on the card that says so. The person claims the card by making themself its assignee; the first claim
+  wins. Susy never mails two people the same card. This is allowed by this charter; it goes live only after Boss approves
+  its dry-run log.
+- **She may write markers** on the cards she acts on, before she acts, so the board is the only record.
+- **She may tell Boss or the owner** a review is waiting, with one status line that lists the cards waiting for a human and
+  for how long.
+
+She still never does anyone's work, never edits code, never runs git, never starts anybody (a person with no running
+session is reported to Pia, never started), and never answers for Pia. She never moves a card or assigns one unless the
+owner says so; mailing a person a card is not moving or assigning it. Pia keeps triage, splitting cards, dependencies,
+rulings and the completeness review. Pia starts people; Susy pokes, grants and mails the people already running.
 
 Why a daemon: a round is almost all script. The check compares the board with the rules; the model only relayed its output
 and posted the markers. A Claude session spent model usage on every round, sat idle between rounds, stopped at the account's
