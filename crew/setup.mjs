@@ -21,6 +21,7 @@ import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { withCrewDefaults } from './crew-defaults.mjs'
 
 const kitDir = dirname(fileURLToPath(import.meta.url))
 
@@ -142,13 +143,14 @@ if (!shadow.url || !shadow.board_id) {
   console.error('Stopped: the create answer has no shadow board. The crew is made; ask the owner to check the Crews page.')
   process.exit(1)
 }
-const crewJson = {
+// "reader" and "devServers" default from the keys of the crew's people (crew-defaults.mjs); init fills in what is missing.
+const crewJson = withCrewDefaults({
   team: typeof answer.team === 'string' ? answer.team : (answer.team?.name ?? name),
   crew: { slug, name },
   product: { name: boardName, repo: args.repo },
   board: { url: shadow.url, id: shadow.board_id, name: shadow.board_name ?? `${boardName} crew board` },
   realBoard: { url: real.url ?? '', id: real.board_id ?? args.board, name: real.board_name ?? boardName, readOnly: true }
-}
+}, Object.keys(keys.people ?? {})).crew
 writeFileSync(join(home, 'crew.json'), `${JSON.stringify(crewJson, null, 2)}\n`, { mode: 0o600 })
 chmodSync(join(home, 'crew.json'), 0o600)
 

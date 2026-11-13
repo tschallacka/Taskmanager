@@ -12,6 +12,7 @@ import { join } from 'node:path'
 import { CAST, OWNER_FILES, agentNames, config, forkMemberPlan, here, kitDir, loadForks, modelProblems, renderTemplate, templateValues } from './config.mjs'
 import { writePiaHooks } from './pia-session.mjs'
 import { writeBossHooks } from './boss-session.mjs'
+import { withCrewDefaults } from './crew-defaults.mjs'
 
 const ok = m => console.log(`  ok   ${m}`)
 const warn = m => console.log(`  WARN ${m}`)
@@ -262,6 +263,22 @@ else {
     const { file, changed, excluded } = writeBossHooks(config.bossSession, { crewHome: here.replace(/\/$/, ''), kitDir: kitDir.replace(/\/$/, '') })
     ok(`${file} ${changed ? 'written: the watch hook' : 'kept, hook already current'}${excluded ? ' (kept out of git)' : ''}`)
   } catch (error) { fail(error.message) }
+}
+
+// crew.json's "reader" and "devServers" default from the keys of the crew's people (creds.json); a field already set stays.
+try {
+  const crewFile = join(here, 'crew.json')
+  const credsFile = join(here, 'creds.json')
+  if (existsSync(crewFile) && existsSync(credsFile)) {
+    const creds = JSON.parse(readFileSync(credsFile, 'utf8'))
+    const { crew: filled, added } = withCrewDefaults(JSON.parse(readFileSync(crewFile, 'utf8')), Object.keys(creds.people ?? {}))
+    if (added.length) {
+      writeFileSync(crewFile, `${JSON.stringify(filled, null, 2)}\n`, { mode: 0o600 })
+      ok(`crew.json: ${added.join(' and ')} set from the crew's people`)
+    }
+  }
+} catch (error) {
+  fail(`crew.json defaults: ${error.message}`)
 }
 
 const next = existsSync(`${here}creds.json`)
