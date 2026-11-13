@@ -13,7 +13,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { join, dirname } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { crewHome } from './home.mjs'
-import { settingsPath, writeSettingsFile } from './session-settings.mjs'
+import { longRunEnv, settingsPath, writeSettingsFile } from './session-settings.mjs'
 
 export const MODEL = 'claude-haiku-5-5'
 export const NO_REMOTE_SETTINGS = JSON.stringify({ remoteControlAtStartup: false })
@@ -145,8 +145,8 @@ export function startSession({ home, kit, key, folder, role, bin, now = Date.now
   mkdirSync(join(home, 'sessions'), { recursive: true })
   writeFileSync(mcpConfigPath(home, key), `${JSON.stringify(mcpConfig({ key, home, kit }), null, 2)}\n`, { mode: 0o600 })
   // The person's own settings file (deny rules, own CREW_HOME, remote control off), written before the start: the start
-  // passes that one file as its --settings.
-  writeSettingsFile(home, key)
+  // passes that one file as its --settings. The long-run profile's env is merged in, so the session keeps the owner's timeouts.
+  writeSettingsFile(home, key, { profileEnv: longRunEnv(kit) })
   const run = runClaude(args, { bin, cwd })
   if (!run.ok) return { ok: false, reason: `claude did not start the session: ${run.stderr || `exit ${run.status}`}` }
   const after = listAgents({ bin }) ?? []
