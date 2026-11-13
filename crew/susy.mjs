@@ -232,6 +232,7 @@ export function suggestedMessage(reason, card, to) {
     'stuck in column': `move ${card.id} "${card.title}" on, or post why it is waiting`,
     'blocked by an unowned card': `give the blocker of ${card.id} "${card.title}" an owner`,
     'blocked in a cycle': `break the blocker cycle that includes ${card.id} "${card.title}"`,
+    'blocked, no BLOCKED ON line': `name who unblocks ${card.id} "${card.title}" (a BLOCKED ON line: BLOCKED ON <key>: <what they must do>)`,
     'ready to clean, not assigned to cleaner': `assign the cleaner to ${card.id} "${card.title}"`,
     'clean plan, no check': `check the clean plan on ${card.id} "${card.title}"`,
     'cleaning granted, cleaner not working': `start cleaning ${card.id} "${card.title}"`,
@@ -290,11 +291,11 @@ export function candidatesFor(card, th, ctx) {
   add('cleaning granted, cleaner not working', cleaner, lastChange(card), th.cleanGrantMinutes, tags.includes('cleaning granted') && !tags.includes('clean done') && !postedBy(card, [cleaner], lastChange(card)))
 
   // A card in Blocked that names whom it waits for (its BLOCKED ON line, blocked-on.mjs): that person is poked after the
-  // normal threshold, then the PM. Only a card with a line is poked here; a Blocked card with no line is not poked by this
-  // (a finding for the PM, to be ruled on separately).
+  // normal threshold, then the PM. A Blocked card with no line has no one to poke, so the PM is told to name the unblocker.
   const blockedOn = blockedOnOf(card.updates ?? [])
   const namedKey = blockedOn && [...AGENTS, 'boss'].includes(blockedOn.key) ? blockedOn.key : null
   add(`blocked, waiting on ${namedKey}`, namedKey ?? 'pia', lastChange(card), th.idleMinutes, card.column === 'Blocked' && Boolean(namedKey))
+  add('blocked, no BLOCKED ON line', 'pia', lastChange(card), th.idleMinutes, card.column === 'Blocked' && !blockedOn)
   add('clean done, not checked', 'pia', lastChange(card), th.cleanDoneMinutes, tags.includes('clean done') && !tags.includes('cleaned') && !postedBy(card, ['pia'], lastChange(card)))
   return out
 }
