@@ -305,7 +305,7 @@ function showPrompt(key: ApiKeySummary) {
   promptCopied.value = false
 }
 
-async function copySetupPrompt() {
+async function copyShownPrompt() {
   if (!shownPrompt.value) return
   await copyWithFeedback(shownPromptText.value, promptCopied, 'Prompt copied')
 }
@@ -912,7 +912,7 @@ function reachLabel(key: ApiKeySummary): string {
                       color="neutral"
                       variant="soft"
                       size="xs"
-                      @click="copySetupPrompt"
+                      @click="copyShownPrompt"
                     />
                   </div>
                 </div>
