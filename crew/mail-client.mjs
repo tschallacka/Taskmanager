@@ -116,7 +116,8 @@ export async function deliverOnce({ fetch: fetchImpl = fetch, base, slug, key, m
   const fresh = !existsSync(seenPath)
   if (fresh) {
     // The record keeps the mail's text and sender, so a waiter (crew down) can find a reply by its text without the inbox.
-    writeFileSync(seenPath, `${JSON.stringify({ at: new Date().toISOString(), id: mail.id, from: mail.from, text: mail.text })}\n`)
+    // Mode 0o600, like the outbox file for the same text: the record holds the mail's text.
+    writeFileSync(seenPath, `${JSON.stringify({ at: new Date().toISOString(), id: mail.id, from: mail.from, text: mail.text })}\n`, { mode: 0o600 })
     deliver(mailLine(mail), mail)
   }
   try {

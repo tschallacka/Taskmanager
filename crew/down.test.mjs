@@ -4,9 +4,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { downParts, wrapUpText, isDownOk, askPerson, waitForConfirmation, deliveredToPia } from './down.mjs'
-import { tick } from './mail-client.mjs'
+import { deliverOnce, tick } from './mail-client.mjs'
 import { spawnSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -81,6 +81,30 @@ test('waitForConfirmation reads the down ok the mailer delivered (the seen recor
   assert.equal(route.pending.length, 0, 'the mailer acked both')
   assert.equal(await wait(REQ), true, 'the own down ok, delivered, confirms')
   assert.equal(await wait('ffffffffffffffff'), false, 'the same mail does not confirm another request id')
+})
+
+test('deliverOnce writes the seen record with the sender and text at mode 0600; deliveredToPia reads them back, once each', async () => {
+  const mailboxDir = mkdtempSync(join(tmpdir(), 'down-record-'))
+  const id = 'f'.repeat(32)
+  const route = fakeMailRoute([{ id, from: 'wren', text: okLine('wren') }])
+  const delivered = []
+  const one = await deliverOnce({
+    fetch: route.fetch, base: 'https://board.example', slug: 'tm', key: 'k', to: 'pia', mailboxDir,
+    mail: { id, from: 'wren', text: okLine('wren') }, deliver: line => delivered.push(line)
+  })
+  assert.equal(one.delivered, true)
+  assert.equal(delivered[0], `from wren: ${okLine('wren')}`)
+  const path = join(mailboxDir, 'pia', 'seen', id)
+  const record = JSON.parse(readFileSync(path, 'utf8'))
+  assert.equal(record.id, id)
+  assert.equal(record.from, 'wren')
+  assert.equal(record.text, okLine('wren'))
+  assert.equal(statSync(path).mode & 0o777, 0o600, 'the record holds the text, so it is owner-only')
+
+  const checked = new Set()
+  assert.equal(deliveredToPia(mailboxDir, checked).length, 1)
+  assert.equal(deliveredToPia(mailboxDir, checked).length, 0, 'a later poll reads only what is new')
+  assert.equal(deliveredToPia(mailboxDir).length, 1, 'a fresh reader still sees the record')
 })
 
 test('a timestamp-only seen record (the old form) carries no text, so it never confirms', async () => {

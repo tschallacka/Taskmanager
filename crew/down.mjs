@@ -107,8 +107,12 @@ export async function askPerson({ base, slug, key, person, text, mailboxDir, mak
  * The mails the mailer has already delivered to Pia, from her seen records (mailbox/pia/seen/<mail id>, written by
  * deliverOnce before the delivery). Reads the local folder only: the live inbox is not read, the mailer acks it. A record
  * with no text (the old timestamp-only form) is skipped.
+ *
+ * `checked` (a Set of record names, kept by the caller across polls) makes each poll read only the records not seen
+ * before. A record that cannot be read yet (half written) is not added, so the next poll reads it again. Records are
+ * not pruned here: the mailer owns them, and removing one could let a mail be delivered twice.
  */
-export function deliveredToPia(mailboxDir) {
+export function deliveredToPia(mailboxDir, checked = new Set()) {
   const folder = join(mailboxDir, 'pia', 'seen')
   let names = []
   try {
@@ -118,8 +122,11 @@ export function deliveredToPia(mailboxDir) {
   }
   const out = []
   for (const name of names) {
+    if (checked.has(name)) continue
     const record = readJsonOr(join(folder, name), null)
-    if (record && typeof record.text === 'string') out.push(record)
+    if (!record || typeof record.text !== 'string') continue
+    checked.add(name)
+    out.push(record)
   }
   return out
 }
@@ -133,8 +140,10 @@ export async function waitForConfirmation({
   now = Date.now, sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 }) {
   const deadline = now() + timeoutMs
+  const checked = new Set()
   for (;;) {
-    if (deliveredToPia(mailboxDir).some(mail => mail.from === person && isDownOk(mail.text, person, requestId))) return true
+    const fresh = deliveredToPia(mailboxDir, checked)
+    if (fresh.some(mail => mail.from === person && isDownOk(mail.text, person, requestId))) return true
     const left = deadline - now()
     if (left <= 0) return false
     await sleep(Math.min(interval, left))
