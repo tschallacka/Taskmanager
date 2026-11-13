@@ -7,6 +7,7 @@
 // PROJECT-RULES.md or BRIEF.md once they exist.
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, chmodSync, copyFileSync } from 'node:fs'
 import { execSync } from 'node:child_process'
+import { withServeCommand } from './port-registry.mjs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { CAST, OWNER_FILES, agentNames, config, forkMemberPlan, here, kitDir, loadForks, modelProblems, renderTemplate, templateValues } from './config.mjs'
@@ -256,6 +257,14 @@ if (!skipsProvider('pia', config.models.pia)) {
 // The worktree folder: prepare worktree needs it; init does not guess it, setup writes it from --worktree-base.
 if (typeof config.worktreeBase !== 'string' || !config.worktreeBase.startsWith('/')) {
   warn('crew.json has no "worktreeBase" (an absolute folder): set it, or "crew <who> prepare worktree" stops with a clear message')
+}
+
+// The dev copies: the start command (scripts.serve), written only where missing. The ports (devServers) are written by
+// crew-defaults below, for the crew's people only.
+const serveDefault = withServeCommand(config)
+if (serveDefault.changed) {
+  writeFileSync(`${here}crew.json`, `${JSON.stringify(serveDefault.config, null, 2)}\n`, { mode: 0o600 })
+  ok('crew.json: the start command (scripts.serve) was written where it was missing')
 }
 
 // Boss's session: its Stop hook keeps the two crew watches running (boss-stop-hook.sh). Written into the folder that

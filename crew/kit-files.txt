@@ -50,11 +50,13 @@ package.json
 people.mjs
 pia-listener-hook.sh
 pia-session.mjs
+port-registry.mjs
 postbrief.mjs
 prepare-worktree-cli.mjs
 prepare-worktree.mjs
 publish.mjs
 restart-brief.mjs
+serve.mjs
 session-hooks.mjs
 setup.mjs
 susy.mjs

@@ -74,6 +74,21 @@ export function removePlan({ dirty, branchPushed, aheadOfRemote }) {
   return { ok: true, message: 'The worktree is clean and its branch is on origin; it can be removed.' }
 }
 
+/**
+ * What to do with a new worktree whose port could not be reserved. It is removed only when it holds nothing: clean, and
+ * no commit beyond the default branch. Anything else is kept, and the message says so and how to go on.
+ */
+export function reservationFailure({ dirty, aheadOfBase, error, who, taskId }) {
+  const why = `the port could not be reserved (${error})`
+  if (!dirty && aheadOfBase === 0) {
+    return { remove: true, message: `${why}; the new worktree had nothing in it, so it was removed (its branch is kept)` }
+  }
+  return {
+    remove: false,
+    message: `${why}; the worktree is kept because it has work in it. Free the port, then run "crew ${who} prepare worktree ${taskId}" again`
+  }
+}
+
 /** The real runner: runs the script with no shell, so the arguments are never interpreted. */
 export function runScript(script, args) {
   const child = spawnSync(script, args, { encoding: 'utf8', timeout: 30 * 60 * 1000 })

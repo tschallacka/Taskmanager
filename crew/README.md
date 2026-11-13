@@ -397,6 +397,18 @@ Limits, which the design does not remove:
 - **Dialogs are dismissed** unless asked for. A page can still hold a command for up to two minutes, the request timeout.
 - **`shot` writes PNG or JPEG files only**, never through a link, never over a folder, and never over an existing file without `--overwrite`.
 
+## Dev copies (`crew <who> serve`)
+
+Each worker has one dev copy, on the port `devServers` in `crew.json` gives them (the ports come from the one table in `crew-defaults.mjs`, written into crew.json for the crew's people where they are missing: pia 3100, wren 3101, wick 3102, wynn 3103, wade 3104, quincy 3105, usher 3106, pat 3107, nina 3108). The port registry, `<CREW_HOME>/.listen/ports.json`, records which worktree holds which port (worktree, branch, card, pid, and the commit started from), under one lock file. Stale entries are dropped when their process is gone.
+
+- `crew <who> prepare worktree <task-id>` reserves the port for the new worktree and prints it.
+- `crew <who> serve` starts the worktree's copy with the command in `crew.json` `scripts.serve` (init writes the default, `bunx nuxt dev --host 127.0.0.1 --port {port}`; a project with another stack changes it). A port that another worktree holds is refused, and the message names that worktree and card.
+- `crew <who> serve --replace` stops only your own old copy on the port, and says which one, before it starts the new one.
+- `crew <who> serve --stop` stops the copy and frees the port. `prepare worktree --remove <task-id>` does the same before it removes the folder.
+- `crew <who> serve --check` says which copy answers the port and from which folder. It passes only when that copy serves the worktree's current HEAD, the commit recorded when it started; otherwise it stops with exit 3 and says to run `--replace`. A browser run calls it first.
+
+The listener is found with `lsof`; without `lsof` the `/proc` tables are read instead (`ss` is not used).
+
 ## Updating
 
 To update a crew's kit, run this one line, with the crew home (the folder that holds `crew.json`) as the argument:

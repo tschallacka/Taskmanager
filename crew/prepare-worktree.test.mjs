@@ -3,7 +3,19 @@
 // for the script, so no git, dependency or database work runs here.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { parseResultLine, prepareWorktree, removePlan, slugOf, worktreeFolder } from './prepare-worktree.mjs'
+import { parseResultLine, prepareWorktree, removePlan, reservationFailure, slugOf, worktreeFolder } from './prepare-worktree.mjs'
+
+test('a new worktree whose port cannot be reserved is removed only when it holds nothing; otherwise it is kept and says so', () => {
+  const empty = reservationFailure({ dirty: false, aheadOfBase: 0, error: 'port 3101 is held', who: 'wren', taskId: 'mwdlkxb56xr2ek89g92' })
+  assert.equal(empty.remove, true)
+  assert.match(empty.message, /had nothing in it, so it was removed/)
+  const dirty = reservationFailure({ dirty: true, aheadOfBase: 0, error: 'port 3101 is held', who: 'wren', taskId: 'mwdlkxb56xr2ek89g92' })
+  assert.equal(dirty.remove, false)
+  assert.match(dirty.message, /the worktree is kept because it has work in it/)
+  assert.match(dirty.message, /crew wren prepare worktree mwdlkxb56xr2ek89g92/)
+  const ahead = reservationFailure({ dirty: false, aheadOfBase: 2, error: 'x', who: 'wren', taskId: 't' })
+  assert.equal(ahead.remove, false, 'commits beyond the default branch keep it')
+})
 
 test('the worktree folder comes from crew.json worktreeBase, and a missing or relative one is a clear error', () => {
   const missing = worktreeFolder({ config: {}, who: 'wren', taskId: 'mwdlkxb56xr2ek89g92' })
