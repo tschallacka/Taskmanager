@@ -18,8 +18,10 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-// Pia's Claude Code process, as its command line reads on /proc.
-export const PIA_PROCESS = ['claude', '--continue', '--model', 'haiku']
+// Pia's Claude Code process, as its command line reads on /proc. Her model is the full id (card mwc5aicfyb9r0fvopvf);
+// the bare alias is what a process started before the fix carries, so both are Pia's.
+export const PIA_PROCESS = ['claude', '--continue', '--model']
+export const PIA_MODELS = ['claude-haiku-5-5', 'haiku']
 
 /** The Claude Code folder of Pia's session: its path with every "/" and "." turned into "-", under ~/.claude/projects. */
 export function piaProjectsDir(crewHome, home = homedir()) {
@@ -134,7 +136,7 @@ export function activityRows({ root, hours = 6, now = Date.now(), cmdlines = [],
 
 /** Whether a command line is Pia's Claude Code process. */
 export function isPiaProcess(args) {
-  return PIA_PROCESS.every((word, i) => args[i] === word)
+  return PIA_PROCESS.every((word, i) => args[i] === word) && PIA_MODELS.includes(args[3])
 }
 
 function main() {
