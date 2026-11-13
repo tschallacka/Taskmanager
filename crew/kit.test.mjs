@@ -626,6 +626,15 @@ describe('crew update: the kit folder and the owner files', () => {
     writeFileSync(join(crew.home, 'JANET.md'), '# Janet card\n\nOwner janitor line kept.\n')
     writeFileSync(join(crew.home, 'creds.json'), JSON.stringify({ people: { wade: { password: 'test-only' } } }))
     const creds = readFileSync(join(crew.home, 'creds.json'), 'utf8')
+    // The crew.json a running crew holds: its reader, dev ports and start command are already set (init fills in only
+    // what is missing, so a complete crew.json is one it leaves alone).
+    const running = JSON.parse(readFileSync(join(crew.home, 'crew.json'), 'utf8'))
+    writeFileSync(join(crew.home, 'crew.json'), JSON.stringify({
+      ...running,
+      reader: running.reader ?? 'wade',
+      devServers: running.devServers ?? { wade: 3104 },
+      scripts: { ...(running.scripts ?? {}), serve: running.scripts?.serve ?? 'bunx nuxt dev --host 127.0.0.1 --port {port}' }
+    }, null, 2) + '\n')
     const config = readFileSync(join(crew.home, 'crew.json'), 'utf8')
     const out = await updateKit(dirA, crew, ['--from', dirB, '--kit', dirA])
     // init's FAIL line about playwright is expected in a copy with no node_modules, so the exit code is not checked.

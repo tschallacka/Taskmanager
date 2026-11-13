@@ -12,6 +12,7 @@ import { pathToFileURL } from 'node:url'
 import { crewHome } from './home.mjs'
 import { renameKeys } from './keys.mjs'
 import { rpcResult } from './mentions.mjs'
+import { blockedOnOf } from './blocked-on.mjs'
 
 export const DEFAULTS = { questionMinutes: 10, idleMinutes: 10, gateMinutes: 15, cleanGrantMinutes: 5, cleanPlanMinutes: 10, cleanDoneMinutes: 15, stuckMinutes: 240 }
 export const WORKERS = ['wren', 'wick', 'wynn', 'wade']
@@ -231,12 +232,16 @@ export function suggestedMessage(reason, card, to) {
     'stuck in column': `move ${card.id} "${card.title}" on, or post why it is waiting`,
     'blocked by an unowned card': `give the blocker of ${card.id} "${card.title}" an owner`,
     'blocked in a cycle': `break the blocker cycle that includes ${card.id} "${card.title}"`,
+    'blocked, no BLOCKED ON line': `name who unblocks ${card.id} "${card.title}" (a BLOCKED ON line: BLOCKED ON <key>: <what they must do>)`,
+    'blocked, BLOCKED ON names no one known': `fix the BLOCKED ON line on ${card.id} "${card.title}": its key names no crew member (check the spelling)`,
     'ready to clean, not assigned to cleaner': `assign the cleaner to ${card.id} "${card.title}"`,
     'clean plan, no check': `check the clean plan on ${card.id} "${card.title}"`,
     'cleaning granted, cleaner not working': `start cleaning ${card.id} "${card.title}"`,
     'clean done, not checked': `check the clean on ${card.id} "${card.title}"`
   }
-  return `"${ask[reason] ?? `act on ${card.id} "${card.title}"`}" (to ${to})`
+  // A reason with a key after it ("...names no one known: bos") takes the wording of its part before the colon.
+  const known = Object.keys(ask).find(k => reason === k || reason.startsWith(`${k}: `))
+  return `"${ask[known] ?? `act on ${card.id} "${card.title}"`}" (to ${to})`
 }
 
 /** Every reason Susy checks for one card, each with its condition. A reason that does not hold is still listed, so its open poke closes. */
@@ -287,6 +292,16 @@ export function candidatesFor(card, th, ctx) {
   add('ready to clean, not assigned to cleaner', 'pia', lastChange(card), th.idleMinutes, tags.includes('ready to clean') && key !== cleaner)
   add('clean plan, no check', 'pia', lastChange(card), th.cleanPlanMinutes, tags.includes('clean plan') && !tags.includes('cleaning granted') && !postedBy(card, null, lastChange(card)))
   add('cleaning granted, cleaner not working', cleaner, lastChange(card), th.cleanGrantMinutes, tags.includes('cleaning granted') && !tags.includes('clean done') && !postedBy(card, [cleaner], lastChange(card)))
+
+  // A card in Blocked that names whom it waits for (its BLOCKED ON line, blocked-on.mjs): that person is poked after the
+  // normal threshold, then the PM. A Blocked card with no line has no one to poke, so the PM is told to name the unblocker.
+  const blockedOn = blockedOnOf(card.updates ?? [])
+  const namedKey = blockedOn && [...AGENTS, 'boss'].includes(blockedOn.key) ? blockedOn.key : null
+  add(`blocked, waiting on ${namedKey}`, namedKey ?? 'pia', lastChange(card), th.idleMinutes, card.column === 'Blocked' && Boolean(namedKey))
+  add('blocked, no BLOCKED ON line', 'pia', lastChange(card), th.idleMinutes, card.column === 'Blocked' && !blockedOn)
+  // A BLOCKED ON line that names no one we know (a typo such as "bos") is flagged to the PM, not left silent.
+  // The warning names the key, so the PM sees the typo: "blocked, BLOCKED ON names no one known: bos".
+  add(`blocked, BLOCKED ON names no one known: ${blockedOn?.key ?? ''}`, 'pia', lastChange(card), th.idleMinutes, card.column === 'Blocked' && Boolean(blockedOn) && !namedKey)
   add('clean done, not checked', 'pia', lastChange(card), th.cleanDoneMinutes, tags.includes('clean done') && !tags.includes('cleaned') && !postedBy(card, ['pia'], lastChange(card)))
   return out
 }
@@ -362,6 +377,38 @@ export function cardsFrom(board, updatesOf) {
   })))
 }
 
+/** One JSON-RPC tool call to the board's /api/mcp with Susy's key. Throws on an HTTP error or a failed call. */
+export function makeCall(base, key) {
+  let id = 1
+  return async (name, args) => {
+    const res = await fetch(`${base}/api/mcp`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'accept': 'application/json, text/event-stream', 'authorization': `Bearer ${key}` },
+      body: JSON.stringify({ jsonrpc: '2.0', id: id++, method: 'tools/call', params: { name, arguments: args } }),
+      signal: AbortSignal.timeout(30000)
+    })
+    if (!res.ok) throw new Error(`${name} answered HTTP ${res.status}`)
+    return rpcResult(name, await res.json())
+  }
+}
+
+/** The board's cards with their updates, read the way `crew susy check` reads them. `call` is makeCall's function. */
+export async function readBoardCards(call, boardId) {
+  const board = await call('get_board', { board: boardId, detail: 'titles', limit: 200 })
+  const updatesOf = {}
+  for (const column of board?.columns ?? []) {
+    for (const task of column.tasks ?? []) {
+      if (!Number(task.updates)) continue
+      // The newest 200, then put in time order: a card over 200 updates keeps its latest changes and her latest pokes.
+      const full = await call('get_task', { id: task.id, order: 'newest', limit: 200 })
+      updatesOf[task.id] = (full?.updates ?? [])
+        .map(update => ({ id: update.id, author: update.author, body: update.body, at: update.at }))
+        .sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
+    }
+  }
+  return cardsFrom(board, updatesOf)
+}
+
 function readJson(path, fallback) {
   try {
     return existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : fallback
@@ -407,17 +454,7 @@ async function main() {
     return 65
   }
   const boardId = creds.board?.id
-  let id = 1
-  const call = async (name, args) => {
-    const res = await fetch(`${creds.base}/api/mcp`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'accept': 'application/json, text/event-stream', 'authorization': `Bearer ${key}` },
-      body: JSON.stringify({ jsonrpc: '2.0', id: id++, method: 'tools/call', params: { name, arguments: args } }),
-      signal: AbortSignal.timeout(30000)
-    })
-    if (!res.ok) throw new Error(`${name} answered HTTP ${res.status}`)
-    return rpcResult(name, await res.json())
-  }
+  const call = makeCall(creds.base, key)
 
   const statePath = `${home}/.listen/susy.json`
   const state = readJson(statePath, {})
@@ -426,19 +463,7 @@ async function main() {
   const stale = state.lastRound ? staleRoundLine(state.lastRound, now) : null
   if (stale) lines.push(stale)
 
-  const board = await call('get_board', { board: boardId, detail: 'titles', limit: 200 })
-  const updatesOf = {}
-  for (const column of board?.columns ?? []) {
-    for (const task of column.tasks ?? []) {
-      if (!Number(task.updates)) continue
-      // The newest 200, then put in time order: a card over 200 updates keeps its latest changes and her latest pokes.
-      const full = await call('get_task', { id: task.id, order: 'newest', limit: 200 })
-      updatesOf[task.id] = (full?.updates ?? [])
-        .map(update => ({ id: update.id, author: update.author, body: update.body, at: update.at }))
-        .sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
-    }
-  }
-  const cards = cardsFrom(board, updatesOf)
+  const cards = await readBoardCards(call, boardId)
   const keyOf = keyOfName(crew.people)
   const cleaner = crew.susy?.cleaner ?? DEFAULT_CLEANER
   const round = findPokes(cards, { now, thresholds: crew.susy, keyOf, cleaner, agents: state.agents })

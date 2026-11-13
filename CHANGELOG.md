@@ -2,6 +2,14 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.23.0 - 2026-11-13
+
+- **Susy runs as a daemon, with a live mode that acts on the board.** `crew susy-daemon start` puts the loop in its own detached tmux session through `detach.sh`, so it outlives the session that started it; `stop` kills that session; `status` shows the heartbeat. `start --live` (or `loop --live`, or `once --live`) posts Susy's own lines on the board, and mails Boss once per streak when the board gives no answer. Without `--live` the loop only logs what it would post, to `.listen/susy-daemon-dryrun.log`. Each tick writes `.listen/susy-daemon.json`, the heartbeat. A second live loop refuses to start while one runs (pid lock). The start command quotes its paths, so a home or kit folder with spaces or quotes works. The board read in `crew/susy.mjs` is shared with the daemon (`makeCall`, `readBoardCards`). Files: `crew/susy-daemon.mjs`, `crew/susy-daemon.test.mjs`, `crew/kit-imports.test.mjs`, `crew/susy.mjs`, `crew/crew.mjs`, `crew/kit-files.txt`.
+
+- **A board that fails to load says so instead of spinning.** A board the reader cannot open says "You do not have access to this board or it does not exist.", any other failure says "This board could not be loaded.", a request that takes longer than 60 seconds counts as a failure, and a bad board id (board ids are letters and digits only) says "This is not a valid board link." Each with Try again and Back to boards. Files: app/utils/boardLoad.ts, app/composables/useProjects.ts, app/pages/projects/[id].vue, tests/board-load.test.ts.
+
+- **Dev copies: `crew <who> serve`, one per person, with the port registry.** Each worker's copy starts on their `devServers` port, with `--replace`, `--stop` and `--check` (the check passes only for the commit the copy started from). The registry `.listen/ports.json` holds one entry per port under one lock. `prepare worktree` reserves the port. init writes `scripts.serve` where it is missing; the ports come from the one table in `crew-defaults.mjs`. The listener is found with `lsof`, with a `/proc` fallback.
+
 ## 0.22.0 - 2026-11-13
 
 - **The crew comes back after a restart of Boss's session.** `crew up` brings the parts in the `up` list of crew.json back in order (already running, started, or failed and why), and is safe to run twice. `crew/detach.sh` keeps Pia's session and the dev services in a detached tmux session, so they outlive the session that started them. `crew restart-brief` lists each standing member's open cards and last update for Pia to start them fresh, and stops with the reason when a board call fails. Files: `crew/up.mjs`, `crew/detach.sh`, `crew/restart-brief.mjs`, `crew/board-call.mjs`, `crew/janet.mjs`, `crew/crew.mjs`, `crew/PROMPTS.md.tmpl`, `crew/SKILL.md`, `crew/kit-files.txt`.
