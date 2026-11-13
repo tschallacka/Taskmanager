@@ -19,6 +19,7 @@ import { crewHome } from './home.mjs'
 import { DEFAULT_CLEANER, findPokes, keyOfName, makeCall, readBoardCards } from './susy.mjs'
 import { collectActivity, listenerRunning, newActivityLines, readLoad } from './susy-collector.mjs'
 import { projectsRoot, readWorkerRows, workerStates } from './susy-workers.mjs'
+import { sessionErrorReport } from './session-errors.mjs'
 
 export const TICK_SECONDS = 60
 
@@ -152,7 +153,21 @@ export async function runOnce(home, now = Date.now(), { live = false } = {}) {
   result.state.loadUnderSince = activity?.loadUnderSince ?? undefined
   result.state.listenerSeenAt = activity?.listenerSeenAt ?? undefined
   const lines = [...result.lines, ...repeats.fresh]
+  // The API-error check (card mwdblb506deyxnet5i7): a session whose last transcript line is an API error is blocked, not
+  // stuck. Boss gets one mail per distinct error text; a later normal line clears it. Mails go out only in live mode.
+  const errors = sessionErrorReport({ home, root: projectsRoot({ crewHome: home, crew }), state: result.state })
+  result.state.sessionErrors = errors.sessionErrors
+  lines.push(...errors.lines)
   if (live) {
+    for (const text of errors.mails) {
+      try {
+        const { sendMail } = await import('./mail-client.mjs')
+        await sendMail({ base: creds.base, slug: creds.crew?.slug, key, to: 'boss', text, mailboxDir: `${home}/mailbox`, makeId: () => crypto.randomUUID().replaceAll('-', '') })
+        lines.push('mailed boss: api error')
+      } catch (error) {
+        lines.push(`could not mail boss about an api error: ${error.message}`)
+      }
+    }
     lines.push(...await postFresh({ fresh: result.fresh, pending: result.state.pending, call }))
     if (result.mailBoss && key && creds.crew?.slug) {
       try {
