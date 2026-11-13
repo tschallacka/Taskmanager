@@ -1374,11 +1374,12 @@ function exchange(conn, message) {
  * Starts the driver when none is running and start is true. Throws when the command fails.
  */
 // A driver that is shutting down closes its socket under a call that has just connected. The call then gets a dropped
-// connection and no reply. Such a call is retried. When every try is dropped, the answer depends on start: with start
-// false, nothing answers, so the answer is null; with start true the error is thrown. A command that drops before its
-// reply may have run already, so it can run twice. The browser commands the crew sends are ones a second run is
-// harmless for.
+// connection and no reply. A read-only call is retried. When every try is dropped, the answer depends on start: with
+// start false, nothing answers, so the answer is null; with start true the error is thrown. A command that may change
+// the page (goto, eval, send, close-tab, done) is never resent: a dropped one may have run already, and running it twice
+// could click or submit twice. Such a command gets the same answer as a drop after the last try, without a retry.
 const DROPPED = /connection failed|closed the connection/
+const READ_ONLY = new Set(['status', 'tabs', 'console', 'shot'])
 const DROP_RETRIES = 5
 const DROP_RETRY_MS = 300
 
@@ -1388,7 +1389,7 @@ export async function request(options) {
       return await requestOnce(options)
     } catch (error) {
       if (!(error instanceof BrowserError) || !DROPPED.test(error.message)) throw error
-      if (attempt >= DROP_RETRIES) {
+      if (!READ_ONLY.has(options.cmd) || attempt >= DROP_RETRIES) {
         if ((options.start ?? true) === false) return null
         throw error
       }

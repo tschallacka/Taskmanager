@@ -10,7 +10,11 @@ export function usersOf(dir) {
   for (const pid of readdirSync('/proc')) {
     if (!/^\d+$/.test(pid) || Number(pid) === process.pid) continue
     try {
-      if (readFileSync(`/proc/${pid}/cmdline`, 'utf8').includes(dir)) hits.push(Number(pid))
+      // An argument names the folder when it is the folder, ends with it (--user-data-dir=<dir>, or a script that ends
+      // with it) or has a path under it. A sibling such as <dir>x does not match.
+      const named = readFileSync(`/proc/${pid}/cmdline`, 'utf8').split('\0')
+        .some(arg => arg === dir || arg.endsWith(dir) || arg.includes(`${dir}/`))
+      if (named) hits.push(Number(pid))
     } catch {
       // the process ended while it was read
     }
