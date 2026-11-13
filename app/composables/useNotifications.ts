@@ -226,6 +226,15 @@ export function useNotifications() {
     return res?.items ?? []
   }
 
+  /**
+   * Empties the Read box: everything (`all`), or what was archived more than `olderThanDays` ago. With `dryRun` it
+   * only counts. Answers the count (dry run) or how many were deleted.
+   */
+  async function emptyReadBox(options: { all?: boolean, olderThanDays?: number, dryRun?: boolean }): Promise<{ count?: number, deleted?: number }> {
+    const res = await request<{ count?: number, deleted?: number }>('/api/notifications/empty', { method: 'POST', headers: realtimeHeaders(), body: options })
+    return res ?? {}
+  }
+
   /** Turns a way of being told on or off; a desktop notification needs the browser's permission first. */
   async function setPreference(key: 'email' | 'browser', value: boolean): Promise<string | null> {
     if (key === 'browser' && value) {
@@ -257,5 +266,5 @@ export function useNotifications() {
     })
   }
 
-  return { items: _items, unread: _unread, prefs: _prefs, push: _push, loaded: _loaded, load, markRead, markAllRead, archive, archiveAll, unarchive, loadReadBox, decideGuestRequest, setPreference, setPush, testPush, init }
+  return { items: _items, unread: _unread, prefs: _prefs, push: _push, loaded: _loaded, load, markRead, markAllRead, archive, archiveAll, unarchive, loadReadBox, emptyReadBox, decideGuestRequest, setPreference, setPush, testPush, init }
 }

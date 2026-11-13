@@ -76,6 +76,34 @@ async function moveBack(item: NotificationItem) {
   await unarchive([item.id])
 }
 
+// Emptying the Read box: pick an option, the page counts what it would delete, and only the confirm button deletes.
+type EmptyChoice = { label: string, all?: boolean, olderThanDays?: number }
+const emptyChoices: EmptyChoice[] = [
+  { label: 'Empty Read box', all: true },
+  { label: 'Older than 30 days', olderThanDays: 30 },
+  { label: 'Older than 2 months', olderThanDays: 60 },
+  { label: 'Older than 6 months', olderThanDays: 182 },
+  { label: 'Older than 1 year', olderThanDays: 365 }
+]
+const pendingEmpty = ref<(EmptyChoice & { count: number }) | null>(null)
+const emptying = ref(false)
+async function askEmpty(choice: EmptyChoice) {
+  const { count } = await emptyReadBox({ all: choice.all, olderThanDays: choice.olderThanDays, dryRun: true })
+  pendingEmpty.value = { ...choice, count: count ?? 0 }
+}
+async function confirmEmpty() {
+  const choice = pendingEmpty.value
+  if (!choice) return
+  emptying.value = true
+  try {
+    await emptyReadBox({ all: choice.all, olderThanDays: choice.olderThanDays })
+    pendingEmpty.value = null
+    readBox.value = await loadReadBox()
+  } finally {
+    emptying.value = false
+  }
+}
+
 // Grouped by the day they arrived, newest day first.
 function groupByDay<T extends { createdAt: number }>(list: T[]) {
   const groups = new Map<string, T[]>()
