@@ -2,7 +2,7 @@
 import { format } from 'date-fns'
 import { keyPanelMode } from '~/utils/apiKeyView'
 import { keyPrompt } from '~/utils/connectPrompt'
-import { agentConfigFileText } from '~/utils/agentConfig'
+import { agentConfigFileText, serverNameFor } from '~/utils/agentConfig'
 import type { KeyPromptInput } from '~/utils/connectPrompt'
 import type { Ref } from 'vue'
 
@@ -272,7 +272,12 @@ async function copyCommand() {
 }
 
 // The per-agent config file (agentConfig.ts): the main path, one file per agent.
-const agentConfigText = computed(() => (issuedToken.value ? agentConfigFileText(window.location.origin, issuedToken.value) : ''))
+// The server name is unique per board and key: the key's label and the boards it reaches (agentConfig.ts).
+const issuedServerName = computed(() => {
+  const boards = issuedReach.value.allBoards ? 'all boards' : (issuedReach.value.boards.map(board => board.name).join(' ') || 'board')
+  return serverNameFor(boards, issuedName.value, window.location.origin)
+})
+const agentConfigText = computed(() => (issuedToken.value ? agentConfigFileText(window.location.origin, issuedToken.value, issuedServerName.value) : ''))
 const configCopied = ref(false)
 async function copyAgentConfig() {
   if (!issuedToken.value) return
