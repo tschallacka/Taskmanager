@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import { mkdtempSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { tick, pendingKey, postBody, postFresh, runOnce, statusLines, heartbeatAgeMinutes, heartbeatFresh, daemonCommand, SESSION, upPart, isDaemonPid, lockState, takeLock, releaseLock, LOCK_NAME } from './susy-daemon.mjs'
+import { tick, pendingKey, postBody, postFresh, runOnce, statusLines, heartbeatAgeMinutes, heartbeatFresh, daemonCommand, shellQuote, SESSION, upPart, isDaemonPid, lockState, takeLock, releaseLock, LOCK_NAME } from './susy-daemon.mjs'
 import { spawnSync } from 'node:child_process'
 import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -136,7 +136,7 @@ test('start puts the dry-run loop in its own detached session through detach.sh;
   const [file, args] = daemonCommand('/crew/home', 'start', { kit: '/kit' })
   assert.equal(file, 'sh')
   assert.deepEqual(args.slice(0, 4), ['/kit/detach.sh', 'start', '/crew/home/tmux.sock', SESSION])
-  assert.match(args[4], /susy-daemon\.mjs loop$/)
+  assert.match(args[4], /susy-daemon\.mjs' loop$/)
   assert.doesNotMatch(args[4], /--live/)
   const [, liveArgs] = daemonCommand('/crew/home', 'start', { kit: '/kit', live: true })
   assert.match(liveArgs[4], /loop --live$/)
@@ -144,6 +144,12 @@ test('start puts the dry-run loop in its own detached session through detach.sh;
   assert.equal(stopFile, 'tmux')
   assert.deepEqual(stopArgs, ['-S', '/crew/home/tmux.sock', 'kill-session', '-t', SESSION])
   assert.throws(() => daemonCommand('/crew/home', 'restart', { kit: '/kit' }), /no such action/)
+})
+
+test('the paths in the loop command are quoted, so a home or kit folder with spaces or quotes is one word each', () => {
+  const [, args] = daemonCommand("/crew home/it's", 'start', { kit: '/my kit', live: true })
+  assert.equal(args[4], `CREW_HOME='/crew home/it'\\''s' ${shellQuote(process.execPath)} '/my kit/susy-daemon.mjs' loop --live`)
+  assert.equal(shellQuote('plain'), "'plain'")
 })
 
 test('the up part: its check passes on a fresh heartbeat and fails on a stale one; only the live part starts with --live', () => {

@@ -205,6 +205,11 @@ export function heartbeatFresh(heartbeat, now = Date.now()) {
   return age !== null && age >= 0 && age <= STALE_MINUTES
 }
 
+/** One word for a POSIX shell: single quotes, with any single quote written as '\'' so paths with spaces or quotes survive. */
+export function shellQuote(value) {
+  return `'${String(value).replace(/'/g, `'\\''`)}'`
+}
+
 /**
  * The command for start and stop, as argv (not run here): start puts the loop in a detached tmux session through
  * crew/detach.sh, so it outlives the session that started it; stop kills that session. `kit` is the folder of this file.
@@ -213,7 +218,7 @@ export function daemonCommand(home, action, { kit, live = false }) {
   const socket = `${home}/tmux.sock`
   if (action === 'stop') return ['tmux', ['-S', socket, 'kill-session', '-t', SESSION]]
   if (action !== 'start') throw new Error(`no such action: ${action}`)
-  const loop = `CREW_HOME=${home} ${process.execPath} ${join(kit, 'susy-daemon.mjs')} loop${live ? ' --live' : ''}`
+  const loop = `CREW_HOME=${shellQuote(home)} ${shellQuote(process.execPath)} ${shellQuote(join(kit, 'susy-daemon.mjs'))} loop${live ? ' --live' : ''}`
   return ['sh', [join(kit, 'detach.sh'), 'start', socket, SESSION, loop]]
 }
 
@@ -317,7 +322,7 @@ async function main(argv) {
     return run.status ?? 1
   }
   if (command !== 'once' && command !== 'loop') {
-    console.error('usage: crew susy-daemon once | loop [sec] | start | stop | status   (add --live to act on the board)')
+    console.error('usage: crew susy-daemon once | loop [sec] | start | stop | status   (--live acts on the board: once --live, loop --live, start --live)')
     return 64
   }
   const live = rest.includes('--live')
