@@ -2,9 +2,10 @@
 // recorded session (CREW_HOME/sessions/<key>.json) is not running, with the strict start, and sends one wake through the
 // wake sender. `crew down` stops each recorded session that is running, by its recorded id. One line per person.
 //
-// The role a started worker gets is the worker section of PROMPTS.md (the fenced block under "## Worker"), with the
-// placeholders W (the key) and NICK (the chat nick) filled in. Only the four workers have a role here; any other key is
-// reported as failed, not started with a guessed role.
+// The role a started worker gets is one file, CREW_HOME/sessions/<key>.role.md (mode 600): the worker section of PROMPTS.md
+// (the fenced block under "## Worker", with the placeholders W and NICK filled in) followed by the standing rules of
+// CREW.md. The start reads that role file. Only the four workers have a role here; any other key is reported as failed,
+// not started with a guessed role.
 import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -40,7 +41,6 @@ export function recordedKeys(home) {
     .sort()
 }
 
-/** The wake text after a restart: the person reads their own card, the kit does not name one. */
 /**
  * The role text of one person's session: the PROMPTS.md worker section, then the CREW.md standing rules (the whole file),
  * in that order. Pure. A missing CREW.md gives the section alone.
@@ -61,7 +61,9 @@ export function writeRoleFile(home, key, text) {
   return path
 }
 
-export const RESTART_WAKE ='Crew up: your session was started again. Read your card with my_tasks, carry on with it, and post your next update on the card.'
+// The wake text typed into a restarted session, once. It is the text, not the role file: the role is read by the start, and
+// the wake only says that the session is back. The person reads their own card; the kit does not name one.
+export const RESTART_WAKE = 'Crew up: your session was started again. Read your card with my_tasks, carry on with it, and post your next update on the card.'
 
 /**
  * `crew up` for the recorded sessions. `deps` are injected for the tests: `listAgents()` (the live list, or null),
