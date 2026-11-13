@@ -51,7 +51,6 @@ export function agentConfigStartCommand(filePath: string): string {
   return `claude --mcp-config ${filePath} --strict-mcp-config`
 }
 
-
 // Per folder: the project server name for a key. The suffix is the one the server stored for that key.
 export function projectServerName(keyLabel: string, suffix = ''): string {
   return `taskmanager-${slug(keyLabel) || 'key'}${suffix}`

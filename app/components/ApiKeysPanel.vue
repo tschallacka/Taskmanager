@@ -167,7 +167,7 @@ async function createKey() {
   if (!canCreate.value) return
   creating.value = true
   try {
-    const response = await $fetch<{ token: string, key: { id: string } }>('/api/settings/api-keys', {
+    const response = await $fetch<{ token: string, key: { id: string, nameSuffix: string } }>('/api/settings/api-keys', {
       method: 'POST',
       body: {
         name: newName.value.trim(),

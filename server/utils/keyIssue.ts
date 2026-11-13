@@ -123,11 +123,11 @@ export async function issueKey(input: { userId: string, teamId: string | null, r
   const now = Date.now()
   const attempt = () => db.transaction(async (tx) => {
     // The new key's suffix is counted over every key the person has now, after any older key without one has got its own.
-    const rows = await tx.select({ id: apiKeys.id, name: apiKeys.name, createdAt: apiKeys.createdAt, suffix: apiKeys.nameSuffix })
+    const rows = await tx.select({ id: apiKeys.id, name: apiKeys.name, createdAt: apiKeys.createdAt, nameSuffix: apiKeys.nameSuffix })
       .from(apiKeys).where(eq(apiKeys.userId, input.userId))
     // Older keys without a stored suffix are counted as the list endpoint would give them (in memory only; the list stores them).
     const filled = backfillSuffixes(rows)
-    const known = rows.map(row => ({ name: row.name, suffix: row.suffix ?? filled[row.id] ?? '' }))
+    const known = rows.map(row => ({ name: row.name, nameSuffix: row.nameSuffix ?? filled[row.id] ?? '' }))
     const nameSuffix = nextKeySuffix(input.request.name, known)
     const [row] = await tx.insert(apiKeys).values({
       id: Date.now().toString(36) + Math.random().toString(36).slice(2),
