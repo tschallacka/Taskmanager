@@ -12,8 +12,8 @@ const here = dirname(fileURLToPath(import.meta.url))
 function kitFiles() {
   return readFileSync(join(here, 'kit-files.txt'), 'utf8')
     .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line && !line.startsWith('#'))
+    .map(line => line.trim())
+    .filter(line => line && !line.startsWith('#'))
 }
 
 // Relative module specifiers from import/export statements and dynamic import() calls.
@@ -42,10 +42,10 @@ test('kit-files.txt lists every kit file that the kit files import', () => {
 
 test('the checker finds static, export-from and dynamic relative imports', () => {
   const source = [
-    "import { a } from './one.mjs'",
-    "export { b } from './two.mjs'",
-    "const c = await import('./three.mjs')",
-    "import x from 'node:fs'",
+    'import { a } from \'./one.mjs\'',
+    'export { b } from \'./two.mjs\'',
+    'const c = await import(\'./three.mjs\')',
+    'import x from \'node:fs\''
   ].join('\n')
   assert.deepEqual(relativeImports(source).sort(), ['./one.mjs', './three.mjs', './two.mjs'])
 })

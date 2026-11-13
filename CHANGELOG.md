@@ -2,6 +2,18 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.22.0 - 2026-11-13
+
+- **The crew comes back after a restart of Boss's session.** `crew up` brings the parts in the `up` list of crew.json back in order (already running, started, or failed and why), and is safe to run twice. `crew/detach.sh` keeps Pia's session and the dev services in a detached tmux session, so they outlive the session that started them. `crew restart-brief` lists each standing member's open cards and last update for Pia to start them fresh, and stops with the reason when a board call fails. Files: `crew/up.mjs`, `crew/detach.sh`, `crew/restart-brief.mjs`, `crew/board-call.mjs`, `crew/janet.mjs`, `crew/crew.mjs`, `crew/PROMPTS.md.tmpl`, `crew/SKILL.md`, `crew/kit-files.txt`.
+
+- **Crew sessions get a long-run profile, for that one session only.** `crew/claude-long-run.json` raises Claude Code's shell, MCP and background-agent limits; `crew claude` starts a session with it, and Pia's start line passes it with `--settings`. Other sessions keep the defaults. The README section "Claude Code limits" has the table, what cannot be raised, and the version it was checked against (2.1.319). `crew/claude-long-run.json`, `crew/claude-long-run.comments.md`, `crew/claude.mjs`, `crew/claude.test.mjs`, `crew/crew.mjs`, `crew/PROMPTS.md.tmpl`, `crew/README.md`, `crew/kit-files.txt`.
+
+- **Your picture and display name are yours to change, and a person without a picture gets their initials on a colour that stays the same.** In Settings, Account, upload a PNG, JPEG, WebP or SVG picture (up to 2 MB; cropped to a square and kept at 256 pixels), remove it, or edit your display name in place. The initials and colour come from one shared avatar. `app/components/account/ProfileEditor.vue`, `app/components/UserAvatar.vue`, `server/api/account/`, `docs/workspace/settings.md`.
+
+- **Comment permalinks load a window.** Opening a comment's link shows that comment with the five before and five after; **Load earlier comments** and **Show later comments** load the rest on their side, with the count of what is left. On a phone, a comment's link opens the Activity sheet, so the buttons are visible and work. Files: server/utils/commentWindow.ts, server/api/tasks/[id]/comments.ts, tests/comment-window.test.ts, docs/basics/comments-and-updates.md, changelog.d/mwav0vmcp2v8g8w5rz-comment-window.md.
+
+- **`crew dev-copies` checks the tester copies.** After `crew up`, it checks each card waiting in Verify UX or Verify QA: the owner, the card, the branch linked to the card, the port, and whether a copy answers there. A copy that does not answer gets the line `no copy: ask Boss: tester-copy.sh start <owner> <branch>`. It starts nothing. The board is read in one call (the two gate columns, up to 200 cards each), then one card read per gate card for its branch. A gate column over 200 cards is printed as cut, its cards past 200 are not checked, and the command exits 1. Files: `crew/dev-copies.mjs`, `crew/dev-copies.test.mjs`, `crew/crew.mjs`.
+
 ## 0.21.0 - 2026-11-13
 
 - **`tm.mjs` loads Playwright only when it starts a browser.** A plain board call (`crew <who> mcp ...`) no longer loads Playwright at start, which cut the CPU each call used while the crew shares one server. `crew/tm.mjs`, `crew/tm-lazy.test.mjs`, `crew/README.md`.
