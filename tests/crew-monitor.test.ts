@@ -64,3 +64,26 @@ test('a card in a working column that is not theirs changes nothing for them', (
   assert.equal(boardStatusOf(WREN, tasks).state, 'idle')
   assert.equal(boardStatusOf(PIA, tasks).state, 'busy')
 })
+
+test('a card tagged in progress makes its owner busy, whatever its column', () => {
+  const tasks = [task({ id: 'c1', title: 'Tagged', stage: 'backlog', column: 'To do', assigneeId: WREN, tags: ['in progress'] })]
+  assert.deepEqual(boardStatusOf(WREN, tasks), { state: 'busy', note: 'Busy: Tagged in To do' })
+})
+
+test('an untagged card in a non-working column still does not count', () => {
+  const tasks = [task({ id: 'c1', title: 'Plain', stage: 'backlog', column: 'To do', assigneeId: WREN, tags: ['bug'] })]
+  assert.equal(boardStatusOf(WREN, tasks).state, 'idle')
+})
+
+test('a finished card tagged in progress does not make its owner busy', () => {
+  const tasks = [task({ id: 'c1', title: 'Done', stage: 'backlog', column: 'Done', assigneeId: WREN, completed: true, tags: ['in progress'] })]
+  assert.equal(boardStatusOf(WREN, tasks).state, 'idle')
+})
+
+test('an open subtask under a card tagged in progress makes its owner busy', () => {
+  const tasks = [
+    task({ id: 'p1', title: 'Parent', stage: 'backlog', column: 'To do', assigneeId: PIA, tags: ['in progress'] }),
+    task({ id: 's1', title: 'Child', stage: 'backlog', column: 'To do', assigneeId: WREN, parentTaskId: 'p1' })
+  ]
+  assert.deepEqual(boardStatusOf(WREN, tasks), { state: 'busy', note: 'Busy: subtask Child under Parent' })
+})

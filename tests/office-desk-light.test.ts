@@ -3,7 +3,16 @@
 //   TSX_TSCONFIG_PATH=.nuxt/tsconfig.server.json node --import tsx --test tests/office-desk-light.test.ts
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { deskLightOf } from '../shared/office/model'
+
+test('the floating dot, ring and dashed light are gone from the actor; the desk lamp carries the status', () => {
+  const actor = readFileSync(new URL('../app/office/actor.ts', import.meta.url), 'utf8')
+  assert.doesNotMatch(actor, /buildDeskLight|this\.light\b|LIGHT_RADIUS/, 'no floating light is built or drawn')
+  assert.match(actor, /statusText = deskLightOf\(status\)\.text|deskLightOf\(status\)\.text/, 'the actor keeps the status text')
+  const office = readFileSync(new URL('../app/office/office.ts', import.meta.url), 'utf8')
+  assert.match(office, /lamp\.glow\.visible = deskLightOf\(person\.status\)\.shape === 'lit'/, 'the lamp glow follows the status')
+})
 import type { OfficePerson, PersonStatus } from '../shared/office/model'
 import { deskStatusSource, withDeskStatus } from '../server/utils/deskStatus'
 
