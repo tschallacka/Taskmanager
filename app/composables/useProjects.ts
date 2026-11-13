@@ -1,6 +1,21 @@
 import { computed, ref } from 'vue'
 import type MiniSearch from 'minisearch'
 import { realtimeHeaders } from '~/composables/useRealtime'
+import { mergeCommentPages } from '~/utils/commentMerge'
+import { applyLiveComment } from '~/utils/commentWindowLive'
+
+// A permalink's window as the API returns it (server/utils/commentWindow.ts): the comments and what is left either side.
+interface CommentWindowPage {
+  comments: TaskComment[]
+  hasEarlier: boolean
+  earlierCount: number
+  hasLater: boolean
+  laterCount: number
+}
+
+function windowCounts(page: CommentWindowPage) {
+  return { hasEarlier: page.hasEarlier, earlierCount: page.earlierCount, hasLater: page.hasLater, laterCount: page.laterCount }
+}
 import { clearCustomFields, ingestBoardFields } from '~/composables/useCustomFields'
 import type { FieldValues, ProjectField } from '~/composables/useCustomFields'
 import { matchesTagRequirements, type TagRequirement } from '#shared/utils/tags'
@@ -217,6 +232,10 @@ const _boardLoading = ref(false)
 const _ready = ref(false)
 const _comments = ref<TaskComment[]>([])
 const _commentsTaskId = ref<string | null>(null)
+// What is left on each side of the comments shown, when a permalink opened a window (null: the whole thread).
+// The task whose permalink window is shown (null: none). While it is set, a whole-thread load leaves the window alone.
+let windowTaskId: string | null = null
+const _commentWindow = ref<{ hasEarlier: boolean, earlierCount: number, hasLater: boolean, laterCount: number } | null>(null)
 const _activity = ref<TaskActivityItem[]>([])
 // Label filter for the open board. Kanban labels annotate tasks (priority,
 // workstream, …) rather than group boards, so they act as a board-level filter
@@ -988,13 +1007,67 @@ export function useProjects() {
     if (_commentsTaskId.value === taskId) _activity.value = rows
   }
 
+  // A permalink's window: the comment with 5 either side (the API counts what is left on each side).
+  async function loadCommentWindow(taskId: string, around: string) {
+    _commentsTaskId.value = taskId
+    windowTaskId = taskId
+    const page = await $fetch<CommentWindowPage>(`/api/tasks/${taskId}/comments`, { query: { around } })
+    if (_commentsTaskId.value === taskId) {
+      _comments.value = page.comments
+      _commentWindow.value = windowCounts(page)
+    }
+    return page.comments
+  }
+
+  // "Load earlier comments": every comment before the oldest one shown, joined in front of the window.
+  async function loadEarlierComments(taskId: string) {
+    const current = _comments.value
+    if (!current.length || _commentsTaskId.value !== taskId) return
+    const page = await $fetch<CommentWindowPage>(`/api/tasks/${taskId}/comments`, { query: { before: current[0]!.id } })
+    if (_commentsTaskId.value !== taskId) return
+    _comments.value = mergeCommentPages(page.comments, _comments.value)
+    _commentWindow.value = { ...(_commentWindow.value ?? windowCounts(page)), hasEarlier: false, earlierCount: 0 }
+  }
+
+  // "Show later comments": every comment after the newest one shown, joined after the window.
+  async function loadLaterComments(taskId: string) {
+    const current = _comments.value
+    if (!current.length || _commentsTaskId.value !== taskId) return
+    const page = await $fetch<CommentWindowPage>(`/api/tasks/${taskId}/comments`, { query: { after: current.at(-1)!.id } })
+    if (_commentsTaskId.value !== taskId) return
+    _comments.value = mergeCommentPages(_comments.value, page.comments)
+    _commentWindow.value = { ...(_commentWindow.value ?? windowCounts(page)), hasLater: false, laterCount: 0 }
+  }
+
   async function loadComments(taskId: string) {
+    // A permalink's window stays for its task: the whole-thread load must not replace it.
+    if (windowTaskId !== taskId) {
+      windowTaskId = null
+      _commentWindow.value = null
+    }
     _commentsTaskId.value = taskId
     const [comments] = await Promise.all([
       $fetch<TaskComment[]>(`/api/tasks/${taskId}/comments`),
       loadActivity(taskId).catch(() => {})
     ])
     if (_commentsTaskId.value === taskId) {
+      if (windowTaskId === taskId) {
+        // A window stays as it is. A comment newer than the window joins it only when the later side is loaded;
+        // otherwise the Show later count goes up (commentWindowLive.ts).
+        const newest = _comments.value.at(-1)?.createdAt ?? Number.NEGATIVE_INFINITY
+        let shown = _comments.value
+        let state = _commentWindow.value
+        if (state) {
+          for (const live of comments.filter(c => c.createdAt > newest).sort((a, b) => a.createdAt - b.createdAt)) {
+            const next = applyLiveComment(shown, state, live)
+            shown = next.comments
+            state = next.state
+          }
+        }
+        _comments.value = shown
+        _commentWindow.value = state
+        return comments
+      }
       _comments.value = comments
       _commentCounts.value = { ..._commentCounts.value, [taskId]: comments.length }
     }
@@ -1045,6 +1118,8 @@ export function useProjects() {
     _comments.value = []
     _activity.value = []
     _commentsTaskId.value = null
+    windowTaskId = null
+    _commentWindow.value = null
   }
 
   // Merged hits for the global search modal: tasks first (title boost), then
@@ -1157,6 +1232,10 @@ export function useProjects() {
     deleteTask,
     restoreTask,
     loadComments,
+    loadCommentWindow,
+    loadEarlierComments,
+    loadLaterComments,
+    commentWindow: _commentWindow,
     addComment,
     editComment,
     setCommentVisibility,

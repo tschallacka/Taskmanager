@@ -44,7 +44,7 @@ Remember that a customer's contact only reads comments on tasks that are themsel
 
 - **Reply** under a comment starts a reply: the box says *Replying to* the author, and the new comment shows a line
   pointing back at the one it answers. Click that line to jump to the original. **x** cancels the reply.
-- **Copy link** gives you a link that opens the task and flashes that comment. Handy for pointing a colleague at it.
+- **Copy link** gives you a link that opens the task and flashes that comment. Handy for pointing a colleague at it. Opening a comment's link shows that comment with the five comments before and after it. **Load earlier comments** shows everything before it, and **Show later comments** shows everything after it; the count on each button says how many are left. On a phone, a comment's link opens the Activity sheet by itself, so the comment and its buttons are on screen.
 - **Edit** (in the **...** menu) turns the comment into a box. Enter saves, Escape cancels. A comment cannot be emptied
   by editing.
 - **Delete** (also in the **...** menu) asks first and then removes the comment for good. There is no undo.
