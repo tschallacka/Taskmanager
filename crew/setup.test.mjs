@@ -65,7 +65,7 @@ function runSetup(origin, extra, { token = TOKEN, home } = {}) {
   const env = { ...process.env, HOME: join(scratch, 'home'), CREW_HOME: home, TASKMANAGER_MANAGEMENT_TOKEN: token }
   if (!token) delete env.TASKMANAGER_MANAGEMENT_TOKEN
   return new Promise((resolve) => {
-    const child = spawn(process.execPath, [SETUP, '--origin', origin, '--board', 'real-1', '--repo', '/srv/repo', ...extra], { env })
+    const child = spawn(process.execPath, [SETUP, '--origin', origin, '--board', 'real-1', '--repo', '/srv/repo', '--worktree-base', '/srv/agents/taskmanager-maintenance', ...extra], { env })
     let stdout = ''
     let stderr = ''
     child.stdout.on('data', (chunk) => {

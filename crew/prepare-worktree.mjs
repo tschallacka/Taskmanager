@@ -5,6 +5,20 @@
 
 import { spawnSync } from 'node:child_process'
 
+/**
+ * The folder of a card's worktree: <worktreeBase>/taskmanager-<who>-<first 8 characters of the task id>. The base comes
+ * from crew.json "worktreeBase" and is required: a missing or relative value is a clear one-line error, never a guess.
+ */
+export function worktreeFolder({ config, who, taskId }) {
+  const base = config?.worktreeBase
+  if (typeof base !== 'string' || !base.startsWith('/')) {
+    return { ok: false, message: 'crew.json has no worktreeBase (an absolute folder); set it, then run this again' }
+  }
+  const trimmed = base.replace(/\/+$/, '') || '/'
+  const path = `${trimmed === '/' ? '' : trimmed}/taskmanager-${who}-${taskId.slice(0, 8)}`
+  return { ok: true, path }
+}
+
 /** The slug of a card's title for a branch name: lower case, words joined by dashes, at most 40 characters. */
 export function slugOf(title) {
   const slug = String(title ?? '')

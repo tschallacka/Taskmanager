@@ -252,6 +252,11 @@ if (!skipsProvider('pia', config.models.pia)) {
   } catch (error) { fail(error.message) }
 }
 
+// The worktree folder: prepare worktree needs it; init does not guess it, setup writes it from --worktree-base.
+if (typeof config.worktreeBase !== 'string' || !config.worktreeBase.startsWith('/')) {
+  warn('crew.json has no "worktreeBase" (an absolute folder): set it, or "crew <who> prepare worktree" stops with a clear message')
+}
+
 // Boss's session: its Stop hook keeps the two crew watches running (boss-stop-hook.sh). Written into the folder that
 // crew.json names as "bossSession"; without one, init says so and writes nothing, because a hook in a folder Boss does
 // not run in does nothing.

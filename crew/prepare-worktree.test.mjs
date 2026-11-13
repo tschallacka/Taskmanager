@@ -3,7 +3,18 @@
 // for the script, so no git, dependency or database work runs here.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { parseResultLine, prepareWorktree, removePlan, slugOf } from './prepare-worktree.mjs'
+import { parseResultLine, prepareWorktree, removePlan, slugOf, worktreeFolder } from './prepare-worktree.mjs'
+
+test('the worktree folder comes from crew.json worktreeBase, and a missing or relative one is a clear error', () => {
+  const missing = worktreeFolder({ config: {}, who: 'wren', taskId: 'mwdlkxb56xr2ek89g92' })
+  assert.equal(missing.ok, false)
+  assert.match(missing.message, /crew\.json has no worktreeBase \(an absolute folder\)/)
+  assert.equal(missing.message.includes('\n'), false, 'one line')
+  assert.equal(worktreeFolder({ config: { worktreeBase: 'relative/dir' }, who: 'wren', taskId: 'x' }).ok, false)
+  assert.equal(worktreeFolder({ config: null, who: 'wren', taskId: 'x' }).ok, false)
+  const set = worktreeFolder({ config: { worktreeBase: '/srv/agents/taskmanager-maintenance/' }, who: 'wren', taskId: 'mwdlkxb56xr2ek89g92' })
+  assert.deepEqual(set, { ok: true, path: '/srv/agents/taskmanager-maintenance/taskmanager-wren-mwdlkxb5' })
+})
 
 test('a worktree is removed only when it is clean and its branch is on origin with nothing ahead', () => {
   assert.equal(removePlan({ dirty: false, branchPushed: true, aheadOfRemote: 0 }).ok, true)
@@ -32,7 +43,11 @@ test('the script gets who, the task id and a slug of the title, and its result l
 
 test('a project with no script gets a clear message, and nothing runs', () => {
   let ran = false
-  const result = prepareWorktree({ who: 'wren', taskId: 'x', title: 'x', config: {}, runner: () => { ran = true; return { status: 0, stdout: '', stderr: '' } } })
+  const runner = () => {
+    ran = true
+    return { status: 0, stdout: '', stderr: '' }
+  }
+  const result = prepareWorktree({ who: 'wren', taskId: 'x', title: 'x', config: {}, runner })
   assert.equal(result.ok, false)
   assert.match(result.message, /no prepareWorktree script in crew\.json/)
   assert.equal(ran, false)
