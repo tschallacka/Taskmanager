@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.27.0 - 2026-11-13
+
+- **Every crew session starts with its own settings file.** Each background session gets `CREW_HOME/settings/<key>.json` (mode 600): the `mcp__git__restart_self` tool is denied for every agent, the person's own crew home is set, and remote control is off. The start passes that one file as its `--settings`. Files: `crew/session-settings.mjs`, `crew/session.mjs`, `crew/session.test.mjs`, `crew/session-settings.test.mjs`, `crew/kit-files.txt`.
+
 ## 0.26.0 - 2026-11-13
 
 - **A crew person can run as its own background session.** `crew session start <key> <folder>` starts one person as a `claude --bg` session with remote control off and the crew's own strict mcp config, and records its id in `sessions/<key>.json`; `status`, `list` and `stop` read that record by id. Only the crew kit changes: `crew/session.mjs`, `crew/crew.mjs`, `crew/kit-files.txt`, `crew/session.test.mjs`.
