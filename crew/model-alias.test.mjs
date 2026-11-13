@@ -13,11 +13,11 @@ const here = dirname(fileURLToPath(import.meta.url))
 const BARE = [/model: haiku\b/, /--model haiku\b/, /\b\w+: ['"]haiku['"]/]
 
 test('the check catches the single-quoted object form, default: \'haiku\', and the other spellings', () => {
-  assert.ok(BARE.some(re => re.test("const d = { default: 'haiku' }")))
+  assert.ok(BARE.some(re => re.test('const d = { default: \'haiku\' }')))
   assert.ok(BARE.some(re => re.test('  usher: "haiku",')))
   assert.ok(BARE.some(re => re.test('model: haiku')))
   assert.ok(BARE.some(re => re.test('claude --model haiku')))
-  assert.ok(!BARE.some(re => re.test("const id = 'claude-haiku-5-5'")))
+  assert.ok(!BARE.some(re => re.test('const id = \'claude-haiku-5-5\'')))
 })
 
 test('no kit source or template writes a bare model alias into a generated file or a start command', () => {
