@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 import type MiniSearch from 'minisearch'
 import { realtimeHeaders } from '~/composables/useRealtime'
+import { BOARD_LOAD_TIMEOUT_MS, withTimeout } from '~/utils/boardLoad'
 import { clearCustomFields, ingestBoardFields } from '~/composables/useCustomFields'
 import type { FieldValues, ProjectField } from '~/composables/useCustomFields'
 import { matchesTagRequirements, type TagRequirement } from '#shared/utils/tags'
@@ -679,7 +680,8 @@ export function useProjects() {
       _activeProjectId.value = id
       await refreshArchivedActive(id)
       const [board, people] = await Promise.all([
-        $fetch<BoardPayload>(boardUrl(id)),
+        // A request that never completes is a failure after the timeout, not a spinner (boardLoad.ts).
+        withTimeout($fetch<BoardPayload>(boardUrl(id)), BOARD_LOAD_TIMEOUT_MS),
         // The picker is not worth failing the board over.
         $fetch<ProjectPerson[]>(`/api/projects/${id}/people`).catch(() => _people.value)
       ])
