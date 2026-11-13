@@ -5,7 +5,6 @@ import type { ProjectPerson } from '~/composables/useProjects'
 
 definePageMeta({ layout: 'app' })
 
-const { sidebarOpen } = useSidebar()
 useSeoMeta({ title: 'Profile' })
 
 const { session } = useAuth()
@@ -36,22 +35,22 @@ watch(projects, async (list) => {
 
 <template>
   <div class="flex min-w-0 flex-1 flex-col overflow-y-auto">
-    <header class="flex shrink-0 items-center gap-2 px-4 py-3 lg:hidden">
-      <UButton
-        icon="i-lucide-panel-left"
-        color="neutral"
-        variant="ghost"
-        size="sm"
-        aria-label="Open sidebar"
-        @click="sidebarOpen = true"
-      />
-    </header>
+    <Teleport
+      defer
+      to="#app-topbar-title"
+    >
+      <h1 class="text-base font-semibold text-default">
+        Profile
+      </h1>
+    </Teleport>
 
     <div class="mx-auto w-full max-w-4xl px-4 pb-12 pt-6 lg:px-6">
       <div class="flex items-center gap-5">
-        <UAvatar
-          :src="me?.image ?? undefined"
-          :alt="me?.name"
+        <UserAvatar
+          :user-id="me?.id ?? ''"
+          :name="me?.name"
+          :email="me?.email"
+          :image="me?.image"
           size="3xl"
         />
         <div class="min-w-0">
@@ -142,9 +141,11 @@ watch(projects, async (list) => {
                 class="min-w-0"
               >
                 <span class="flex min-w-0 items-center gap-2.5">
-                  <UAvatar
-                    :src="person.image ?? undefined"
-                    :alt="person.name || person.email || ''"
+                  <UserAvatar
+                    :user-id="person.id"
+                    :name="person.name"
+                    :email="person.email"
+                    :image="person.image"
                     size="sm"
                   />
                   <span class="truncate">{{ person.name || person.email }}</span>

@@ -1,4 +1,4 @@
-// The copy-paste prompt of "Get AI management token", the countdown, and the link a crew refusal points to. Pure, no
+// The copy-paste prompt of "Put an AI crew to work on this board", the countdown, and the link a crew refusal points to. Pure, no
 // database. Run:
 //   DATABASE_URL=postgresql://arnotes:arnotes@localhost:5432/arnotes_test node --import tsx --test tests/management-prompt.test.ts
 import { describe, test } from 'node:test'
@@ -21,95 +21,86 @@ const input = {
   expiresAt: EXPIRES_AT
 }
 
-describe('the management prompt', () => {
+describe('the management prompt: one new crew, in three steps', () => {
   test('names the base URL, the board id and the board name', () => {
     const prompt = managementPrompt(input)
-    assert.match(prompt, /"Launch board" \(board id board-abc\) at https:\/\/taskmanager\.example\./)
-    assert.match(prompt, /"projectId": "board-abc"/)
-    assert.match(prompt, /"board_id": "board-abc"/)
+    assert.match(prompt, /one Taskmanager board\. The board is "Launch board" \(board id board-abc\) at https:\/\/taskmanager\.example\./)
+    assert.match(prompt, /--board board-abc/)
+    assert.match(prompt, /--origin https:\/\/taskmanager\.example/)
   })
 
-  test('says the token dies in 10 minutes, with the exact expiry time', () => {
+  test('says the token dies in 10 minutes, with the exact expiry time, and works for this board only', () => {
     const prompt = managementPrompt(input)
-    assert.match(prompt, /It works for 10 minutes, until 2026-11-07T22:40:00\.000Z, and then it stops\./)
+    assert.match(prompt, /Your management token works for 10 minutes, until 2026-11-07T22:40:00\.000Z, and then it stops\. It works for this board only\./)
   })
 
-  test('lists the crew endpoints: targets, create or rotate, and delete', () => {
+  test('has the three steps, in order: the kit, the setup command, the report', () => {
     const prompt = managementPrompt(input)
-    assert.match(prompt, /GET https:\/\/taskmanager\.example\/api\/crews\/targets/)
-    assert.match(prompt, /POST https:\/\/taskmanager\.example\/api\/crews$/m)
-    assert.match(prompt, /DELETE https:\/\/taskmanager\.example\/api\/crews\/<slug>/)
+    const one = prompt.indexOf('Step 1: get the kit')
+    const two = prompt.indexOf('Step 2: make the crew')
+    const three = prompt.indexOf('Step 3: report')
+    assert.ok(one > 0 && two > one && three > two, 'the steps are in order')
   })
 
-  test('describes the response, with the shadow board as the work board', () => {
+  test('downloads the kit from this instance, into a folder of its own', () => {
     const prompt = managementPrompt(input)
-    assert.match(prompt, /"shadow_board": the crew's work board\. Give the crew this board's "url"/)
-    assert.match(prompt, /"real_board": the board of the people\. Do not write to it\./)
-    assert.match(prompt, /"userboard": the real board with its shadow boards\./)
+    assert.match(prompt, /curl -sSf -D - -o ~\/crew-kit\.tar\.gz https:\/\/taskmanager\.example\/crew\/kit\.tar\.gz/)
+    assert.match(prompt, /~\/crew-kit-<host>/)
   })
 
-  test('states the rules: shadow board only, no writes to the real board, the header only, stop on 401', () => {
+  test('runs the setup with the token in the environment variable, and nowhere on the command line', () => {
     const prompt = managementPrompt(input)
-    assert.match(prompt, /A crew works only on its shadow_board\. Never write to the real board/)
-    assert.match(prompt, /Never paste the token anywhere except the Authorization header\./)
+    assert.match(prompt, /TASKMANAGER_MANAGEMENT_TOKEN=<token> node setup\.mjs --origin https:\/\/taskmanager\.example --board board-abc --repo <repository path>/)
+    assert.doesNotMatch(prompt, /--token/)
+  })
+
+  test('the setup command passes --worktree-base, the folder the worktrees go in', () => {
+    const prompt = managementPrompt(input)
+    assert.match(prompt, /--repo <repository path> --worktree-base <folder the repository is in>/)
+    assert.doesNotMatch(prompt, /--worktree-base \/(?![a-z])/, 'the prompt never suggests the root')
+  })
+
+  test('the token appears once: on its own line, shown once', () => {
+    const prompt = managementPrompt(input)
+    assert.equal(prompt.split(TOKEN).length - 1, 1, 'the token is shown once, and never repeated')
+  })
+
+  test('a crew is always new: a taken slug is never rotated', () => {
+    const prompt = managementPrompt(input)
+    assert.match(prompt, /The crew is always new\. If the command says the slug is taken, run it again with --slug <another slug>\. Never rotate a crew\./)
+    assert.doesNotMatch(prompt, /"rotate": true/)
+  })
+
+  test('the report is the three lines the command prints, and no key or file of the crew home is opened', () => {
+    const prompt = managementPrompt(input)
+    assert.match(prompt, /The command prints three lines: the crew home, the work board's address, and what to do next\./)
+    assert.match(prompt, /Do not open or print any file in the crew home, and print no key or password\./)
+  })
+
+  test('the keys route and the keys.env file are gone from the prompt', () => {
+    const prompt = managementPrompt(input)
+    assert.doesNotMatch(prompt, /keys\.env/)
+    assert.doesNotMatch(prompt, /keys_url/)
+    assert.doesNotMatch(prompt, /~\/\.config\/taskmanager/)
+  })
+
+  test('states the rules: the work board only, no writes to the real board, a management token and not a crews:manage key', () => {
+    const prompt = managementPrompt(input)
+    assert.match(prompt, /A crew works only on its work board, the shadow board the command names\. Never write to the real board, board-abc\./)
+    assert.match(prompt, /A remote call to the crew API needs this management token\. A crews:manage key does not work here\./)
+    assert.match(prompt, /A management token reaches only this board\. Any other board or crew is refused or answers 404\./)
+  })
+
+  test('stops on 401 with the token message word for word, and on 403 with the sentence', () => {
+    const prompt = managementPrompt(input)
     assert.match(prompt, /If a call answers 401 with the code token_expired, token_regenerated or token_revoked, stop\. Do not retry with this token\./)
-    assert.match(prompt, /Tell your main agent the message the reply gave, word for word/)
+    assert.match(prompt, /Tell the user the message the reply gave, word for word/)
+    assert.match(prompt, /If a call answers 403, tell the user the sentence in the reply, word for word, and stop\./)
   })
 
-  test('carries the token in the Authorization header line, and nowhere else but its own line', () => {
+  test('asks the user one question at most: the repository path', () => {
     const prompt = managementPrompt(input)
-    assert.match(prompt, new RegExp(`Authorization: Bearer ${TOKEN}`))
-    assert.equal(prompt.split(TOKEN).length - 1, 2, 'the token appears on its own line and in the header line, only')
-  })
-
-  test('a call that names another board or crew is refused, and the prompt says so', () => {
-    const prompt = managementPrompt(input)
-    assert.match(prompt, /Any other board or crew is refused or answers 404\./)
-  })
-})
-
-describe('the management prompt: the one-time keys', () => {
-  test('the create answer holds no keys: the keys come from keys_url, in step 3', () => {
-    const prompt = managementPrompt(input)
-    assert.match(prompt, /The answer holds no keys and no passwords\. They come from the keys route in step 3, once\./)
-    assert.match(prompt, /3\. Get the keys: POST the "keys_url" with the same token and no body\./)
-  })
-
-  test('the keys are saved to a folder of mode 700 and a file of mode 600, under the user\'s config folder', () => {
-    const prompt = managementPrompt(input)
-    assert.match(prompt, /The folder is ~\/\.config\/taskmanager\/<slug>\/ \(mode 700\) and the file in it is keys\.env \(mode 600\), outside any repository\./)
-    assert.match(prompt, /umask 077; mkdir -p -m 700 ~\/\.config\/taskmanager\/<slug>; curl -s -f -X POST -H "Authorization: Bearer <token>" "<keys_url>" -o ~\/\.config\/taskmanager\/<slug>\/keys\.env/)
-  })
-
-  test('the keys are never printed, read back or pasted, and only the path goes to the user', () => {
-    const prompt = managementPrompt(input)
-    assert.match(prompt, /Never print the file, open it, read it back, or paste a key into a chat, a task, a log or a file of your own\. Tell the user the path, and nothing else about the keys\./)
-  })
-
-  test('an existing keys.env is not overwritten: the answer goes to a new name next to it', () => {
-    const prompt = managementPrompt(input)
-    assert.match(prompt, /If keys\.env already exists, do not overwrite it\. Save the answer to a new name next to it \(keys-2\.env, keys-3\.env, and so on\) and tell the user that name\./)
-  })
-
-  test('the file loads into a shell, and the names of its variables are spelled out', () => {
-    const prompt = managementPrompt(input)
-    assert.match(prompt, /The file loads into a shell with: \. ~\/\.config\/taskmanager\/<slug>\/keys\.env/)
-    assert.match(prompt, /TASKMANAGER_CREW_<SLUG>_<PERSON>_API_KEY or TASKMANAGER_CREW_<SLUG>_<PERSON>_PASSWORD, with the slug and the person upper-cased and dashes turned into underscores\./)
-  })
-
-  test('each call to keys_url makes new keys, so it is called once', () => {
-    const prompt = managementPrompt(input)
-    assert.match(prompt, /Every call to keys_url makes new keys, and the old ones stop working at once\. Call it once, and again only when the file was lost\./)
-  })
-
-  test('a taken slug answers 409, and "rotate": true makes new keys for that crew', () => {
-    const prompt = managementPrompt(input)
-    assert.match(prompt, /If the slug is already taken the call answers 409\. Then send the same call again with "rotate": true, which makes new keys for that crew\./)
-  })
-
-  test('the crew\'s own board is not the work board: the shadow board is', () => {
-    const prompt = managementPrompt(input)
-    assert.match(prompt, /The crew's own board, "crew\.boardUrl", is not the work board\. Do not give it to the crew, unless the owner decides otherwise\./)
+    assert.match(prompt, /Ask the user one question only: the path of the repository the crew works on, if you do not know it\./)
   })
 })
 

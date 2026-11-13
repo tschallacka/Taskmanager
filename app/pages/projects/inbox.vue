@@ -8,7 +8,6 @@ import type { NotificationItem } from '~/composables/useNotifications'
 
 definePageMeta({ layout: 'app' })
 
-const { sidebarOpen } = useSidebar()
 useSeoMeta({ title: 'Inbox' })
 
 const { items, unread, prefs, push, loaded, load, markRead, markAllRead, archive, archiveAll, unarchive, loadReadBox, decideGuestRequest, setPreference, setPush, testPush } = useNotifications()
@@ -251,25 +250,26 @@ async function sendTest() {
 
 <template>
   <div class="flex min-w-0 flex-1 flex-col">
-    <header class="flex shrink-0 items-center gap-2 border-b border-default px-4 py-3 lg:px-6">
-      <UButton
-        icon="i-lucide-panel-left"
-        color="neutral"
-        variant="ghost"
-        size="sm"
-        class="lg:hidden"
-        aria-label="Open sidebar"
-        @click="sidebarOpen = true"
-      />
-      <h1 class="text-base font-semibold text-default">
-        Inbox
-      </h1>
-      <span
-        v-if="!onAgentTab && unread"
-        class="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium tabular-nums text-primary"
-        data-inbox-unread
-      >{{ unread }} unread</span>
-      <div class="ml-auto flex items-center gap-1">
+    <Teleport
+      defer
+      to="#app-topbar-title"
+    >
+      <div class="flex min-w-0 items-center gap-2">
+        <h1 class="text-base font-semibold text-default">
+          Inbox
+        </h1>
+        <span
+          v-if="!onAgentTab && unread"
+          class="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium tabular-nums text-primary"
+          data-inbox-unread
+        >{{ unread }} unread</span>
+      </div>
+    </Teleport>
+    <Teleport
+      defer
+      to="#app-topbar-actions"
+    >
+      <div class="flex items-center gap-1">
         <UButton
           v-if="!onAgentTab && unread"
           label="Mark all read"
@@ -311,7 +311,7 @@ async function sendTest() {
           @click="settingsOpen = !settingsOpen"
         />
       </div>
-    </header>
+    </Teleport>
 
     <nav
       v-if="hasAgents"
@@ -527,9 +527,10 @@ async function sendTest() {
                   class="mt-1.5 size-2 shrink-0 rounded-full"
                   :class="item.readAt ? 'bg-transparent' : 'bg-primary'"
                 />
-                <UAvatar
-                  :src="item.actorImage ?? undefined"
-                  :alt="item.actorName ?? 'Someone'"
+                <UserAvatar
+                  :user-id="item.actorId ?? ''"
+                  :name="item.actorName ?? 'Someone'"
+                  :image="item.actorImage"
                   size="xs"
                   class="mt-0.5"
                 />

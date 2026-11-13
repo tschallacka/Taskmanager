@@ -24,6 +24,9 @@ import { crewHome } from './home.mjs'
 import { codeAt, keyOf } from './totp.mjs'
 import { createOTP } from '@better-auth/utils/otp'
 import { CAST, EXTRA_CAST, forkMemberPlan, forkRole } from './cast.mjs'
+import { copyKitFiles, kitListed, writeCrewJson } from './test-fixtures.mjs'
+
+const kitFilesOf = kitListed
 
 test('the extra workers the kit names are the ones the app shares: one list, and this fails when they differ', () => {
   const shared = readFileSync(join(KIT, '..', 'shared', 'utils', 'extraWorkers.ts'), 'utf8')
@@ -45,7 +48,7 @@ test('an extra worker plays its role from its fork, and the plan of a forked mem
 const KIT = dirname(fileURLToPath(import.meta.url))
 const CREW = join(KIT, 'crew.mjs')
 const DRIVER = join(KIT, 'browser-driver.mjs')
-const NOT_SHIPPED = /\.test\.mjs$|^\.|^kit-files\.txt$/
+const NOT_SHIPPED = /\.test\.mjs$|^\.|^kit-files\.txt$|^test-fixtures\.mjs$/
 const SECRET_OR_RUN = /^(creds|crew|crew\.config|package-lock)\.json$|\.log$/
 
 describe('the kit file list', () => {
@@ -513,17 +516,11 @@ describe('CREW_HOME and the agent types', () => {
 // ---------- crew update: the kit folder and the owner files (no browser needed) ----------
 
 describe('crew update: the kit folder and the owner files', () => {
-  const kitFilesOf = dir => readFileSync(join(dir, 'kit-files.txt'), 'utf8').split('\n').map(line => line.trim()).filter(line => line && !line.startsWith('#'))
   const editFile = (path, change) => writeFileSync(path, change(readFileSync(path, 'utf8')))
 
-  // A copy of the kit's listed files, as a folder the crew runs from.
-  function copyKit(dest, from = KIT) {
-    mkdirSync(dest, { recursive: true })
-    for (const name of [...kitFilesOf(from), 'kit-files.txt']) copyFileSync(join(from, name), join(dest, name))
-  }
-  function writeConfig(crew, url) {
-    writeFileSync(join(crew.home, 'crew.json'), JSON.stringify({ team: 'Test Crew', crew: { slug: 'test' }, product: { name: 'Test', repo: '' }, board: { url } }))
-  }
+  // A copy of the kit's listed files, as a folder the crew runs from (the fixture the update tests share).
+  const copyKit = (dest, from = KIT) => copyKitFiles(dest, from)
+  const writeConfig = (crew, url) => writeCrewJson(crew.home, { slug: 'test', url, team: 'Test Crew' })
   function newCrew() {
     const root = mkdtempSync(join(SCRATCH, 'kit-update-'))
     made.push(root)
@@ -575,7 +572,11 @@ describe('crew update: the kit folder and the owner files', () => {
     const out = await updateKit(dirA, crew, ['--from', KIT, '--kit', dirA])
     assert.equal(out.code, 0, out.stderr)
     assert.match(out.stdout, /is up to date/)
-    assert.deepEqual(snapshot(crew.home), before, 'the crew home is the same after the check')
+    // The crew home had no record of its kit (init does not write one), so the check links it to the folder it runs
+    // from. That link is the one change; every owner file and the rest of the home stay as they were.
+    const { '/crew-kit.json': link, ...rest } = snapshot(crew.home)
+    assert.deepEqual(rest, before, 'the crew home is the same after the check, apart from its link')
+    assert.equal(JSON.parse(link).kit, dirA, 'the home now names the kit folder it runs from')
     assert.deepEqual(backupsOf(crew), [], 'no backup when nothing changed')
   })
 
@@ -613,6 +614,40 @@ describe('crew update: the kit folder and the owner files', () => {
     assert.ok(manifest.files['update.mjs'], 'the install is recorded')
     const again = await updateKit(dirA, crew, ['--check', '--from', dirB, '--kit', dirA])
     assert.equal(again.code, 0, again.stdout)
+  })
+
+  test('a real crew keeps its own files through an update: rules, brief, janitor card and creds are untouched', async () => {
+    const crew = newCrew()
+    const dirA = await installedKit(crew)
+    const dirB = newerKit(dirA, crew)
+    // The crew's own filled-in files and its secrets, as a crew that has been running holds them. The secrets are fake.
+    editFile(ownerFile(crew), text => `${text}\nOwner rules kept.\n`)
+    editFile(join(crew.home, 'BRIEF.md'), text => `${text}\nOwner brief kept.\n`)
+    writeFileSync(join(crew.home, 'JANET.md'), '# Janet card\n\nOwner janitor line kept.\n')
+    writeFileSync(join(crew.home, 'creds.json'), JSON.stringify({ people: { wade: { password: 'test-only' } } }))
+    const creds = readFileSync(join(crew.home, 'creds.json'), 'utf8')
+    // The crew.json a running crew holds: its reader, dev ports and start command are already set (init fills in only
+    // what is missing, so a complete crew.json is one it leaves alone).
+    const running = JSON.parse(readFileSync(join(crew.home, 'crew.json'), 'utf8'))
+    writeFileSync(join(crew.home, 'crew.json'), JSON.stringify({
+      ...running,
+      reader: running.reader ?? 'wade',
+      devServers: running.devServers ?? { wade: 3104 },
+      scripts: { ...(running.scripts ?? {}), serve: running.scripts?.serve ?? 'bunx nuxt dev --host 127.0.0.1 --port {port}' }
+    }, null, 2) + '\n')
+    const config = readFileSync(join(crew.home, 'crew.json'), 'utf8')
+    const out = await updateKit(dirA, crew, ['--from', dirB, '--kit', dirA])
+    // init's FAIL line about playwright is expected in a copy with no node_modules, so the exit code is not checked.
+    assert.match(out.stdout, /crew update: the kit in/, out.stdout + out.stderr)
+    assert.doesNotMatch(out.stdout, /CONFLICT:/, out.stdout)
+    assert.equal(readFileSync(join(crew.home, 'creds.json'), 'utf8'), creds, 'creds.json is not touched')
+    assert.equal(readFileSync(join(crew.home, 'crew.json'), 'utf8'), config, 'crew.json is not touched')
+    assert.equal(readFileSync(join(crew.home, 'JANET.md'), 'utf8'), '# Janet card\n\nOwner janitor line kept.\n', 'the janitor card is the crew\'s own')
+    const rules = readFileSync(ownerFile(crew), 'utf8')
+    assert.match(rules, /Owner rules kept\./, 'the rules keep the crew\'s text')
+    assert.match(rules, /Replace the examples here/, 'the new template line is merged in')
+    assert.doesNotMatch(rules, /<<<<<<</)
+    assert.match(readFileSync(join(crew.home, 'BRIEF.md'), 'utf8'), /Owner brief kept\./, 'the brief keeps the crew\'s text')
   })
 
   test('an owner edit on the line the template changed is a conflict: the owner file is kept', async () => {

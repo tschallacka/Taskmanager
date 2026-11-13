@@ -7,7 +7,6 @@ import type { TimeEntry } from '~/composables/useTimeTracking'
 
 definePageMeta({ layout: 'app' })
 
-const { sidebarOpen } = useSidebar()
 useSeoMeta({ title: 'Timesheet' })
 
 const { allTasks, projects } = useProjects()
@@ -108,23 +107,17 @@ async function removeEntry(id: string) {
 
 <template>
   <div class="flex min-w-0 flex-1 flex-col">
-    <header class="flex shrink-0 items-center gap-2 border-b border-default px-4 py-3 lg:px-6">
-      <UButton
-        icon="i-lucide-panel-left"
-        color="neutral"
-        variant="ghost"
-        size="sm"
-        class="lg:hidden"
-        aria-label="Open sidebar"
-        @click="sidebarOpen = true"
-      />
+    <Teleport
+      defer
+      to="#app-topbar-title"
+    >
       <h1 class="flex items-center gap-1.5 text-base font-semibold text-default">
         Timesheet
         <HelpHint page="workspace/timesheet">
           The time you and your team logged, by day and project. How to start a timer or log time by hand is in the help.
         </HelpHint>
       </h1>
-    </header>
+    </Teleport>
 
     <div class="min-h-0 flex-1 overflow-y-auto px-4 py-4 lg:px-6">
       <div class="mb-4 flex flex-wrap items-center gap-2">

@@ -7,7 +7,6 @@ useSeoMeta({ title: 'Crews' })
 
 const { isInstanceAdmin, isPending: sessionPending } = useAuth()
 const toast = useToast()
-const { sidebarOpen } = useSidebar()
 
 function errMsg(e: unknown): string | undefined {
   return (e as { data?: { message?: string } })?.data?.message
@@ -241,16 +240,6 @@ function cancelPurge() {
   <div class="h-full overflow-y-auto px-4 pb-10 pt-6 lg:px-6">
     <div class="mx-auto max-w-4xl space-y-8">
       <div class="flex items-center gap-3">
-        <UButton
-          v-if="!sidebarOpen"
-          icon="i-lucide-panel-left"
-          color="neutral"
-          variant="ghost"
-          size="sm"
-          class="lg:hidden"
-          aria-label="Open sidebar"
-          @click="sidebarOpen = true"
-        />
         <div class="flex-1 min-w-0">
           <h1 class="text-xl font-semibold text-default">
             Crews

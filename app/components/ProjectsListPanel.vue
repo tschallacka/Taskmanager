@@ -2,14 +2,16 @@
 import { relativeTime } from '~/composables/useRelativeTime'
 import type { Project } from '~/composables/useProjects'
 import type { PinnedBoard } from '~/composables/usePins'
+import { crewUpdatePrompt } from '~/utils/crewUpdatePrompt'
 import { taskCountLabel } from '#shared/utils/board'
 import { crewTreeRows } from '~/utils/crewTreeRows'
+import { countOpenTasks, healthTint, kindIcon, projectKind } from '~/utils/projectKind'
 
 const { ready, projects, allTasks, deleteProject, renameProject } = useProjects()
 const route = useRoute()
 const { unread: inboxUnread } = useNotifications()
 const { pins, pinsLoaded, loadPins, isPinned, pinBoard, unpinBoard } = usePins()
-const { activeTeamId, isTeamAdmin } = useTeams()
+const { activeTeamId } = useTeams()
 const { switchWorkspace } = useWorkspace()
 const toast = useToast()
 
@@ -129,8 +131,10 @@ async function openPin(pin: PinnedBoard) {
 async function togglePin(projectId: string) {
   try {
     await (isPinned(projectId) ? unpinBoard(projectId) : pinBoard(projectId))
-  } catch {
-    toast.add({ title: 'Could not change the pin', color: 'error' })
+  } catch (error) {
+    // The server answers 409 when eight boards are already pinned; say so in its own words.
+    const message = (error as { data?: { message?: string } })?.data?.message
+    toast.add({ title: message ?? 'Could not change the pin', color: 'error' })
   }
 }
 
@@ -144,14 +148,7 @@ function newProject() {
 // how much is left, and the total is still there behind it.
 const taskCounts = computed(() => {
   const terminal = new Map(projects.value.map(p => [p.id, new Set(p.terminalColumnIds ?? [])]))
-  const counts = new Map<string, { open: number, total: number }>()
-  for (const task of allTasks.value) {
-    const entry = counts.get(task.projectId) ?? { open: 0, total: 0 }
-    entry.total++
-    if (!terminal.get(task.projectId)?.has(task.columnId)) entry.open++
-    counts.set(task.projectId, entry)
-  }
-  return counts
+  return countOpenTasks(allTasks.value, terminal)
 })
 
 function countsFor(project: Project) {
@@ -166,6 +163,11 @@ function countLabel(project: Project) {
 function countTitle(project: Project) {
   const { open, total } = countsFor(project)
   return project.terminalColumnIds?.length ? `${open} open of ${total}` : `${total} in total`
+}
+
+// The icon and the open count take the board's health as their tint; the open row is primary (projectKind.ts).
+function kindTint(project: Project) {
+  return healthTint(project, activeId.value === project.id)
 }
 
 // ─── Inline rename / delete ────────────────────────────────
@@ -196,7 +198,7 @@ const WORKSPACE_LINKS = [
   { to: '/projects/home', label: 'Home', icon: 'i-lucide-house' },
   { to: '/projects/inbox', label: 'Inbox', icon: 'i-lucide-inbox' },
   { to: '/projects/my-tasks', label: 'My tasks', icon: 'i-lucide-circle-check' },
-  { to: '/projects/browse', label: 'Browse projects', icon: 'i-lucide-folder-search' },
+  { to: '/projects/browse', label: 'All projects', icon: 'i-lucide-folder-search' },
   { to: '/projects/goals', label: 'Goals', icon: 'i-lucide-target' },
   { to: '/projects/portfolios', label: 'Portfolios', icon: 'i-lucide-layout-grid' },
   { to: '/projects/timesheet', label: 'Timesheet', icon: 'i-lucide-clock' },
@@ -204,7 +206,7 @@ const WORKSPACE_LINKS = [
 ]
 
 const deleteTarget = ref<{ id: string, name: string, crewBoard?: boolean } | null>(null)
-// The board whose management token dialog is open ("Get AI management token").
+// The board whose management token dialog is open ("Put an AI crew to work on this board").
 const managementBoard = ref<{ id: string, name: string } | null>(null)
 
 async function confirmDelete() {
@@ -214,6 +216,22 @@ async function confirmDelete() {
   await deleteProject(target.id, target.crewBoard)
   if (isPinned(target.id)) loadPins().catch(() => {})
   if (activeId.value === target.id) navigateTo('/projects')
+}
+
+// The "…" trigger is hidden until hover on a fine pointer (a mouse). Below lg, and on any screen
+// without a hover, it stays visible on every row, so no control is tapped unseen.
+const menuTriggerClass = 'mt-0.5 shrink-0 opacity-100 transition-opacity lg:opacity-0 lg:group-hover:opacity-100 lg:focus-visible:opacity-100'
+
+// A pinned row has the same menu as a board row. A board outside the loaded list (another
+// workspace) has no project to build the menu from, so its menu carries only the pin.
+function pinMenuItems(pin: PinnedBoard) {
+  const project = projects.value.find(p => p.id === pin.projectId)
+  if (project) return menuItems(project)
+  return [[{
+    label: 'Unpin',
+    icon: 'i-lucide-pin-off',
+    onSelect: () => togglePin(pin.projectId)
+  }]]
 }
 
 // The delete of a crew's shadow board that the server says this person may make: confirmed first, then the crew route.
@@ -226,6 +244,16 @@ function crewDeleteItem(project: Project) {
   }
 }
 
+// "Update this crew's kit": copies the fire-and-forget prompt; it needs no token, the kit is public.
+async function copyCrewUpdatePrompt() {
+  try {
+    await navigator.clipboard.writeText(crewUpdatePrompt(window.location.origin))
+    toast.add({ title: 'Update prompt copied', description: 'Paste it into the agent that runs the crew.', icon: 'i-lucide-check' })
+  } catch {
+    toast.add({ title: 'Could not copy the prompt', color: 'error' })
+  }
+}
+
 // Anyone may pin a board they can open; a customer's board is the organisation's to rename or delete.
 function menuItems(project: Project) {
   const pinned = isPinned(project.id)
@@ -234,7 +262,7 @@ function menuItems(project: Project) {
     icon: pinned ? 'i-lucide-pin-off' : 'i-lucide-pin',
     onSelect: () => togglePin(project.id)
   }]
-  // The two agent links sit next to the pin: the Connect window for this board, and a 10-minute management token.
+  // The two agent links sit next to the pin: the Connect window for this board, and the one crew action for it.
   const agent = [
     {
       label: 'Connect your Claude',
@@ -242,9 +270,14 @@ function menuItems(project: Project) {
       onSelect: () => { void navigateTo({ path: '/connect', query: { board: project.id } }) }
     },
     {
-      label: 'Get AI management token',
-      icon: 'i-lucide-key-round',
+      label: 'Put an AI crew to work on this board',
+      icon: 'i-lucide-users-round',
       onSelect: () => { managementBoard.value = { id: project.id, name: project.name } }
+    },
+    {
+      label: 'Update this crew\'s kit',
+      icon: 'i-lucide-refresh-cw',
+      onSelect: () => { void copyCrewUpdatePrompt() }
     }
   ]
   // A crew board seen from the other side of the tree is read-only here, so it gets no rename or delete: only the
@@ -253,15 +286,8 @@ function menuItems(project: Project) {
   const manage: { label: string, icon: string, onSelect: () => unknown }[] = [
     { label: 'Rename', icon: 'i-lucide-pencil', onSelect: () => startRename(project) }
   ]
-  // A team's owner or admin gives a board a crew; the Crews section of /team does the attaching.
-  if (isTeamAdmin.value) {
-    manage.push({
-      label: 'Give it a crew',
-      icon: 'i-lucide-users-round',
-      onSelect: () => { void navigateTo({ path: '/team', query: { section: 'crews', board: project.id, wizard: '1' } }) }
-    })
-  }
   // A crew's shadow board this person may delete gets Delete board instead, which confirms and runs the crew route.
+  // "Give it a crew" is gone from the menu: the add-a-crew window on the board replaces it.
   const remove = project.crewDeletable
     ? crewDeleteItem(project)
     : {
@@ -327,15 +353,21 @@ function menuItems(project: Project) {
             {{ pinPlace(pin) }}
           </p>
         </div>
-        <UButton
-          icon="i-lucide-pin-off"
-          size="xs"
-          color="neutral"
-          variant="ghost"
-          class="mt-0.5 shrink-0 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
-          :aria-label="`Unpin ${pinName(pin)}`"
-          @click.stop="togglePin(pin.projectId)"
-        />
+        <!-- The same "…" menu as a board row below, so a tap on the right side opens it, and Unpin is one of its items. -->
+        <UDropdownMenu
+          :items="pinMenuItems(pin)"
+          :content="{ align: 'start', collisionPadding: 12 }"
+        >
+          <UButton
+            icon="i-lucide-ellipsis"
+            size="xs"
+            color="neutral"
+            variant="ghost"
+            :class="menuTriggerClass"
+            :aria-label="`Options for ${pinName(pin)}`"
+            @click.stop
+          />
+        </UDropdownMenu>
       </div>
       <div class="mb-2 border-b border-default pb-2" />
     </template>
@@ -404,9 +436,11 @@ function menuItems(project: Project) {
           @click.stop="toggleTree(project.id)"
         />
         <UIcon
-          :name="project.role === 'shadow' ? 'i-lucide-users-round' : project.role === 'crew_home' ? 'i-lucide-house' : project.customerId ? 'i-lucide-building-2' : 'i-lucide-kanban'"
+          :name="kindIcon(project)"
           class="mt-0.5 size-4 shrink-0"
-          :class="activeId === project.id ? 'text-primary' : 'text-dimmed group-hover:text-muted'"
+          :class="kindTint(project)"
+          :data-kind="projectKind(project)"
+          :data-health="project.status ?? 'unset'"
         />
         <div class="min-w-0 flex-1">
           <p class="truncate text-sm font-medium leading-snug text-default">
@@ -419,6 +453,14 @@ function menuItems(project: Project) {
             {{ rowNote(project) }}
           </p>
         </div>
+        <!-- The open count, in the board's health tint: the design's number at the row's right edge. -->
+        <span
+          v-if="!isLabelRow(project) && countsFor(project).open"
+          class="mt-0.5 shrink-0 text-xs font-semibold tabular-nums"
+          :class="kindTint(project)"
+          :title="countTitle(project)"
+          data-open-count
+        >{{ countsFor(project).open }}</span>
         <!-- The menu keeps its slot even when invisible, so rows never jump on hover. -->
         <UDropdownMenu
           v-if="!isLabelRow(project)"
@@ -430,7 +472,7 @@ function menuItems(project: Project) {
             size="xs"
             color="neutral"
             variant="ghost"
-            class="mt-0.5 shrink-0 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100 max-md:min-h-11 max-md:min-w-11 max-md:opacity-100"
+            :class="[menuTriggerClass, 'max-md:min-h-11 max-md:min-w-11']"
             aria-label="Project options"
             @click.stop
           />

@@ -24,6 +24,7 @@ export default defineEventHandler(async (event) => {
       body: notifications.body,
       createdAt: notifications.createdAt,
       readAt: notifications.readAt,
+      actorId: notifications.actorId,
       actorName: user.name,
       actorImage: user.image,
       // For a guest request: what became of it, so the inbox offers Approve and Decline only while it waits.

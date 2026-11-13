@@ -60,9 +60,10 @@ async function load() {
         data-person-card
       >
         <div class="flex items-center gap-3">
-          <UAvatar
-            :src="(view?.person.image ?? image) ?? undefined"
-            :alt="view?.person.name ?? name ?? 'Person'"
+          <UserAvatar
+            :user-id="view?.person.id ?? ''"
+            :name="view?.person.name ?? name ?? null"
+            :image="(view?.person.image ?? image) ?? null"
             size="lg"
           />
           <div class="min-w-0">

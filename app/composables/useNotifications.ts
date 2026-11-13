@@ -18,6 +18,8 @@ export interface NotificationItem {
   body: string
   createdAt: number
   readAt: number | null
+  /** Who did it, so the avatar is the person's own (picture or initials). Null when their account is gone. */
+  actorId: string | null
   actorName: string | null
   actorImage: string | null
 }

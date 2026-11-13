@@ -4,9 +4,12 @@ import { format } from 'date-fns'
 import { relativeTime } from '~/composables/useRelativeTime'
 import type { Visibility, ProjectTask } from '~/composables/useProjects'
 import { dueDayToMs, isOverdueDay } from '~/utils/dueDate'
+import { absoluteUrl, copyTaskLink } from '~/utils/copyTaskLink'
+import { activityStartsOpen, taskPanelPath } from '~/utils/taskPanelUrl'
 
 interface Task {
   id: string
+  projectId?: string
   columnId: string
   title: string
   description: string
@@ -25,6 +28,32 @@ const props = defineProps<{ task: Task | null }>()
 const emit = defineEmits<{ close: [] }>()
 
 const toast = useToast()
+
+// The task number is its id. The copy control puts a link to the task on the clipboard, as an html anchor with the
+// number as its text, and the bare number as plain text (utils/copyTaskLink.ts).
+const linkCopied = ref(false)
+// On a phone, the Activity sheet is open (the comments and the composer fill the panel). A permalink (a comment in the
+// address) opens it, so the comment and its window buttons are on screen.
+const route = useRoute()
+const activityOpen = ref(activityStartsOpen(route.params.comment))
+watch(() => route.params.comment, (comment) => {
+  if (activityStartsOpen(comment)) activityOpen.value = true
+})
+// The phone's tap chevron on an editable property row (the grid gets a third column for it). A read-only panel
+// has no chevron: its rows show values only.
+const chevronRow = `max-md:grid-cols-[6rem_1fr_1rem] max-md:after:content-['›'] max-md:after:text-lg max-md:after:leading-none max-md:after:text-dimmed`
+async function copyTaskNumberLink() {
+  const task = props.task
+  if (!task) return
+  const path = taskPanelPath(task.projectId ?? '', task.id)
+  const href = absoluteUrl(window.location.origin, path)
+  if (!(await copyTaskLink(href, task.id))) {
+    toast.add({ title: 'The clipboard refused the link. Select the number and copy it.', icon: 'i-lucide-alert-triangle', color: 'warning' })
+    return
+  }
+  linkCopied.value = true
+  setTimeout(() => (linkCopied.value = false), 2000)
+}
 const {
   activeProject,
   isCustomerView,
@@ -78,6 +107,9 @@ const storedWidth = useCookie<number | null>('kanban-drawer-width', { default: (
 
 const width = ref(DEFAULT_WIDTH)
 const maxWidth = ref(DEFAULT_WIDTH)
+// "Open as page" (the design's header button): the panel takes the whole content width. It is the same address, since the
+// app has no task-only page; the width the person picked is kept for when they collapse it again.
+const expanded = ref(false)
 
 function measure() {
   maxWidth.value = Math.max(MIN_WIDTH, window.innerWidth - 24)
@@ -383,11 +415,17 @@ const subtasks = computed(() => shownTask.value ? allSubtasks(shownTask.value.id
 
 const taskInternal = computed(() => shownTask.value?.visibility === 'internal')
 
-async function toggleTaskVisibility() {
+// The labelled choices of the visibility select (the state row, redesign card 5/9).
+const visibilityItems = [
+  { label: 'Team only', value: 'internal', icon: 'i-lucide-lock' },
+  { label: 'Shared with customer', value: 'customer', icon: 'i-lucide-eye' }
+]
+
+async function setTaskVisibility(next: Visibility) {
   const task = props.task
   if (!task || readonly.value) return
   const before = task.visibility
-  const next = before === 'internal' ? 'customer' : 'internal'
+  if (before === next) return
   // The Undo toast is the safety net, so a change does not ask first.
   try {
     await updateTask(task.id, { visibility: next })
@@ -455,6 +493,7 @@ async function confirmDelete() {
 }
 
 const menuItems = computed(() => [[
+  { label: 'Copy link', icon: 'i-lucide-link', onSelect: copyTaskNumberLink },
   { label: 'Reset panel width', icon: 'i-lucide-rotate-ccw', onSelect: resetWidth }
 ], ...(readonly.value
   ? []
@@ -483,7 +522,7 @@ const menuItems = computed(() => [[
       <div
         v-if="shownTask"
         class="relative flex h-full flex-col bg-default focus:outline-none"
-        :style="{ width: `${width}px`, maxWidth: '100%' }"
+        :style="{ width: expanded ? '100%' : `${width}px`, maxWidth: '100%' }"
       >
         <!-- Resize edge -->
         <div
@@ -568,6 +607,33 @@ const menuItems = computed(() => [[
             </template>
           </UDropdownMenu>
 
+          <!-- The task number, with a copy control: the link to the task goes on the clipboard, as a number that is a link
+               in a rich editor. One compact element, so it fits a phone-width panel. -->
+          <span
+            class="inline-flex min-w-0 max-w-[11rem] shrink-0 items-center gap-0.5 font-mono text-xs text-muted"
+            data-testid="task-number"
+          >
+            <span
+              class="truncate"
+              :title="shownTask.id"
+            >{{ shownTask.id }}</span>
+            <UButton
+              :icon="linkCopied ? 'i-lucide-check' : 'i-lucide-link'"
+              size="xs"
+              color="neutral"
+              variant="ghost"
+              aria-label="Copy task link"
+              :title="linkCopied ? 'Copied' : 'Copy task link'"
+              class="shrink-0"
+              @click="copyTaskNumberLink"
+            />
+            <span
+              v-if="linkCopied"
+              role="status"
+              class="shrink-0 text-xs text-success"
+            >Copied</span>
+          </span>
+
           <!-- Board and last-edited time, kept to one quiet line; the exact
                timestamps live in the tooltip. -->
           <span
@@ -577,17 +643,28 @@ const menuItems = computed(() => [[
             <template v-if="activeProject">{{ activeProject.name }} · </template>edited {{ relativeTime(shownTask.updatedAt) }}
           </span>
 
-          <UButton
+          <!-- Who sees the task: a labelled select. The change is applied at once, with the 6 s Undo toast. -->
+          <USelect
             v-if="!readonly"
-            :icon="taskInternal ? 'i-lucide-lock' : 'i-lucide-eye'"
+            :model-value="taskInternal ? 'internal' : 'customer'"
+            :items="visibilityItems"
+            value-key="value"
             size="xs"
-            :color="taskInternal ? 'warning' : 'neutral'"
-            variant="soft"
-            :label="taskInternal ? 'Team only' : 'Shared with customer'"
-            :title="taskInternal
-              ? 'Team only. Click to share with the customer.'
-              : 'Shared with the customer. Click to make it team only.'"
-            @click="toggleTaskVisibility"
+            aria-label="Who sees this task"
+            class="shrink-0 w-44"
+            @update:model-value="(v: string) => setTaskVisibility(v as Visibility)"
+          />
+
+          <UButton
+            :icon="expanded ? 'i-lucide-minimize-2' : 'i-lucide-maximize-2'"
+            size="xs"
+            color="neutral"
+            variant="ghost"
+            aria-label="Open as page"
+            :title="expanded ? 'Back to panel width' : 'Open as page'"
+            :aria-pressed="expanded ? 'true' : 'false'"
+            class="shrink-0"
+            @click="expanded = !expanded"
           />
 
           <UDropdownMenu
@@ -631,143 +708,175 @@ const menuItems = computed(() => [[
               :ui="{ base: 'px-0 py-0 text-lg font-semibold leading-snug resize-none' }"
               @keydown.enter.prevent="($event.target as HTMLTextAreaElement).blur()"
             />
-
-            <div class="mt-2 flex flex-wrap items-center gap-1.5">
-              <KanbanLabelChip
-                v-for="tag in shownTask.tags"
-                :key="tag"
-                :tag="tag"
-                :editable="!readonly"
-                :removable="!readonly"
-                chip-class="text-xs"
-                @remove="removeTag"
-              />
-              <div
-                v-if="!readonly"
-                class="relative min-w-24 flex-1"
-              >
-                <input
-                  v-model="tagDraft"
-                  :placeholder="shownTask.tags.length ? 'Add label…' : 'Add a label…'"
-                  class="w-full bg-transparent py-0.5 text-xs text-default outline-none placeholder:text-dimmed"
-                  @keydown="onTagKeydown"
-                  @focus="tagFocused = true"
-                  @input="tagFocused = true"
-                  @blur="onTagBlur"
-                >
-
-                <!-- The board's own labels. `mousedown.prevent` keeps the field
-                     focused so picking one is not read as blurring away from it. -->
-                <div
-                  v-if="showTagSuggestions"
-                  class="absolute left-0 top-full z-20 mt-1 w-44 rounded-lg border border-default bg-default p-1 shadow-lg"
-                >
-                  <button
-                    v-for="(tag, index) in tagSuggestions"
-                    :key="tag"
-                    class="flex w-full items-center rounded-md px-1 py-1 text-left transition-colors"
-                    :class="index === tagHighlight ? 'bg-elevated' : 'hover:bg-elevated/60'"
-                    @mousedown.prevent="addTagValue(tag)"
-                  >
-                    <KanbanLabelChip
-                      :tag="tag"
-                      chip-class="min-w-0 text-xs"
-                    />
-                  </button>
-                </div>
-              </div>
-            </div>
           </div>
 
-          <!-- Assignee and due date, Asana's two fields every task has. -->
-          <dl class="grid shrink-0 grid-cols-[6rem_1fr] items-center gap-x-3 gap-y-1.5 px-5 pb-3 text-xs">
-            <dt class="text-muted">
-              Assignee
-            </dt>
-            <dd class="min-w-0">
-              <UDropdownMenu
-                v-if="!readonly"
-                :items="assigneeItems"
-                :content="{ align: 'start', collisionPadding: 12 }"
-              >
+          <!-- Properties, two columns on a wide panel and rows on a phone, in this order: Assignee, Due date,
+               Start date, Labels, the custom fields (Priority). Time, Blocked by and GitHub are full-width blocks
+               below them (redesign card 5/9). -->
+          <dl class="grid shrink-0 grid-cols-1 gap-x-6 gap-y-1.5 px-5 pb-3 text-xs md:grid-cols-2">
+            <div
+              class="grid grid-cols-[6rem_1fr] items-center gap-x-3"
+              :class="readonly ? '' : chevronRow"
+            >
+              <dt class="text-muted">
+                Assignee
+              </dt>
+              <dd class="min-w-0">
+                <UDropdownMenu
+                  v-if="!readonly"
+                  :items="assigneeItems"
+                  :content="{ align: 'start', collisionPadding: 12 }"
+                >
+                  <UButton
+                    size="xs"
+                    color="neutral"
+                    variant="ghost"
+                    class="-ml-2 max-w-full"
+                    :avatar="assignee ? { src: assignee.image ?? undefined, alt: assignee.name || assignee.email || '' } : undefined"
+                    :icon="assignee ? undefined : 'i-lucide-user-plus'"
+                    :label="assignee ? (assignee.name || assignee.email || '') : 'No assignee'"
+                    :ui="{ label: assignee ? 'text-default' : 'text-dimmed' }"
+                  />
+                </UDropdownMenu>
+                <span
+                  v-else
+                  class="text-default"
+                >{{ assignee ? (assignee.name || assignee.email) : 'No assignee' }}</span>
+              </dd>
+            </div>
+
+            <div
+              class="grid grid-cols-[6rem_1fr] items-center gap-x-3"
+              :class="readonly ? '' : chevronRow"
+            >
+              <dt class="text-muted">
+                Due date
+              </dt>
+              <dd class="flex min-w-0 items-center gap-1">
+                <input
+                  v-if="!readonly"
+                  type="date"
+                  min="2000-01-01"
+                  max="2999-12-31"
+                  :value="shownTask.dueOn ?? ''"
+                  class="rounded bg-transparent px-0 py-0.5 text-xs outline-none focus:ring-1 focus:ring-primary"
+                  :class="dueOverdue ? 'font-medium text-error' : shownTask.dueOn ? 'text-default' : 'text-dimmed'"
+                  @change="onDueChange"
+                >
+                <span
+                  v-else
+                  :class="dueOverdue ? 'font-medium text-error' : 'text-default'"
+                >{{ shownTask.dueOn ? format(new Date(dueDayToMs(shownTask.dueOn)), 'PP') : 'No due date' }}</span>
                 <UButton
+                  v-if="!readonly && shownTask.dueOn"
+                  icon="i-lucide-x"
                   size="xs"
                   color="neutral"
                   variant="ghost"
-                  class="-ml-2 max-w-full"
-                  :avatar="assignee ? { src: assignee.image ?? undefined, alt: assignee.name || assignee.email || '' } : undefined"
-                  :icon="assignee ? undefined : 'i-lucide-user-plus'"
-                  :label="assignee ? (assignee.name || assignee.email || '') : 'No assignee'"
-                  :ui="{ label: assignee ? 'text-default' : 'text-dimmed' }"
+                  aria-label="Clear due date"
+                  @click="patchTask({ dueOn: null }, 'Could not change the due date')"
                 />
-              </UDropdownMenu>
-              <span
-                v-else
-                class="text-default"
-              >{{ assignee ? (assignee.name || assignee.email) : 'No assignee' }}</span>
-            </dd>
+              </dd>
+            </div>
 
-            <dt class="text-muted">
-              Start date
-            </dt>
-            <dd class="flex min-w-0 items-center gap-1">
-              <input
-                v-if="!readonly"
-                type="date"
-                min="2000-01-01"
-                max="2999-12-31"
-                :value="shownTask.startOn ?? ''"
-                class="rounded bg-transparent px-0 py-0.5 text-xs outline-none focus:ring-1 focus:ring-primary"
-                :class="shownTask.startOn ? 'text-default' : 'text-dimmed'"
-                data-start-input
-                @change="onStartChange"
-              >
-              <span
-                v-else
-                class="text-default"
-              >{{ shownTask.startOn ? format(new Date(dueDayToMs(shownTask.startOn)), 'PP') : 'No start date' }}</span>
-              <UButton
-                v-if="!readonly && shownTask.startOn"
-                icon="i-lucide-x"
-                size="xs"
-                color="neutral"
-                variant="ghost"
-                aria-label="Clear start date"
-                @click="patchTask({ startOn: null }, 'Could not change the start date')"
-              />
-            </dd>
+            <div
+              class="grid grid-cols-[6rem_1fr] items-center gap-x-3"
+              :class="readonly ? '' : chevronRow"
+            >
+              <dt class="text-muted">
+                Start date
+              </dt>
+              <dd class="flex min-w-0 items-center gap-1">
+                <input
+                  v-if="!readonly"
+                  type="date"
+                  min="2000-01-01"
+                  max="2999-12-31"
+                  :value="shownTask.startOn ?? ''"
+                  class="rounded bg-transparent px-0 py-0.5 text-xs outline-none focus:ring-1 focus:ring-primary"
+                  :class="shownTask.startOn ? 'text-default' : 'text-dimmed'"
+                  data-start-input
+                  @change="onStartChange"
+                >
+                <span
+                  v-else
+                  class="text-default"
+                >{{ shownTask.startOn ? format(new Date(dueDayToMs(shownTask.startOn)), 'PP') : 'No start date' }}</span>
+                <UButton
+                  v-if="!readonly && shownTask.startOn"
+                  icon="i-lucide-x"
+                  size="xs"
+                  color="neutral"
+                  variant="ghost"
+                  aria-label="Clear start date"
+                  @click="patchTask({ startOn: null }, 'Could not change the start date')"
+                />
+              </dd>
+            </div>
 
-            <dt class="text-muted">
-              Due date
-            </dt>
-            <dd class="flex min-w-0 items-center gap-1">
-              <input
-                v-if="!readonly"
-                type="date"
-                min="2000-01-01"
-                max="2999-12-31"
-                :value="shownTask.dueOn ?? ''"
-                class="rounded bg-transparent px-0 py-0.5 text-xs outline-none focus:ring-1 focus:ring-primary"
-                :class="dueOverdue ? 'font-medium text-error' : shownTask.dueOn ? 'text-default' : 'text-dimmed'"
-                @change="onDueChange"
-              >
-              <span
-                v-else
-                :class="dueOverdue ? 'font-medium text-error' : 'text-default'"
-              >{{ shownTask.dueOn ? format(new Date(dueDayToMs(shownTask.dueOn)), 'PP') : 'No due date' }}</span>
-              <UButton
-                v-if="!readonly && shownTask.dueOn"
-                icon="i-lucide-x"
-                size="xs"
-                color="neutral"
-                variant="ghost"
-                aria-label="Clear due date"
-                @click="patchTask({ dueOn: null }, 'Could not change the due date')"
-              />
-            </dd>
+            <div
+              class="grid grid-cols-[6rem_1fr] items-start gap-x-3"
+              :class="readonly ? '' : chevronRow"
+            >
+              <dt class="pt-0.5 text-muted">
+                Labels
+              </dt>
+              <dd class="min-w-0">
+                <div class="flex flex-wrap items-center gap-1.5">
+                  <KanbanLabelChip
+                    v-for="tag in shownTask.tags"
+                    :key="tag"
+                    :tag="tag"
+                    :editable="!readonly"
+                    :removable="!readonly"
+                    chip-class="text-xs"
+                    @remove="removeTag"
+                  />
+                  <div
+                    v-if="!readonly"
+                    class="relative min-w-24 flex-1"
+                  >
+                    <input
+                      v-model="tagDraft"
+                      :placeholder="shownTask.tags.length ? 'Add label…' : 'Add a label…'"
+                      class="w-full bg-transparent py-0.5 text-xs text-default outline-none placeholder:text-dimmed"
+                      @keydown="onTagKeydown"
+                      @focus="tagFocused = true"
+                      @input="tagFocused = true"
+                      @blur="onTagBlur"
+                    >
+
+                    <!-- The board's own labels. `mousedown.prevent` keeps the field
+                         focused so picking one is not read as blurring away from it. -->
+                    <div
+                      v-if="showTagSuggestions"
+                      class="absolute left-0 top-full z-20 mt-1 w-44 rounded-lg border border-default bg-default p-1 shadow-lg"
+                    >
+                      <button
+                        v-for="(tag, index) in tagSuggestions"
+                        :key="tag"
+                        class="flex w-full items-center rounded-md px-1 py-1 text-left transition-colors"
+                        :class="index === tagHighlight ? 'bg-elevated' : 'hover:bg-elevated/60'"
+                        @mousedown.prevent="addTagValue(tag)"
+                      >
+                        <KanbanLabelChip
+                          :tag="tag"
+                          chip-class="min-w-0 text-xs"
+                        />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </dd>
+            </div>
+
+            <KanbanTaskFields
+              v-if="!readonly && shownTask"
+              :task-id="shownTask.id"
+            />
           </dl>
 
-          <KanbanTaskFields
+          <KanbanTaskTime
             v-if="!readonly && shownTask"
             :task-id="shownTask.id"
           />
@@ -778,10 +887,29 @@ const menuItems = computed(() => [[
             :readonly="readonly"
           />
 
-          <KanbanTaskTime
-            v-if="!readonly && shownTask"
+          <KanbanTaskGithub
+            v-if="shownTask"
             :task-id="shownTask.id"
+            :readonly="readonly"
           />
+
+          <!-- Description (before the subtasks, redesign card 5/9): the rich-text editor, bounded so it keeps its own scroll -->
+          <div class="flex min-h-72 flex-col border-t border-default">
+            <div
+              v-if="readonly"
+              class="min-h-0 flex-1 overflow-y-auto"
+            >
+              <ReadOnlyRichText :content="shownTask.description" />
+            </div>
+            <RichEditor
+              v-else
+              v-model="editorContent"
+              :upload-image="uploadImage"
+              toolbar-on-focus
+              placeholder="Add a description… (@ for dates, / for commands)"
+              class="min-h-0 flex-1"
+            />
+          </div>
 
           <!-- Subtasks: an Asana-style checklist, nestable and drag-reorderable. -->
           <div
@@ -802,36 +930,31 @@ const menuItems = computed(() => [[
             />
           </div>
 
-          <KanbanTaskGithub
-            v-if="shownTask"
-            :task-id="shownTask.id"
-            :readonly="readonly"
-          />
-
-          <!-- Description: the rich-text editor, bounded so it keeps its own scroll -->
-          <div class="flex min-h-72 flex-col border-t border-default">
-            <div
-              v-if="readonly"
-              class="min-h-0 flex-1 overflow-y-auto"
+          <!-- Activity: inline on a wide panel. On a phone it is a sheet opened from its bar, so the
+               description and the composer do not compete for one screen (redesign card 5/9, page 11). -->
+          <div :class="activityOpen ? 'max-md:fixed max-md:inset-0 max-md:z-30 max-md:flex max-md:flex-col max-md:bg-default' : ''">
+            <button
+              type="button"
+              class="flex w-full items-center justify-between border-t border-default px-5 py-2.5 text-left text-xs font-medium text-muted md:hidden"
+              :aria-expanded="activityOpen ? 'true' : 'false'"
+              data-activity-toggle
+              @click="activityOpen = !activityOpen"
             >
-              <ReadOnlyRichText :content="shownTask.description" />
-            </div>
-            <RichEditor
-              v-else
-              v-model="editorContent"
-              :upload-image="uploadImage"
-              placeholder="Add a description… (@ for dates, / for commands)"
-              class="min-h-0 flex-1"
+              {{ activityOpen ? 'Close activity' : 'Activity' }}
+              <UIcon
+                :name="activityOpen ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'"
+                class="size-4"
+              />
+            </button>
+            <KanbanTaskComments
+              v-if="shownTask"
+              :key="shownTask.id"
+              ref="thread"
+              :class="activityOpen ? 'max-md:min-h-0 max-md:flex-1' : 'max-md:hidden'"
+              :task-id="shownTask.id"
+              :readonly="readonly"
             />
           </div>
-          <!-- Under the description, in the same scroll body: the conversation and its box. -->
-          <KanbanTaskComments
-            v-if="shownTask"
-            :key="shownTask.id"
-            ref="thread"
-            :task-id="shownTask.id"
-            :readonly="readonly"
-          />
         </div>
       </div>
     </template>

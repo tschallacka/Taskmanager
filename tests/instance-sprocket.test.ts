@@ -54,7 +54,15 @@ before(async () => {
 after(async () => {
   await db.delete(rateLimitHits).where(inArray(rateLimitHits.scope, userIds.map(id => `sprocket:user:${id}`)))
   await db.delete(rateLimitHits).where(eq(rateLimitHits.scope, 'sprocket:instance'))
-  await db.delete(instanceSettings).where(eq(instanceSettings.id, SPROCKET_INSTANCE_ROW_ID))
+  // The row is shared with other test files that run at the same time (rate limits live on it), so the Sprocket
+  // fields are reset in place and the row is never deleted.
+  await db.update(instanceSettings).set({
+    sprocketForEveryone: false,
+    sprocketOpenrouterKey: null,
+    sprocketUserDailyLimit: 200,
+    sprocketInstanceDailyCap: 2000,
+    sprocketModel: 'openai/gpt-4o-mini'
+  }).where(eq(instanceSettings.id, SPROCKET_INSTANCE_ROW_ID))
   await db.delete(user).where(inArray(user.id, userIds))
 })
 
