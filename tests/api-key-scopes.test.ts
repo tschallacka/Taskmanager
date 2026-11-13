@@ -13,6 +13,15 @@ test('a new key selects both board scopes by default: read boards and tasks, and
   assert.match(panel, /permission\.scope\.startsWith\('boards:'\)/, 'the default ticks every boards: scope')
 })
 
+test('Show prompt and Regenerate use the connect prompt builder, with the placeholder until a regenerate', () => {
+  assert.match(panel, /function reachOfKey\(key: ApiKeySummary\)/, 'a listed key\'s reach is read from the key')
+  assert.match(panel, /const shownPromptText = computed\(\(\) => \{/, 'the shown prompt is built once')
+  assert.match(panel, /keyPrompt\(\{ origin: window\.location\.origin, name: key\.name, reach: reachOfKey\(key\), pairing: null, token: shown\.token, mode: 'token' \}\)/)
+  assert.doesNotMatch(panel, /setupCommandFor\(shownPrompt\.token\)/, 'the old command shape is no longer shown')
+  assert.match(panel, /\{\{ shownPromptText \}\}/, 'the template shows the shared builder')
+  assert.match(panel, /shownPrompt\.value = \{ id: key\.id, token: response\.token \}/, 'a regenerate sets the one secret that is shown')
+})
+
 test('the panel has no separate update command: the one prompt covers a re-connect', () => {
   assert.doesNotMatch(panel, /Copy update command/, 'the update button is gone')
   assert.doesNotMatch(panel, /Paste the update command below/, 'the sentence that points to it is gone')

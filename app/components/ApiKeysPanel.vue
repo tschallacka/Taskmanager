@@ -280,6 +280,21 @@ const regenerating = ref<string | null>(null)
 // The setup prompt of one key. Its token is set only right after a regenerate: that secret is shown once, never again.
 const shownPrompt = ref<{ id: string, token: string | null } | null>(null)
 
+// What a listed key reaches, for its prompt: every board when it is an all-boards key, else the boards it reaches.
+function reachOfKey(key: ApiKeySummary): KeyPromptInput['reach'] {
+  if (key.allBoards) return { boards: [], allBoards: { scopes: key.scopes } }
+  return { boards: key.reachedBoards.map(board => ({ id: board.id, name: board.name, workspace: board.workspace, scopes: key.scopes })) }
+}
+
+// The same prompt as after a key is made (connectPrompt). With no secret it has the placeholder; after a regenerate it
+// has the new secret, once. A pairing code is not used here: the key is only in the prompt when a secret was just made.
+const shownPromptText = computed(() => {
+  const shown = shownPrompt.value
+  const key = shown ? keys.value.find(k => k.id === shown.id) : undefined
+  if (!shown || !key) return ''
+  return keyPrompt({ origin: window.location.origin, name: key.name, reach: reachOfKey(key), pairing: null, token: shown.token, mode: 'token' })
+})
+
 // The ready-to-paste setup: the key in the shell, then the server added to Claude Code. Without a secret the key is a placeholder.
 function setupCommandFor(token: string | null): string {
   return `${PROFILE_STEP}\n${exportKeyCommand(token ?? '<paste the new key>')}\n${mcpAddCommand(window.location.origin)}`
@@ -292,7 +307,7 @@ function showPrompt(key: ApiKeySummary) {
 
 async function copySetupPrompt() {
   if (!shownPrompt.value) return
-  await copyWithFeedback(setupCommandFor(shownPrompt.value.token), promptCopied, 'Setup prompt copied')
+  await copyWithFeedback(shownPromptText.value, promptCopied, 'Prompt copied')
 }
 
 async function revokeKey(key: ApiKeySummary) {
@@ -890,9 +905,9 @@ function reachLabel(key: ApiKeySummary): string {
                     >
                       Regenerate the key to get a secret to paste. Until then the prompt shows a placeholder.
                     </p>
-                    <pre class="text-xs font-mono bg-elevated/50 border border-default rounded-md p-3 whitespace-pre-wrap break-all">{{ setupCommandFor(shownPrompt.token) }}</pre>
+                    <pre class="text-xs font-mono bg-elevated/50 border border-default rounded-md p-3 whitespace-pre-wrap break-all">{{ shownPromptText }}</pre>
                     <UButton
-                      :label="promptCopied ? 'Copied' : 'Copy setup prompt'"
+                      :label="promptCopied ? 'Copied' : 'Copy prompt'"
                       :icon="promptCopied ? 'i-lucide-check' : 'i-lucide-copy'"
                       color="neutral"
                       variant="soft"
