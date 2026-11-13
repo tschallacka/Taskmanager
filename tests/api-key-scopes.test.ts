@@ -13,6 +13,14 @@ test('a new key selects both board scopes by default: read boards and tasks, and
   assert.match(panel, /permission\.scope\.startsWith\('boards:'\)/, 'the default ticks every boards: scope')
 })
 
+test('the panel has no separate update command: the one prompt covers a re-connect', () => {
+  assert.doesNotMatch(panel, /Copy update command/, 'the update button is gone')
+  assert.doesNotMatch(panel, /Paste the update command below/, 'the sentence that points to it is gone')
+  assert.doesNotMatch(panel, /\{\{ replaceCommand \}\}/, 'the update command is not shown')
+  assert.doesNotMatch(panel, /copyReplaceCommand/, 'nothing copies it')
+  assert.match(panel, /Set it up yourself/, 'the collapsed section stays')
+})
+
 test('the panel names the board scopes as the connect prompt does, with what each allows', () => {
   assert.match(panel, /scope: 'boards:read', label: 'Read boards and tasks', description: 'Boards, tasks, comments and time logs'/)
   assert.match(panel, /scope: 'boards:write', label: 'Change tasks', description: 'Create, edit, move and delete tasks, comment, log time'/)

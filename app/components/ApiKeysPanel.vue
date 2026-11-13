@@ -209,8 +209,6 @@ const claudeCommand = computed(() => {
   return setupCommandFor(issuedToken.value)
 })
 
-// Already connected: one paste swaps the key in and the server out for a fresh one.
-const replaceCommand = computed(() => (issuedToken.value ? mcpReplaceCommand(window.location.origin, issuedToken.value) : ''))
 
 const origin = import.meta.client ? window.location.origin : ''
 const kitCommands = crewKitCommands(origin)
@@ -229,7 +227,6 @@ async function copyKit(text: string, id: string) {
   }
 }
 
-const replaceCopied = ref(false)
 
 async function copyWithFeedback(text: string, copiedFlag: Ref<boolean>, title: string) {
   try {
@@ -273,11 +270,6 @@ function startEdit(key: ApiKeySummary) {
 async function copyCommand() {
   if (!issuedToken.value) return
   await copyWithFeedback(claudeCommand.value, commandCopied, 'Command copied')
-}
-
-async function copyReplaceCommand() {
-  if (!issuedToken.value) return
-  await copyWithFeedback(replaceCommand.value, replaceCopied, 'Update command copied')
 }
 
 // Revoke and regenerate ask first, inline, under the key's row. The confirmation names the key and its secret prefix and
@@ -621,20 +613,9 @@ function reachLabel(key: ApiKeySummary): string {
                   />
                 </div>
                 <p class="text-xs text-muted pt-1">
-                  {{ ALREADY_CONNECTED_STEP }} Paste the update command below.
+                  {{ ALREADY_CONNECTED_STEP }} The prompt above does this too, so one prompt covers a first setup and a re-connect.
                   {{ RESTART_STEP }}
                 </p>
-                <div class="flex flex-col sm:flex-row gap-2">
-                  <pre class="flex-1 min-w-0 text-xs font-mono bg-default border border-default rounded-md px-3 py-2 whitespace-pre-wrap break-words">{{ replaceCommand }}</pre>
-                  <UButton
-                    :icon="replaceCopied ? 'i-lucide-check' : 'i-lucide-copy'"
-                    :label="replaceCopied ? 'Copied' : 'Copy update command'"
-                    color="neutral"
-                    variant="soft"
-                    size="sm"
-                    @click="copyReplaceCommand"
-                  />
-                </div>
               </div>
             </details>
           </div>
