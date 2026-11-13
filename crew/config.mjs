@@ -123,6 +123,8 @@ export const PROVIDERS = ['claude', 'openrouter', 'ollama']
 export const CHEAP_CLAUDE_MODEL = 'claude-haiku-5-5'
 const CHEAP_CLAUDE = { provider: 'claude', model: CHEAP_CLAUDE_MODEL }
 const MODEL_NAME = /^[A-Za-z0-9][\w.:/@-]{0,99}$/
+// The bare alias that Claude Code stopped accepting; crew.json naming it is reported, never written into an agent file.
+const BARE_HAIKU = 'haiku'
 
 /**
  * Every cast member's { provider, model } from the "models" of crew.json. A string is a Claude model
@@ -152,6 +154,10 @@ function parseModel(entry, key, problems) {
   const model = object.model ?? (provider === 'claude' ? CHEAP_CLAUDE.model : undefined)
   if (typeof model !== 'string' || !MODEL_NAME.test(model)) {
     problems.push(`models.${key}: the model must be a name of letters, digits and . _ : / @ - (it is written into an agent definition)`)
+    return null
+  }
+  if (provider === 'claude' && model === BARE_HAIKU) {
+    problems.push(`models.${key}: "${BARE_HAIKU}" is not a model name Claude Code accepts any more; use "${CHEAP_CLAUDE_MODEL}" or another full model id`)
     return null
   }
   return { provider, model }

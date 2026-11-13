@@ -9,7 +9,16 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const here = dirname(fileURLToPath(import.meta.url))
-const BARE = [/model: haiku\b/, /--model haiku\b/, /model: ['"]haiku['"]/]
+// Any object key set to the bare alias, quoted or not: model: haiku, default: 'haiku', usher: "haiku".
+const BARE = [/model: haiku\b/, /--model haiku\b/, /\b\w+: ['"]haiku['"]/]
+
+test('the check catches the single-quoted object form, default: \'haiku\', and the other spellings', () => {
+  assert.ok(BARE.some(re => re.test("const d = { default: 'haiku' }")))
+  assert.ok(BARE.some(re => re.test('  usher: "haiku",')))
+  assert.ok(BARE.some(re => re.test('model: haiku')))
+  assert.ok(BARE.some(re => re.test('claude --model haiku')))
+  assert.ok(!BARE.some(re => re.test("const id = 'claude-haiku-5-5'")))
+})
 
 test('no kit source or template writes a bare model alias into a generated file or a start command', () => {
   const files = readdirSync(here).filter(f => /\.(mjs|tmpl|sh)$/.test(f) && !/\.test\.mjs$/.test(f))
