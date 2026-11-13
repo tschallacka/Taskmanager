@@ -2,6 +2,12 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.24.0 - 2026-11-13
+
+- **Settings > API keys gives one prompt to paste into an agent.** After a key is made, the panel shows one "Copy prompt for your agent" button. The prompt carries a one-time pairing code by default (the key stays out of it), removes an old taskmanager server before it adds the new one, so it also serves a re-connect, and lists the key's boards in plain words. The key, the export line and the mcp commands move into a collapsed "Set it up yourself" section. `app/utils/connectPrompt.ts`, `app/components/ApiKeysPanel.vue`, `docs/agents/create-and-revoke-a-key.md`, `tests/key-prompt.test.ts`.
+
+- **Notifications can be archived into a Read box, and the Read box can be emptied.** Every notification in the inbox gets an Archive button, and Archive all takes the shown ones out; archived notifications move to the Read box, where each can be moved back to the inbox. The Read box can be emptied in full or only the notifications archived more than 30 days, 2 months, 6 months or 1 year ago, after the page says how many will go. Emptying deletes for the signed-in person only. A failed archive puts the rows back and says so. Files: `server/utils/notificationBox.ts`, `server/api/notifications/archive.post.ts`, `server/api/notifications/unarchive.post.ts`, `server/api/notifications/empty.post.ts`, `app/pages/projects/inbox.vue`, `app/composables/useNotifications.ts`.
+
 ## 0.23.1 - 2026-11-13
 
 - **The default model is the full id, not the bare alias.** A person with no entry in `crew.json` `models` now gets `claude-haiku-5-5`: Claude Code no longer accepts `haiku` ("unrecognized model"), which stopped every agent from starting. Pia's process match accepts the full id and the alias. A kit test fails if a bare alias (`model: haiku`, `--model haiku`, `model: 'haiku'`) appears in the kit's sources or templates. The README's examples and defaults are updated. Not yet: the one-word model check in `init` and `crew update`, and the listener message when Pia cannot answer. Files: `crew/config.mjs`, `crew/activity.mjs`, `crew/model-alias.test.mjs`, `crew/kit.test.mjs`, `crew/README.md`.

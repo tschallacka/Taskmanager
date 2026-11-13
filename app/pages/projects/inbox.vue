@@ -448,7 +448,11 @@ async function sendTest() {
           </button>
         </div>
 
-        <div v-if="filter === 'readbox' && !onAgentTab" class="mb-3 flex flex-wrap gap-1" data-read-box-empty>
+        <div
+          v-if="filter === 'readbox' && !onAgentTab"
+          class="mb-3 flex flex-wrap gap-1"
+          data-read-box-empty
+        >
           <UButton
             v-for="choice in emptyChoices"
             :key="choice.label"
@@ -493,8 +497,20 @@ async function sendTest() {
             />
           </div>
         </div>
-        <p v-if="emptyError" class="mb-3 text-sm text-error" data-empty-error>{{ emptyError }}</p>
-        <p v-if="actionError" class="mb-3 text-sm text-error" data-action-error>{{ actionError }}</p>
+        <p
+          v-if="emptyError"
+          class="mb-3 text-sm text-error"
+          data-empty-error
+        >
+          {{ emptyError }}
+        </p>
+        <p
+          v-if="actionError"
+          class="mb-3 text-sm text-error"
+          data-action-error
+        >
+          {{ actionError }}
+        </p>
 
         <template v-if="!onAgentTab">
           <p
