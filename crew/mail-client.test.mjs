@@ -31,6 +31,7 @@ test('a send the endpoint takes is sent once with its id; when the endpoint is d
   const ok = await sendMail({ fetch: up.fetchImpl, base: BASE, slug: 'tm', key: 'k1', to: 'pia', text: 'hi', id: ID, mailboxDir: dir })
   assert.equal(ok.sent, true)
   assert.equal(up.calls.length, 1)
+  assert.equal(up.calls[0].url, `${BASE}/api/crew-mail/tm`, 'the send goes to /api/crew-mail/<slug>, outside the crew gate')
   const down = fakeEndpoint({ down: true })
   const later = await sendMail({ fetch: down.fetchImpl, base: BASE, slug: 'tm', key: 'k1', to: 'pia', text: 'again', id: ID2, mailboxDir: dir })
   assert.equal(later.sent, false)
@@ -58,7 +59,7 @@ test('a fetched mail is delivered once with the sender from the row, and acked',
   assert.equal(result.delivered, 1)
   assert.equal(result.acked, 1)
   assert.deepEqual(lines, ['from wick: from boss: pay attention'])
-  assert.ok(endpoint.calls.some(c => c.url.endsWith(`/${ID}/ack`)))
+  assert.ok(endpoint.calls.some(c => c.url === `${BASE}/api/crew-mail/tm/${ID}/ack`), 'the ack goes to /api/crew-mail/<slug>/<id>/ack')
 })
 
 test('a mail whose ack failed is acked again next time and never delivered twice', async () => {
@@ -84,7 +85,7 @@ test('the delivered line is built from the row: a text that claims another sende
 test('the fetch asks for one recipient, and a failed fetch is reported, not thrown by tick', async () => {
   const endpoint = fakeEndpoint()
   await fetchMail({ fetch: endpoint.fetchImpl, base: BASE, slug: 'tm', key: 'k1', to: 'pia' })
-  assert.ok(endpoint.calls[0].url.endsWith('/api/crews/tm/mail?to=pia'))
+  assert.ok(endpoint.calls[0].url.endsWith('/api/crew-mail/tm?to=pia'), 'the mail URL is under /api/crew-mail, outside the crew gate')
   const dir = mkdtempSync(join(tmpdir(), 'mail-client-'))
   const down = fakeEndpoint({ down: true })
   const result = await tick({ fetch: down.fetchImpl, base: BASE, slug: 'tm', key: 'k1', to: 'pia', mailboxDir: dir, deliver: () => {} })
