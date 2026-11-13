@@ -10,13 +10,13 @@ import { deskStatusSource, withDeskStatus } from '../server/utils/deskStatus'
 const wren: OfficePerson = { userId: 'u1', key: 'wren', name: 'Wren Worker', role: 'worker' }
 const pia: OfficePerson = { userId: 'u2', key: 'pia', name: 'Pia Planner', role: 'pm' }
 
-test('busy is red and a filled dot, and says what the monitor gives', () => {
+test('busy (a card in progress) is green and lit, and says what the monitor gives', () => {
   const light = deskLightOf({ state: 'busy', note: 'Busy: ir9yf review' })
-  assert.deepEqual(light, { state: 'busy', color: '#d62828', shape: 'dot', text: 'Busy: ir9yf review' })
+  assert.deepEqual(light, { state: 'busy', color: '#2a9d43', shape: 'lit', text: 'Busy: ir9yf review' })
 })
 
-test('idle is green and a ring; with no note it still says idle', () => {
-  assert.deepEqual(deskLightOf({ state: 'idle', note: 'Idle since 21:40' }), { state: 'idle', color: '#2a9d43', shape: 'ring', text: 'Idle since 21:40' })
+test('idle (nothing in progress) is red and dim; with no note it still says idle', () => {
+  assert.deepEqual(deskLightOf({ state: 'idle', note: 'Idle since 21:40' }), { state: 'idle', color: '#d62828', shape: 'dim', text: 'Idle since 21:40' })
   assert.equal(deskLightOf({ state: 'idle', note: '' }).text, 'Idle')
 })
 

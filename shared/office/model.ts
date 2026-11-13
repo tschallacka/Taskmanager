@@ -30,17 +30,19 @@ export interface OfficePerson {
   status?: PersonStatus
 }
 
-export type DeskShape = 'dot' | 'ring' | 'dashed'
+/** The lamp's look: lit (a glow cone), dim (a dark shade), dashed (an outline, while nothing is known). */
+export type DeskShape = 'lit' | 'dim' | 'dashed'
 
 /**
- * The desk light for a status: busy red and filled, idle green and a ring, unknown grey and dashed. The shape
- * says it too, so the light does not rely on colour alone. The text is what hover and tap show.
+ * The desk lamp for a status. Green and lit when the person has a card in progress (or a subtask of theirs under
+ * one); red and dim when they have nothing in progress; grey with a dashed outline while nothing is known. The shape
+ * says it too, so the lamp does not rely on colour alone. The text is what hover and tap show.
  */
 export function deskLightOf(status: PersonStatus | undefined): { state: DeskState, color: string, shape: DeskShape, text: string } {
   const state: DeskState = status?.state ?? 'unknown'
   const note = status?.note.trim() ?? ''
-  if (state === 'busy') return { state, color: '#d62828', shape: 'dot', text: note || 'Busy' }
-  if (state === 'idle') return { state, color: '#2a9d43', shape: 'ring', text: note || 'Idle' }
+  if (state === 'busy') return { state, color: '#2a9d43', shape: 'lit', text: note || 'Busy' }
+  if (state === 'idle') return { state, color: '#d62828', shape: 'dim', text: note || 'Idle' }
   return { state: 'unknown', color: '#8e8e93', shape: 'dashed', text: 'No status yet' }
 }
 
