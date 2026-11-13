@@ -10,7 +10,7 @@ definePageMeta({ layout: 'app' })
 
 useSeoMeta({ title: 'Inbox' })
 
-const { items, unread, prefs, push, loaded, load, markRead, markAllRead, archive, archiveAll, unarchive, loadReadBox, decideGuestRequest, setPreference, setPush, testPush } = useNotifications()
+const { items, unread, prefs, push, loaded, load, markRead, markAllRead, archive, archiveAll, unarchive, loadReadBox, emptyReadBox, decideGuestRequest, setPreference, setPush, testPush } = useNotifications()
 onMounted(load)
 
 // A guest manager's request for a person outside their domain is decided here, by a project admin.
