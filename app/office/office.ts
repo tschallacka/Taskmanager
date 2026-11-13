@@ -6,6 +6,7 @@ import {
   activityOf, castWithStandIns, describeErrand, errandsBetween, ownerOf, pingsBetween, placeOf,
   JAR, SHELF, SHREDDER
 } from '../../shared/office/model'
+import { deskLightOf } from '../../shared/office/model'
 import type { Errand, OfficePerson, OfficeSnapshot, Place } from '../../shared/office/model'
 import { Actor, roundSharpCorners, routes } from './actor'
 import type { Beat, IdleStyle } from './actor'
@@ -277,7 +278,12 @@ export class OfficeScene {
 
   /** Each desk's light follows the status in the snapshot, live: no rebuild of the floor. */
   private syncStatuses() {
-    for (const person of this.cast) this.actors.get(person.key)?.setStatus(person.status)
+    for (const person of this.cast) {
+      this.actors.get(person.key)?.setStatus(person.status)
+      // The desk lamp glows green only while the person has a card in progress (the shape 'lit').
+      const lamp = this.desks.get(person.key)?.lamp
+      if (lamp) lamp.glow.visible = deskLightOf(person.status).shape === 'lit'
+    }
   }
 
   setSnapshot(next: OfficeSnapshot) {
