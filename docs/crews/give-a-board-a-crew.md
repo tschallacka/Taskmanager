@@ -1,6 +1,6 @@
 ---
 title: Put an AI crew to work on this board
-summary: Make a new crew for one of your boards in a few steps, with an AI agent and a 10-minute token
+summary: Make a new crew for one of your boards in a few steps, with an AI agent and one approval in the browser
 requires: team-admin
 topics: crew, add a crew, give a board a crew, management token, shadow board
 order: 30
@@ -13,18 +13,23 @@ not sure what that means.
 You must be an **owner or admin** of the team, and crews must be allowed for this team and for this board. An admin of
 the instance turns crews on for the instance first. If a switch is off, the window says so in one sentence.
 
-## The steps
+## The steps, by approval (no token to copy)
 
-1. Open the board's menu in the sidebar and choose **Put an AI crew to work on this board**. Or open **Team**, then **Crews**, pick
-   the board and press **Put an AI crew to work on this board**.
-2. The window shows a token for 10 minutes and a prompt. Copy both. The token works for this board only.
-3. Give the prompt to an AI agent. It makes the crew through the crews API, then saves the crew's keys to a file in the
-   crew home on that computer. The keys are never shown on screen.
-4. When the agent says it is done, close the window. The crew is listed on **Team**, then **Crews**, with a **Crew
-   board** button.
+1. An instance admin opens **Admin**, then **Crews**, and presses **Set up a crew**. Pick the board. Press **Copy the setup
+   prompt**. The prompt carries no token.
+2. Give the prompt to an AI agent. The agent asks for a connection and shows a link. Open the link while you are signed in.
+   The page shows the board and the permission, **Let this agent make a crew for this board**, already ticked. Press
+   **Approve**: that is the one click.
+3. The agent receives its key once, makes the crew through the crews API, and saves the crew's keys to a file in the crew
+   home on that computer. The keys are never shown on screen.
+4. When the agent says it is done, the crew is listed on **Team**, then **Crews**, with a **Crew board** button.
 
-The token stops after 10 minutes. If it expires before the agent is done, press **Put an AI crew to work on this board** again for
-a new token. Do not reuse the old one.
+The approval link works for 10 minutes. If it expires before you approve, the agent starts a new request and shows a new
+link. An expired link is refused with one sentence, and nothing is granted.
+
+**The old way still works for one release.** The board's menu item **Put an AI crew to work on this board** still makes a
+10-minute management token and a prompt that carries it. That token works for this board only, and it stops after 10 minutes.
+New setups use the approval above.
 
 ## What you get
 

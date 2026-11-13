@@ -14,8 +14,24 @@ const toast = useToast()
 // boards this admin can open (GET /api/projects, an existing session endpoint) before the prompt is copied.
 const setupOpen = ref(false)
 const setupBoardId = ref('')
+const setupBoardItems = ref<Array<{ label: string, value: string }>>([])
 const setupProblem = ref<string | null>(null)
 const setupBusy = ref(false)
+
+// The picker lists the boards this admin can open (the same list as the app's own boards). The copy still checks the
+// chosen id on the server, so a board that is not there is refused.
+async function loadSetupBoards() {
+  try {
+    const rows = await $fetch<Array<{ id: string, name: string }>>('/api/projects')
+    setupBoardItems.value = rows.map(row => ({ label: row.name, value: row.id }))
+  } catch {
+    setupProblem.value = 'Could not load the boards. Try again.'
+  }
+}
+
+watch(setupOpen, (open) => {
+  if (open) void loadSetupBoards()
+})
 
 async function copySetupPrompt() {
   setupProblem.value = setupBoardProblem({ boardId: setupBoardId.value })
@@ -306,14 +322,16 @@ function cancelPurge() {
         @submit.prevent="copySetupPrompt"
       >
         <p class="text-sm text-muted">
-          Type the board's id. It is in the board's address: the part after <span class="font-mono">/projects/</span>.
-          The prompt it copies sets up a crew for that board by an approval in the browser, with no token in it.
+          Pick the board. The prompt it copies sets up a crew for that board by an approval in the browser, with no token in it.
           The board's name comes from the board itself.
         </p>
-        <UFormField label="Board id">
-          <UInput
+        <UFormField label="Board">
+          <USelectMenu
             v-model="setupBoardId"
-            placeholder="e.g. mw7vn0cp9pspxfvjru"
+            :items="setupBoardItems"
+            value-key="value"
+            placeholder="Choose a board"
+            class="w-full"
             data-setup-board-id
           />
         </UFormField>
