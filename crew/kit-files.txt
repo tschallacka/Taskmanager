@@ -30,6 +30,7 @@ browser.mjs
 cast.mjs
 channel.mjs
 config.mjs
+crew-defaults.mjs
 crew.config.example.json
 crew.mjs
 detach.sh
