@@ -556,6 +556,32 @@ function tray(label: string, color: string): THREE.Group {
   return g
 }
 
+/** A desk lamp: a base, an arm and a shade. Its glow cone shows while the person has a card in progress (green, lit). */
+export interface DeskLamp {
+  group: THREE.Group
+  shade: THREE.Mesh
+  glow: THREE.Mesh
+}
+
+export function buildDeskLamp(at: Partial<P3>): DeskLamp {
+  const group = new THREE.Group()
+  group.position.set(at.x ?? 0, at.y ?? 0, at.z ?? 0)
+  group.add(cyl(0.16, 0.18, 0.04, '#2b2d42', { y: 0.02 }))
+  group.add(cyl(0.025, 0.025, 0.5, '#5c677d', { y: 0.27 }))
+  group.add(box(0.04, 0.04, 0.3, '#5c677d', { y: 0.52, z: 0.12 }))
+  const shade = cyl(0.04, 0.12, 0.14, '#f4d35e', { y: 0.46, z: 0.26 })
+  shade.rotation.x = -Math.PI / 4
+  group.add(shade)
+  const glow = new THREE.Mesh(
+    new THREE.ConeGeometry(0.45, 0.8, 16, 1, true),
+    new THREE.MeshBasicMaterial({ color: '#2a9d43', transparent: true, opacity: 0.2, depthWrite: false })
+  )
+  glow.position.set(0, -0.4, 0.26)
+  glow.visible = false
+  group.add(glow)
+  return { group, shade, glow }
+}
+
 export interface DeskParts {
   group: THREE.Group
   screen: Painted
@@ -563,6 +589,8 @@ export interface DeskParts {
   chair: THREE.Group
   /** The Boss's office only: the ball on the putting green. */
   golfBall?: THREE.Mesh
+  /** The desk lamp; its glow follows the person's status. Missing where a desk has no lamp yet (the Boss's). */
+  lamp?: DeskLamp
 }
 
 function monitorWith(screen: Painted): THREE.Group {
@@ -642,7 +670,10 @@ export function buildCubicle(desk: Desk, name: string, trayLabel: string, title?
     item.position.set(i === 0 ? 1.2 : -0.9, 0.8, i === 0 ? -0.2 : -0.3)
     group.add(item)
   })
-  return { group, screen, monitor, chair: seat }
+  // The desk lamp stands on the desk top, front right, clear of the monitor, keyboard and tray.
+  const lamp = buildDeskLamp({ x: 1.2, y: 0.84, z: 0.15 })
+  group.add(lamp.group)
+  return { group, screen, monitor, chair: seat, lamp }
 }
 
 export function buildPiaDesk(desk: Desk, flair: string[] = []): DeskParts {
@@ -680,7 +711,10 @@ export function buildPiaDesk(desk: Desk, flair: string[] = []): DeskParts {
     item.rotation.y = Math.PI
     group.add(item)
   })
-  return { group, screen, monitor, chair: seat }
+  // Her lamp stands on her side of the desk, the left end, clear of her things and the monitor.
+  const lamp = buildDeskLamp({ x: -1.95, y: 0.83, z: -0.2 })
+  group.add(lamp.group)
+  return { group, screen, monitor, chair: seat, lamp }
 }
 
 export function buildBossOffice(desk: Desk, flair: string[] = [], owner = ''): DeskParts {
@@ -765,7 +799,10 @@ export function buildBossOffice(desk: Desk, flair: string[] = [], owner = ''): D
   const golfBall = ball(0.05, '#ffffff', { x: GOLF.tee.x, y: 0.095, z: GOLF.tee.z })
   golfBall.castShadow = true
   group.add(golfBall)
-  return { group, screen, monitor, chair: seat, golfBall }
+  // His desk lamp: back right, away from the monitor on the front side (desk coordinates are absolute here).
+  const lamp = buildDeskLamp({ x: desk.center.x + 0.45, y: 0.83, z: desk.center.z - 1.2 })
+  group.add(lamp.group)
+  return { group, screen, monitor, chair: seat, golfBall, lamp }
 }
 
 // ── The room ────────────────────────────────────────────────────────────────
