@@ -60,6 +60,7 @@ prepare-worktree.mjs
 publish.mjs
 restart-brief.mjs
 session-hooks.mjs
+session-wake.sh
 session.mjs
 setup.mjs
 susy.mjs
@@ -68,6 +69,7 @@ totp.mjs
 unslop.SKILL.md
 up.mjs
 update.mjs
+wake.mjs
 watch-crew.mjs
 watch.mjs
 watchlogs.mjs
