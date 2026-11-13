@@ -17,6 +17,26 @@ export function boardLoadMessage(input: { invalidId?: boolean, status?: number |
   return 'This board could not be loaded.'
 }
 
+// The board load error the store holds: what failed, and the sentence for it.
+export interface BoardLoadError {
+  status: number | null
+  invalidId: boolean
+  message: string
+}
+
+export type BoardLoadEvent
+  = | { type: 'fail', status?: number | null, invalidId?: boolean }
+    | { type: 'retry' }
+    | { type: 'loaded' }
+
+// The next load error after an event: a failure sets it, a retry (the board loads again) and a load that succeeds clear it.
+export function boardLoadStateAfter(_prev: BoardLoadError | null, event: BoardLoadEvent): BoardLoadError | null {
+  if (event.type !== 'fail') return null
+  const status = event.status ?? null
+  const invalidId = event.invalidId ?? false
+  return { status, invalidId, message: boardLoadMessage({ invalidId, status }) }
+}
+
 // Rejects when the promise has not settled in time, so a request that never completes is a failure, not a spinner.
 export function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
