@@ -1,0 +1,1 @@
+- **Task panel link.** The task number in the panel gets a copy control: it puts a link to the task on the clipboard, a number that is a link in a rich editor and the bare number in a plain field. Files: app/utils/copyTaskLink.ts, tests/copy-task-link.test.ts.
