@@ -10,6 +10,7 @@ CREW.md.tmpl
 JANET.md.tmpl
 NINA.md.tmpl
 PAT.md.tmpl
+PIA-CLAUDE.md.tmpl
 PIA-UX.md.tmpl
 PROJECT-RULES.md.tmpl
 PROMPTS.md.tmpl

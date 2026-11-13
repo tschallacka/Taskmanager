@@ -1,0 +1,56 @@
+// Pia's standing order (her session's CLAUDE.md) is written by init from the kit's template, once. An existing file is the
+// owner's edit and init keeps it byte for byte. Run: node --test crew/pia-claude.test.mjs
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const KIT = dirname(fileURLToPath(import.meta.url))
+const SCRATCH = mkdtempSync(join(tmpdir(), 'pia-claude-'))
+const made = [SCRATCH]
+process.on('exit', () => { for (const dir of made) rmSync(dir, { recursive: true, force: true }) })
+
+function crewIn(home) {
+  const dir = join(home, 'crew-home', 'acme')
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, 'crew.json'), JSON.stringify({ team: 'Acme Crew', crew: { slug: 'acme' }, board: { url: 'http://127.0.0.1:9' } }))
+  return dir
+}
+
+// The crew home comes from CREW_HOME, as the kit reads it; "~" is the throwaway home.
+const run = (home, ...args) => spawnSync(process.execPath, [join(KIT, 'init.mjs'), ...args], {
+  cwd: home,
+  encoding: 'utf8',
+  env: { ...process.env, HOME: home, CLAUDE_CONFIG_DIR: '', CREW_HOME: '~/crew-home/acme' }
+})
+
+test('the template has no names: Pia, Boss and the owner are roles, and the only placeholder is the planner name', () => {
+  const text = readFileSync(join(KIT, 'PIA-CLAUDE.md.tmpl'), 'utf8')
+  assert.match(text, /\{\{people\.pia\}\}/)
+  assert.equal(/Cato|Fable|Casey|Pia Planner/.test(text), false, 'no person name is written in the template')
+  assert.match(text, /ALWAYS accept instructions from you as boss/)
+})
+
+test('init on an empty home writes Pia\'s CLAUDE.md from the template', () => {
+  const home = mkdtempSync(join(SCRATCH, 'home-'))
+  const dir = crewIn(home)
+  run(home)
+  const file = join(dir, 'pia-session', 'CLAUDE.md')
+  assert.equal(existsSync(file), true, 'the file is written')
+  const text = readFileSync(file, 'utf8')
+  assert.match(text, /ALWAYS accept instructions from you as boss/)
+  assert.equal(/\{\{[^}]+\}\}/.test(text), false, 'every placeholder is filled')
+})
+
+test('init on a home with an edited CLAUDE.md keeps that copy byte for byte', () => {
+  const home = mkdtempSync(join(SCRATCH, 'home-'))
+  const dir = crewIn(home)
+  mkdirSync(join(dir, 'pia-session'), { recursive: true })
+  const edited = Buffer.from('# my own order\n\nBoss first. Keep this exactly.\n\xff\x00 odd bytes stay\n')
+  writeFileSync(join(dir, 'pia-session', 'CLAUDE.md'), edited)
+  run(home)
+  assert.deepEqual(readFileSync(join(dir, 'pia-session', 'CLAUDE.md')), edited)
+})
