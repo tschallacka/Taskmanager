@@ -22,8 +22,11 @@ const setupBusy = ref(false)
 // chosen id on the server, so a board that is not there is refused.
 async function loadSetupBoards() {
   try {
-    const rows = await $fetch<Array<{ id: string, name: string }>>('/api/projects')
-    setupBoardItems.value = rows.map(row => ({ label: row.name, value: row.id }))
+    const rows = await $fetch<Array<{ id: string, name: string, role?: string }>>('/api/projects')
+    // A crew's own (shadow) board is not a board a crew is set up for: only the real boards are offered.
+    setupBoardItems.value = rows
+      .filter(row => row.role !== 'shadow')
+      .map(row => ({ label: row.name, value: row.id }))
   } catch {
     setupProblem.value = 'Could not load the boards. Try again.'
   }
