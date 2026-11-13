@@ -31,3 +31,19 @@ test('the crew home is ~/crew-<slug>, and the three report lines are the only ou
   assert.match(prompt, /~\/crew-<slug>/)
   assert.match(prompt, /prints three lines/)
 })
+
+// A board name with a double quote, an apostrophe and a command substitution must not break the start command: the
+// curl body is one shell word, and reading that word back as the shell does must give the JSON the server expects.
+test('a board name with quotes and shell characters still gives a valid start request', () => {
+  const name = 'Ann "Q" O\'Brien $(rm -rf ~) `x` \\ end'
+  const text = approvalSetupPrompt({ origin: 'https://tm.example', boardId: 'board-2', boardName: name })
+  const line = text.split('\n').find(l => l.includes('/api/pair/device" -d '))
+  assert.ok(line, 'the start request line is in the prompt')
+  const word = line.slice(line.indexOf(' -d ') + 4)
+  // One shell word: single-quoted, with each inner quote written as '\'' (close, escaped quote, reopen).
+  assert.match(word, /^'.*'$/)
+  const unquoted = word.slice(1, -1).replace(/'\\''/g, '\'')
+  const body = JSON.parse(unquoted) as { client_name: string, boards: Array<{ boardId: string, scopes: string[] }> }
+  assert.equal(body.client_name, `Crew setup for ${name}`)
+  assert.deepEqual(body.boards, [{ boardId: 'board-2', scopes: ['crews:manage'] }])
+})

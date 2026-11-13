@@ -14,12 +14,11 @@ const toast = useToast()
 // boards this admin can open (GET /api/projects, an existing session endpoint) before the prompt is copied.
 const setupOpen = ref(false)
 const setupBoardId = ref('')
-const setupBoardName = ref('')
 const setupProblem = ref<string | null>(null)
 const setupBusy = ref(false)
 
 async function copySetupPrompt() {
-  setupProblem.value = setupBoardProblem({ boardId: setupBoardId.value, boardName: setupBoardName.value })
+  setupProblem.value = setupBoardProblem({ boardId: setupBoardId.value })
   if (setupProblem.value) return
   setupBusy.value = true
   try {
@@ -307,25 +306,17 @@ function cancelPurge() {
         @submit.prevent="copySetupPrompt"
       >
         <p class="text-sm text-muted">
-          Type the board's id and name. The id is in the board's address: the part after <span class="font-mono">/projects/</span>.
+          Type the board's id. It is in the board's address: the part after <span class="font-mono">/projects/</span>.
           The prompt it copies sets up a crew for that board by an approval in the browser, with no token in it.
+          The board's name comes from the board itself.
         </p>
-        <div class="grid gap-3 sm:grid-cols-2">
-          <UFormField label="Board id">
-            <UInput
-              v-model="setupBoardId"
-              placeholder="e.g. mw7vn0cp9pspxfvjru"
-              data-setup-board-id
-            />
-          </UFormField>
-          <UFormField label="Board name">
-            <UInput
-              v-model="setupBoardName"
-              placeholder="e.g. Launch board"
-              data-setup-board-name
-            />
-          </UFormField>
-        </div>
+        <UFormField label="Board id">
+          <UInput
+            v-model="setupBoardId"
+            placeholder="e.g. mw7vn0cp9pspxfvjru"
+            data-setup-board-id
+          />
+        </UFormField>
         <p
           v-if="setupProblem"
           class="text-sm text-error"

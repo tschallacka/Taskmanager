@@ -11,9 +11,17 @@ export interface ApprovalSetupInput {
   boardName: string
 }
 
+/** One shell word: single quotes around it, and each single quote in it closed, escaped and reopened. */
+export function shellQuote(text: string): string {
+  return `'${text.replace(/'/g, `'\\''`)}'`
+}
+
 export function approvalSetupPrompt(input: ApprovalSetupInput): string {
   const { origin, boardId, boardName } = input
   const host = new URL(origin).host
+  // The board name is free text from the board: JSON.stringify escapes it for the JSON body, and shellQuote keeps the
+  // whole body one shell word, so a quote or an apostrophe in the name cannot break the command the agent runs.
+  const startBody = shellQuote(JSON.stringify({ client_name: `Crew setup for ${boardName}`, boards: [{ boardId, scopes: ['crews:manage'] }] }))
   return `You set up one new crew for the Taskmanager board "${boardName}" (board id ${boardId}) at ${origin}.
 
 There is no token in this prompt. You get a key by a browser approval: the owner of the board approves one request in the browser, and you receive the key once.
@@ -26,7 +34,7 @@ Step 1: get the kit. Keep it in ~/crew-kit-${host}.
   Otherwise: mkdir -p ~/crew-kit-${host} && tar -xzf ~/crew-kit.tar.gz -C ~/crew-kit-${host} && cd ~/crew-kit-${host} && npm install
 
 Step 2: get the key by browser approval.
-  a. Start the request: curl -s -X POST -H "content-type: application/json" "${origin}/api/pair/device" -d '{"client_name":"Crew setup for ${boardName}","boards":[{"boardId":"${boardId}","scopes":["crews:manage"]}]}'
+  a. Start the request: curl -s -X POST -H "content-type: application/json" "${origin}/api/pair/device" -d ${startBody}
      The answer holds device_code, user_code, verification_url and interval. Keep device_code in a shell variable only; never print it into a file.
   b. Show the user the verification_url and ask them to open it and approve. The request expires after 10 minutes.
   c. Poll every interval seconds until the answer is approved: curl -s -X POST -H "content-type: application/json" "${origin}/api/pair/device/poll" -d "{\\"device_code\\":\\"$DEVICE_CODE\\"}"
