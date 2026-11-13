@@ -2,6 +2,66 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.26.0 - 2026-11-13
+
+- **A crew person can run as its own background session.** `crew session start <key> <folder>` starts one person as a `claude --bg` session with remote control off and the crew's own strict mcp config, and records its id in `sessions/<key>.json`; `status`, `list` and `stop` read that record by id. Only the crew kit changes: `crew/session.mjs`, `crew/crew.mjs`, `crew/kit-files.txt`, `crew/session.test.mjs`.
+
+## 0.25.2 - 2026-11-13
+
+- **Crew listener: pid files instead of process scans, and a one-hour listener wait.** Pia's listener and the Boss watches now record their pid in `.listen/<name>.pid`, and the Stop hooks and Susy read that file instead of running `pgrep -f` over every process; Pia's listener waits up to 3600 s (was 600 s) before it exits on quiet, so she is woken less often. Files: `crew/pidfile.mjs` (new), `crew/listen.mjs`, `crew/crew.mjs`, `crew/boss-stop-hook.sh`, `crew/pia-listener-hook.sh`, `crew/susy-collector.mjs`, `crew/susy-activity.mjs`, `crew/PROMPTS.md.tmpl`, and their tests.
+
+## 0.25.1 - 2026-11-13
+
+- **A session that stops on an API error is reported as blocked, and Boss gets one mail.** The daemon reads the last transcript line of each person's session. A line that is an API error (a 403, a login request, or the account limit) shows the session as `blocked: api error` with the error text, not as stuck. Boss gets one mail per distinct error, and a later normal line clears the block. A dry run only reports and never marks a mail as sent.
+
+## 0.25.0 - 2026-11-13
+
+- **Connect a folder or an agent with its own MCP setup, not a shared variable.** The key panel offers two copies. **Copy agent config file** writes a per-agent file, started with `claude --mcp-config <file> --strict-mcp-config`, with a server name unique per instance, board and key. **Copy folder setup** writes only `.mcp.json` and `.claude/settings.local.json` in one folder: the header reads a variable named for the key, and nothing goes to user settings or a shell profile. Both files are excluded from git. The check is `/mcp` inside a session, and a reconnect is a new session (`claude --continue`). A key's name suffix (`-2`, `-3`) and its name slug are stored on its row in two new nullable columns, `api_keys.name_suffix` and `api_keys.name_slug`, with a unique index `api_keys_name_suffix_uidx` on (user, slug, suffix). They are added with `db:push` (the repo keeps no migration SQL). Check on live after deploy: the two columns and the index exist, and the key list returns `nameSuffix`. Files: app/utils/agentConfig.ts, app/components/ApiKeysPanel.vue, docs/agents/create-and-revoke-a-key.md, tests/agent-config-project.test.ts, tests/agent-config-names.test.ts, tests/agent-config.test.ts.
+
+## 0.24.0 - 2026-11-13
+
+- **Settings > API keys gives one prompt to paste into an agent.** After a key is made, the panel shows one "Copy prompt for your agent" button. The prompt carries a one-time pairing code by default (the key stays out of it), removes an old taskmanager server before it adds the new one, so it also serves a re-connect, and lists the key's boards in plain words. The key, the export line and the mcp commands move into a collapsed "Set it up yourself" section. `app/utils/connectPrompt.ts`, `app/components/ApiKeysPanel.vue`, `docs/agents/create-and-revoke-a-key.md`, `tests/key-prompt.test.ts`.
+
+- **Notifications can be archived into a Read box, and the Read box can be emptied.** Every notification in the inbox gets an Archive button, and Archive all takes the shown ones out; archived notifications move to the Read box, where each can be moved back to the inbox. The Read box can be emptied in full or only the notifications archived more than 30 days, 2 months, 6 months or 1 year ago, after the page says how many will go. Emptying deletes for the signed-in person only. A failed archive puts the rows back and says so. Files: `server/utils/notificationBox.ts`, `server/api/notifications/archive.post.ts`, `server/api/notifications/unarchive.post.ts`, `server/api/notifications/empty.post.ts`, `app/pages/projects/inbox.vue`, `app/composables/useNotifications.ts`.
+
+## 0.23.1 - 2026-11-13
+
+- **The default model is the full id, not the bare alias.** A person with no entry in `crew.json` `models` now gets `claude-haiku-5-5`: Claude Code no longer accepts `haiku` ("unrecognized model"), which stopped every agent from starting. Pia's process match accepts the full id and the alias. A kit test fails if a bare alias (`model: haiku`, `--model haiku`, `model: 'haiku'`) appears in the kit's sources or templates. The README's examples and defaults are updated. Not yet: the one-word model check in `init` and `crew update`, and the listener message when Pia cannot answer. Files: `crew/config.mjs`, `crew/activity.mjs`, `crew/model-alias.test.mjs`, `crew/kit.test.mjs`, `crew/README.md`.
+
+## 0.23.0 - 2026-11-13
+
+- **Susy runs as a daemon, with a live mode that acts on the board.** `crew susy-daemon start` puts the loop in its own detached tmux session through `detach.sh`, so it outlives the session that started it; `stop` kills that session; `status` shows the heartbeat. `start --live` (or `loop --live`, or `once --live`) posts Susy's own lines on the board, and mails Boss once per streak when the board gives no answer. Without `--live` the loop only logs what it would post, to `.listen/susy-daemon-dryrun.log`. Each tick writes `.listen/susy-daemon.json`, the heartbeat. A second live loop refuses to start while one runs (pid lock). The start command quotes its paths, so a home or kit folder with spaces or quotes works. The board read in `crew/susy.mjs` is shared with the daemon (`makeCall`, `readBoardCards`). Files: `crew/susy-daemon.mjs`, `crew/susy-daemon.test.mjs`, `crew/kit-imports.test.mjs`, `crew/susy.mjs`, `crew/crew.mjs`, `crew/kit-files.txt`.
+
+- **A board that fails to load says so instead of spinning.** A board the reader cannot open says "You do not have access to this board or it does not exist.", any other failure says "This board could not be loaded.", a request that takes longer than 60 seconds counts as a failure, and a bad board id (board ids are letters and digits only) says "This is not a valid board link." Each with Try again and Back to boards. Files: app/utils/boardLoad.ts, app/composables/useProjects.ts, app/pages/projects/[id].vue, tests/board-load.test.ts.
+
+- **Dev copies: `crew <who> serve`, one per person, with the port registry.** Each worker's copy starts on their `devServers` port, with `--replace`, `--stop` and `--check` (the check passes only for the commit the copy started from). The registry `.listen/ports.json` holds one entry per port under one lock. `prepare worktree` reserves the port. init writes `scripts.serve` where it is missing; the ports come from the one table in `crew-defaults.mjs`. The listener is found with `lsof`, with a `/proc` fallback.
+
+## 0.22.0 - 2026-11-13
+
+- **The crew comes back after a restart of Boss's session.** `crew up` brings the parts in the `up` list of crew.json back in order (already running, started, or failed and why), and is safe to run twice. `crew/detach.sh` keeps Pia's session and the dev services in a detached tmux session, so they outlive the session that started them. `crew restart-brief` lists each standing member's open cards and last update for Pia to start them fresh, and stops with the reason when a board call fails. Files: `crew/up.mjs`, `crew/detach.sh`, `crew/restart-brief.mjs`, `crew/board-call.mjs`, `crew/janet.mjs`, `crew/crew.mjs`, `crew/PROMPTS.md.tmpl`, `crew/SKILL.md`, `crew/kit-files.txt`.
+
+- **Crew sessions get a long-run profile, for that one session only.** `crew/claude-long-run.json` raises Claude Code's shell, MCP and background-agent limits; `crew claude` starts a session with it, and Pia's start line passes it with `--settings`. Other sessions keep the defaults. The README section "Claude Code limits" has the table, what cannot be raised, and the version it was checked against (2.1.319). `crew/claude-long-run.json`, `crew/claude-long-run.comments.md`, `crew/claude.mjs`, `crew/claude.test.mjs`, `crew/crew.mjs`, `crew/PROMPTS.md.tmpl`, `crew/README.md`, `crew/kit-files.txt`.
+
+- **Your picture and display name are yours to change, and a person without a picture gets their initials on a colour that stays the same.** In Settings, Account, upload a PNG, JPEG, WebP or SVG picture (up to 2 MB; cropped to a square and kept at 256 pixels), remove it, or edit your display name in place. The initials and colour come from one shared avatar. `app/components/account/ProfileEditor.vue`, `app/components/UserAvatar.vue`, `server/api/account/`, `docs/workspace/settings.md`.
+
+- **Comment permalinks load a window.** Opening a comment's link shows that comment with the five before and five after; **Load earlier comments** and **Show later comments** load the rest on their side, with the count of what is left. On a phone, a comment's link opens the Activity sheet, so the buttons are visible and work. Files: server/utils/commentWindow.ts, server/api/tasks/[id]/comments.ts, tests/comment-window.test.ts, docs/basics/comments-and-updates.md, changelog.d/mwav0vmcp2v8g8w5rz-comment-window.md.
+
+- **`crew dev-copies` checks the tester copies.** After `crew up`, it checks each card waiting in Verify UX or Verify QA: the owner, the card, the branch linked to the card, the port, and whether a copy answers there. A copy that does not answer gets the line `no copy: ask Boss: tester-copy.sh start <owner> <branch>`. It starts nothing. The board is read in one call (the two gate columns, up to 200 cards each), then one card read per gate card for its branch. A gate column over 200 cards is printed as cut, its cards past 200 are not checked, and the command exits 1. Files: `crew/dev-copies.mjs`, `crew/dev-copies.test.mjs`, `crew/crew.mjs`.
+
+## 0.21.0 - 2026-11-13
+
+- **`tm.mjs` loads Playwright only when it starts a browser.** A plain board call (`crew <who> mcp ...`) no longer loads Playwright at start, which cut the CPU each call used while the crew shares one server. `crew/tm.mjs`, `crew/tm-lazy.test.mjs`, `crew/README.md`.
+
+## 0.20.1 - 2026-11-12
+
+- **The mail routes moved out of the crew gate.** A member's mail was unreachable from a remote machine: the crew gate answers every `/api/crews/*` path with a 404 to a member key, and the mail routes were under `/api/crews`. They are now `/api/crew-mail/<slug>` (send and fetch) and `/api/crew-mail/<slug>/<id>/ack`, and the mailer client uses them. The rules are unchanged. A regression test pins that the mail paths are not crew API paths and that no mail route is left under `/api/crews`. Files: `server/api/crew-mail/[slug]/`, `crew/mail-client.mjs`, `tests/crew-mail-path.test.ts`, `docs/crews/crew-mail.md`.
+
+## 0.20.0 - 2026-11-12
+
+- **Crew rule notes are written by the crew's Boss account, never the board owner.** The built-in crew rules (promotion, gate routing, the time-log check, the failing-test clock) posted their notes as the board owner when no Pia account was on the board, so every reply landed in the owner's inbox. They now post as the Boss account (Pia's if there is none), and a rule with neither skips the note and logs why. A new crew's Boss account is named Cato. `server/utils/crewRules.ts`, `server/utils/ruleActions.ts`, `server/utils/crewProvisioning.ts`, `tests/crew-rule-note-author.test.ts`, `tests/crew-provisioning-boss-name.test.ts`, `tests/crew-server-rules.test.ts`, `docs/crews/crew-rule-notes.md`.
+
+- **The crew's mail goes through the app.** A person's mail is kept by the server until the person's mailer has delivered it, so a mailer on any machine can fetch it once a minute. `POST /api/crews/<slug>/mail` sends (the sender is the caller's own key, never a body field), `GET /api/crews/<slug>/mail?to=<key>` returns the undelivered mail for one person (the boss key may read any), and `POST /api/crews/<slug>/mail/<id>/ack` marks it delivered (only the recipient can). A key of another crew, a customer or a non-crew key gets 403. Text up to 1 MB (the one safety stop; a text is never cut); 30 sends a minute per sender; 500 undelivered per recipient; delivered mail is deleted after 7 days and undelivered after 30. The mailer falls back to its outbox when the endpoint does not answer and flushes it later; a mail is delivered once, even when an ack fails. Files: `server/db/schema.ts` (crew_mail), `server/utils/crewMail.ts`, `server/utils/crewMailRules.ts`, `server/api/crews/[slug]/mail/`, `crew/mail-client.mjs`, `docs/crews/crew-mail.md`.
+
 ## 0.19.1 - 2026-11-12
 
 - **The result of Regenerate key, Edit boards and Add a board shows in the key's own row.** The one-time code and prompt appear under the row that was clicked, which scrolls into view, and the confirmation of a save or an added board shows there too; the box at the top of the Connect page is for a new connection only. `app/components/connect/ConnectTokens.vue`, `docs/agents/create-and-revoke-a-key.md`.

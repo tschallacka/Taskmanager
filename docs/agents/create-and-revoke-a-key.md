@@ -25,13 +25,35 @@ You make and end your own keys under **Settings**, in the panel **API keys & MCP
 
 ## Copy it now
 
-A box titled **Copy your key now** appears with the whole key in it. This is the only time it is shown.
+A box titled **Copy this prompt for your agent** appears. It is one prompt: paste it into a new Claude Code session with
+nothing else, and the agent connects, removes an older connection first if there is one, and lists the boards it may use.
 
-- Press **Copy** to copy the key.
-- Press **Copy command** to copy two lines that connect Claude Code with the key in place: one that puts the key in
-  `TASKMANAGER_API_KEY`, and one that adds the MCP server. See
-  [Connect Claude Code to your boards](/help/agents/connect-claude-code).
+- The prompt carries a **pairing code** by default. The agent exchanges it for its key, so the key stays out of the chat.
+  The code works once, for ten minutes.
+- Press **Put the key in the prompt instead** only for an agent that cannot call the pairing route. The key is then in
+  the prompt, so paste it only into your own agent.
+- Press **Copy prompt** to copy it.
+- Under **Set it up yourself** are the key itself (shown once, never again), and the two commands that connect Claude
+  Code by hand. See [Connect Claude Code to your boards](/help/agents/connect-claude-code).
 - Press the X to dismiss the box. Once dismissed, the key cannot be brought back.
+
+### One folder, always on
+
+For one person who wants the board in one project folder, the panel also gives **Copy folder setup**. It writes two files
+in that folder, and only those two: `.mcp.json` (the server, whose header reads a variable, not the key) and
+`.claude/settings.local.json` (an `env` block that holds the key under the variable). The server is named
+`taskmanager-<key name>` and the variable `TASKMANAGER_<KEY NAME>`. Two keys whose names are alike (`Wren Worker` and
+`wren-worker`) would share them, so the later key gets `-2`, `-3` and so on: `taskmanager-wren-worker-2` and
+`TASKMANAGER_WREN_WORKER_2`. The first key keeps the plain name, and a key keeps its suffix. A suffix freed by a revoke can be
+reused by a new key, since the revoked key's setup no longer works. A key made before suffixes were stored gets its suffix the first time the key list is shown. Nothing goes to your
+user settings or to your shell profile, and no `headersHelper` is used.
+
+- Both files are added to `.git/info/exclude`, and must not be committed: the key is in the settings file.
+- The first time Claude Code starts in that folder, it asks you to approve the project server. Approve it.
+- Check the connection inside a session with `/mcp`. Do not judge by `claude mcp list`: it reports the variable as missing
+  even when it is set.
+- If the server is not connected, start a new session with `claude --continue` (it keeps the conversation). Try
+  `/mcp reconnect` first; if that does not connect, start a new session.
 
 Store the key where the agent reads it from, such as an environment variable or a password manager. Never paste it into
 a task, a message, a chat or a repository.

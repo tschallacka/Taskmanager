@@ -5,7 +5,7 @@ import { relativeTime } from '~/composables/useRelativeTime'
 import type { Visibility, ProjectTask } from '~/composables/useProjects'
 import { dueDayToMs, isOverdueDay } from '~/utils/dueDate'
 import { absoluteUrl, copyTaskLink } from '~/utils/copyTaskLink'
-import { taskPanelPath } from '~/utils/taskPanelUrl'
+import { activityStartsOpen, taskPanelPath } from '~/utils/taskPanelUrl'
 
 interface Task {
   id: string
@@ -32,8 +32,13 @@ const toast = useToast()
 // The task number is its id. The copy control puts a link to the task on the clipboard, as an html anchor with the
 // number as its text, and the bare number as plain text (utils/copyTaskLink.ts).
 const linkCopied = ref(false)
-// On a phone, the Activity sheet is open (the comments and the composer fill the panel).
-const activityOpen = ref(false)
+// On a phone, the Activity sheet is open (the comments and the composer fill the panel). A permalink (a comment in the
+// address) opens it, so the comment and its window buttons are on screen.
+const route = useRoute()
+const activityOpen = ref(activityStartsOpen(route.params.comment))
+watch(() => route.params.comment, (comment) => {
+  if (activityStartsOpen(comment)) activityOpen.value = true
+})
 // The phone's tap chevron on an editable property row (the grid gets a third column for it). A read-only panel
 // has no chevron: its rows show values only.
 const chevronRow = `max-md:grid-cols-[6rem_1fr_1rem] max-md:after:content-['›'] max-md:after:text-lg max-md:after:leading-none max-md:after:text-dimmed`

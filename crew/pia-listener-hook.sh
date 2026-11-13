@@ -21,20 +21,25 @@ while [ -n "$p" ] && [ "$p" -gt 1 ]; do
   p=$(ps -o ppid= -p "$p" 2>/dev/null | tr -d ' ')
 done
 
+# The listener writes its pid into CREW_HOME/.listen/pia.pid when it starts (crew/pidfile.mjs). The file names one
+# process: it must be alive and still listen.mjs pia (its /proc command line), and it must be under Pia's session.
+# No process scan (pgrep) is run.
 has_listener() {
   [ -n "$claude_pid" ] || return 1
-  for l in $(pgrep -f "listen.mjs pia"); do
-    q=$l
-    while [ -n "$q" ] && [ "$q" -gt 1 ]; do
-      [ "$q" = "$claude_pid" ] && return 0
-      q=$(ps -o ppid= -p "$q" 2>/dev/null | tr -d ' ')
-    done
+  l=$(cat "$CREW/.listen/pia.pid" 2>/dev/null | tr -d ' \n')
+  [ -n "$l" ] && [ -r "/proc/$l/cmdline" ] || return 1
+  tr '\0' ' ' < "/proc/$l/cmdline" | grep -q 'listen.mjs pia' || return 1
+  q=$l
+  while [ -n "$q" ] && [ "$q" -gt 1 ]; do
+    [ "$q" = "$claude_pid" ] && return 0
+    q=$(ps -o ppid= -p "$q" 2>/dev/null | tr -d ' ')
   done
   return 1
 }
 
-# The command Pia runs. Quoted for the shell, then escaped for the JSON the hook prints.
-START="CREW_HOME='$CREW' node '$KIT/listen.mjs' pia 600"
+# The command Pia runs. Quoted for the shell, then escaped for the JSON the hook prints. The listener waits up to an
+# hour when nothing comes (it still exits on the first event, which is what wakes her).
+START="CREW_HOME='$CREW' node '$KIT/listen.mjs' pia 3600"
 JSON_START=$(printf '%s' "$START" | sed 's/\\/\\\\/g; s/"/\\"/g')
 
 case "$EVENT" in
