@@ -42,6 +42,15 @@ test('a Blocked card with a BLOCKED ON line pokes the named person after the thr
   assert.equal(run([unnamed]).actions.filter(a => a.kind === 'poke' && a.reason.startsWith('blocked, waiting on')).length, 0)
 })
 
+test('a BLOCKED ON line that names no one we know (a typo such as bos) is flagged to the PM, not left silent', () => {
+  const typo = card('b3', { column: 'Blocked', updates: [update(agent('pia'), 'BLOCKED ON bos: push actor_id', 30)] })
+  const { actions } = run([typo])
+  const flagged = actions.filter(a => a.kind === 'poke' && a.reason === 'blocked, BLOCKED ON names no one known')
+  assert.equal(flagged.length, 1)
+  assert.equal(flagged[0].to, 'pia')
+  assert.equal(actions.filter(a => a.kind === 'poke' && a.reason.startsWith('blocked, waiting on')).length, 0, 'nobody is poked for an unknown name')
+})
+
 test('thresholds: defaults, overridden by crew.json, a bad value falls back', () => {
   assert.deepEqual(thresholdsFrom({}), { questionMinutes: 10, idleMinutes: 10, gateMinutes: 15, cleanGrantMinutes: 5, cleanPlanMinutes: 10, cleanDoneMinutes: 15, stuckMinutes: 240 })
   assert.equal(thresholdsFrom({ susy: { questionMinutes: 3, idleMinutes: -1 } }).questionMinutes, 3)

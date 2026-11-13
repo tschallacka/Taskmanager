@@ -233,6 +233,7 @@ export function suggestedMessage(reason, card, to) {
     'blocked by an unowned card': `give the blocker of ${card.id} "${card.title}" an owner`,
     'blocked in a cycle': `break the blocker cycle that includes ${card.id} "${card.title}"`,
     'blocked, no BLOCKED ON line': `name who unblocks ${card.id} "${card.title}" (a BLOCKED ON line: BLOCKED ON <key>: <what they must do>)`,
+    'blocked, BLOCKED ON names no one known': `fix the BLOCKED ON line on ${card.id} "${card.title}": its key names no crew member (check the spelling)`,
     'ready to clean, not assigned to cleaner': `assign the cleaner to ${card.id} "${card.title}"`,
     'clean plan, no check': `check the clean plan on ${card.id} "${card.title}"`,
     'cleaning granted, cleaner not working': `start cleaning ${card.id} "${card.title}"`,
@@ -296,6 +297,8 @@ export function candidatesFor(card, th, ctx) {
   const namedKey = blockedOn && [...AGENTS, 'boss'].includes(blockedOn.key) ? blockedOn.key : null
   add(`blocked, waiting on ${namedKey}`, namedKey ?? 'pia', lastChange(card), th.idleMinutes, card.column === 'Blocked' && Boolean(namedKey))
   add('blocked, no BLOCKED ON line', 'pia', lastChange(card), th.idleMinutes, card.column === 'Blocked' && !blockedOn)
+  // A BLOCKED ON line that names no one we know (a typo such as "bos") is flagged to the PM, not left silent.
+  add('blocked, BLOCKED ON names no one known', 'pia', lastChange(card), th.idleMinutes, card.column === 'Blocked' && Boolean(blockedOn) && !namedKey)
   add('clean done, not checked', 'pia', lastChange(card), th.cleanDoneMinutes, tags.includes('clean done') && !tags.includes('cleaned') && !postedBy(card, ['pia'], lastChange(card)))
   return out
 }
