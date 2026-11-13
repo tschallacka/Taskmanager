@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.21.0 - 2026-11-13
+
+- **`tm.mjs` loads Playwright only when it starts a browser.** A plain board call (`crew <who> mcp ...`) no longer loads Playwright at start, which cut the CPU each call used while the crew shares one server. `crew/tm.mjs`, `crew/tm-lazy.test.mjs`, `crew/README.md`.
+
 ## 0.20.1 - 2026-11-12
 
 - **The mail routes moved out of the crew gate.** A member's mail was unreachable from a remote machine: the crew gate answers every `/api/crews/*` path with a 404 to a member key, and the mail routes were under `/api/crews`. They are now `/api/crew-mail/<slug>` (send and fetch) and `/api/crew-mail/<slug>/<id>/ack`, and the mailer client uses them. The rules are unchanged. A regression test pins that the mail paths are not crew API paths and that no mail route is left under `/api/crews`. Files: `server/api/crew-mail/[slug]/`, `crew/mail-client.mjs`, `tests/crew-mail-path.test.ts`, `docs/crews/crew-mail.md`.

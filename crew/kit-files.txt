@@ -35,6 +35,7 @@ crew.config.example.json
 crew.mjs
 detach.sh
 dev-copies.mjs
+down.mjs
 fonts.conf.tmpl
 guard.sh
 home.mjs
@@ -50,6 +51,8 @@ people.mjs
 pia-listener-hook.sh
 pia-session.mjs
 postbrief.mjs
+prepare-worktree-cli.mjs
+prepare-worktree.mjs
 publish.mjs
 restart-brief.mjs
 session-hooks.mjs
