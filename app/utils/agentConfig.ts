@@ -6,8 +6,10 @@
 //
 // Per folder (one person, always on in one folder): a project .mcp.json whose header reads ${VAR}, and a
 // .claude/settings.local.json env block that sets VAR. The server is taskmanager-<key slug>, the variable
-// TASKMANAGER_<KEY SLUG>. Only those two files change, both are excluded from git and never committed. Nothing goes to
-// user scope or to a shell profile, and headersHelper is not used. Pure.
+// TASKMANAGER_<KEY SLUG>. When two of a person's keys slug the same, the later key (by creation order) gets -2, -3 and
+// so on: taskmanager-wren-worker-2 and TASKMANAGER_WREN_WORKER_2. The first key keeps the plain slug. Only those two
+// files change, both are excluded from git and never committed. Nothing goes to user scope or to a shell profile, and
+// headersHelper is not used. Pure.
 
 // Shown next to the old shared-variable text, so nobody mistakes it for the main path.
 export const SHARED_VARIABLE_LEGACY_LABEL = 'Legacy: one shared environment variable for every key (TASKMANAGER_API_KEY). It breaks with several keys, so it is off by default. Prefer the agent config file.'
@@ -49,41 +51,52 @@ export function agentConfigStartCommand(filePath: string): string {
   return `claude --mcp-config ${filePath} --strict-mcp-config`
 }
 
-// Per folder: the project server name for a key (the folder is the boundary, so no host or board).
-export function projectServerName(keyLabel: string): string {
-  return `taskmanager-${slug(keyLabel) || 'key'}`
+// Per folder: the suffix for a key among the person's keys that slug the same. The earlier key (by creation time, then id)
+// has no suffix; each later one gets -2, -3, and so on. It depends only on creation order, so it never shifts when the
+// list changes. A key that is not in the list yet counts as the latest.
+export function keyNameSuffix(key: { id: string, name: string, createdAt: number }, all: readonly { id: string, name: string, createdAt: number }[]): string {
+  const target = slug(key.name) || 'key'
+  const same = all.filter(other => (slug(other.name) || 'key') === target && other.id !== key.id)
+  const earlier = same.filter(other => other.createdAt < key.createdAt || (other.createdAt === key.createdAt && other.id < key.id))
+  const position = earlier.length
+  return position === 0 ? '' : `-${position + 1}`
 }
 
-// Per folder: the variable that holds the key. Written in capitals with underscores.
-export function projectVariableName(keyLabel: string): string {
-  return `TASKMANAGER_${(slug(keyLabel) || 'key').replace(/-/g, '_').toUpperCase()}`
+// Per folder: the project server name for a key. The suffix is the one keyNameSuffix gives.
+export function projectServerName(keyLabel: string, suffix = ''): string {
+  return `taskmanager-${slug(keyLabel) || 'key'}${suffix}`
+}
+
+// Per folder: the variable that holds the key. Written in capitals with underscores; the suffix's dash is an underscore.
+export function projectVariableName(keyLabel: string, suffix = ''): string {
+  return `TASKMANAGER_${(slug(keyLabel) || 'key').replace(/-/g, '_').toUpperCase()}${suffix.replace(/-/g, '_')}`
 }
 
 // Per folder: the project .mcp.json body. The header reads the variable; no key value is in the file.
-export function projectMcpText(origin: string, keyLabel: string): string {
-  const name = projectServerName(keyLabel)
-  const variable = projectVariableName(keyLabel)
+export function projectMcpText(origin: string, keyLabel: string, suffix = ''): string {
+  const name = projectServerName(keyLabel, suffix)
+  const variable = projectVariableName(keyLabel, suffix)
   const config = { mcpServers: { [name]: serverEntry(origin, `Bearer \${${variable}}`) } }
   return `${JSON.stringify(config, null, 2)}\n`
 }
 
 // Per folder: the env block that sets the variable, as a new settings.local.json.
-export function settingsLocalText(keyLabel: string, token: string): string {
-  return `${JSON.stringify({ env: { [projectVariableName(keyLabel)]: token } }, null, 2)}\n`
+export function settingsLocalText(keyLabel: string, token: string, suffix = ''): string {
+  return `${JSON.stringify({ env: { [projectVariableName(keyLabel, suffix)]: token } }, null, 2)}\n`
 }
 
 // Per folder: an existing .claude/settings.local.json with the variable added to its env block. Its other settings and
 // env entries are kept; a file that is not JSON is an error, so nothing is overwritten by mistake.
-export function mergeSettingsLocal(existingText: string, keyLabel: string, token: string): string {
+export function mergeSettingsLocal(existingText: string, keyLabel: string, token: string, suffix = ''): string {
   const existing = JSON.parse(existingText) as { env?: Record<string, string> } & Record<string, unknown>
-  const merged = { ...existing, env: { ...(existing.env ?? {}), [projectVariableName(keyLabel)]: token } }
+  const merged = { ...existing, env: { ...(existing.env ?? {}), [projectVariableName(keyLabel, suffix)]: token } }
   return `${JSON.stringify(merged, null, 2)}\n`
 }
 
 // Per folder: the text the page copies for the folder form. Reads top to bottom, one step each.
-export function projectSetupText(origin: string, keyLabel: string): string {
-  const name = projectServerName(keyLabel)
-  const variable = projectVariableName(keyLabel)
+export function projectSetupText(origin: string, keyLabel: string, suffix = ''): string {
+  const name = projectServerName(keyLabel, suffix)
+  const variable = projectVariableName(keyLabel, suffix)
   return [
     `# Folder setup for the server ${name}. Run these in the project folder. The key is not in this text; paste it where the step says.`,
     '# 1. Optional, only if you still have an old bare user-scope entry called taskmanager (it collides with other projects):',

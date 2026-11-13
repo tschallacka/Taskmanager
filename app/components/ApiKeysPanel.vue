@@ -2,7 +2,7 @@
 import { format } from 'date-fns'
 import { keyPanelMode } from '~/utils/apiKeyView'
 import { keyPrompt } from '~/utils/connectPrompt'
-import { agentConfigFileText, projectSetupText, serverNameFor } from '~/utils/agentConfig'
+import { agentConfigFileText, keyNameSuffix, projectSetupText, serverNameFor } from '~/utils/agentConfig'
 import type { KeyPromptInput } from '~/utils/connectPrompt'
 import type { Ref } from 'vue'
 
@@ -286,7 +286,11 @@ async function copyAgentConfig() {
 
 // The folder form (one person, always on in one folder): the steps for .mcp.json and .claude/settings.local.json, named
 // for the key. The text holds no key value; the step says where to paste the key.
-const folderSetupText = computed(() => (issuedName.value ? projectSetupText(window.location.origin, issuedName.value) : ''))
+// The new key counts as the latest of the person's keys, so its suffix is the one it keeps once it is in the list.
+const issuedSuffix = computed(() => (issuedName.value
+  ? keyNameSuffix({ id: issuedKeyId.value ?? '', name: issuedName.value, createdAt: Number.MAX_SAFE_INTEGER }, keys.value)
+  : ''))
+const folderSetupText = computed(() => (issuedName.value ? projectSetupText(window.location.origin, issuedName.value, issuedSuffix.value) : ''))
 const folderCopied = ref(false)
 async function copyFolderSetup() {
   if (!issuedName.value) return

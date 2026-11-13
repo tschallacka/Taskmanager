@@ -42,7 +42,9 @@ nothing else, and the agent connects, removes an older connection first if there
 For one person who wants the board in one project folder, the panel also gives **Copy folder setup**. It writes two files
 in that folder, and only those two: `.mcp.json` (the server, whose header reads a variable, not the key) and
 `.claude/settings.local.json` (an `env` block that holds the key under the variable). The server is named
-`taskmanager-<key name>` and the variable `TASKMANAGER_<KEY NAME>`, so two keys never share a name. Nothing goes to your
+`taskmanager-<key name>` and the variable `TASKMANAGER_<KEY NAME>`. Two keys whose names are alike (`Wren Worker` and
+`wren-worker`) would share them, so the later key gets `-2`, `-3` and so on: `taskmanager-wren-worker-2` and
+`TASKMANAGER_WREN_WORKER_2`. The first key keeps the plain name, and a key keeps its suffix. Nothing goes to your
 user settings or to your shell profile, and no `headersHelper` is used.
 
 - Both files are added to `.git/info/exclude`, and must not be committed: the key is in the settings file.

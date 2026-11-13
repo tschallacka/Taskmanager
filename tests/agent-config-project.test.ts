@@ -6,7 +6,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { mergeSettingsLocal, projectMcpText, projectServerName, projectSetupText, projectVariableName, settingsLocalText } from '../app/utils/agentConfig'
+import { keyNameSuffix, mergeSettingsLocal, projectMcpText, projectServerName, projectSetupText, projectVariableName, settingsLocalText } from '../app/utils/agentConfig'
 
 const ORIGIN = 'https://tm.example.test'
 
@@ -82,7 +82,34 @@ test('no generated text writes to user scope, to the shell profile, or uses head
 test('the key panel offers the folder setup as a copy button, built from the key label', () => {
   const panel = readFileSync(new URL('../app/components/ApiKeysPanel.vue', import.meta.url), 'utf8')
   assert.match(panel, /'Copy folder setup'/)
-  assert.match(panel, /projectSetupText\(window\.location\.origin, issuedName\.value\)/)
+  assert.match(panel, /projectSetupText\(window\.location\.origin, issuedName\.value, issuedSuffix\.value\)/)
+})
+
+test('two keys whose names slug the same get -2 and -3 by creation order, so their server names and variables differ', () => {
+  const first = { id: 'k1', name: 'Wren Worker', createdAt: 1000 }
+  const second = { id: 'k2', name: 'wren-worker', createdAt: 2000 }
+  assert.equal(keyNameSuffix(first, [first, second]), '', 'the earlier key keeps the plain slug')
+  assert.equal(keyNameSuffix(second, [first, second]), '-2', 'the later key gets -2')
+  assert.equal(projectServerName(first.name, keyNameSuffix(first, [first, second])), 'taskmanager-wren-worker')
+  assert.equal(projectServerName(second.name, keyNameSuffix(second, [first, second])), 'taskmanager-wren-worker-2')
+  assert.equal(projectVariableName(second.name, '-2'), 'TASKMANAGER_WREN_WORKER_2')
+  assert.notEqual(projectServerName(first.name), projectServerName(second.name, '-2'))
+  assert.notEqual(projectVariableName(first.name), projectVariableName(second.name, '-2'))
+})
+
+test('the suffix is stable: it depends on creation order, not on the order of the list', () => {
+  const first = { id: 'k1', name: 'Wren Worker', createdAt: 1000 }
+  const second = { id: 'k2', name: 'wren-worker', createdAt: 2000 }
+  const third = { id: 'k3', name: 'WREN WORKER', createdAt: 3000 }
+  assert.equal(keyNameSuffix(second, [third, second, first]), '-2')
+  assert.equal(keyNameSuffix(third, [second, third, first]), '-3')
+  assert.equal(keyNameSuffix(first, [third, first, second]), '')
+})
+
+test('the key panel uses the suffix for the new key and its files, and no longer refuses a name', () => {
+  const panel = readFileSync(new URL('../app/components/ApiKeysPanel.vue', import.meta.url), 'utf8')
+  assert.match(panel, /keyNameSuffix\(/, 'the panel derives the suffix from the key list')
+  assert.doesNotMatch(panel, /nameTaken/, 'the refusal rule is gone')
 })
 
 test('the one remove line is optional, and it is only for an old bare user-scope entry', () => {
