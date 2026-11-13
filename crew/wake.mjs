@@ -31,7 +31,9 @@ export async function deliverBossMail({ creds = {}, mailboxDir, text, makeId, fe
   const key = creds.people?.susy?.apiKey ?? ''
   const base = creds.base ?? ''
   const slug = creds.crew?.slug ?? ''
-  const refuse = async () => { throw new Error('the mail route is not reachable with this config') }
+  const refuse = async () => {
+    throw new Error('the mail route is not reachable with this config')
+  }
   const configured = Boolean(key && base && slug)
   try {
     const out = await sendMail({ fetch: configured ? fetchImpl : refuse, base, slug, key, to: 'boss', text, mailboxDir, makeId })

@@ -34,7 +34,12 @@ const ID = 'a1b2c3d4'
 const entry = (state, status = 'running', id = ID) => ({ id, name: 'wren', state, status, startedAt: 1 })
 const clock = () => {
   let t = 0
-  return { now: () => t, sleep: async ms => { t += ms } }
+  return {
+    now: () => t,
+    sleep: async (ms) => {
+      t += ms
+    }
+  }
 }
 
 test('the logged wake text is cut to 80 characters, on one line, never more', () => {
