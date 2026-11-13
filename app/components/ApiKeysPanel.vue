@@ -2,7 +2,7 @@
 import { format } from 'date-fns'
 import { keyPanelMode } from '~/utils/apiKeyView'
 import { keyPrompt } from '~/utils/connectPrompt'
-import { agentConfigFileText, keyNameSuffix, projectSetupText, serverNameFor } from '~/utils/agentConfig'
+import { agentConfigFileText, projectSetupText, serverNameFor } from '~/utils/agentConfig'
 import type { KeyPromptInput } from '~/utils/connectPrompt'
 import type { Ref } from 'vue'
 
@@ -29,6 +29,8 @@ interface ReachedBoardRow {
 interface ApiKeySummary {
   id: string
   name: string
+  /** The stored name suffix: '' for the plain slug, '-2' and so on (server: shared/utils/keyNameSuffix.ts). */
+  nameSuffix: string
   keyPrefix: string
   scopes: string[]
   createdAt: number
@@ -110,6 +112,7 @@ const commandCopied = ref(false)
 // The one prompt a new key gives. The pairing code is the default; the key goes in only when the owner picks it.
 const issuedKeyId = ref<string | null>(null)
 const issuedName = ref('')
+const issuedNameSuffix = ref('')
 const issuedReach = ref<KeyPromptInput['reach']>({ boards: [] })
 const issuedPairing = ref<{ code: string, expiresAt: number } | null>(null)
 const promptMode = ref<'code' | 'token'>('code')
@@ -179,6 +182,7 @@ async function createKey() {
     // The prompt for this key: a pairing code by default, the key only when the owner picks it.
     issuedKeyId.value = response.key.id
     issuedName.value = newName.value.trim()
+    issuedNameSuffix.value = response.key.nameSuffix ?? ''
     issuedReach.value = reachForPrompt(newPick.value)
     issuedPairing.value = await pairingFor(response.key.id)
     promptMode.value = 'code'
@@ -286,10 +290,8 @@ async function copyAgentConfig() {
 
 // The folder form (one person, always on in one folder): the steps for .mcp.json and .claude/settings.local.json, named
 // for the key. The text holds no key value; the step says where to paste the key.
-// The new key counts as the latest of the person's keys, so its suffix is the one it keeps once it is in the list.
-const issuedSuffix = computed(() => (issuedName.value
-  ? keyNameSuffix({ id: issuedKeyId.value ?? '', name: issuedName.value, createdAt: Number.MAX_SAFE_INTEGER }, keys.value)
-  : ''))
+// The suffix the server stored for the new key (api-keys.post returns it); it does not change after that.
+const issuedSuffix = computed(() => issuedNameSuffix.value)
 const folderSetupText = computed(() => (issuedName.value ? projectSetupText(window.location.origin, issuedName.value, issuedSuffix.value) : ''))
 const folderCopied = ref(false)
 async function copyFolderSetup() {

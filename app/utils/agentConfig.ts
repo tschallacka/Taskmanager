@@ -51,18 +51,8 @@ export function agentConfigStartCommand(filePath: string): string {
   return `claude --mcp-config ${filePath} --strict-mcp-config`
 }
 
-// Per folder: the suffix for a key among the person's keys that slug the same. The earlier key (by creation time, then id)
-// has no suffix; each later one gets -2, -3, and so on. It depends only on creation order, so it never shifts when the
-// list changes. A key that is not in the list yet counts as the latest.
-export function keyNameSuffix(key: { id: string, name: string, createdAt: number }, all: readonly { id: string, name: string, createdAt: number }[]): string {
-  const target = slug(key.name) || 'key'
-  const same = all.filter(other => (slug(other.name) || 'key') === target && other.id !== key.id)
-  const earlier = same.filter(other => other.createdAt < key.createdAt || (other.createdAt === key.createdAt && other.id < key.id))
-  const position = earlier.length
-  return position === 0 ? '' : `-${position + 1}`
-}
 
-// Per folder: the project server name for a key. The suffix is the one keyNameSuffix gives.
+// Per folder: the project server name for a key. The suffix is the one the server stored for that key.
 export function projectServerName(keyLabel: string, suffix = ''): string {
   return `taskmanager-${slug(keyLabel) || 'key'}${suffix}`
 }

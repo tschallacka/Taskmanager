@@ -829,7 +829,11 @@ export const apiKeys = pgTable(
     // Management tokens (the 10-minute crew token) are kept apart from access tokens. Access is the default.
     kind: text('kind').$type<'access' | 'management'>().notNull().default('access'),
     // True once the per-board scopes are stored in api_key_board_scopes. Until then the key's scopes apply to every board.
-    boardScopesSet: boolean('board_scopes_set').notNull().default(false)
+    boardScopesSet: boolean('board_scopes_set').notNull().default(false),
+    // The key's name suffix, stored when the key is made: '' for the plain slug, '-2', '-3' ... for a name that slugs
+    // the same as a key the person already had. NULL only for keys made before it was stored; they get theirs on first
+    // display (shared/utils/keyNameSuffix.ts). Additive and nullable: no data rewrite.
+    nameSuffix: text('name_suffix')
   },
   table => [index('api_keys_user_idx').on(table.userId)]
 )

@@ -9,6 +9,7 @@ import { generateApiKey, isApiKeyScope } from './api-keys'
 import { storeReach, teamReachOf } from './keyReach'
 import type { ReachRequest } from './keyReach'
 import { CREW_SENTENCES, crewPermissionRefusal, ownsLiveCrew } from './crewPermission'
+import { backfillSuffixes, nextKeySuffix } from '../../shared/utils/keyNameSuffix'
 
 export const MAX_KEY_NAME_LENGTH = 60
 const MAX_EXPIRY_DAYS = 3650
@@ -115,6 +116,15 @@ export async function issueKey(input: { userId: string, teamId: string | null, r
     ?? (input.teamId ? teamReachOf(input.teamId, limit) : { allBoards: false, workspaceTeamIds: [null], boardIds: [] })
   const now = Date.now()
   const created = await db.transaction(async (tx) => {
+    // The new key's suffix is counted over every key the person has now, after any older key without one has got its own.
+    const rows = await tx.select({ id: apiKeys.id, name: apiKeys.name, createdAt: apiKeys.createdAt, suffix: apiKeys.nameSuffix })
+      .from(apiKeys).where(eq(apiKeys.userId, input.userId))
+    const filled = backfillSuffixes(rows)
+    for (const [id, suffix] of Object.entries(filled)) {
+      await tx.update(apiKeys).set({ nameSuffix: suffix }).where(eq(apiKeys.id, id))
+    }
+    const known = rows.map(row => ({ name: row.name, suffix: row.suffix ?? filled[row.id] ?? '' }))
+    const nameSuffix = nextKeySuffix(input.request.name, known)
     const [row] = await tx.insert(apiKeys).values({
       id: Date.now().toString(36) + Math.random().toString(36).slice(2),
       userId: input.userId,
@@ -128,7 +138,8 @@ export async function issueKey(input: { userId: string, teamId: string | null, r
       expiresAt: input.request.expiresAt,
       createdAt: now,
       allBoards: reach.allBoards,
-      boardReachSet: true
+      boardReachSet: true,
+      nameSuffix
     }).returning()
     await storeReach(tx, row!.id, reach, now)
     return row!

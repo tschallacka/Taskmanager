@@ -6,7 +6,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { keyNameSuffix, mergeSettingsLocal, projectMcpText, projectServerName, projectSetupText, projectVariableName, settingsLocalText } from '../app/utils/agentConfig'
+import { mergeSettingsLocal, projectMcpText, projectServerName, projectSetupText, projectVariableName, settingsLocalText } from '../app/utils/agentConfig'
 
 const ORIGIN = 'https://tm.example.test'
 
@@ -85,30 +85,17 @@ test('the key panel offers the folder setup as a copy button, built from the key
   assert.match(panel, /projectSetupText\(window\.location\.origin, issuedName\.value, issuedSuffix\.value\)/)
 })
 
-test('two keys whose names slug the same get -2 and -3 by creation order, so their server names and variables differ', () => {
-  const first = { id: 'k1', name: 'Wren Worker', createdAt: 1000 }
-  const second = { id: 'k2', name: 'wren-worker', createdAt: 2000 }
-  assert.equal(keyNameSuffix(first, [first, second]), '', 'the earlier key keeps the plain slug')
-  assert.equal(keyNameSuffix(second, [first, second]), '-2', 'the later key gets -2')
-  assert.equal(projectServerName(first.name, keyNameSuffix(first, [first, second])), 'taskmanager-wren-worker')
-  assert.equal(projectServerName(second.name, keyNameSuffix(second, [first, second])), 'taskmanager-wren-worker-2')
-  assert.equal(projectVariableName(second.name, '-2'), 'TASKMANAGER_WREN_WORKER_2')
-  assert.notEqual(projectServerName(first.name), projectServerName(second.name, '-2'))
-  assert.notEqual(projectVariableName(first.name), projectVariableName(second.name, '-2'))
+test('deleting the earlier key does not change the later key: its name comes from its stored suffix alone', () => {
+  // The later key was stored with -2. Once the earlier key is gone, the name is still built from the stored suffix.
+  assert.equal(projectServerName('wren-worker', '-2'), 'taskmanager-wren-worker-2')
+  assert.equal(projectVariableName('wren-worker', '-2'), 'TASKMANAGER_WREN_WORKER_2')
 })
 
-test('the suffix is stable: it depends on creation order, not on the order of the list', () => {
-  const first = { id: 'k1', name: 'Wren Worker', createdAt: 1000 }
-  const second = { id: 'k2', name: 'wren-worker', createdAt: 2000 }
-  const third = { id: 'k3', name: 'WREN WORKER', createdAt: 3000 }
-  assert.equal(keyNameSuffix(second, [third, second, first]), '-2')
-  assert.equal(keyNameSuffix(third, [second, third, first]), '-3')
-  assert.equal(keyNameSuffix(first, [third, first, second]), '')
-})
-
-test('the key panel uses the suffix for the new key and its files, and no longer refuses a name', () => {
+test('the key panel reads the stored suffix from the key, and no longer derives it from the list', () => {
   const panel = readFileSync(new URL('../app/components/ApiKeysPanel.vue', import.meta.url), 'utf8')
-  assert.match(panel, /keyNameSuffix\(/, 'the panel derives the suffix from the key list')
+  assert.doesNotMatch(panel, /keyNameSuffix\(/, 'the panel does not derive the suffix')
+  assert.doesNotMatch(panel, /nextKeySuffix\(/, 'the panel does not compute it: the server stores it')
+  assert.match(panel, /issuedNameSuffix\.value|\.nameSuffix/, 'the panel reads the stored suffix')
   assert.doesNotMatch(panel, /nameTaken/, 'the refusal rule is gone')
 })
 
