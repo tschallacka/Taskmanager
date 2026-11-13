@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { format } from 'date-fns'
 import { keyPanelMode } from '~/utils/apiKeyView'
+import { keyPrompt } from '~/utils/connectPrompt'
+import type { KeyPromptInput } from '~/utils/connectPrompt'
 import type { Ref } from 'vue'
 
 interface ReachWorkspace {
@@ -73,8 +75,8 @@ const EXPIRY_OPTIONS = [
 
 // One toggle per permission, in the order they are advertised to a client.
 const PERMISSIONS = [
-  { scope: 'boards:read', label: 'Read boards', description: 'Boards, tasks and updates' },
-  { scope: 'boards:write', label: 'Write boards', description: 'Create, edit, move and delete' },
+  { scope: 'boards:read', label: 'Read boards and tasks', description: 'Boards, tasks, comments and time logs' },
+  { scope: 'boards:write', label: 'Change tasks', description: 'Create, edit, move and delete tasks, comment, log time' },
   { scope: 'secrets:read', label: 'Read project secrets', description: 'Names of a project\'s secrets and its .env text, values included. Every read is recorded in the project\'s trail' },
   { scope: 'secrets:write', label: 'Write project secrets', description: 'Add, change and delete a project\'s secrets by name, where this person is a project manager' }
 ] as const
@@ -103,6 +105,52 @@ const creating = ref(false)
 const issuedToken = ref<string | null>(null)
 const copied = ref(false)
 const commandCopied = ref(false)
+
+// The one prompt a new key gives. The pairing code is the default; the key goes in only when the owner picks it.
+const issuedKeyId = ref<string | null>(null)
+const issuedName = ref('')
+const issuedReach = ref<KeyPromptInput['reach']>({ boards: [] })
+const issuedPairing = ref<{ code: string, expiresAt: number } | null>(null)
+const promptMode = ref<'code' | 'token'>('code')
+const promptCopied = ref(false)
+const issuedPromptText = computed(() => {
+  if (!issuedKeyId.value) return ''
+  return keyPrompt({
+    origin: window.location.origin,
+    name: issuedName.value,
+    reach: issuedReach.value,
+    pairing: issuedPairing.value,
+    token: issuedToken.value,
+    mode: promptMode.value
+  })
+})
+
+// What the prompt says the key reaches: every board the owner can open, or the boards and workspaces picked.
+function reachForPrompt(pick: ReachPick): KeyPromptInput['reach'] {
+  const picked = scopes.value
+  if (pick.all) return { boards: [], allBoards: { scopes: picked } }
+  const boards = pickBoards.value
+    .filter(board => pick.boards.includes(board.id) || pick.workspaces.includes(wsKeyOf(board.teamId)))
+    .map(board => ({ id: board.id, name: board.name, workspace: board.workspace, scopes: picked }))
+  return { boards }
+}
+
+// A one-time pairing code for the key. Null when it cannot be made: the prompt then has a placeholder, not a key.
+async function pairingFor(keyId: string): Promise<{ code: string, expiresAt: number } | null> {
+  try {
+    const response = await $fetch<{ code: string, expiresAt: number }>('/api/settings/pairing-codes', {
+      method: 'POST',
+      body: { tokenId: keyId }
+    })
+    return { code: response.code, expiresAt: response.expiresAt }
+  } catch {
+    return null
+  }
+}
+
+async function copyPrompt() {
+  await copyWithFeedback(issuedPromptText.value, promptCopied, 'Prompt copied')
+}
 const scopes = computed(() => PERMISSIONS.filter(p => granted.value[p.scope]).map(p => p.scope))
 
 const canCreate = computed(() => newName.value.trim().length > 0 && scopes.value.length > 0 && pickIsSet(newPick.value))
@@ -115,7 +163,7 @@ async function createKey() {
   if (!canCreate.value) return
   creating.value = true
   try {
-    const response = await $fetch<{ token: string }>('/api/settings/api-keys', {
+    const response = await $fetch<{ token: string, key: { id: string } }>('/api/settings/api-keys', {
       method: 'POST',
       body: {
         name: newName.value.trim(),
@@ -127,6 +175,13 @@ async function createKey() {
     issuedToken.value = response.token
     copied.value = false
     commandCopied.value = false
+    // The prompt for this key: a pairing code by default, the key only when the owner picks it.
+    issuedKeyId.value = response.key.id
+    issuedName.value = newName.value.trim()
+    issuedReach.value = reachForPrompt(newPick.value)
+    issuedPairing.value = await pairingFor(response.key.id)
+    promptMode.value = 'code'
+    promptCopied.value = false
     newName.value = ''
     await refresh()
   } catch (e) {
@@ -154,8 +209,6 @@ const claudeCommand = computed(() => {
   return setupCommandFor(issuedToken.value)
 })
 
-// Already connected: one paste swaps the key in and the server out for a fresh one.
-const replaceCommand = computed(() => (issuedToken.value ? mcpReplaceCommand(window.location.origin, issuedToken.value) : ''))
 
 const origin = import.meta.client ? window.location.origin : ''
 const kitCommands = crewKitCommands(origin)
@@ -174,7 +227,6 @@ async function copyKit(text: string, id: string) {
   }
 }
 
-const replaceCopied = ref(false)
 
 async function copyWithFeedback(text: string, copiedFlag: Ref<boolean>, title: string) {
   try {
@@ -220,11 +272,6 @@ async function copyCommand() {
   await copyWithFeedback(claudeCommand.value, commandCopied, 'Command copied')
 }
 
-async function copyReplaceCommand() {
-  if (!issuedToken.value) return
-  await copyWithFeedback(replaceCommand.value, replaceCopied, 'Update command copied')
-}
-
 // Revoke and regenerate ask first, inline, under the key's row. The confirmation names the key and its secret prefix and
 // last use, so two keys with the same name can be told apart.
 const confirming = ref<{ id: string, action: 'revoke' | 'regenerate' } | null>(null)
@@ -232,7 +279,21 @@ const revoking = ref<string | null>(null)
 const regenerating = ref<string | null>(null)
 // The setup prompt of one key. Its token is set only right after a regenerate: that secret is shown once, never again.
 const shownPrompt = ref<{ id: string, token: string | null } | null>(null)
-const promptCopied = ref(false)
+
+// What a listed key reaches, for its prompt: every board when it is an all-boards key, else the boards it reaches.
+function reachOfKey(key: ApiKeySummary): KeyPromptInput['reach'] {
+  if (key.allBoards) return { boards: [], allBoards: { scopes: key.scopes } }
+  return { boards: key.reachedBoards.map(board => ({ id: board.id, name: board.name, workspace: board.workspace, scopes: key.scopes })) }
+}
+
+// The same prompt as after a key is made (connectPrompt). With no secret it has the placeholder; after a regenerate it
+// has the new secret, once. A pairing code is not used here: the key is only in the prompt when a secret was just made.
+const shownPromptText = computed(() => {
+  const shown = shownPrompt.value
+  const key = shown ? keys.value.find(k => k.id === shown.id) : undefined
+  if (!shown || !key) return ''
+  return keyPrompt({ origin: window.location.origin, name: key.name, reach: reachOfKey(key), pairing: null, token: shown.token, mode: 'token' })
+})
 
 // The ready-to-paste setup: the key in the shell, then the server added to Claude Code. Without a secret the key is a placeholder.
 function setupCommandFor(token: string | null): string {
@@ -244,9 +305,9 @@ function showPrompt(key: ApiKeySummary) {
   promptCopied.value = false
 }
 
-async function copyPrompt() {
+async function copyShownPrompt() {
   if (!shownPrompt.value) return
-  await copyWithFeedback(setupCommandFor(shownPrompt.value.token), promptCopied, 'Setup prompt copied')
+  await copyWithFeedback(shownPromptText.value, promptCopied, 'Prompt copied')
 }
 
 async function revokeKey(key: ApiKeySummary) {
@@ -468,63 +529,110 @@ function reachLabel(key: ApiKeySummary): string {
           </div>
           <div class="flex-1 min-w-0 space-y-2">
             <p class="text-sm font-medium">
-              Copy your key now
+              Copy this prompt for your agent
             </p>
             <p class="text-xs text-muted">
-              This is the only time it is shown. Taskmanager stores a hash of it, so it cannot be displayed again.
+              Paste it into a new Claude Code session with nothing else. It connects this key, removes an older connection
+              first, and lists the boards the agent may use. Nothing else needs explaining.
             </p>
-            <div class="flex gap-2">
-              <code class="flex-1 min-w-0 text-xs font-mono bg-default border border-default rounded-md px-3 py-2 overflow-x-auto whitespace-nowrap">{{ issuedToken }}</code>
+            <div class="flex flex-wrap gap-2">
               <UButton
-                :icon="copied ? 'i-lucide-check' : 'i-lucide-copy'"
-                :label="copied ? 'Copied' : 'Copy'"
+                label="Pairing code (recommended)"
+                :color="promptMode === 'code' ? 'primary' : 'neutral'"
+                :variant="promptMode === 'code' ? 'solid' : 'soft'"
+                size="xs"
+                @click="promptMode = 'code'"
+              />
+              <UButton
+                label="Put the key in the prompt instead"
+                :color="promptMode === 'token' ? 'primary' : 'neutral'"
+                :variant="promptMode === 'token' ? 'solid' : 'soft'"
+                size="xs"
+                @click="promptMode = 'token'"
+              />
+            </div>
+            <p
+              v-if="promptMode === 'code' && !issuedPairing"
+              class="text-xs text-error"
+            >
+              The pairing code could not be made. Choose "Put the key in the prompt instead" to copy the key into the prompt.
+            </p>
+            <p
+              v-else-if="promptMode === 'code' && issuedPairing"
+              class="text-xs text-muted"
+            >
+              The code works once, until {{ new Date(issuedPairing.expiresAt).toLocaleTimeString() }}. The agent exchanges it for its key, so the key stays out of the chat.
+            </p>
+            <p
+              v-else
+              class="text-xs text-error"
+            >
+              The key is in this prompt. Paste it only into your own agent, never into a chat.
+            </p>
+            <div class="flex flex-col sm:flex-row gap-2">
+              <pre class="flex-1 min-w-0 text-xs font-mono bg-default border border-default rounded-md px-3 py-2 whitespace-pre-wrap break-words">{{ issuedPromptText }}</pre>
+              <UButton
+                :icon="promptCopied ? 'i-lucide-check' : 'i-lucide-copy'"
+                :label="promptCopied ? 'Copied' : 'Copy prompt'"
                 color="primary"
                 size="sm"
-                @click="copyToken"
-              />
-              <UButton
-                icon="i-lucide-x"
-                color="neutral"
-                variant="ghost"
-                size="sm"
-                aria-label="Dismiss key"
-                @click="issuedToken = null"
+                @click="copyPrompt"
               />
             </div>
-            <p class="text-xs text-muted pt-1">
-              Or connect Claude Code in one go. These lines put the key in
-              <code class="font-mono">$TASKMANAGER_API_KEY</code> and add the MCP server by that name only, so
-              the key is not saved in Claude Code settings; only the variable name is. Claude Code reads the variable every time it starts.
-              {{ KEY_VARIABLE_HOME }}
-              Then open a new terminal, check with <code class="font-mono">echo ${TASKMANAGER_API_KEY:0:4}</code>
-              that it prints <code class="font-mono">arn_</code>, then start <code class="font-mono">claude</code>.
-            </p>
-            <div class="flex flex-col sm:flex-row gap-2">
-              <pre class="flex-1 min-w-0 text-xs font-mono bg-default border border-default rounded-md px-3 py-2 whitespace-pre-wrap break-words">{{ claudeCommand }}</pre>
-              <UButton
-                :icon="commandCopied ? 'i-lucide-check' : 'i-lucide-copy'"
-                :label="commandCopied ? 'Copied' : 'Copy command'"
-                color="neutral"
-                variant="soft"
-                size="sm"
-                @click="copyCommand"
-              />
-            </div>
-            <p class="text-xs text-muted pt-1">
-              {{ ALREADY_CONNECTED_STEP }} Paste the update command below.
-              {{ RESTART_STEP }}
-            </p>
-            <div class="flex flex-col sm:flex-row gap-2">
-              <pre class="flex-1 min-w-0 text-xs font-mono bg-default border border-default rounded-md px-3 py-2 whitespace-pre-wrap break-words">{{ replaceCommand }}</pre>
-              <UButton
-                :icon="replaceCopied ? 'i-lucide-check' : 'i-lucide-copy'"
-                :label="replaceCopied ? 'Copied' : 'Copy update command'"
-                color="neutral"
-                variant="soft"
-                size="sm"
-                @click="copyReplaceCommand"
-              />
-            </div>
+            <details class="text-xs">
+              <summary class="cursor-pointer text-muted">
+                Set it up yourself
+              </summary>
+              <div class="space-y-3 pt-3">
+                <p class="text-sm font-medium">
+                  Copy your key now
+                </p>
+                <p class="text-xs text-muted">
+                  This is the only time it is shown. Taskmanager stores a hash of it, so it cannot be displayed again.
+                </p>
+                <div class="flex gap-2">
+                  <code class="flex-1 min-w-0 text-xs font-mono bg-default border border-default rounded-md px-3 py-2 overflow-x-auto whitespace-nowrap">{{ issuedToken }}</code>
+                  <UButton
+                    :icon="copied ? 'i-lucide-check' : 'i-lucide-copy'"
+                    :label="copied ? 'Copied' : 'Copy'"
+                    color="primary"
+                    size="sm"
+                    @click="copyToken"
+                  />
+                  <UButton
+                    icon="i-lucide-x"
+                    color="neutral"
+                    variant="ghost"
+                    size="sm"
+                    aria-label="Dismiss key"
+                    @click="issuedToken = null"
+                  />
+                </div>
+                <p class="text-xs text-muted pt-1">
+                  Or connect Claude Code in one go. These lines put the key in
+                  <code class="font-mono">$TASKMANAGER_API_KEY</code> and add the MCP server by that name only, so
+                  the key is not saved in Claude Code settings; only the variable name is. Claude Code reads the variable every time it starts.
+                  {{ KEY_VARIABLE_HOME }}
+                  Then open a new terminal, check with <code class="font-mono">echo ${TASKMANAGER_API_KEY:0:4}</code>
+                  that it prints <code class="font-mono">arn_</code>, then start <code class="font-mono">claude</code>.
+                </p>
+                <div class="flex flex-col sm:flex-row gap-2">
+                  <pre class="flex-1 min-w-0 text-xs font-mono bg-default border border-default rounded-md px-3 py-2 whitespace-pre-wrap break-words">{{ claudeCommand }}</pre>
+                  <UButton
+                    :icon="commandCopied ? 'i-lucide-check' : 'i-lucide-copy'"
+                    :label="commandCopied ? 'Copied' : 'Copy command'"
+                    color="neutral"
+                    variant="soft"
+                    size="sm"
+                    @click="copyCommand"
+                  />
+                </div>
+                <p class="text-xs text-muted pt-1">
+                  {{ ALREADY_CONNECTED_STEP }} The prompt above does this too, so one prompt covers a first setup and a re-connect.
+                  {{ RESTART_STEP }}
+                </p>
+              </div>
+            </details>
           </div>
         </div>
       </div>
@@ -797,14 +905,14 @@ function reachLabel(key: ApiKeySummary): string {
                     >
                       Regenerate the key to get a secret to paste. Until then the prompt shows a placeholder.
                     </p>
-                    <pre class="text-xs font-mono bg-elevated/50 border border-default rounded-md p-3 whitespace-pre-wrap break-all">{{ setupCommandFor(shownPrompt.token) }}</pre>
+                    <pre class="text-xs font-mono bg-elevated/50 border border-default rounded-md p-3 whitespace-pre-wrap break-all">{{ shownPromptText }}</pre>
                     <UButton
-                      :label="promptCopied ? 'Copied' : 'Copy setup prompt'"
+                      :label="promptCopied ? 'Copied' : 'Copy prompt'"
                       :icon="promptCopied ? 'i-lucide-check' : 'i-lucide-copy'"
                       color="neutral"
                       variant="soft"
                       size="xs"
-                      @click="copyPrompt"
+                      @click="copyShownPrompt"
                     />
                   </div>
                 </div>
