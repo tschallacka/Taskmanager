@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.25.2 - 2026-11-13
+
+- **Crew listener: pid files instead of process scans, and a one-hour listener wait.** Pia's listener and the Boss watches now record their pid in `.listen/<name>.pid`, and the Stop hooks and Susy read that file instead of running `pgrep -f` over every process; Pia's listener waits up to 3600 s (was 600 s) before it exits on quiet, so she is woken less often. Files: `crew/pidfile.mjs` (new), `crew/listen.mjs`, `crew/crew.mjs`, `crew/boss-stop-hook.sh`, `crew/pia-listener-hook.sh`, `crew/susy-collector.mjs`, `crew/susy-activity.mjs`, `crew/PROMPTS.md.tmpl`, and their tests.
+
 ## 0.25.1 - 2026-11-13
 
 - **A session that stops on an API error is reported as blocked, and Boss gets one mail.** The daemon reads the last transcript line of each person's session. A line that is an API error (a 403, a login request, or the account limit) shows the session as `blocked: api error` with the error text, not as stuck. Boss gets one mail per distinct error, and a later normal line clears the block. A dry run only reports and never marks a mail as sent.

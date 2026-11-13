@@ -8,6 +8,7 @@ import { spawnSync } from 'node:child_process'
 import { authorKey } from './susy.mjs'
 import { MIN, workerLines, piaTriggerLines, escalationLines } from './susy-activity.mjs'
 import { workerPeople } from './susy-workers.mjs'
+import { livePid } from './pidfile.mjs'
 
 export const LOAD_LIMIT = 14
 export const WORKERS = ['wren', 'wick', 'wynn', 'wade']
@@ -59,18 +60,13 @@ export function mailAgeMinutes(home, to, now) {
 }
 
 /**
- * Whether Pia's listener process is running now (`pgrep -f "listen.mjs pia"`): true, false, or null when it cannot be asked.
+ * Whether Pia's listener process is running now: true, false, or null when there is no crew home to look in. It reads
+ * the listener's pid file (CREW_HOME/.listen/pia.pid, crew/pidfile.mjs) and checks that process; no process scan.
  * The listener is a process that waits and exits, and is started again, so its presence is the signal, not a file time.
  */
-export function listenerRunning(run = spawnSync) {
-  try {
-    const out = run('pgrep', ['-f', 'listen.mjs pia'], { encoding: 'utf8', timeout: 5000 })
-    if (out.status === 0) return true
-    if (out.status === 1) return false
-    return null
-  } catch {
-    return null
-  }
+export function listenerRunning({ home } = {}) {
+  if (!home) return null
+  return livePid(home, 'pia', 'listen.mjs pia') !== null
 }
 
 /**

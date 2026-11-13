@@ -221,16 +221,21 @@ describe('Boss\'s session settings', () => {
 
 describe('boss-stop-hook.sh: the stop is blocked while a watch is down', () => {
   // Runs the hook the way Claude Code does: the event as JSON on stdin, the answer on stdout.
-  function runHook(stdin = '{}', crew = '/crew') {
-    const run = spawnSync('sh', [HOOK, crew, KIT.replace(/\/$/, '')], { input: stdin, encoding: 'utf8' })
+  // The hook finds each watch by its pid file in CREW_HOME/.listen (no process scan), so the fakes write there.
+  const crew = tempDir('boss-crew-')
+  function runHook(stdin = '{}', home = crew) {
+    const run = spawnSync('sh', [HOOK, home, KIT.replace(/\/$/, '')], { input: stdin, encoding: 'utf8' })
     return { status: run.status, stdout: run.stdout }
   }
 
-  // Stand-ins for the two Monitors: a node process whose command line names the kit command.
+  // Stand-ins for the two Monitors: a node process whose command line names the kit command, with its pid file written
+  // the way crew.mjs writes it when a watch starts.
   const fakes = []
   function fake(command) {
     const child = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 30000)', 'crew.mjs', command], { stdio: 'ignore' })
     fakes.push(child)
+    mkdirSync(join(crew, '.listen'), { recursive: true })
+    writeFileSync(join(crew, '.listen', `${command}.pid`), `${child.pid}\n`)
     return child
   }
   after(() => {
@@ -242,8 +247,8 @@ describe('boss-stop-hook.sh: the stop is blocked while a watch is down', () => {
     assert.equal(run.status, 0)
     const answer = JSON.parse(run.stdout)
     assert.equal(answer.decision, 'block')
-    assert.match(answer.reason, /Monitor\(command: "CREW_HOME=\/crew node .*\/crew\.mjs boss-mentions"/)
-    assert.match(answer.reason, /Monitor\(command: "CREW_HOME=\/crew node .*\/crew\.mjs watch-crew"/)
+    assert.match(answer.reason, /Monitor\(command: "CREW_HOME=[^ ]+ node .*\/crew\.mjs boss-mentions"/)
+    assert.match(answer.reason, /Monitor\(command: "CREW_HOME=[^ ]+ node .*\/crew\.mjs watch-crew"/)
   })
 
   test('the second try after a block lets Boss stop (stop_hook_active), so it never loops', () => {
@@ -260,7 +265,7 @@ describe('boss-stop-hook.sh: the stop is blocked while a watch is down', () => {
     assert.equal(run.status, 0)
     const answer = JSON.parse(run.stdout)
     assert.equal(answer.decision, 'block')
-    assert.match(answer.reason, /Monitor\(command: "CREW_HOME=\/crew node .*\/crew\.mjs watch-crew"/)
+    assert.match(answer.reason, /Monitor\(command: "CREW_HOME=[^ ]+ node .*\/crew\.mjs watch-crew"/)
     assert.doesNotMatch(answer.reason, /crew\.mjs boss-mentions/)
   })
 
@@ -272,7 +277,7 @@ describe('boss-stop-hook.sh: the stop is blocked while a watch is down', () => {
     assert.equal(run.status, 0)
     const answer = JSON.parse(run.stdout)
     assert.equal(answer.decision, 'block')
-    assert.match(answer.reason, /Monitor\(command: "CREW_HOME=\/crew node .*\/crew\.mjs boss-mentions"/)
+    assert.match(answer.reason, /Monitor\(command: "CREW_HOME=[^ ]+ node .*\/crew\.mjs boss-mentions"/)
     assert.doesNotMatch(answer.reason, /crew\.mjs watch-crew/)
   })
 

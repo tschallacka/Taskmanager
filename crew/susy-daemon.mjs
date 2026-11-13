@@ -146,7 +146,7 @@ export async function runOnce(home, now = Date.now(), { live = false } = {}) {
   // folder of the crew home). A missing folder or an unreadable transcript is no evidence.
   const workerRows = result.ok ? readWorkerRows({ root: projectsRoot({ crewHome: home, crew }), now }) : new Map()
   const activity = result.ok
-    ? collectActivity({ now, home, cards: result.cards ?? [], rows: workerRows, load: readLoad(), state, keyOf: keyOfName(crew?.people), listenerRunning: listenerRunning() })
+    ? collectActivity({ now, home, cards: result.cards ?? [], rows: workerRows, load: readLoad(), state, keyOf: keyOfName(crew?.people), listenerRunning: listenerRunning({ home }) })
     : null
   const repeats = newActivityLines(activity?.lines ?? [], state.activity)
   result.state.activity = repeats.pending

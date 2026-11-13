@@ -31,9 +31,13 @@
 import { spawnSync } from 'node:child_process'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { crewHome } from './home.mjs'
+import { writePidFile } from './pidfile.mjs'
 
 const kit = dirname(fileURLToPath(import.meta.url))
 const [first, ...rest] = process.argv.slice(2)
+// Boss's two watches record their pid for the Stop hook (boss-stop-hook.sh reads CREW_HOME/.listen/<name>.pid).
+if (first === 'boss-mentions' || first === 'watch-crew') writePidFile(crewHome(), first)
 const scripts = { 'people': 'people.mjs', 'listen': 'listen.mjs', 'watch': 'watch.mjs', 'init': 'init.mjs', 'setup': 'setup.mjs', 'channel': 'channel.mjs', 'update': 'update.mjs', 'mentions': 'mentions.mjs', 'totp': 'totp.mjs', 'claude': 'claude.mjs', 'janet': 'janet.mjs', 'publish': 'publish.mjs', 'activity': 'activity.mjs', 'watch-crew': 'watch-crew.mjs', 'up': 'up.mjs', 'restart-brief': 'restart-brief.mjs', 'dev-copies': 'dev-copies.mjs', 'down': 'down.mjs', 'susy-daemon': 'susy-daemon.mjs' }
 
 if (!first || first === '-h' || first === '--help') {
