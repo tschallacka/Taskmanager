@@ -66,6 +66,7 @@ serve.mjs
 session-errors.mjs
 session-health.mjs
 session-hooks.mjs
+session-settings.mjs
 session-wake.sh
 session.mjs
 setup.mjs

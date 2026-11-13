@@ -7,8 +7,9 @@ import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   startArgs, parseAgents, liveById, planWake, checkKey, startSession, sessionStatus, sessionList, stopSession,
-  readRecord, NO_REMOTE_SETTINGS, MODEL, mcpConfig, mcpConfigPath, withRules, WORKTREE_RULE
+  readRecord, MODEL, mcpConfig, mcpConfigPath, withRules, WORKTREE_RULE
 } from './session.mjs'
+import { settingsPath } from './session-settings.mjs'
 
 test('a session starts with strict mcp config, and that config holds only the crew taskmanager entry', () => {
   const home = mkdtempSync(join(tmpdir(), 'session-mcp-'))
@@ -88,8 +89,8 @@ test('the start argv turns remote control off, names the session, and sets the m
   assert.equal(args[0], '--bg')
   assert.deepEqual(args.slice(args.indexOf('-n'), args.indexOf('-n') + 2), ['-n', 'wren'])
   assert.equal(args[args.indexOf('--model') + 1], MODEL)
-  assert.equal(args[args.indexOf('--settings') + 1], NO_REMOTE_SETTINGS)
-  assert.equal(JSON.parse(NO_REMOTE_SETTINGS).remoteControlAtStartup, false)
+  // The start passes the person's own settings file, not an inline string (card mwf45rzxf8z9wtv9nv).
+  assert.equal(args[args.indexOf('--settings') + 1], settingsPath('/home/crew', 'wren'))
   assert.match(args[args.indexOf('--append-system-prompt') + 1], /^you are wren\n/)
 })
 
@@ -135,7 +136,9 @@ test('start records the new session id, and a second start while it is live does
   assert.equal(first.started, true)
   assert.equal(readRecord(home, 'wren').id, first.id)
   const bgCall = calls(fake).find(args => args.includes('--bg'))
-  assert.ok(bgCall.includes('--settings') && bgCall.includes(NO_REMOTE_SETTINGS), 'the start turned remote control off')
+  assert.ok(bgCall.includes('--settings') && bgCall.includes(settingsPath(home, 'wren')), 'the start passes the person settings file')
+  const file = JSON.parse(readFileSync(settingsPath(home, 'wren'), 'utf8'))
+  assert.equal(file.remoteControlAtStartup, false, 'remote control is off in the file the start passes')
 
   const second = startSession({ home, kit, key: 'wren', folder: '/tmp', role: 'role text', bin: fake.bin })
   assert.equal(second.started, false)
