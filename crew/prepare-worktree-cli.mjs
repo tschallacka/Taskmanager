@@ -22,7 +22,11 @@ if (!who || !taskId) fail('usage: crew <who> prepare worktree [--remove] <task-i
 
 const crewHome = process.env.CREW_HOME
 const config = crewHome && existsSync(join(crewHome, 'crew.json')) ? JSON.parse(readFileSync(join(crewHome, 'crew.json'), 'utf8')) : {}
-const worktree = `/srv/agents/taskmanager-maintenance/taskmanager-${who}-${taskId.slice(0, 8)}`
+// The worktree folders sit next to the crew home's own project folder: CREW_HOME is <folder>/.config/taskmanager-crew,
+// so the folder is two levels up. crew.json may name it instead (worktreeBase).
+const base = config.worktreeBase ?? (crewHome ? dirname(dirname(crewHome)) : null)
+if (!base) fail('CREW_HOME is not set and crew.json has no worktreeBase; the worktree folder cannot be found')
+const worktree = join(base, `taskmanager-${who}-${taskId.slice(0, 8)}`)
 
 function git(args) {
   const run = spawnSync('git', ['-C', worktree, ...args], { encoding: 'utf8' })
