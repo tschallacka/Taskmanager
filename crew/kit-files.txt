@@ -29,6 +29,9 @@ browser-driver.mjs
 browser.mjs
 cast.mjs
 channel.mjs
+claude-long-run.comments.md
+claude-long-run.json
+claude.mjs
 config.mjs
 crew-defaults.mjs
 crew.config.example.json
@@ -50,6 +53,7 @@ package.json
 people.mjs
 pia-listener-hook.sh
 pia-session.mjs
+pia-session.settings.json
 postbrief.mjs
 prepare-worktree-cli.mjs
 prepare-worktree.mjs
