@@ -11,7 +11,9 @@ test('the floating dot, ring and dashed light are gone from the actor; the desk 
   assert.doesNotMatch(actor, /buildDeskLight|this\.light\b|LIGHT_RADIUS/, 'no floating light is built or drawn')
   assert.match(actor, /statusText = deskLightOf\(status\)\.text|deskLightOf\(status\)\.text/, 'the actor keeps the status text')
   const office = readFileSync(new URL('../app/office/office.ts', import.meta.url), 'utf8')
-  assert.match(office, /lamp\.glow\.visible = deskLightOf\(person\.status\)\.shape === 'lit'/, 'the lamp glow follows the status')
+  assert.match(office, /lamp\.glow\.visible = lit/, 'the lamp glow follows the status')
+  assert.match(office, /const lit = deskLightOf\(person\.status\)\.shape === 'lit'/, 'the lit state comes from the status')
+  assert.match(office, /color\.set\(lit \? '#f4d35e' : '#6b6b70'\)/, 'the shade goes yellow when lit, grey otherwise')
 })
 import type { OfficePerson, PersonStatus } from '../shared/office/model'
 import { deskStatusSource, withDeskStatus } from '../server/utils/deskStatus'
