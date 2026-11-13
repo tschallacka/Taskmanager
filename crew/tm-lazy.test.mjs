@@ -12,7 +12,7 @@ test('tm.mjs has no static import of playwright', () => {
 
 test('the browser launch imports playwright dynamically, and the mcp command returns before the launch', () => {
   assert.match(source, /launching = import\('playwright'\)\.then\(\(\{ chromium \}\) => chromium\.launchPersistentContext\(/)
-  const mcpAt = source.indexOf("if (command === 'mcp')")
-  const launchAt = source.indexOf("launching = import('playwright')")
+  const mcpAt = source.indexOf('if (command === \'mcp\')')
+  const launchAt = source.indexOf('launching = import(\'playwright\')')
   assert.ok(mcpAt > 0 && launchAt > mcpAt, 'the mcp branch comes before the launch, so mcp never loads playwright')
 })

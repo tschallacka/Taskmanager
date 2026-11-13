@@ -39,7 +39,10 @@ test('askPerson mails the person through the app with the request text, and neve
   assert.match(sent[0].url, /\/api\/crew-mail\/tm$/)
   assert.deepEqual(sent[0].body, { id: 'a'.repeat(32), to: 'wren', text: 'the request' })
 
-  const failing = await askPerson({ fetch: async () => { throw new Error('offline') }, base: 'https://board.example', slug: 'tm', key: 'k', person: 'wren', text: 'x', mailboxDir, makeId: () => 'b'.repeat(32) })
+  const offline = async () => {
+    throw new Error('offline')
+  }
+  const failing = await askPerson({ fetch: offline, base: 'https://board.example', slug: 'tm', key: 'k', person: 'wren', text: 'x', mailboxDir, makeId: () => 'b'.repeat(32) })
   assert.equal(failing, true, 'an unsent mail goes to the outbox, not an error')
 })
 
@@ -69,7 +72,9 @@ test('waitForConfirmation reads the down ok the mailer delivered (the seen recor
   ])
   const base = 'https://board.example'
   let clock = 0
-  const sleep = async ms => { clock += ms }
+  const sleep = async (ms) => {
+    clock += ms
+  }
   const wait = (requestId, timeoutMs = 2000) => waitForConfirmation({ mailboxDir, person: 'wren', requestId, timeoutMs, interval: 1000, now: () => clock, sleep })
 
   assert.equal(await wait(REQ), false, 'a reply still in the inbox, not yet delivered, does not confirm')
