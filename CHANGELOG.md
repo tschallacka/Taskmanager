@@ -2,6 +2,20 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.21.0 - 2026-11-13
+
+- **`tm.mjs` loads Playwright only when it starts a browser.** A plain board call (`crew <who> mcp ...`) no longer loads Playwright at start, which cut the CPU each call used while the crew shares one server. `crew/tm.mjs`, `crew/tm-lazy.test.mjs`, `crew/README.md`.
+
+## 0.20.1 - 2026-11-12
+
+- **The mail routes moved out of the crew gate.** A member's mail was unreachable from a remote machine: the crew gate answers every `/api/crews/*` path with a 404 to a member key, and the mail routes were under `/api/crews`. They are now `/api/crew-mail/<slug>` (send and fetch) and `/api/crew-mail/<slug>/<id>/ack`, and the mailer client uses them. The rules are unchanged. A regression test pins that the mail paths are not crew API paths and that no mail route is left under `/api/crews`. Files: `server/api/crew-mail/[slug]/`, `crew/mail-client.mjs`, `tests/crew-mail-path.test.ts`, `docs/crews/crew-mail.md`.
+
+## 0.20.0 - 2026-11-12
+
+- **Crew rule notes are written by the crew's Boss account, never the board owner.** The built-in crew rules (promotion, gate routing, the time-log check, the failing-test clock) posted their notes as the board owner when no Pia account was on the board, so every reply landed in the owner's inbox. They now post as the Boss account (Pia's if there is none), and a rule with neither skips the note and logs why. A new crew's Boss account is named Cato. `server/utils/crewRules.ts`, `server/utils/ruleActions.ts`, `server/utils/crewProvisioning.ts`, `tests/crew-rule-note-author.test.ts`, `tests/crew-provisioning-boss-name.test.ts`, `tests/crew-server-rules.test.ts`, `docs/crews/crew-rule-notes.md`.
+
+- **The crew's mail goes through the app.** A person's mail is kept by the server until the person's mailer has delivered it, so a mailer on any machine can fetch it once a minute. `POST /api/crews/<slug>/mail` sends (the sender is the caller's own key, never a body field), `GET /api/crews/<slug>/mail?to=<key>` returns the undelivered mail for one person (the boss key may read any), and `POST /api/crews/<slug>/mail/<id>/ack` marks it delivered (only the recipient can). A key of another crew, a customer or a non-crew key gets 403. Text up to 1 MB (the one safety stop; a text is never cut); 30 sends a minute per sender; 500 undelivered per recipient; delivered mail is deleted after 7 days and undelivered after 30. The mailer falls back to its outbox when the endpoint does not answer and flushes it later; a mail is delivered once, even when an ack fails. Files: `server/db/schema.ts` (crew_mail), `server/utils/crewMail.ts`, `server/utils/crewMailRules.ts`, `server/api/crews/[slug]/mail/`, `crew/mail-client.mjs`, `docs/crews/crew-mail.md`.
+
 ## 0.19.1 - 2026-11-12
 
 - **The result of Regenerate key, Edit boards and Add a board shows in the key's own row.** The one-time code and prompt appear under the row that was clicked, which scrolls into view, and the confirmation of a save or an added board shows there too; the box at the top of the Connect page is for a new connection only. `app/components/connect/ConnectTokens.vue`, `docs/agents/create-and-revoke-a-key.md`.

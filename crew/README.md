@@ -105,7 +105,9 @@ The workflow's hard rules (the AI text editor for every document, CodeGraph for 
 `crew setup` (`setup.mjs`) makes one new crew for one board in one go. It is a thin client of the crew
 API, with the management token that "Put an AI crew to work on this board" gives (10 minutes, one board):
 
-    TASKMANAGER_MANAGEMENT_TOKEN=<token> node setup.mjs --origin <url> --board <board id> --repo <path> [--name <crew name>] [--slug <slug>]
+    TASKMANAGER_MANAGEMENT_TOKEN=<token> node setup.mjs --origin <url> --board <board id> --repo <path> --worktree-base <absolute folder> [--name <crew name>] [--slug <slug>]
+
+`--worktree-base` is required: the folder the crew's worktrees go in (for example the folder your repository sits in). It is written to crew.json as `worktreeBase`; `/` is refused.
 
 The token comes from `TASKMANAGER_MANAGEMENT_TOKEN`, or from stdin. It is never read from the command line. A
 crews:manage key does not work here: the remote crew API takes a management token. The crew is always new: a taken
@@ -326,6 +328,10 @@ accounts, after which their definitions and the file are yours to delete.
     crew browser status|shutdown  the shared browser for everyone
 
 The old file names (`tm.mjs`, `listen.mjs`, ...) still work.
+
+**Keeping the machine light.** An idle person can wait with `crew listen <who> 600`: the wait returns early when there is
+news, so a long wait costs almost nothing. A listener may run under `nice -n 10`, which is fine. `tm.mjs` loads Playwright
+only for the commands that open a browser (the `mcp` calls and `update` never load it), so a plain board call starts fast.
 
 ## Adding missing people (`crew people add`)
 
