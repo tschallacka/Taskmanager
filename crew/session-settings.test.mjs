@@ -2,10 +2,11 @@
 //   node --test crew/session-settings.test.mjs
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, readFileSync, statSync } from 'node:fs'
+import { mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { DENY_RULES, settingsFor, settingsPath, writeSettingsFile } from './session-settings.mjs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { DENY_RULES, longRunEnv, settingsFor, settingsPath, writeSettingsFile } from './session-settings.mjs'
 import { startArgs } from './session.mjs'
 
 const WORKERS = ['wren', 'wick', 'wynn', 'wade']
@@ -54,4 +55,31 @@ test('a start argv without a --settings flag fails the check', () => {
   const { args } = startArgs({ key: 'wade', folder: '/tmp', home: '/h', kit: '/k', role: 'r' })
   const withoutFlag = args.filter((a, i) => a !== '--settings' && args[i - 1] !== '--settings')
   assert.throws(() => settingsFlagOf(withoutFlag), /no --settings flag/)
+})
+
+const HERE = dirname(fileURLToPath(import.meta.url))
+
+test('the long-run profile env is read from the kit folder; a missing profile gives none', () => {
+  const kit = mkdtempSync(join(tmpdir(), 'settings-kit-'))
+  writeFileSync(join(kit, 'claude-long-run.json'), JSON.stringify({ env: { BASH_MAX_TIMEOUT_MS: '7200000', MCP_TIMEOUT: '60000' } }))
+  assert.deepEqual(longRunEnv(kit), { BASH_MAX_TIMEOUT_MS: '7200000', MCP_TIMEOUT: '60000' })
+  assert.deepEqual(longRunEnv(join(kit, 'nowhere')), {})
+})
+
+test('the person settings file carries the long-run profile env, with the own CREW_HOME and the deny rule', () => {
+  const home = mkdtempSync(join(tmpdir(), 'settings-long-'))
+  const profile = longRunEnv(HERE)
+  assert.equal(profile.BASH_MAX_TIMEOUT_MS, '7200000', 'the kit profile names the owner\'s bash timeout')
+  const path = writeSettingsFile(home, 'wren', { profileEnv: profile })
+  const file = JSON.parse(readFileSync(path, 'utf8'))
+  assert.equal(file.env.BASH_MAX_TIMEOUT_MS, '7200000', 'the file carries the long-run env')
+  assert.equal(file.env.CREW_HOME, home, 'the person keeps its own CREW_HOME')
+  assert.deepEqual(file.permissions.deny, ['mcp__git__restart_self'], 'the deny rule is still there')
+  assert.equal(file.remoteControlAtStartup, false)
+})
+
+test('a profile can never override the person\'s own CREW_HOME', () => {
+  const s = settingsFor({ home: '/own/home', key: 'wick', profileEnv: { CREW_HOME: '/other/home', MCP_TIMEOUT: '60000' } })
+  assert.equal(s.env.CREW_HOME, '/own/home')
+  assert.equal(s.env.MCP_TIMEOUT, '60000')
 })
