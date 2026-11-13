@@ -69,12 +69,12 @@ export function transcriptOf(root, id) {
  * the mailed error texts per person). Returns the log lines, the mail texts to send to Boss (only for the new errors), and
  * the next sessionErrors map.
  */
-export function sessionErrorReport({ home, root, state = {} }) {
+export function sessionErrorReport({ home, root, state = {}, live = false }) {
   const dir = join(home, 'sessions')
   const next = {}
   const lines = []
-  const mails = []
-  if (!existsSync(dir)) return { lines, mails, sessionErrors: next }
+  const pending = []
+  if (!existsSync(dir)) return { lines, pending, sessionErrors: next }
   const keys = readdirSync(dir).filter(f => f.endsWith('.json') && !f.endsWith('.mcp.json')).map(f => f.slice(0, -5))
   for (const key of keys) {
     let record
@@ -88,18 +88,25 @@ export function sessionErrorReport({ home, root, state = {} }) {
     const health = blockedReason(textOf(last))
     const prior = state.sessionErrors?.[key] ?? { seen: [] }
     if (!health) {
-      // A normal line clears the blocked state; the mailed list is cleared with it.
-      if (prior.seen?.length) lines.push(`${key}: no api error on the last line; the block is cleared`)
-      next[key] = { seen: [] }
+      // A normal line clears the blocked state, and the mailed list with it. A dry run only reports, so it changes nothing.
+      if (prior.seen?.length) lines.push(`${key}: no api error on the last line; the block is cleared${live ? '' : ' (dry run: not applied)'}`)
+      next[key] = live ? { seen: [] } : prior
       continue
     }
-    const { mail, seen } = errorMailOnce(health, prior.seen ?? [])
-    next[key] = { seen }
+    const { mail } = errorMailOnce(health, prior.seen ?? [])
+    // The error is marked seen only by markMailed, after a live send succeeds: a dry run never marks it.
+    next[key] = prior
     lines.push(`${key}: ${health.state}: ${health.error}`)
     if (mail) {
-      lines.push(`mail boss once: ${key} is blocked by an API error`)
-      mails.push(errorMailText({ key, cardId: record.cardId ?? null, error: health.error }))
+      lines.push(live ? `mail boss once: ${key} is blocked by an API error` : `would mail boss once: ${key} is blocked by an API error (dry run)`)
+      pending.push({ key, error: health.error, text: errorMailText({ key, cardId: record.cardId ?? null, error: health.error }) })
     }
   }
-  return { lines, mails, sessionErrors: next }
+  return { lines, pending, sessionErrors: next }
+}
+
+/** The sessionErrors map with the error marked as mailed for that person. Called only after a live send succeeded. */
+export function markMailed(sessionErrors, key, error) {
+  const prior = sessionErrors?.[key] ?? { seen: [] }
+  return { ...sessionErrors, [key]: { seen: [...(prior.seen ?? []), error] } }
 }

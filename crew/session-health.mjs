@@ -4,8 +4,10 @@
 export const BLOCKED_STATE = 'blocked: api error'
 export const ERROR_CUT = 80
 
-// An API error line: the 'API Error' marker, a login request, or the account limit line.
-const API_ERROR = /API Error|Please run \/login|hit your \d+-hour limit/
+// An API error line, anchored at the start of the line: the transcript records the error as the line itself (optionally
+// behind the login request), or the account limit line. A normal reply that only quotes one of these phrases mid-sentence
+// is not an error.
+const API_ERROR = /^(?:Please run \/login · )?API Error: \d{3}\b|^Please run \/login · API Error|^You'?ve hit your \d+-hour limit/
 
 /**
  * The health of one session from its last transcript line: { state, error } when the line is an API error, otherwise null.
