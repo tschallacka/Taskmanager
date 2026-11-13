@@ -16,6 +16,7 @@ import { join, resolve } from 'node:path'
 import { after, describe, test } from 'node:test'
 import { once } from 'node:events'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { removeWhenUnused } from './browser-cleanup.mjs'
 import {
   acquireLock, acquireLockWaiting, BrowserError, chromeArgs, encodeFrame, retryAfterReattach, findChromium, formatDuration, idleNote, lockDecision, Mutex,
   checkDirectory, checkSendMethod, checkShotPath, keepLock, openDirectory, parseCli, parseRequest, pidAlive, request, releaseLock, sameFolder, serve, shotRoots,
@@ -548,7 +549,8 @@ describe('the shared browser (real Chromium)', { skip: SKIP }, () => {
   after(async () => {
     for (const dir of dirs) await stopDriver(dir).catch(() => {})
     if (site) await site.close()
-    for (const dir of made) rmSync(dir, { recursive: true, force: true })
+    // Wait until no process still names a folder (Chromium's helpers can outlive it), then remove it.
+    for (const dir of made) await removeWhenUnused(dir)
   })
 
   test('setup: a page server for the tests', async () => {
@@ -775,6 +777,6 @@ test('the request with no Chromium anywhere fails with a plain message', async (
   }
 })
 
-after(() => {
-  for (const dir of made) rmSync(dir, { recursive: true, force: true })
+after(async () => {
+  for (const dir of made) await removeWhenUnused(dir)
 })
