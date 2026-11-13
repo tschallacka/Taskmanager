@@ -115,7 +115,8 @@ export async function deliverOnce({ fetch: fetchImpl = fetch, base, slug, key, m
   const seenPath = join(seenDir, mail.id)
   const fresh = !existsSync(seenPath)
   if (fresh) {
-    writeFileSync(seenPath, `${new Date().toISOString()}\n`)
+    // The record keeps the mail's text and sender, so a waiter (crew down) can find a reply by its text without the inbox.
+    writeFileSync(seenPath, `${JSON.stringify({ at: new Date().toISOString(), id: mail.id, from: mail.from, text: mail.text })}\n`)
     deliver(mailLine(mail), mail)
   }
   try {

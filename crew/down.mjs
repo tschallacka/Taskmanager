@@ -6,10 +6,10 @@
 // (the dev services) has no mail, and is stopped by its own stop command. Pia relays the request to the workers (condition 3).
 import { spawnSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { fetchMail, sendMail } from './mail-client.mjs'
+import { sendMail } from './mail-client.mjs'
 
 export const DEFAULT_TIMEOUT_MS = 5 * 60_000
 
@@ -24,7 +24,7 @@ export function newRequestId() {
 
 /** The wrap-up text sent with the request (condition 1): what the person does before it stops. */
 export function wrapUpText(person, requestId) {
-  return `crew down request ${requestId} for ${person}: finish or park your current step, post what is open on your card, read your mail, then reply with the line "crew down ok: ${person}; stopped; <N> unread kept; request ${requestId}; at <time>". Your session is stopped after that reply.`
+  return `crew down request ${requestId} for ${person}: finish or park your current step, post what is open on your card, read your mail, then reply to pia (the mail to pia, not to the board) with the line "crew down ok: ${person}; stopped; <N> unread kept; request ${requestId}; at <time>". Your session is stopped after that reply.`
 }
 
 /**
@@ -104,21 +104,37 @@ export async function askPerson({ base, slug, key, person, text, mailboxDir, mak
 }
 
 /**
- * Waits for the person's own "crew down ok" with the same request id, reading Pia's inbox (fetchMail reads and does not
- * ack, so no other mail is consumed). Polls every `interval` ms until `timeoutMs`. Resolves true at the first match.
+ * The mails the mailer has already delivered to Pia, from her seen records (mailbox/pia/seen/<mail id>, written by
+ * deliverOnce before the delivery). Reads the local folder only: the live inbox is not read, the mailer acks it. A record
+ * with no text (the old timestamp-only form) is skipped.
+ */
+export function deliveredToPia(mailboxDir) {
+  const folder = join(mailboxDir, 'pia', 'seen')
+  let names = []
+  try {
+    names = readdirSync(folder)
+  } catch {
+    return []
+  }
+  const out = []
+  for (const name of names) {
+    const record = readJsonOr(join(folder, name), null)
+    if (record && typeof record.text === 'string') out.push(record)
+  }
+  return out
+}
+
+/**
+ * Waits for the person's own "crew down ok" with the same request id, in Pia's delivered mail (deliveredToPia). Polls
+ * every `interval` ms until `timeoutMs`. Resolves true at the first match.
  */
 export async function waitForConfirmation({
-  base, slug, key, person, requestId, timeoutMs = DEFAULT_TIMEOUT_MS, interval = 5000,
-  fetch: fetchImpl = fetch, now = Date.now, sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
+  mailboxDir, person, requestId, timeoutMs = DEFAULT_TIMEOUT_MS, interval = 5000,
+  now = Date.now, sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 }) {
   const deadline = now() + timeoutMs
   for (;;) {
-    try {
-      const mails = await fetchMail({ fetch: fetchImpl, base, slug, key, to: 'pia' })
-      if (mails.some(mail => mail.from === person && isDownOk(mail.text, person, requestId))) return true
-    } catch (error) {
-      console.error(`crew down: could not read Pia's mail, will try again: ${error.message}`)
-    }
+    if (deliveredToPia(mailboxDir).some(mail => mail.from === person && isDownOk(mail.text, person, requestId))) return true
     const left = deadline - now()
     if (left <= 0) return false
     await sleep(Math.min(interval, left))

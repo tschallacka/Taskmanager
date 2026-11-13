@@ -3,9 +3,10 @@
 // text is in the request. Run: node --test crew/down.test.mjs
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { downParts, wrapUpText, isDownOk, askPerson, waitForConfirmation } from './down.mjs'
+import { downParts, wrapUpText, isDownOk, askPerson, waitForConfirmation, deliveredToPia } from './down.mjs'
+import { tick } from './mail-client.mjs'
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -42,27 +43,52 @@ test('askPerson mails the person through the app with the request text, and neve
   assert.equal(failing, true, 'an unsent mail goes to the outbox, not an error')
 })
 
-test('waitForConfirmation resolves on the person own down ok, and times out when there is none', async () => {
-  let calls = 0
-  const inbox = [{ from: 'wick', text: okLine('wren') }, { from: 'wren', text: okLine('wren') }]
-  const fetch = async () => {
-    calls += 1
-    return jsonResponse({ mail: calls < 2 ? [] : inbox })
+// A fake app mail route with the mailer's behaviour: the pending rows are served until each one is acked.
+function fakeMailRoute(initial) {
+  const pending = [...initial]
+  const acked = []
+  const fetch = async (url, init = {}) => {
+    if (init.method === 'POST' && /\/ack$/.test(url)) {
+      const id = url.split('/').at(-2)
+      acked.push(id)
+      const at = pending.findIndex(mail => mail.id === id)
+      if (at >= 0) pending.splice(at, 1)
+      return jsonResponse({})
+    }
+    if (init.method === 'POST') return jsonResponse({})
+    return jsonResponse({ mail: pending.map(mail => ({ ...mail })) })
   }
-  let clock = 0
-  const sleeps = []
-  const confirmed = await waitForConfirmation({
-    fetch, base: 'https://board.example', slug: 'tm', key: 'k', person: 'wren', requestId: REQ, timeoutMs: 60000, interval: 1000,
-    now: () => clock, sleep: async ms => { sleeps.push(ms); clock += ms }
-  })
-  assert.equal(confirmed, true)
-  assert.equal(calls, 2, 'polled until the reply came')
+  return { fetch, acked, pending }
+}
 
-  const none = await waitForConfirmation({
-    fetch: async () => jsonResponse({ mail: [{ from: 'wick', text: okLine('wren') }] }), base: 'https://board.example', slug: 'tm', key: 'k',
-    person: 'wren', requestId: REQ, timeoutMs: 3000, interval: 1000, now: () => clock, sleep: async ms => { clock += ms }
-  })
-  assert.equal(none, false, 'a down ok from another person does not confirm, and the wait ends at the timeout')
+test('waitForConfirmation reads the down ok the mailer delivered (the seen record), never the live inbox', async () => {
+  const mailboxDir = mkdtempSync(join(tmpdir(), 'down-wait-'))
+  const route = fakeMailRoute([
+    { id: 'c'.repeat(32), from: 'wick', text: okLine('wren') },
+    { id: 'd'.repeat(32), from: 'wren', text: okLine('wren') }
+  ])
+  const base = 'https://board.example'
+  let clock = 0
+  const sleep = async ms => { clock += ms }
+  const wait = (requestId, timeoutMs = 2000) => waitForConfirmation({ mailboxDir, person: 'wren', requestId, timeoutMs, interval: 1000, now: () => clock, sleep })
+
+  assert.equal(await wait(REQ), false, 'a reply still in the inbox, not yet delivered, does not confirm')
+
+  const delivered = []
+  const result = await tick({ fetch: route.fetch, base, slug: 'tm', key: 'k', to: 'pia', mailboxDir, deliver: line => delivered.push(line) })
+  assert.equal(result.error, null)
+  assert.equal(delivered.length, 2)
+  assert.equal(route.pending.length, 0, 'the mailer acked both')
+  assert.equal(await wait(REQ), true, 'the own down ok, delivered, confirms')
+  assert.equal(await wait('ffffffffffffffff'), false, 'the same mail does not confirm another request id')
+})
+
+test('a timestamp-only seen record (the old form) carries no text, so it never confirms', async () => {
+  const mailboxDir = mkdtempSync(join(tmpdir(), 'down-old-'))
+  mkdirSync(join(mailboxDir, 'pia', 'seen'), { recursive: true })
+  writeFileSync(join(mailboxDir, 'pia', 'seen', 'e'.repeat(32)), `${new Date().toISOString()}\n`)
+  assert.deepEqual(deliveredToPia(mailboxDir), [])
+  assert.equal(await waitForConfirmation({ mailboxDir, person: 'wren', requestId: REQ, timeoutMs: 0, now: () => 0, sleep: async () => {} }), false)
 })
 
 test('crew down is routed from crew.mjs and wants CREW_HOME', () => {
