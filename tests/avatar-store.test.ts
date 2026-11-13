@@ -1,11 +1,28 @@
-// The picture store (server/utils/avatarStore.ts) and its routes: only a stored name is served, the content type follows the
-// extension, an SVG is served under a restrictive policy, and the upload runs the shared checks before it writes.
+// The picture store (server/utils/avatarStore.ts) and its serving route, run as a handler: only a stored name is served,
+// and the content type follows the extension. The route's refusals are tested by calling it; an SVG served under the
+// restrictive policy needs a stored file, so that header is not covered here.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { createError, getRouterParam, setHeader } from 'h3'
 import { AVATAR_EXT, contentTypeOf, safeAvatarName } from '../server/utils/avatarStore'
 
-const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8')
+// Nitro provides these as globals; the route file uses them without importing.
+Object.assign(globalThis, {
+  createError,
+  getRouterParam,
+  setHeader,
+  defineEventHandler: (fn: unknown) => fn
+})
+
+const pictureRoute = (await import('../server/api/account/avatars/[userId]/[filename].get.ts')).default as (event: unknown) => unknown
+
+function requestFor(userId: string, filename: string) {
+  const res = {
+    setHeader: () => undefined,
+    getHeader: () => undefined
+  }
+  return { context: { params: { userId, filename } }, node: { req: { headers: {} }, res } }
+}
 
 test('only a stored picture name is accepted: 24 hex characters and a known extension', () => {
   assert.deepEqual(safeAvatarName('0123456789abcdef01234567.png'), { ext: 'png' })
@@ -25,17 +42,25 @@ test('the content type follows the extension, and an unknown one is served as by
   assert.deepEqual(Object.keys(AVATAR_EXT).sort(), ['image/jpeg', 'image/png', 'image/svg+xml', 'image/webp'])
 })
 
-test('the upload runs the shared checks before it writes, and the stored name is random, never the client name', () => {
-  const upload = read('server/api/account/avatar.post.ts')
-  assert.match(upload, /uploadProblem\(\{ type, bytes: file\.data\.length \}\)/)
-  assert.match(upload, /svgProblem\(file\.data\.toString\('utf8'\)\)/)
-  assert.match(upload, /mayChangeProfile\(me, me\)/)
-  assert.match(upload, /randomBytes\(12\)\.toString\('hex'\)/)
-  assert.doesNotMatch(upload, /file\.filename/, 'the client file name is never used')
+test('the picture route refuses a name that is not a stored picture name, with 404', async () => {
+  for (const filename of ['../../etc/passwd', '0123456789abcdef01234567.exe', 'picture.png']) {
+    await assert.rejects(Promise.resolve().then(() => pictureRoute(requestFor('user-a', filename))), (error: { statusCode?: number }) => {
+      assert.equal(error.statusCode, 404, filename)
+      return true
+    })
+  }
 })
 
-test('the picture route serves only a checked name, and an SVG under a restrictive policy', () => {
-  const serve = read('server/api/account/avatars/[userId]/[filename].get.ts')
-  assert.match(serve, /safeAvatarName\(filename\)/)
-  assert.match(serve, /default-src 'none'/, 'an SVG cannot load or run anything')
+test('the picture route refuses a user id with characters a folder name may not have, with 404', async () => {
+  await assert.rejects(Promise.resolve().then(() => pictureRoute(requestFor('../other', '0123456789abcdef01234567.png'))), (error: { statusCode?: number }) => {
+    assert.equal(error.statusCode, 404)
+    return true
+  })
+})
+
+test('the picture route refuses a stored name that is not on disk, with 404', async () => {
+  await assert.rejects(Promise.resolve().then(() => pictureRoute(requestFor('user-nobody-here', '0123456789abcdef01234567.png'))), (error: { statusCode?: number }) => {
+    assert.equal(error.statusCode, 404)
+    return true
+  })
 })

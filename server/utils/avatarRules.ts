@@ -7,6 +7,20 @@ export const AVATAR_MAX_BYTES = 2 * 1024 * 1024
 export const NAME_MIN = 1
 export const NAME_MAX = 60
 
+// The multipart envelope (boundary and field headers) is a few hundred bytes; the allowance covers it with room to spare.
+export const MULTIPART_ALLOWANCE_BYTES = 64 * 1024
+
+/**
+ * The problem with an upload's declared size, checked before the body is read: a request must say its length, and a
+ * declared length over the picture limit plus the envelope allowance is refused. Null when the body may be read.
+ */
+export function requestSizeProblem(declared: string | undefined): { statusCode: number, message: string } | null {
+  const length = declared === undefined ? Number.NaN : Number(declared)
+  if (!Number.isFinite(length) || length < 0) return { statusCode: 411, message: 'The upload must say its size (Content-Length).' }
+  if (length > AVATAR_MAX_BYTES + MULTIPART_ALLOWANCE_BYTES) return { statusCode: 413, message: 'A picture must be 2 MB or smaller.' }
+  return null
+}
+
 /** The problem with an uploaded picture by its type and size, or null when it may be stored. */
 export function uploadProblem(input: { type: string, bytes: number }): string | null {
   if (!(AVATAR_TYPES as readonly string[]).includes(input.type)) return 'A picture must be a PNG, JPEG, WebP or SVG file.'
