@@ -45,7 +45,7 @@ in that folder, and only those two: `.mcp.json` (the server, whose header reads 
 `taskmanager-<key name>` and the variable `TASKMANAGER_<KEY NAME>`. Two keys whose names are alike (`Wren Worker` and
 `wren-worker`) would share them, so the later key gets `-2`, `-3` and so on: `taskmanager-wren-worker-2` and
 `TASKMANAGER_WREN_WORKER_2`. The first key keeps the plain name, and a key keeps its suffix. A suffix freed by a revoke can be
-reused by a new key, since the revoked key's setup no longer works. Nothing goes to your
+reused by a new key, since the revoked key's setup no longer works. A key made before suffixes were stored gets its suffix the first time the key list is shown. Nothing goes to your
 user settings or to your shell profile, and no `headersHelper` is used.
 
 - Both files are added to `.git/info/exclude`, and must not be committed: the key is in the settings file.

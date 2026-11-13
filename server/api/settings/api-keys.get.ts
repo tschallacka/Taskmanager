@@ -2,7 +2,7 @@ import { desc, eq } from 'drizzle-orm'
 import { db } from '../../db'
 import { apiKeys } from '../../db/schema'
 import { openBoardsOf, reachViewsOf, reachedBoardsOf, workspacesOf } from '../../utils/keyReach'
-import { backfillSuffixes } from '../../../shared/utils/keyNameSuffix'
+import { backfillSuffixes, keySlug } from '../../../shared/utils/keyNameSuffix'
 
 /**
  * The caller's API keys, whichever workspace they were made in, each with what it reaches. A key made
@@ -13,10 +13,12 @@ export default defineEventHandler(async (event) => {
   const userId = event.context.session.user.id
 
   const rows = await db.select().from(apiKeys).where(eq(apiKeys.userId, userId)).orderBy(desc(apiKeys.createdAt))
-  // Keys made before the suffix was stored get theirs now, once, oldest first, and it is kept (keyNameSuffix.ts).
+  // Backfill, here and only here: a key made before the suffix was stored gets its suffix and slug on first display, oldest
+  // first, and they are kept. Keys that already have a stored suffix are left alone (shared/utils/keyNameSuffix.ts).
   const filled = backfillSuffixes(rows)
+  const nameOf = new Map(rows.map(row => [row.id, row.name]))
   for (const [id, suffix] of Object.entries(filled)) {
-    await db.update(apiKeys).set({ nameSuffix: suffix }).where(eq(apiKeys.id, id))
+    await db.update(apiKeys).set({ nameSuffix: suffix, nameSlug: keySlug(nameOf.get(id) ?? '') || 'key' }).where(eq(apiKeys.id, id))
   }
   const [views, workspaces, boards, reached] = await Promise.all([
     reachViewsOf(rows),

@@ -9,7 +9,13 @@ import { generateApiKey, isApiKeyScope } from './api-keys'
 import { storeReach, teamReachOf } from './keyReach'
 import type { ReachRequest } from './keyReach'
 import { CREW_SENTENCES, crewPermissionRefusal, ownsLiveCrew } from './crewPermission'
-import { backfillSuffixes, nextKeySuffix } from '../../shared/utils/keyNameSuffix'
+import { backfillSuffixes, keySlug, nextKeySuffix } from '../../shared/utils/keyNameSuffix'
+
+// A unique-index conflict (Postgres 23505), possibly wrapped by the query layer.
+function isUniqueConflict(error: unknown): boolean {
+  const e = error as { code?: string, cause?: { code?: string } } | null
+  return e?.code === '23505' || e?.cause?.code === '23505'
+}
 
 export const MAX_KEY_NAME_LENGTH = 60
 const MAX_EXPIRY_DAYS = 3650
@@ -115,14 +121,12 @@ export async function issueKey(input: { userId: string, teamId: string | null, r
   const reach = input.reach
     ?? (input.teamId ? teamReachOf(input.teamId, limit) : { allBoards: false, workspaceTeamIds: [null], boardIds: [] })
   const now = Date.now()
-  const created = await db.transaction(async (tx) => {
+  const attempt = () => db.transaction(async (tx) => {
     // The new key's suffix is counted over every key the person has now, after any older key without one has got its own.
     const rows = await tx.select({ id: apiKeys.id, name: apiKeys.name, createdAt: apiKeys.createdAt, suffix: apiKeys.nameSuffix })
       .from(apiKeys).where(eq(apiKeys.userId, input.userId))
+    // Older keys without a stored suffix are counted as the list endpoint would give them (in memory only; the list stores them).
     const filled = backfillSuffixes(rows)
-    for (const [id, suffix] of Object.entries(filled)) {
-      await tx.update(apiKeys).set({ nameSuffix: suffix }).where(eq(apiKeys.id, id))
-    }
     const known = rows.map(row => ({ name: row.name, suffix: row.suffix ?? filled[row.id] ?? '' }))
     const nameSuffix = nextKeySuffix(input.request.name, known)
     const [row] = await tx.insert(apiKeys).values({
@@ -139,10 +143,20 @@ export async function issueKey(input: { userId: string, teamId: string | null, r
       createdAt: now,
       allBoards: reach.allBoards,
       boardReachSet: true,
-      nameSuffix
+      nameSuffix,
+      nameSlug: keySlug(input.request.name) || 'key'
     }).returning()
     await storeReach(tx, row!.id, reach, now)
     return row!
   })
+  // Two keys made at the same moment can take the same suffix; the unique index refuses the second. Its transaction reads
+  // the rows again and tries once more, so it takes the next free suffix.
+  let created
+  try {
+    created = await attempt()
+  } catch (error) {
+    if (!isUniqueConflict(error)) throw error
+    created = await attempt()
+  }
   return { token: generated.token, key: created }
 }
