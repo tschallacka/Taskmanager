@@ -4,6 +4,7 @@
 //   node --test crew/dev-copies.test.mjs
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { gateCards, branchOf, copyLines, workingBoardId, readerOf, devServersOf } from './dev-copies.mjs'
 
 test('the board is the working board from crew.json, not the crew-home board', () => {
@@ -80,6 +81,19 @@ test('a card with no branch or no port in crew.json is reported, not guessed', (
   const noPort = copyLines([{ who: 'usher', id: 'c6', column: 'Verify UX' }], { probe: () => true, branches: { c6: 'u/q' }, ports: {} })
   assert.equal(noPort.ok, false)
   assert.match(noPort.lines[0], /no port for usher in crew.json "devServers"/)
+})
+
+// The real get_task_github answer for a pull request link (PR 139), copied as it came: the branch is data.headRef.
+const PR_FIXTURE = JSON.parse(readFileSync(new URL('./fixtures/real-get_task_github-pr139.json', import.meta.url), 'utf8'))
+
+test('the real pull request answer names its head branch in data.headRef, and the probe finds the copy on that branch\'s port', () => {
+  assert.equal(branchOf(PR_FIXTURE), 'wren/mw86lpq5yob2l03hu7k-newboard-rebased-3')
+  const cards = [{ who: 'wren', id: 'mw86lpq5yob2l03hu7k', column: 'Verify QA' }]
+  const up = copyLines(cards, { probe: port => port === 3101, branches: { mw86lpq5yob2l03hu7k: branchOf(PR_FIXTURE) }, ports: { wren: 3101 } })
+  assert.deepEqual(up.lines, ['wren: card mw86lpq5yob2l03hu7k [Verify QA] branch wren/mw86lpq5yob2l03hu7k-newboard-rebased-3 on :3101: up'])
+  assert.equal(up.ok, true)
+  const down = copyLines(cards, { probe: () => false, branches: { mw86lpq5yob2l03hu7k: branchOf(PR_FIXTURE) }, ports: { wren: 3101 } })
+  assert.equal(down.lines[1], 'no copy: ask Boss: tester-copy.sh start wren wren/mw86lpq5yob2l03hu7k-newboard-rebased-3')
 })
 
 test('the reader and the ports come from crew.json: no name is built in', () => {
