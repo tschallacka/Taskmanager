@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { format } from 'date-fns'
+import { approvalSetupPrompt } from '~/utils/approvalSetupPrompt'
+import { setupBoardProblem } from '~/utils/approvalSetupBoard'
 
 definePageMeta({ layout: 'app' })
 
@@ -7,6 +9,53 @@ useSeoMeta({ title: 'Crews' })
 
 const { isInstanceAdmin, isPending: sessionPending } = useAuth()
 const toast = useToast()
+
+// "Set up a crew" (card mwdd5q94mmq78py1ntp, option b): the admin types a board id and name. The id is checked against the
+// boards this admin can open (GET /api/projects, an existing session endpoint) before the prompt is copied.
+const setupOpen = ref(false)
+const setupBoardId = ref('')
+const setupBoardItems = ref<Array<{ label: string, value: string }>>([])
+const setupProblem = ref<string | null>(null)
+const setupBusy = ref(false)
+
+// The picker lists the boards this admin can open (the same list as the app's own boards). The copy still checks the
+// chosen id on the server, so a board that is not there is refused.
+async function loadSetupBoards() {
+  try {
+    const rows = await $fetch<Array<{ id: string, name: string, role?: string }>>('/api/projects')
+    // A crew's own (shadow) board is not a board a crew is set up for: only the real boards are offered.
+    setupBoardItems.value = rows
+      .filter(row => row.role !== 'shadow')
+      .map(row => ({ label: row.name, value: row.id }))
+  } catch {
+    setupProblem.value = 'Could not load the boards. Try again.'
+  }
+}
+
+watch(setupOpen, (open) => {
+  if (open) void loadSetupBoards()
+})
+
+async function copySetupPrompt() {
+  setupProblem.value = setupBoardProblem({ boardId: setupBoardId.value })
+  if (setupProblem.value) return
+  setupBusy.value = true
+  try {
+    // The server decides: an unknown board, or one this admin cannot open, answers 404 (or 403); nothing is copied then.
+    const id = setupBoardId.value.trim()
+    const board = await $fetch<{ id: string, name: string }>(`/api/projects/${encodeURIComponent(id)}`)
+    await navigator.clipboard.writeText(approvalSetupPrompt({ origin: window.location.origin, boardId: board.id, boardName: board.name }))
+    toast.add({ title: 'Setup prompt copied', description: 'Paste it into the agent that runs the crew.', icon: 'i-lucide-check' })
+    setupOpen.value = false
+  } catch (error) {
+    const status = (error as { statusCode?: number, status?: number } | null)?.statusCode ?? (error as { status?: number } | null)?.status
+    setupProblem.value = status === 404 || status === 403
+      ? 'No board you can open has that id. Copy the id from the board\'s address (the part after /projects/).'
+      : 'Could not check the board or copy the prompt. Try again.'
+  } finally {
+    setupBusy.value = false
+  }
+}
 
 function errMsg(e: unknown): string | undefined {
   return (e as { data?: { message?: string } })?.data?.message
@@ -248,14 +297,63 @@ function cancelPurge() {
             Agent teams, made here or through the crew API. Only the instance admin sees this page.
           </p>
         </div>
-        <UButton
+        <div
           v-if="isInstanceAdmin"
-          to="/admin/crews/new"
-          label="New crew"
-          icon="i-lucide-plus"
-          size="sm"
-        />
+          class="flex flex-wrap items-center gap-2"
+        >
+          <UButton
+            label="Set up a crew"
+            icon="i-lucide-clipboard-copy"
+            size="sm"
+            variant="soft"
+            data-setup-crew
+            @click="setupOpen = !setupOpen"
+          />
+          <UButton
+            to="/admin/crews/new"
+            label="New crew"
+            icon="i-lucide-plus"
+            size="sm"
+          />
+        </div>
       </div>
+
+      <form
+        v-if="isInstanceAdmin && setupOpen"
+        class="mb-4 space-y-3 rounded-xl border border-default p-4"
+        data-setup-crew-form
+        @submit.prevent="copySetupPrompt"
+      >
+        <p class="text-sm text-muted">
+          Pick the board. The prompt it copies sets up a crew for that board by an approval in the browser, with no token in it.
+          The board's name comes from the board itself.
+        </p>
+        <UFormField label="Board">
+          <USelectMenu
+            v-model="setupBoardId"
+            :items="setupBoardItems"
+            value-key="value"
+            placeholder="Choose a board"
+            class="w-full"
+            data-setup-board-id
+          />
+        </UFormField>
+        <p
+          v-if="setupProblem"
+          class="text-sm text-error"
+          data-setup-problem
+        >
+          {{ setupProblem }}
+        </p>
+        <UButton
+          type="submit"
+          label="Copy the setup prompt"
+          icon="i-lucide-clipboard-copy"
+          :loading="setupBusy"
+          :disabled="setupBusy"
+          data-setup-copy
+        />
+      </form>
 
       <!-- Until the session is known, nothing of the admin's UI is drawn. -->
       <div

@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.28.0 - 2026-11-13
+
+- **Set up a crew by approval: the setup prompt carries no token.** On the Crews page, an instance admin picks a board and copies a prompt. The agent asks for a connection, the admin approves the link in the browser with one click, and the agent gets its key once. A link that expires is refused with one sentence. The old management-token prompt keeps working for one release. Files: `app/utils/approvalSetupPrompt.ts`, `app/utils/approvalSetupBoard.ts`, `app/pages/admin/crews/index.vue`, `app/utils/connectPrompt.ts`, `app/pages/connect-approve.vue`, `docs/crews/give-a-board-a-crew.md`, `tests/approval-setup-prompt.test.ts`, `tests/approval-setup-board.test.ts`, `tests/connect-permission-wording.test.ts`.
+
 ## 0.27.0 - 2026-11-13
 
 - **Every crew session starts with its own settings file.** Each background session gets `CREW_HOME/settings/<key>.json` (mode 600): the `mcp__git__restart_self` tool is denied for every agent, the person's own crew home is set, and remote control is off. The start passes that one file as its `--settings`. Files: `crew/session-settings.mjs`, `crew/session.mjs`, `crew/session.test.mjs`, `crew/session-settings.test.mjs`, `crew/kit-files.txt`.
