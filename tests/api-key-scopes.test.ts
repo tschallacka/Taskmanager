@@ -1,0 +1,21 @@
+// A new key's default scopes, and the scope text in the Settings panel. The panel and the connect prompt must name the
+// same two board scopes the same way, so a key that gets both (read boards and tasks, change tasks) is what the owner
+// reads. Source checks on the panel and the prompt builder. Run:
+//   node --import tsx --test tests/api-key-scopes.test.ts
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+
+const panel = readFileSync(new URL('../app/components/ApiKeysPanel.vue', import.meta.url), 'utf8')
+const prompt = readFileSync(new URL('../app/utils/connectPrompt.ts', import.meta.url), 'utf8')
+
+test('a new key selects both board scopes by default: read boards and tasks, and change tasks', () => {
+  assert.match(panel, /permission\.scope\.startsWith\('boards:'\)/, 'the default ticks every boards: scope')
+})
+
+test('the panel names the board scopes as the connect prompt does, with what each allows', () => {
+  assert.match(panel, /scope: 'boards:read', label: 'Read boards and tasks', description: 'Boards, tasks, comments and time logs'/)
+  assert.match(panel, /scope: 'boards:write', label: 'Change tasks', description: 'Create, edit, move and delete tasks, comment, log time'/)
+  assert.match(prompt, /scope: 'boards:read', label: 'Read boards and tasks'/)
+  assert.match(prompt, /scope: 'boards:write', label: 'Change tasks'/)
+})

@@ -75,8 +75,8 @@ const EXPIRY_OPTIONS = [
 
 // One toggle per permission, in the order they are advertised to a client.
 const PERMISSIONS = [
-  { scope: 'boards:read', label: 'Read boards', description: 'Boards, tasks and updates' },
-  { scope: 'boards:write', label: 'Write boards', description: 'Create, edit, move and delete' },
+  { scope: 'boards:read', label: 'Read boards and tasks', description: 'Boards, tasks, comments and time logs' },
+  { scope: 'boards:write', label: 'Change tasks', description: 'Create, edit, move and delete tasks, comment, log time' },
   { scope: 'secrets:read', label: 'Read project secrets', description: 'Names of a project\'s secrets and its .env text, values included. Every read is recorded in the project\'s trail' },
   { scope: 'secrets:write', label: 'Write project secrets', description: 'Add, change and delete a project\'s secrets by name, where this person is a project manager' }
 ] as const
