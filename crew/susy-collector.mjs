@@ -89,6 +89,8 @@ export function activityKey(line) {
   let m
   if ((m = /^poke (\S+) on (\S+):/.exec(line))) return `poke|${m[1]}|${m[2]}`
   if ((m = /^to pia: needs resume: (\S+) has (\S+)/.exec(line))) return `resume|${m[1]}|${m[2]}`
+  if ((m = /^to pia: stuck: (\S+) has (\S+)/.exec(line))) return `stuck|${m[1]}|${m[2]}`
+  if ((m = /^to pia: absent: (\S+) is not running, start them \((\S+) /.exec(line))) return `absent|${m[1]}|${m[2]}`
   if ((m = /^to pia: (\w+) trigger silent/.exec(line))) return `trigger|${m[1]}`
   if (/^to pia: a go is waiting/.test(line)) return 'go'
   if ((m = /^to boss: (\S+) "/.exec(line))) return `verify|${m[1]}`

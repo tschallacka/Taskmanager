@@ -2,9 +2,11 @@
 // evidence is its own transcript under Pia's project folder, read by activity.mjs (activityRows, Boss's state names:
 // working, running, listening, ended, handedback, silent). This module maps those rows onto the poke rules:
 //   - ended or handedback WITH a card In progress: needs resume (to Pia, at once);
-//   - listening, silent or ended for 10+ minutes WITH a card In progress and not blocked: idle with work (poke);
+//   - silent (no step for 15+ minutes, not listening) WITH a card In progress: stuck (to Pia, at once);
+//   - listening or ended for 10+ minutes WITH a card In progress and not blocked: idle with work (poke);
+//   - no transcript in the window WITH a card In progress: absent, not running (to Pia, at once);
 //   - working or running: nothing; a WAITING marker on the card (younger than 45 minutes): nothing.
-// No transcript for a worker in the window is no evidence, not a fault. Read only.
+// A worker with no card In progress and no transcript is no evidence, not a fault. Read only.
 import { activityRows, piaProjectsDir, readCmdlines, isPiaProcess } from './activity.mjs'
 import { MIN, IDLE_MINUTES, waitingOf } from './susy-activity.mjs'
 
@@ -39,15 +41,20 @@ export function workerPeople({ rows, cards, keyOf, now = Date.now() }) {
   const people = []
   for (const key of WORKERS) {
     const row = rows.get(key)
-    if (!row) continue
     const card = cardOf(key, cards, keyOf)
     const lastUpdate = card?.updates?.at(-1)?.body ?? null
+    if (!row) {
+      // No transcript in the window, but a card in hand: the agent is not running (never started, or gone for good).
+      if (card) people.push({ key, state: 'absent', reason: 'none', card: { id: card.id, title: card.title }, blocked: Boolean(card.blocked), idleMs: 0, lastUpdate })
+      continue
+    }
     const idleMs = row.mins * MIN
     const waiting = card ? (card.updates ?? []).some(u => waitingOf(u, now)) : false
     let state = 'working'
     if (waiting) state = 'waiting'
     else if (card && (row.state === 'ended' || row.state === 'handedback')) state = 'gone'
-    else if (card && !card.blocked && ['listening', 'silent'].includes(row.state) && idleMs >= IDLE_MINUTES * MIN) state = 'idle'
+    else if (card && row.state === 'silent') state = 'stuck'
+    else if (card && !card.blocked && row.state === 'listening' && idleMs >= IDLE_MINUTES * MIN) state = 'idle'
     people.push({
       key,
       state,

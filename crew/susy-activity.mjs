@@ -47,6 +47,11 @@ export function workerLines(people) {
     if (person.state === 'gone') {
       const how = person.reason === 'handedback' ? 'handed back' : person.reason === 'ended' ? 'ended' : 'gone'
       lines.push(`to pia: needs resume: ${person.key} has ${person.card.id} "${person.card.title}" in progress and is ${how}; resume that agent`)
+    } else if (person.state === 'stuck') {
+      const minutes = Math.floor(person.idleMs / MIN)
+      lines.push(`to pia: stuck: ${person.key} has ${person.card.id} "${person.card.title}" in progress, no step for ${minutes} min; check that agent`)
+    } else if (person.state === 'absent') {
+      lines.push(`to pia: absent: ${person.key} is not running, start them (${person.card.id} "${person.card.title}" in progress)`)
     } else if (person.state === 'idle' && person.idleMs >= IDLE_MINUTES * MIN) {
       const minutes = Math.floor(person.idleMs / MIN)
       lines.push(`poke ${person.key} on ${person.card.id}: idle ${minutes} min; last update: ${String(person.lastUpdate ?? '(none)').slice(0, 120)}`)
