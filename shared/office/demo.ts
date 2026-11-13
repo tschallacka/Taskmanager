@@ -115,13 +115,16 @@ export class DemoBoard {
   }
 
   snapshot(): OfficeSnapshot {
-    return {
-      boardId: 'demo',
-      boardName: 'Demo office',
-      crewName: 'The demo crew',
-      cast: DEMO_CAST,
-      tasks: [...this.tasks.values()].map(t => ({ ...t }))
-    }
+    const tasks = [...this.tasks.values()].map(t => ({ ...t }))
+    // Each person's status follows the board, as the crew monitor reads it: busy while they have an open card in a
+    // working column (In progress, or a Verify column), idle otherwise. So the desk lamps show the rule in the demo.
+    const cast = DEMO_CAST.map((p) => {
+      const working = tasks.find(t => t.assigneeId === p.userId && !t.completed && (t.stage === 'doing' || t.stage.startsWith('verify-')))
+      return working
+        ? { ...p, status: { state: 'busy' as const, note: `Busy: ${working.title} in ${working.column}` } }
+        : { ...p, status: { state: 'idle' as const, note: '' } }
+    })
+    return { boardId: 'demo', boardName: 'Demo office', crewName: 'The demo crew', cast, tasks }
   }
 
   /** True while the scripted scenes still have beats left. */
