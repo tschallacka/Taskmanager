@@ -54,6 +54,12 @@ describe('the management prompt: one new crew, in three steps', () => {
     assert.doesNotMatch(prompt, /--token/)
   })
 
+  test('the setup command passes --worktree-base, the folder the worktrees go in', () => {
+    const prompt = managementPrompt(input)
+    assert.match(prompt, /--repo <repository path> --worktree-base <folder the repository is in>/)
+    assert.doesNotMatch(prompt, /--worktree-base \/(?![a-z])/, 'the prompt never suggests the root')
+  })
+
   test('the token appears once: on its own line, shown once', () => {
     const prompt = managementPrompt(input)
     assert.equal(prompt.split(TOKEN).length - 1, 1, 'the token is shown once, and never repeated')

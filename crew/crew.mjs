@@ -37,6 +37,13 @@ if (!first || first === '-h' || first === '--help') {
   process.exit(first ? 0 : 2)
 }
 
+// Starting a card: `crew <who> prepare worktree <task-id>` sets up the worktree, branch, dependencies and database, and
+// `crew <who> prepare worktree --remove <task-id>` removes it when it is clean and pushed (prepare-worktree-cli.mjs).
+if (rest[0] === 'prepare' && rest[1] === 'worktree') {
+  const run = spawnSync(process.execPath, [join(kit, 'prepare-worktree-cli.mjs'), first, ...rest.slice(2)], { stdio: 'inherit' })
+  process.exit(run.status ?? 1)
+}
+
 // The shared browser: `crew <who> browser ...` and `crew browser status|shutdown`.
 if (first === 'browser' || rest[0] === 'browser') {
   const browserArgs = first === 'browser' ? rest : [first, ...rest.slice(1)]
