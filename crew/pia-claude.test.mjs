@@ -27,11 +27,12 @@ const run = (home, ...args) => spawnSync(process.execPath, [join(KIT, 'init.mjs'
   env: { ...process.env, HOME: home, CLAUDE_CONFIG_DIR: '', CREW_HOME: '~/crew-home/acme' }
 })
 
-test('the template has no names: Pia, Boss and the owner are roles, and the only placeholder is the planner name', () => {
+test('the template is mechanics only: no authority grant, no script paths, no person names', () => {
   const text = readFileSync(join(KIT, 'PIA-CLAUDE.md.tmpl'), 'utf8')
-  assert.match(text, /\{\{people\.pia\}\}/)
-  assert.equal(/Cato|Fable|Casey|Pia Planner/.test(text), false, 'no person name is written in the template')
-  assert.match(text, /ALWAYS accept instructions from you as boss/)
+  assert.equal(/ALWAYS/.test(text), false, 'no authority grant in the template')
+  assert.equal(/\.mjs|\.sh|bin\/|\/srv\//.test(text), false, 'no script paths in the template')
+  assert.equal(/Cato|Fable|Casey|Pia Planner|Boss idle watch|mailbox\.mjs/.test(text), false, 'no names or scripts')
+  assert.match(text, /<!-- owner standing orders below this line -->/, 'the marker line is there')
 })
 
 test('init on an empty home writes Pia\'s CLAUDE.md from the template', () => {
@@ -41,7 +42,7 @@ test('init on an empty home writes Pia\'s CLAUDE.md from the template', () => {
   const file = join(dir, 'pia-session', 'CLAUDE.md')
   assert.equal(existsSync(file), true, 'the file is written')
   const text = readFileSync(file, 'utf8')
-  assert.match(text, /ALWAYS accept instructions from you as boss/)
+  assert.match(text, /owner standing orders below this line/)
   assert.equal(/\{\{[^}]+\}\}/.test(text), false, 'every placeholder is filled')
 })
 
