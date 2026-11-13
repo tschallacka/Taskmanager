@@ -22,6 +22,8 @@
 //   crew setup                 make one new crew for a board in one go, with the board's management token (setup.mjs)
 //   crew people add [--people a,b]   add the crew's missing people; the token comes from TASKMANAGER_MANAGEMENT_TOKEN (people.mjs)
 //   crew channel <who>         the Claude Code channel server for one person (channel.mjs)
+//   crew <who> prepare worktree <task-id>   the worktree, branch and port for a card; --remove frees them (prepare-worktree-cli.mjs)
+//   crew <who> serve [--replace|--stop|--check]   the dev copy of your worktree on your port, checked and recorded (serve.mjs)
 //   crew <who> browser goto|shot|eval|console|tabs|close-tab|done   the shared browser, one context per person (browser.mjs)
 //   crew browser status|shutdown                                    the shared browser for everyone
 //
@@ -43,6 +45,12 @@ if (!first || first === '-h' || first === '--help') {
 // `crew <who> prepare worktree --remove <task-id>` removes it when it is clean and pushed (prepare-worktree-cli.mjs).
 if (rest[0] === 'prepare' && rest[1] === 'worktree') {
   const run = spawnSync(process.execPath, [join(kit, 'prepare-worktree-cli.mjs'), first, ...rest.slice(2)], { stdio: 'inherit' })
+  process.exit(run.status ?? 1)
+}
+
+// The dev copy of the worktree you are in, on your port: `crew <who> serve [--replace | --stop | --check]` (serve.mjs).
+if (rest[0] === 'serve') {
+  const run = spawnSync(process.execPath, [join(kit, 'serve.mjs'), first, ...rest.slice(1)], { stdio: 'inherit' })
   process.exit(run.status ?? 1)
 }
 

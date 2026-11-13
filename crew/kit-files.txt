@@ -55,11 +55,13 @@ people.mjs
 pia-listener-hook.sh
 pia-session.mjs
 pia-session.settings.json
+port-registry.mjs
 postbrief.mjs
 prepare-worktree-cli.mjs
 prepare-worktree.mjs
 publish.mjs
 restart-brief.mjs
+serve.mjs
 session-hooks.mjs
 setup.mjs
 susy-activity.mjs
