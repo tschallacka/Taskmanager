@@ -9,6 +9,7 @@ import { randomBytes } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { fetchMail, sendMail } from './mail-client.mjs'
 
 export const DEFAULT_TIMEOUT_MS = 5 * 60_000
 
@@ -73,6 +74,57 @@ export function downParts(parts, {
   })()
 }
 
+function readJsonOr(path, fallback) {
+  try {
+    return existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : fallback
+  } catch {
+    return fallback
+  }
+}
+
+/** The reply line a person sends back (wrapUpText asks for it): "crew down ok: <person>; ...; request <id>; ...". */
+export function isDownOk(text, person, requestId) {
+  const body = String(text ?? '')
+  return body.includes(`crew down ok: ${person};`) && body.includes(`request ${requestId};`)
+}
+
+/**
+ * Mails the request to one person through the app's mail route, from Pia's key. A send the app does not take yet goes to
+ * the outbox and is flushed later. A failure is reported on stderr and never thrown: the wait then times out and the part
+ * is left running (or stopped with --force), so one bad mail never stops the rest of the parts.
+ */
+export async function askPerson({ base, slug, key, person, text, mailboxDir, makeId, fetch: fetchImpl = fetch }) {
+  try {
+    await sendMail({ fetch: fetchImpl, base, slug, key, to: person, text, mailboxDir, makeId })
+    return true
+  } catch (error) {
+    console.error(`crew down: could not mail ${person}: ${error.message}`)
+    return false
+  }
+}
+
+/**
+ * Waits for the person's own "crew down ok" with the same request id, reading Pia's inbox (fetchMail reads and does not
+ * ack, so no other mail is consumed). Polls every `interval` ms until `timeoutMs`. Resolves true at the first match.
+ */
+export async function waitForConfirmation({
+  base, slug, key, person, requestId, timeoutMs = DEFAULT_TIMEOUT_MS, interval = 5000,
+  fetch: fetchImpl = fetch, now = Date.now, sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
+}) {
+  const deadline = now() + timeoutMs
+  for (;;) {
+    try {
+      const mails = await fetchMail({ fetch: fetchImpl, base, slug, key, to: 'pia' })
+      if (mails.some(mail => mail.from === person && isDownOk(mail.text, person, requestId))) return true
+    } catch (error) {
+      console.error(`crew down: could not read Pia's mail, will try again: ${error.message}`)
+    }
+    const left = deadline - now()
+    if (left <= 0) return false
+    await sleep(Math.min(interval, left))
+  }
+}
+
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const crewHome = process.env.CREW_HOME
   if (!crewHome) {
@@ -87,8 +139,18 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     process.exit(1)
   }
   const force = process.argv.includes('--force')
-  console.error('crew down: this command mails each person; the mail itself is written by the mailbox, not here.')
-  downParts(parts, { force, env: process.env }).then((result) => {
+  const creds = readJsonOr(join(crewHome, 'creds.json'), {})
+  const piaKey = creds.people?.pia?.apiKey
+  const mail = {
+    base: creds.base,
+    slug: creds.crew?.slug,
+    key: piaKey,
+    mailboxDir: join(crewHome, 'mailbox'),
+    makeId: () => randomBytes(16).toString('hex')
+  }
+  const ask = (person, requestId, text) => askPerson({ ...mail, person, text })
+  const waitFor = (person, requestId, ms) => waitForConfirmation({ ...mail, person, requestId, timeoutMs: ms })
+  downParts(parts, { force, env: process.env, ask, waitFor }).then((result) => {
     for (const line of result.lines) console.log(line)
     process.exit(result.ok ? 0 : 1)
   })

@@ -30,7 +30,7 @@ import { fileURLToPath } from 'node:url'
 
 const kit = dirname(fileURLToPath(import.meta.url))
 const [first, ...rest] = process.argv.slice(2)
-const scripts = { 'people': 'people.mjs', 'listen': 'listen.mjs', 'watch': 'watch.mjs', 'init': 'init.mjs', 'setup': 'setup.mjs', 'channel': 'channel.mjs', 'update': 'update.mjs', 'mentions': 'mentions.mjs', 'totp': 'totp.mjs', 'janet': 'janet.mjs', 'publish': 'publish.mjs', 'activity': 'activity.mjs', 'watch-crew': 'watch-crew.mjs', 'up': 'up.mjs', 'restart-brief': 'restart-brief.mjs', 'dev-copies': 'dev-copies.mjs' }
+const scripts = { 'people': 'people.mjs', 'listen': 'listen.mjs', 'watch': 'watch.mjs', 'init': 'init.mjs', 'setup': 'setup.mjs', 'channel': 'channel.mjs', 'update': 'update.mjs', 'mentions': 'mentions.mjs', 'totp': 'totp.mjs', 'janet': 'janet.mjs', 'publish': 'publish.mjs', 'activity': 'activity.mjs', 'watch-crew': 'watch-crew.mjs', 'up': 'up.mjs', 'restart-brief': 'restart-brief.mjs', 'dev-copies': 'dev-copies.mjs', 'down': 'down.mjs' }
 
 if (!first || first === '-h' || first === '--help') {
   console.log('usage: crew <who> <command ...> | crew <who> browser <command> | crew browser status|shutdown | crew listen <who> [sec] | crew watch | crew init | crew setup | crew channel <who> | crew mentions [minutes|--follow] | crew publish <slug> <branch> <title> <msg-file> <pr-file> | crew update [--check] [--from <kit folder|kit.tar.gz>] [--kit <folder>] | crew up | crew restart-brief')

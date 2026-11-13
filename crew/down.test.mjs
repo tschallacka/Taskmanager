@@ -3,7 +3,75 @@
 // text is in the request. Run: node --test crew/down.test.mjs
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { downParts, wrapUpText } from './down.mjs'
+import { downParts, wrapUpText, isDownOk, askPerson, waitForConfirmation } from './down.mjs'
+import { spawnSync } from 'node:child_process'
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const HERE = dirname(fileURLToPath(import.meta.url))
+const REQ = '0123456789abcdef'
+const okLine = (person, requestId = REQ) => `crew down ok: ${person}; stopped; 0 unread kept; request ${requestId}; at 12:00`
+
+function jsonResponse(body, status = 200) {
+  return { ok: status < 400, status, json: async () => body }
+}
+
+test('a down ok counts only with the same person and request id', () => {
+  assert.equal(isDownOk(okLine('wren'), 'wren', REQ), true)
+  assert.equal(isDownOk(okLine('wren'), 'wren', 'ffffffffffffffff'), false, 'another request id does not confirm')
+  assert.equal(isDownOk(okLine('wick'), 'wren', REQ), false, 'another person does not confirm')
+  assert.equal(isDownOk('hello, all good', 'wren', REQ), false)
+})
+
+test('askPerson mails the person through the app with the request text, and never throws', async () => {
+  const sent = []
+  const fetch = async (url, init) => {
+    sent.push({ url, body: JSON.parse(init.body) })
+    return jsonResponse({})
+  }
+  const mailboxDir = mkdtempSync(join(tmpdir(), 'down-ask-'))
+  const ok = await askPerson({ fetch, base: 'https://board.example', slug: 'tm', key: 'k', person: 'wren', text: 'the request', mailboxDir, makeId: () => 'a'.repeat(32) })
+  assert.equal(ok, true)
+  assert.equal(sent.length, 1)
+  assert.match(sent[0].url, /\/api\/crew-mail\/tm$/)
+  assert.deepEqual(sent[0].body, { id: 'a'.repeat(32), to: 'wren', text: 'the request' })
+
+  const failing = await askPerson({ fetch: async () => { throw new Error('offline') }, base: 'https://board.example', slug: 'tm', key: 'k', person: 'wren', text: 'x', mailboxDir, makeId: () => 'b'.repeat(32) })
+  assert.equal(failing, true, 'an unsent mail goes to the outbox, not an error')
+})
+
+test('waitForConfirmation resolves on the person own down ok, and times out when there is none', async () => {
+  let calls = 0
+  const inbox = [{ from: 'wick', text: okLine('wren') }, { from: 'wren', text: okLine('wren') }]
+  const fetch = async () => {
+    calls += 1
+    return jsonResponse({ mail: calls < 2 ? [] : inbox })
+  }
+  let clock = 0
+  const sleeps = []
+  const confirmed = await waitForConfirmation({
+    fetch, base: 'https://board.example', slug: 'tm', key: 'k', person: 'wren', requestId: REQ, timeoutMs: 60000, interval: 1000,
+    now: () => clock, sleep: async ms => { sleeps.push(ms); clock += ms }
+  })
+  assert.equal(confirmed, true)
+  assert.equal(calls, 2, 'polled until the reply came')
+
+  const none = await waitForConfirmation({
+    fetch: async () => jsonResponse({ mail: [{ from: 'wick', text: okLine('wren') }] }), base: 'https://board.example', slug: 'tm', key: 'k',
+    person: 'wren', requestId: REQ, timeoutMs: 3000, interval: 1000, now: () => clock, sleep: async ms => { clock += ms }
+  })
+  assert.equal(none, false, 'a down ok from another person does not confirm, and the wait ends at the timeout')
+})
+
+test('crew down is routed from crew.mjs and wants CREW_HOME', () => {
+  const env = { ...process.env }
+  delete env.CREW_HOME
+  const run = spawnSync(process.execPath, [join(HERE, 'crew.mjs'), 'down'], { encoding: 'utf8', env })
+  assert.equal(run.status, 2)
+  assert.match(run.stderr, /CREW_HOME is not set/)
+})
 
 function fakeRunner(log, failing = []) {
   return (command) => {
