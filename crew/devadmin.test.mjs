@@ -45,12 +45,12 @@ test('show lists admins and touches no other column', () => {
 test('make-admin sets only is_instance_admin for the one email', () => {
   assert.equal(
     sqlFor('make-admin', 'a@b.example'),
-    'UPDATE "user" SET is_instance_admin = true WHERE email = \'a@b.example\' RETURNING email;',
+    'UPDATE "user" SET is_instance_admin = true WHERE email = \'a@b.example\' RETURNING email;'
   )
 })
 
 test('make-admin refuses an email that is not a plain address', () => {
-  assert.throws(() => sqlFor('make-admin', "x'; DROP TABLE \"user\"; --"), /not a plain address/)
+  assert.throws(() => sqlFor('make-admin', 'x\'; DROP TABLE "user"; --'), /not a plain address/)
   assert.throws(() => sqlFor('make-admin', ''), /not a plain address/)
 })
 

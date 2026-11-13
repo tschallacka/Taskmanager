@@ -24,7 +24,11 @@ test('a folder that a helper still writes into is removed once the helper is gon
   // Stop the helper a little after the wait has started, so removeWhenUnused has something to wait for.
   const stop = setTimeout(() => {
     for (const pid of usersOf(dir)) {
-      try { process.kill(pid, 'SIGTERM') } catch {}
+      try {
+        process.kill(pid, 'SIGTERM')
+      } catch {
+        // the process already ended
+      }
     }
   }, 300)
   await removeWhenUnused(dir)

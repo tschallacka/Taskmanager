@@ -18,7 +18,7 @@ test('rule 14 forbids every agent from restarting the session, even on a withdra
 // number or wording shows up here, not only in CREW.md.tmpl.
 const roleTemplates = [
   'PROMPTS.md.tmpl', 'NINA.md.tmpl', 'QUINCY.md.tmpl', 'RITA.md.tmpl', 'SUSY.md.tmpl',
-  'TESS.md.tmpl', 'USHER.md.tmpl', 'PAT.md.tmpl', 'JANET.md.tmpl',
+  'TESS.md.tmpl', 'USHER.md.tmpl', 'PAT.md.tmpl', 'JANET.md.tmpl'
 ]
 
 for (const name of roleTemplates) {
