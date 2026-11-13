@@ -12,7 +12,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { crewHome } from './home.mjs'
 import { sendMail } from './mail-client.mjs'
-import { liveById, listAgents, readRecord, writeRecord } from './session.mjs'
+import { liveById, listAgents, readRecord, validSessionId, writeRecord } from './session.mjs'
 
 function readJsonOr(path, fallback) {
   try {
@@ -99,6 +99,8 @@ export function bossMailText({ key, cardId, lastError }) {
  */
 export async function wakeOnce({ record, list, text, cardId, key, type, readList, now, sleep, timeoutMs, pollMs }) {
   if (!record?.id) return finish(false, 'no recorded session', record, { key, cardId })
+  // A recorded id that is not in claude's form is refused before anything is typed: it would reach a shell command.
+  if (!validSessionId(record.id)) return finish(false, 'recorded id is not a session id; refused', record, { key, cardId }, false)
   if (list === null) return finish(false, 'claude agents did not answer; retry next tick', record, { key, cardId }, false)
   const entry = liveById(list, record.id)
   if (!entry) return finish(false, `recorded session ${record.id} is not live`, record, { key, cardId })

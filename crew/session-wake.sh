@@ -13,6 +13,9 @@ tool() { call "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\
 ID="$1"
 TEXT="$2"
 [ -n "$ID" ] && [ -n "$TEXT" ] || { echo "usage: sh session-wake.sh <session id> <text>" >&2; exit 64; }
+# The id goes into `exec claude attach $ID`, a shell command, so it must be a session id (hex, or UUID groups) before
+# any tool is called. Anything else is refused here, the same rule as validSessionId in crew/session.mjs.
+printf '%s' "$ID" | grep -Eq '^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4,12}){0,4}$' || { echo "refused: not a session id" >&2; exit 64; }
 tool shutdown "{\"session\":\"$S\"}" >/dev/null 2>&1 || true
 # A step counts only when the tool answered without an error: a failed paste exits 1, so the caller counts it.
 ok() {

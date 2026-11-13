@@ -3,7 +3,8 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { logCut, sessionReady, waitForIdle, recordWake, wakeOnce, bossMailText, deliverBossMail, LOG_CUT, FAILURES_TO_MAIL_BOSS } from './wake.mjs'
 import { spawnSync } from 'node:child_process'
-import { chmodSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { parseAgents, planWake, validSessionId } from './session.mjs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -121,7 +122,7 @@ test('no recorded session, or a session that is not live, is a counted failure w
   const none = await wakeOnce({ record: null, list: [], text: 't', cardId: 'c', key: 'wren', type: async c => typed.push(c), readList: () => [] })
   assert.equal(none.ok, false)
   assert.equal(none.wake.failures, 1)
-  const gone = await wakeOnce({ record: { id: 'nope' }, list: [entry('idle', 'idle')], text: 't', cardId: 'c', key: 'wren', type: async c => typed.push(c), readList: () => [entry('idle', 'idle')] })
+  const gone = await wakeOnce({ record: { id: 'ee000009' }, list: [entry('idle', 'idle')], text: 't', cardId: 'c', key: 'wren', type: async c => typed.push(c), readList: () => [entry('idle', 'idle')] })
   assert.equal(gone.ok, false)
   assert.match(gone.reason, /not live/)
   assert.equal(typed.length, 0)
@@ -205,4 +206,45 @@ test('session-wake.sh exits 0 only when every step answers without an error', ()
   assert.match(run.stdout, /typed into session 1f592988/)
   const calls = readFileSync(mcp.log, 'utf8').trim().split('\n')
   assert.ok(calls.includes('paste') && calls.includes('key'), 'the paste and the Enter were sent')
+})
+
+// The id is typed into a shell command, so only a session id may reach it. A metacharacter id must never run anything.
+const EVIL = 'a1b2c3d4;touch MARKER'
+
+test('only a session id in claude\'s form is accepted: hex, or UUID groups', () => {
+  assert.equal(validSessionId('7d543fee'), true)
+  assert.equal(validSessionId('1f592988-aaaa-bbbb-cccc-0123456789ab'), true)
+  for (const bad of ['', undefined, 42, 'a1b2c3d4;rm -rf x', '$(id)', 'a1b2c3d4 && id', '../etc', 'a1b2c3d4`id`', 'a1b2c3d4\nid']) {
+    assert.equal(validSessionId(bad), false, `refused: ${JSON.stringify(bad)}`)
+  }
+})
+
+test('the planner and the agents list refuse a metacharacter id', () => {
+  const list = [{ id: EVIL, name: 'wren', state: 'idle', status: 'idle', startedAt: 1 }]
+  assert.deepEqual(parseAgents(JSON.stringify(list)), [])
+  assert.equal(planWake({ id: EVIL }, list).ok, false)
+})
+
+test('wakeOnce refuses a recorded metacharacter id before typing, and does not count it as a failed wake', async () => {
+  const typed = []
+  const out = await wakeOnce({
+    record: { id: EVIL }, list: [{ id: EVIL, name: 'wren', state: 'idle', status: 'idle', startedAt: 1 }], text: 't', cardId: 'c', key: 'wren',
+    type: async call => typed.push(call), readList: () => []
+  })
+  assert.equal(out.ok, false)
+  assert.match(out.reason, /not a session id/)
+  assert.equal(typed.length, 0, 'nothing is typed')
+  assert.equal(out.wake.failures, 0)
+})
+
+test('session-wake.sh refuses a metacharacter id before any tool call, and runs nothing', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wake-evil-'))
+  const marker = join(dir, 'pwned')
+  const mcp = fakeMcp([])
+  const id = EVIL.replace('MARKER', marker)
+  const run = spawnSync('sh', [join(HERE, 'session-wake.sh'), id, 'hello'], { encoding: 'utf8', env: { ...process.env, SESSION_WAKE_MCP: mcp.bin }, timeout: 120000 })
+  assert.equal(run.status, 64)
+  assert.match(run.stderr, /refused: not a session id/)
+  assert.equal(existsSync(marker), false, 'the injected command did not run')
+  assert.equal(existsSync(mcp.log), false, 'no tool was called')
 })

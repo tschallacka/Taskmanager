@@ -17,6 +17,13 @@ import { crewHome } from './home.mjs'
 export const MODEL = 'claude-haiku-5-5'
 export const NO_REMOTE_SETTINGS = JSON.stringify({ remoteControlAtStartup: false })
 const KEY = /^[a-z][a-z0-9-]{0,31}$/
+// A session id as claude gives it: hex, in one piece or in UUID groups. It is typed into a shell command (session-wake.sh
+// runs `claude attach <id>`), so nothing else is let through: a shell metacharacter in an id would run a command.
+const SESSION_ID = /^[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4,12}){0,4}$/
+
+export function validSessionId(id) {
+  return typeof id === 'string' && SESSION_ID.test(id)
+}
 
 export function checkKey(key) {
   if (!KEY.test(String(key ?? ''))) throw new Error(`no such person key: ${key}`)
@@ -95,13 +102,13 @@ export function parseAgents(json) {
   }
   if (!Array.isArray(list)) return null
   return list
-    .filter(a => a && typeof a.id === 'string')
+    .filter(a => a && validSessionId(a.id))
     .map(a => ({ id: a.id, name: a.name ?? '', state: a.state ?? '', status: a.status ?? '', startedAt: Number(a.startedAt) || 0 }))
 }
 
 /** The live entry for a recorded id, or null. Matched by id only; the name is never used to find a live session here. */
 export function liveById(list, id) {
-  if (!Array.isArray(list) || !id) return null
+  if (!Array.isArray(list) || !validSessionId(id)) return null
   const hit = list.find(a => a.id === id)
   if (!hit || hit.state === 'ended' || hit.status === 'stopped') return null
   return hit

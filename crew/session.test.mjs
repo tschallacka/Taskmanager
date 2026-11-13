@@ -60,7 +60,7 @@ const list = JSON.parse(fs.readFileSync(${JSON.stringify(state)}, 'utf8'))
 if (args[0] === 'agents' && args[1] === '--json') { process.stdout.write(JSON.stringify(list)); process.exit(0) }
 if (args.includes('--bg')) {
   const name = args[args.indexOf('-n') + 1]
-  const id = 'id' + (list.length + 1) + name
+  const id = (0xa0000001 + list.length).toString(16)
   list.push({ id, name, state: 'idle', status: 'running', startedAt: Date.now() + list.length })
   fs.writeFileSync(${JSON.stringify(state)}, JSON.stringify(list))
   process.stdout.write(id + '\\n'); process.exit(0)
@@ -100,30 +100,30 @@ test('a key must be a short lower-case name', () => {
 })
 
 test('parseAgents keeps only entries with an id, and refuses a non-list', () => {
-  const list = parseAgents(JSON.stringify([{ id: 'a1', name: 'wren', state: 'idle', status: 'running', startedAt: 5 }, { name: 'no id' }]))
+  const list = parseAgents(JSON.stringify([{ id: 'a1b2c3d4', name: 'wren', state: 'idle', status: 'running', startedAt: 5 }, { name: 'no id' }]))
   assert.equal(list.length, 1)
-  assert.equal(list[0].id, 'a1')
+  assert.equal(list[0].id, 'a1b2c3d4')
   assert.equal(parseAgents('not json'), null)
   assert.equal(parseAgents('{"a":1}'), null)
 })
 
 test('a recorded id is live only when its own entry is running; a name match alone is not enough', () => {
   const list = [
-    { id: 'old', name: 'wren', state: 'ended', status: 'stopped', startedAt: 1 },
-    { id: 'new', name: 'wren', state: 'idle', status: 'running', startedAt: 2 }
+    { id: 'aa000001', name: 'wren', state: 'ended', status: 'stopped', startedAt: 1 },
+    { id: 'bb000002', name: 'wren', state: 'idle', status: 'running', startedAt: 2 }
   ]
-  assert.equal(liveById(list, 'old'), null, 'an ended session is not live, even with the same name')
-  assert.equal(liveById(list, 'new').id, 'new')
-  assert.equal(liveById(list, 'gone'), null)
+  assert.equal(liveById(list, 'aa000001'), null, 'an ended session is not live, even with the same name')
+  assert.equal(liveById(list, 'bb000002').id, 'bb000002')
+  assert.equal(liveById(list, 'cc000003'), null)
 })
 
 test('the wake plan uses the recorded id only and refuses when that id is not live', () => {
-  const list = [{ id: 'other', name: 'wren', state: 'idle', status: 'running', startedAt: 9 }]
+  const list = [{ id: 'dd000004', name: 'wren', state: 'idle', status: 'running', startedAt: 9 }]
   assert.equal(planWake(null, list).ok, false, 'no record, no wake')
-  const refused = planWake({ id: 'recorded' }, list)
+  const refused = planWake({ id: 'ee000005' }, list)
   assert.equal(refused.ok, false, 'a live session of the same name is not woken in place of the recorded one')
-  assert.match(refused.reason, /recorded session recorded is not live/)
-  assert.deepEqual(planWake({ id: 'other' }, list), { ok: true, id: 'other' })
+  assert.match(refused.reason, /recorded session ee000005 is not live/)
+  assert.deepEqual(planWake({ id: 'dd000004' }, list), { ok: true, id: 'dd000004' })
 })
 
 test('start records the new session id, and a second start while it is live does nothing', () => {
