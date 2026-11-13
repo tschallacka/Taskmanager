@@ -6,7 +6,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import { join } from 'node:path'
 import {
-  held, listenerPid, planRelease, planReserve, portOf, pruned, taskOfBranch, withLock
+  held, listenerPidOnPort, planRelease, planReserve, portOf, pruned, servedCheck, taskOfBranch, withDevDefaults, withLock
 } from './port-registry.mjs'
 
 const WREN = '/work/taskmanager-wren-mwdlkxb5'
@@ -95,10 +95,44 @@ test('portOf reads devServers for the person; a missing or bad port is null', ()
   assert.equal(portOf({}, 'wren'), null)
 })
 
-test('the listener pid is read from ss output; no listener is null', () => {
-  const out = 'LISTEN 0 512 127.0.0.1:3101 0.0.0.0:* users:(("bun",pid=4242,fd=7))\n'
-  assert.equal(listenerPid(out), 4242)
-  assert.equal(listenerPid(''), null)
+test('the listener is found with lsof, and with the /proc tables when lsof is not installed; nothing listening is null', () => {
+  // lsof present: its first pid is the listener; exit 1 with no output means nothing listens.
+  assert.equal(listenerPidOnPort(3101, { run: () => ({ status: 0, stdout: '4242\n' }) }), 4242)
+  assert.equal(listenerPidOnPort(3101, { run: () => ({ status: 1, stdout: '' }) }), null)
+  // lsof missing: the port 3101 row (0x0C1D, state 0A) gives inode 98765; the process holding socket:[98765] is 5151.
+  const dir = fs.mkdtempSync(join(os.tmpdir(), 'ports-proc-'))
+  fs.mkdirSync(join(dir, 'net'))
+  fs.writeFileSync(join(dir, 'net', 'tcp'), '  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n   0: 0100007F:0C1D 00000000:0000 0A 00000000:00000000 00:00000000 00000000  1000        0 98765 1 0000 100 0 0\n')
+  fs.writeFileSync(join(dir, 'net', 'tcp6'), '')
+  fs.mkdirSync(join(dir, '5151', 'fd'), { recursive: true })
+  fs.symlinkSync('socket:[98765]', join(dir, '5151', 'fd', '3'))
+  fs.mkdirSync(join(dir, '6000', 'fd'), { recursive: true })
+  fs.symlinkSync('socket:[11111]', join(dir, '6000', 'fd', '3'))
+  const missing = () => ({ error: Object.assign(new Error('spawnSync lsof ENOENT'), { code: 'ENOENT' }) })
+  assert.equal(listenerPidOnPort(3101, { run: missing, procRoot: dir }), 5151)
+  assert.equal(listenerPidOnPort(3102, { run: missing, procRoot: dir }), null, 'no row for that port')
+  fs.rmSync(dir, { recursive: true, force: true })
+})
+
+test('crew.json gets the missing dev ports and the start command, and nothing that is already set is changed', () => {
+  const first = withDevDefaults({ people: { wren: 'Wren', pia: 'Pia' }, devServers: { wren: 3999 } })
+  assert.equal(first.changed, true)
+  assert.equal(first.config.devServers.wren, 3999, 'an existing port is kept')
+  assert.equal(first.config.devServers.pia, undefined, 'a person with no default port gets none; Boss adds it')
+  assert.match(first.config.scripts.serve, /--port \{port\}/)
+  const second = withDevDefaults(first.config)
+  assert.equal(second.changed, false, 'a second run writes nothing')
+})
+
+test('--check serves the commit recorded at start: the same HEAD passes; a moved HEAD or an old entry stops', () => {
+  assert.deepEqual(servedCheck({ commit: 'abc1234', pid: 9 }, 'abc1234'), { ok: true, commit: 'abc1234' })
+  const moved = servedCheck({ commit: 'abc1234', pid: 9 }, 'def5678')
+  assert.equal(moved.ok, false)
+  assert.match(moved.message, /serves abc1234, but the worktree is at def5678/)
+  const old = servedCheck({ pid: 9 }, 'def5678')
+  assert.equal(old.ok, false)
+  assert.match(old.message, /started before its commit was recorded/)
+  assert.equal(servedCheck(undefined, 'def5678').ok, false, 'no entry is not served')
 })
 
 test('the task id is read from a branch name', () => {

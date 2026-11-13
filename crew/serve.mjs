@@ -7,7 +7,7 @@ import { spawn, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import { join } from 'node:path'
 import {
-  aliveProcess, listenerPid, planRelease, planReserve, portOf, pruned, readRegistry, registryFile, stopGroup, taskOfBranch,
+  aliveProcess, listenerPidOnPort, planRelease, servedCheck, planReserve, portOf, pruned, readRegistry, registryFile, stopGroup, taskOfBranch,
   withLock, writeRegistry
 } from './port-registry.mjs'
 
@@ -43,8 +43,7 @@ const file = registryFile(crewHome)
 
 /** The process that listens on the port: its pid and its working folder (null when nothing answers). */
 function listener() {
-  const out = spawnSync('ss', ['-H', '-ltnp', `sport = :${port}`], { encoding: 'utf8' }).stdout ?? ''
-  const pid = listenerPid(out)
+  const pid = listenerPidOnPort(port)
   if (pid == null) return null
   let cwd = null
   try {
@@ -63,7 +62,10 @@ if (mode === 'check') {
   if (!sameFolder(found.cwd, worktree)) {
     fail(`port ${port} is served from ${found.cwd} (pid ${found.pid}), not from this worktree ${worktree}. Stop that copy first, or run "crew ${who} serve --replace" if it is your own.`, 3)
   }
-  console.log(`serving ${commit} from ${worktree} on port ${port} (pid ${found.pid}, branch ${branch})`)
+  // The commit the copy serves is the worktree HEAD recorded in the registry when the copy started (servedCheck).
+  const verdict = servedCheck(pruned(readRegistry(file), aliveProcess).reg.ports[port], commit)
+  if (!verdict.ok) fail(`port ${port}: ${verdict.message}. Run "crew ${who} serve --replace" to restart it from this worktree.`, 3)
+  console.log(`serving ${verdict.commit} from ${worktree} on port ${port} (pid ${found.pid}, branch ${branch})`)
   process.exit(0)
 }
 
@@ -106,7 +108,8 @@ const started = withLock(file, () => {
   const child = spawn('sh', ['-c', command], { cwd: worktree, detached: true, stdio: ['ignore', log, log], env: { ...process.env, PORT: String(port) } })
   child.unref()
   fs.closeSync(log)
-  const next = { ...plan.next, ports: { ...plan.next.ports, [port]: { ...plan.next.ports[port], pid: child.pid } } }
+  // The worktree HEAD at start time: what this copy serves, for --check.
+  const next = { ...plan.next, ports: { ...plan.next.ports, [port]: { ...plan.next.ports[port], pid: child.pid, commit } } }
   writeRegistry(file, next)
   return { pid: child.pid }
 })

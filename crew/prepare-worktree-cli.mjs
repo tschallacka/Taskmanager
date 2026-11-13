@@ -7,7 +7,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { prepareWorktree, removePlan, worktreeFolder } from './prepare-worktree.mjs'
-import { aliveProcess, planRelease, planReserve, portOf, pruned, readRegistry, registryFile, stopGroup, taskOfBranch, withLock, writeRegistry } from './port-registry.mjs'
+import { aliveProcess, planRelease, planReserve, portOf, pruned, readRegistry, registryFile, stopGroup, withLock, writeRegistry } from './port-registry.mjs'
 
 const kit = dirname(fileURLToPath(import.meta.url))
 const [who, ...rest] = process.argv.slice(2)
