@@ -7,11 +7,13 @@
 // PROJECT-RULES.md or BRIEF.md once they exist.
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, chmodSync, copyFileSync } from 'node:fs'
 import { execSync } from 'node:child_process'
+import { withServeCommand } from './port-registry.mjs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { CAST, OWNER_FILES, agentNames, config, forkMemberPlan, here, kitDir, loadForks, modelProblems, renderTemplate, templateValues } from './config.mjs'
 import { writePiaHooks } from './pia-session.mjs'
 import { writeBossHooks } from './boss-session.mjs'
+import { withCrewDefaults } from './crew-defaults.mjs'
 
 const ok = m => console.log(`  ok   ${m}`)
 const warn = m => console.log(`  WARN ${m}`)
@@ -252,6 +254,17 @@ if (!skipsProvider('pia', config.models.pia)) {
   } catch (error) { fail(error.message) }
 }
 
+// The worktree folder: prepare worktree needs it; init does not guess it, setup writes it from --worktree-base.
+if (typeof config.worktreeBase !== 'string' || !config.worktreeBase.startsWith('/')) {
+  warn('crew.json has no "worktreeBase" (an absolute folder): set it, or "crew <who> prepare worktree" stops with a clear message')
+}
+
+// The dev copies' start command (scripts.serve): crew.json is the owner's, so init only says what to add when it is missing.
+{
+  const serveDefault = withServeCommand(config)
+  if (serveDefault.changed) warn(`crew.json has no scripts.serve: add ${JSON.stringify({ serve: serveDefault.config.scripts.serve })} under "scripts" (crew.json is yours, init does not change it)`)
+}
+
 // Boss's session: its Stop hook keeps the two crew watches running (boss-stop-hook.sh). Written into the folder that
 // crew.json names as "bossSession"; without one, init says so and writes nothing, because a hook in a folder Boss does
 // not run in does nothing.
@@ -262,6 +275,23 @@ else {
     const { file, changed, excluded } = writeBossHooks(config.bossSession, { crewHome: here.replace(/\/$/, ''), kitDir: kitDir.replace(/\/$/, '') })
     ok(`${file} ${changed ? 'written: the watch hook' : 'kept, hook already current'}${excluded ? ' (kept out of git)' : ''}`)
   } catch (error) { fail(error.message) }
+}
+
+// crew.json is an owner file: init (and so `crew update`) never writes it. When "reader" or "devServers" are missing it
+// says so and prints the values setup would have written, from the keys of the crew's people (creds.json).
+try {
+  const crewFile = join(here, 'crew.json')
+  const credsFile = join(here, 'creds.json')
+  if (existsSync(crewFile) && existsSync(credsFile)) {
+    const creds = JSON.parse(readFileSync(credsFile, 'utf8'))
+    const { crew: filled, added } = withCrewDefaults(JSON.parse(readFileSync(crewFile, 'utf8')), Object.keys(creds.people ?? {}))
+    if (added.length) {
+      const suggestion = Object.fromEntries(added.map(field => [field, filled[field]]))
+      warn(`crew.json has no ${added.join(' and ')}: add ${JSON.stringify(suggestion)} (crew.json is yours, init does not change it)`)
+    }
+  }
+} catch (error) {
+  fail(`crew.json defaults: ${error.message}`)
 }
 
 const next = existsSync(`${here}creds.json`)

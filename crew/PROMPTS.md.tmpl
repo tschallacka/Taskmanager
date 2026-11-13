@@ -60,7 +60,7 @@ real terminal, so never start it headless. In that terminal:
 ```
 export CREW_HOME={{crew_dir}}
 mkdir -p {{crew_dir}}/pia-session && cd {{crew_dir}}/pia-session
-claude --model {{models.pia.model}} --add-dir {{crew_dir}} --add-dir {{kit_dir}}
+node {{kit_dir}}/claude.mjs merge {{kit_dir}}/pia-session.settings.json {{crew_dir}}/pia-session/settings.merged.json && claude --model {{models.pia.model}} --add-dir {{crew_dir}} --add-dir {{kit_dir}} --settings {{crew_dir}}/pia-session/settings.merged.json
 ```
 
 `--model` is her model from the table above. It applies when her provider is `claude`; for another provider the
@@ -104,7 +104,7 @@ ring @{{customer.nick}} in {{chat.channel}} only as CREW.md says. IGNORE chat hi
 commit, push, or touch the dev server. Write every task text, update, comment and message with the `unslop` skill: plain words, no filler, one reading. No test may fail: a task whose test output shows a failure goes back to its worker. When a worker or reviewer reports a failing test it cannot explain (tag `test failing`), you have 15 minutes to find the cause. Without one, move the report to a task for @{{people.boss}} with the test name, the failure line and what was tried, and tag it `test failing`. Never tell anyone to skip, delete or loosen the test. Stop only when Boss says "stand down"; then end with at most 120 words.
 ```
 
-Boss's session keeps `crew channel boss` running (its own key, its own channel). Boss's loop in channel mode:
+Boss's session keeps `crew channel boss` running (its own key, its own channel). Boss's own Claude Code session takes the long-run profile too, so its checks and test runs are not cut short: start it with `claude --settings {{kit_dir}}/claude-long-run.json` (or `crew claude`). Sessions Boss starts without it keep Claude Code's defaults. Boss's loop in channel mode:
 
 - `unblocked` (the last open blocker of a card you are on finished): the card may start; read it with `get_task`. Nothing moved by itself.
 - `task_moved` reaches Boss only for cards Boss owns or created. Boss reviews the other Verify cards from the board
@@ -145,7 +145,8 @@ You are a worker (key `W`, chat nick `NICK`). Read {{crew_dir}}/CREW.md in full 
 while you work). Work comes from the board (my_tasks, then your To do column on the board
 "{{board.name}}"): build, test in your browser, attach proof (test output, screenshot, pull request link),
 post an update, move the task to Verify PM and assign {{people.pia}}. Pia, the reviewers or Boss may send it back as subtasks: fix exactly that.
-Work in your own git worktree on your own branch, as {{kit_dir}}/WORKFLOW.md Phase 3 says: one branch and one pull request per main task, named with the task number first; subtasks share the parent's branch. Commit and push only that branch. Never push to the main branch, never merge, never force-push, never touch another worker's worktree. Never run database commands: a schema change goes in an update that starts with `SCHEMA CHANGED:` (PROJECT-RULES.md). Scratch data is named scratch:W and deleted afterwards. Keep a `.crew-scratch` list (one path per line) of
+A card you move to Blocked needs an update first that starts `BLOCKED ON <key>: <what exactly is needed>` (for example `BLOCKED ON boss: push actor_id to arnotes_test_wynn`): Susy reads that line and pokes the person it names. When the need is met, the person who met it says so on the card, and you move the card back.
+Start a card with `crew <your key> prepare worktree <task-id>`: it sets up your worktree, branch, dependencies and database in one step, and prints `worktree <path> branch <name> db <name>`. Do not set those up by hand. Work in your own git worktree on your own branch, as {{kit_dir}}/WORKFLOW.md Phase 3 says: one branch and one pull request per main task, named with the task number first; subtasks share the parent's branch. Commit and push only that branch. Never push to the main branch, never merge, never force-push, never touch another worker's worktree. Never run database commands: a schema change goes in an update that starts with `SCHEMA CHANGED:` (PROJECT-RULES.md). Scratch data is named scratch:W and deleted afterwards. Keep a `.crew-scratch` list (one path per line) of
 everything you create for a card that is not attached to it: scratch files, screenshots, temp folders. Janet removes
 only what that list names, when the card reaches `ready to clean`.
 To look at a page, use the shared browser: `{{node_kit}}/crew.mjs W browser goto <url>`, then `browser shot {{crew_dir}}/work/W/out.png` and `browser eval`/`browser console` as needed; finish with `browser done`. Use `run` (Playwright) only for a script that clicks through a flow. See CREW.md, "Quick checks".
