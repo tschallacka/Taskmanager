@@ -20,7 +20,7 @@ function fail(message, code = 1) {
   process.exit(code)
 }
 
-if (!who) fail('usage: crew <who> serve [--replace | --stop | --check]', 64)
+if (!who) fail('usage: crew <who> serve [--replace | --stop | --check]  (the listener is found with lsof; without lsof, the /proc tables, which exist on Linux only)', 64)
 
 const crewHome = process.env.CREW_HOME
 if (!crewHome || !fs.existsSync(join(crewHome, 'crew.json'))) fail('CREW_HOME is not set, or it has no crew.json')

@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { prepareWorktree, removePlan, worktreeFolder } from './prepare-worktree.mjs'
+import { prepareWorktree, removePlan, reservationFailure, worktreeFolder } from './prepare-worktree.mjs'
 import { aliveProcess, planRelease, planReserve, portOf, pruned, readRegistry, registryFile, stopGroup, withLock, writeRegistry } from './port-registry.mjs'
 
 const kit = dirname(fileURLToPath(import.meta.url))
@@ -72,18 +72,37 @@ try {
 
 const result = prepareWorktree({ who, taskId, title, config })
 if (!result.ok) fail(result.message)
-console.log(result.line)
 
 // Reserve the person's port for this worktree (no copy runs yet). A port held by another worktree is a warning: the
 // worktree is ready either way, and the copy will refuse to start on that port until the holder stops.
+// The result line is printed only once the worktree is final: a reservation that fails after the folder is made cleans
+// up what is empty, and says what it kept, instead of printing a path that is gone.
 const port = portOf(config, who)
+let reserved = null
 if (port) {
-  const reserved = withLock(registryFile(crewHome), () => {
-    const reg = pruned(readRegistry(registryFile(crewHome)), aliveProcess).reg
-    const plan = planReserve({ reg, port, who, worktree: result.path, branch: result.branch, task: taskId, alive: aliveProcess })
-    if (plan.ok) writeRegistry(registryFile(crewHome), plan.next)
-    return plan
-  })
-  if (reserved.ok) console.log(`port ${port}`)
-  else console.error(`warning: ${reserved.message}`)
+  try {
+    reserved = withLock(registryFile(crewHome), () => {
+      const reg = pruned(readRegistry(registryFile(crewHome)), aliveProcess).reg
+      const plan = planReserve({ reg, port, who, worktree: result.path, branch: result.branch, task: taskId, alive: aliveProcess })
+      if (plan.ok) writeRegistry(registryFile(crewHome), plan.next)
+      return plan
+    })
+  } catch (error) {
+    const base = git(['symbolic-ref', '--short', 'refs/remotes/origin/HEAD']).stdout || 'origin/master'
+    const plan = reservationFailure({
+      dirty: git(['status', '--porcelain']).stdout !== '',
+      aheadOfBase: Number(git(['rev-list', '--count', `${base}..HEAD`]).stdout || 0),
+      error: error.message,
+      who,
+      taskId
+    })
+    if (plan.remove) {
+      const removed = spawnSync('git', ['worktree', 'remove', result.path], { encoding: 'utf8' })
+      if (removed.status !== 0) fail(`${plan.message}; git could not remove the new worktree: ${(removed.stderr ?? '').trim()}`)
+    }
+    fail(plan.message)
+  }
 }
+console.log(result.line)
+if (reserved?.ok) console.log(`port ${port}`)
+else if (reserved) console.error(`warning: ${reserved.message}`)

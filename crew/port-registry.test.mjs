@@ -122,6 +122,10 @@ test('crew.json gets the missing dev ports and the start command, and nothing th
   assert.match(first.config.scripts.serve, /--port \{port\}/)
   const second = withDevDefaults(first.config)
   assert.equal(second.changed, false, 'a second run writes nothing')
+  // Only the people in this crew get a port: no default for anyone else (nina's 3108 is not written here).
+  const small = withDevDefaults({ people: { wren: 'Wren', wick: 'Wick' } })
+  assert.deepEqual(Object.keys(small.config.devServers).sort(), ['wick', 'wren'])
+  assert.equal(small.config.devServers.nina, undefined)
 })
 
 test('--check serves the commit recorded at start: the same HEAD passes; a moved HEAD or an old entry stops', () => {
