@@ -26,6 +26,7 @@ blocked-on.mjs
 board-call.mjs
 boss-session.mjs
 boss-stop-hook.sh
+browser-cleanup.mjs
 browser-driver.mjs
 browser.mjs
 cast.mjs
@@ -37,9 +38,9 @@ config.mjs
 crew-defaults.mjs
 crew.config.example.json
 crew.mjs
-devadmin.mjs
 detach.sh
 dev-copies.mjs
+devadmin.mjs
 down.mjs
 fonts.conf.tmpl
 guard.sh
