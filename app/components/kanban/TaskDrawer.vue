@@ -32,6 +32,7 @@ const toast = useToast()
 // The task number is its id. The copy control puts a link to the task on the clipboard, as an html anchor with the
 // number as its text, and the bare number as plain text (utils/copyTaskLink.ts).
 const linkCopied = ref(false)
+let copiedTimer: ReturnType<typeof setTimeout> | undefined
 // On a phone, the Activity sheet is open (the comments and the composer fill the panel).
 const activityOpen = ref(false)
 // The phone's tap chevron on an editable property row (the grid gets a third column for it). A read-only panel
@@ -46,8 +47,10 @@ async function copyTaskNumberLink() {
     toast.add({ title: 'The clipboard refused the link. Select the number and copy it.', icon: 'i-lucide-alert-triangle', color: 'warning' })
     return
   }
+  // A second click restarts the two seconds, and an unmount clears the timer, so no timer writes after the panel is gone.
+  clearTimeout(copiedTimer)
   linkCopied.value = true
-  setTimeout(() => (linkCopied.value = false), 2000)
+  copiedTimer = setTimeout(() => (linkCopied.value = false), 2000)
 }
 const {
   activeProject,
@@ -117,6 +120,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  clearTimeout(copiedTimer)
   window.removeEventListener('resize', measure)
   window.removeEventListener('pointermove', onResizeMove)
   window.removeEventListener('pointerup', onResizeEnd)
