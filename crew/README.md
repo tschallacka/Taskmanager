@@ -343,9 +343,9 @@ session offers it. Shell output is capped at 150,000 characters: write long outp
 change these. `crew claude version` prints the installed version and warns when it is older than the one the profile was
 checked against. Run it after a Claude Code update.
 
-**The PM's listener hook.** Pia's listener hook stays in her folder's own `.claude/settings.json`, which Claude Code
-reads for that session. It is not moved to a second profile: a second `--settings` file would be merged on every
-session, and the hook is needed only where Pia runs.
+**The PM's listener hook.** Pia's listener hooks are written to her folder's own `.claude/settings.json` (`pia-session.mjs`),
+and the PM start line in `PROMPTS.md` also passes `pia-session.settings.json` as a second `--settings` file, after the
+long-run profile. That second file holds only the PM's hooks, and it is passed only when Pia's session starts.
 
 ## Commands
 
