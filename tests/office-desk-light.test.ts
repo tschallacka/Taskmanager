@@ -5,6 +5,8 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { deskLightOf } from '../shared/office/model'
+import type { OfficePerson, PersonStatus } from '../shared/office/model'
+import { deskStatusSource, withDeskStatus } from '../server/utils/deskStatus'
 
 test('the floating dot, ring and dashed light are gone from the actor; the desk lamp carries the status', () => {
   const actor = readFileSync(new URL('../app/office/actor.ts', import.meta.url), 'utf8')
@@ -13,10 +15,8 @@ test('the floating dot, ring and dashed light are gone from the actor; the desk 
   const office = readFileSync(new URL('../app/office/office.ts', import.meta.url), 'utf8')
   assert.match(office, /lamp\.glow\.visible = lit/, 'the lamp glow follows the status')
   assert.match(office, /const lit = deskLightOf\(person\.status\)\.shape === 'lit'/, 'the lit state comes from the status')
-  assert.match(office, /color\.set\(lit \? '#f4d35e' : '#6b6b70'\)/, 'the shade goes yellow when lit, grey otherwise')
+  assert.match(office, /color\.set\(lit \? '#f4d35e' : '#7a2b2b'\)/, 'the shade goes yellow when lit, dim red otherwise')
 })
-import type { OfficePerson, PersonStatus } from '../shared/office/model'
-import { deskStatusSource, withDeskStatus } from '../server/utils/deskStatus'
 
 const wren: OfficePerson = { userId: 'u1', key: 'wren', name: 'Wren Worker', role: 'worker' }
 const pia: OfficePerson = { userId: 'u2', key: 'pia', name: 'Pia Planner', role: 'pm' }

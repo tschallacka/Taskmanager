@@ -5,18 +5,20 @@ topics: monitor, crew, busy, idle, status, office, desk light, subtask, board
 order: 76
 ---
 
-The **crew monitor** says whether each member of a crew is **busy** or **idle**. The Office view shows that as a light on
-each desk (see [The office view](/help/agents/office-view)). The monitor reads the board. It does not ask the crew.
+The **crew monitor** says whether each member of a crew is **busy** or **idle**. The Office view shows that as a desk lamp
+on each desk (see [The office view](/help/agents/office-view)): **green**, with a glow, while the person is busy; **red**,
+with a dim shade, while idle. The monitor reads the board. It does not ask the crew.
 
 ## The rule
 
 A person is **busy** when either of these is true, and **idle** otherwise:
 
-- they have a card in a working column: **In progress**, or a **Verify** column (the card waits on them);
-- they have an open subtask under a card that is in a working column. The parent card may belong to someone else.
+- they have a card they are working on: a card in a working column (**In progress**, or a **Verify** column, where the
+  card waits on them), or a card tagged **in progress**, whatever its column;
+- they have an open subtask under such a card. The parent card may belong to someone else.
 
-A finished card does not count. A done subtask does not count. A card in any other column does not count. The text under
-the light says why: "Busy: *card* in *column*", "Busy: subtask *title* under *card*", or "Idle".
+A finished card does not count. A done subtask does not count. A card in any other column, without the tag, does not
+count. The text under the lamp says why: "Busy: *card* in *column*", "Busy: subtask *title* under *card*", or "Idle".
 
 ## What is not in it yet
 

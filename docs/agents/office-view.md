@@ -27,8 +27,8 @@ address by hand shows *No crew works on this board*. A crew that is switched off
 
 Each desk has a desk lamp on it, the Boss's and Pia's included. It shows whether the person has work in progress, as the crew monitor reports it:
 
-- a **green lit shade** (the glow under the lamp) means the person has a card in progress, or a subtask of theirs under one;
-- **no glow** under the shade means the person has nothing in progress (the lamp itself stays the same colour);
+- a **yellow shade with a green glow** under it means the person has a card in progress (a card in a working column, or tagged in progress), or a subtask of theirs under one;
+- a **dim red shade** with **no glow** means the person has nothing in progress;
 - a **grey dashed outline** means no status yet. The office never guesses in progress or not.
 
 The glow says the state as well as the colour. Hover the light (or tap it on a phone) to read the status text: "Busy: …",
