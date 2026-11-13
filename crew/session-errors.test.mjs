@@ -9,7 +9,7 @@ import { sessionErrorReport, lastLineOf, transcriptOf, markMailed } from './sess
 const ID = 'fbd05fc0'
 const FIXTURE = 'Please run /login · API Error: 403 Attention Required! | Cloudflare'
 const LOGIN = 'Please run /login · API Error: 401 Unauthorized'
-const LIMIT = "You've hit your 5-hour limit · resets 4:10am (Europe/Berlin)"
+const LIMIT = 'You\'ve hit your 5-hour limit · resets 4:10am (Europe/Berlin)'
 
 // A home with one recorded session, and a projects root with one folder holding its transcript.
 function fixture(lines) {
