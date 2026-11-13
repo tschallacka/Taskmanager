@@ -4,12 +4,13 @@ import { relativeTime } from '~/composables/useRelativeTime'
 import { dueDayToMs } from '~/utils/dueDate'
 import { agentAuditLink } from '~/composables/useAgentAudit'
 import type { AgentAuditItem } from '~/composables/useAgentAudit'
+import type { NotificationItem } from '~/composables/useNotifications'
 
 definePageMeta({ layout: 'app' })
 
 useSeoMeta({ title: 'Inbox' })
 
-const { items, unread, prefs, push, loaded, load, markRead, markAllRead, decideGuestRequest, setPreference, setPush, testPush } = useNotifications()
+const { items, unread, prefs, push, loaded, load, markRead, markAllRead, archive, archiveAll, unarchive, loadReadBox, decideGuestRequest, setPreference, setPush, testPush } = useNotifications()
 onMounted(load)
 
 // A guest manager's request for a person outside their domain is decided here, by a project admin.
@@ -58,8 +59,93 @@ const route = useRoute()
 const router = useRouter()
 const onAgentTab = computed(() => hasAgents.value && route.query.tab === 'agent')
 
-const filter = ref<'all' | 'unread'>('all')
-const shown = computed(() => filter.value === 'unread' ? items.value.filter(item => !item.readAt) : items.value)
+// 'readbox' is the archived notifications, read from the server each time the option is picked.
+const filter = ref<'all' | 'unread' | 'readbox'>('all')
+const readBox = ref<NotificationItem[]>([])
+const shown = computed(() => {
+  if (filter.value === 'readbox') return readBox.value
+  return filter.value === 'unread' ? items.value.filter(item => !item.readAt) : items.value
+})
+watch(filter, async (value) => {
+  if (value !== 'readbox') return
+  readBox.value = await loadReadBox()
+})
+async function moveBack(item: NotificationItem) {
+  actionError.value = ''
+  readBox.value = readBox.value.filter(other => other.id !== item.id)
+  try {
+    await unarchive([item.id])
+  } catch (error) {
+    // The server did not move it: the Read box is reloaded so it shows the row again.
+    actionError.value = errorText(error, 'Could not move it back to the inbox.')
+    readBox.value = await loadReadBox().catch(() => readBox.value)
+  }
+}
+
+// Emptying the Read box: pick an option, the page counts what it would delete, and only the confirm button deletes.
+type EmptyChoice = { label: string, all?: boolean, olderThanDays?: number }
+const emptyChoices: EmptyChoice[] = [
+  { label: 'Empty Read box', all: true },
+  { label: 'Older than 30 days', olderThanDays: 30 },
+  { label: 'Older than 2 months', olderThanDays: 60 },
+  { label: 'Older than 6 months', olderThanDays: 182 },
+  { label: 'Older than 1 year', olderThanDays: 365 }
+]
+const pendingEmpty = ref<(EmptyChoice & { count: number }) | null>(null)
+const emptying = ref(false)
+// What went wrong with the last action, shown above the list. Empty.
+const actionError = ref('')
+const emptyError = ref('')
+function errorText(error: unknown, fallback: string) {
+  return error instanceof Error && error.message ? error.message : fallback
+}
+async function askEmpty(choice: EmptyChoice) {
+  emptyError.value = ''
+  try {
+    const { count } = await emptyReadBox({ all: choice.all, olderThanDays: choice.olderThanDays, dryRun: true })
+    pendingEmpty.value = { ...choice, count: count ?? 0 }
+  } catch (error) {
+    emptyError.value = errorText(error, 'Could not count the Read box. Nothing was deleted.')
+  }
+}
+function cancelEmpty() {
+  pendingEmpty.value = null
+  emptyError.value = ''
+}
+async function confirmEmpty() {
+  const choice = pendingEmpty.value
+  if (!choice) return
+  emptying.value = true
+  emptyError.value = ''
+  try {
+    await emptyReadBox({ all: choice.all, olderThanDays: choice.olderThanDays })
+    pendingEmpty.value = null
+    readBox.value = await loadReadBox()
+  } catch (error) {
+    // The server may have refused or failed: the Read box is shown as the server has it now.
+    emptyError.value = errorText(error, 'Could not empty the Read box. Nothing was deleted.')
+    readBox.value = await loadReadBox().catch(() => readBox.value)
+  } finally {
+    emptying.value = false
+  }
+}
+// Archive and Archive all take the rows out at once; a failed request puts them back and says so.
+async function tryArchive(ids: string[]) {
+  actionError.value = ''
+  try {
+    await archive(ids)
+  } catch (error) {
+    actionError.value = errorText(error, 'Could not archive. The notification is back in the inbox.')
+  }
+}
+async function tryArchiveAll() {
+  actionError.value = ''
+  try {
+    await archiveAll()
+  } catch (error) {
+    actionError.value = errorText(error, 'Could not archive. The notifications are back in the inbox.')
+  }
+}
 
 // Grouped by the day they arrived, newest day first.
 function groupByDay<T extends { createdAt: number }>(list: T[]) {
@@ -193,6 +279,16 @@ async function sendTest() {
           variant="ghost"
           data-inbox-mark-all
           @click="markAllRead"
+        />
+        <UButton
+          v-if="!onAgentTab && items.length && filter !== 'readbox'"
+          label="Archive all"
+          icon="i-lucide-archive"
+          size="xs"
+          color="neutral"
+          variant="ghost"
+          data-notification-archive-all
+          @click="tryArchiveAll"
         />
         <UButton
           v-if="onAgentTab && auditUnread"
@@ -340,7 +436,7 @@ async function sendTest() {
 
         <div class="mb-3 flex gap-1">
           <button
-            v-for="option in (['all', 'unread'] as const)"
+            v-for="option in (onAgentTab ? ['all', 'unread'] : ['all', 'unread', 'readbox'] as const)"
             :key="option"
             class="rounded-md px-2.5 py-1 text-xs capitalize transition-colors"
             :class="filter === option ? 'bg-elevated font-medium text-default' : 'text-muted hover:text-default'"
@@ -348,9 +444,57 @@ async function sendTest() {
             :data-agent-filter="option"
             @click="filter = option"
           >
-            {{ option }}
+            {{ option === 'readbox' ? 'Read box' : option }}
           </button>
         </div>
+
+        <div v-if="filter === 'readbox' && !onAgentTab" class="mb-3 flex flex-wrap gap-1" data-read-box-empty>
+          <UButton
+            v-for="choice in emptyChoices"
+            :key="choice.label"
+            :label="choice.label"
+            size="xs"
+            color="neutral"
+            variant="ghost"
+            :data-empty-choice="choice.label"
+            @click="askEmpty(choice)"
+          />
+        </div>
+        <div
+          v-if="pendingEmpty"
+          class="mb-3 rounded-xl border border-default p-3 text-sm"
+          role="alertdialog"
+          aria-live="assertive"
+          data-empty-confirm
+        >
+          <p>
+            {{ pendingEmpty.count === 0
+              ? 'Nothing to delete for this choice.'
+              : `This deletes ${pendingEmpty.count} notification${pendingEmpty.count === 1 ? '' : 's'} from your Read box. Only you lose them.` }}
+          </p>
+          <div class="mt-2 flex gap-2">
+            <UButton
+              label="Delete"
+              color="error"
+              size="xs"
+              :disabled="!pendingEmpty.count || emptying"
+              :loading="emptying"
+              data-empty-confirm-button
+              @click="confirmEmpty"
+            />
+            <UButton
+              label="Cancel"
+              color="neutral"
+              variant="ghost"
+              size="xs"
+              :disabled="emptying"
+              data-empty-cancel
+              @click="cancelEmpty"
+            />
+          </div>
+        </div>
+        <p v-if="emptyError" class="mb-3 text-sm text-error" data-empty-error>{{ emptyError }}</p>
+        <p v-if="actionError" class="mb-3 text-sm text-error" data-action-error>{{ actionError }}</p>
 
         <template v-if="!onAgentTab">
           <p
@@ -358,7 +502,7 @@ async function sendTest() {
             class="rounded-xl border border-dashed border-default px-4 py-12 text-center text-sm text-muted"
             data-inbox-empty
           >
-            {{ filter === 'unread' ? 'You are all caught up.' : 'Nothing yet. Assignments, comments and messages for you will land here.' }}
+            {{ filter === 'readbox' ? 'The Read box is empty. Archived notifications wait here.' : filter === 'unread' ? 'You are all caught up.' : 'Nothing yet. Assignments, comments and messages for you will land here.' }}
           </p>
 
           <section
@@ -406,6 +550,36 @@ async function sendTest() {
                   <p class="mt-1 text-xs text-dimmed">
                     {{ item.projectName }}
                   </p>
+                  <div
+                    v-if="filter !== 'readbox'"
+                    class="mt-2 flex flex-wrap gap-2"
+                    @click.stop
+                  >
+                    <UButton
+                      label="Archive"
+                      icon="i-lucide-archive"
+                      size="xs"
+                      color="neutral"
+                      variant="ghost"
+                      data-notification-archive
+                      @click="tryArchive([item.id])"
+                    />
+                  </div>
+                  <div
+                    v-else
+                    class="mt-2 flex flex-wrap gap-2"
+                    @click.stop
+                  >
+                    <UButton
+                      label="Move to inbox"
+                      icon="i-lucide-undo-2"
+                      size="xs"
+                      color="neutral"
+                      variant="ghost"
+                      data-notification-move-back
+                      @click="moveBack(item)"
+                    />
+                  </div>
                   <div
                     v-if="item.type === 'guest_request' && item.invitationStatus === 'awaiting_approval'"
                     class="mt-2 flex flex-wrap gap-2"
