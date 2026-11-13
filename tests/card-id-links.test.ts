@@ -2,7 +2,7 @@
 // reader may not open stays plain text, and text around the ids is kept in order.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { splitCardIds } from '../app/utils/cardIdLinks'
+import { cardIdHref, splitCardIds } from '../app/utils/cardIdLinks'
 
 const openable = new Set(['mwasus18611939jk1av', 'mwddksx8b69fx30jn18'])
 const mayOpen = (id: string) => openable.has(id)
@@ -37,6 +37,12 @@ test('ids at the start and the end, and two ids in a row, are both split out', (
 test('text with no card id, and an empty text, come back as they are', () => {
   assert.deepEqual(splitCardIds('no ids here', mayOpen), [{ text: 'no ids here' }])
   assert.deepEqual(splitCardIds('', mayOpen), [])
+})
+
+test('a card id links to the card in the path form on its board, never the old ?task= form', () => {
+  assert.equal(cardIdHref('p1', 'mwasus18611939jk1av'), '/projects/p1/mwasus18611939jk1av')
+  assert.doesNotMatch(cardIdHref('p1', 'mwasus18611939jk1av'), /\?task=/)
+  assert.equal(cardIdHref('a b', 'mwasus18611939jk1av'), '/projects/a%20b/mwasus18611939jk1av')
 })
 
 test('a word that only looks like an id (too short, or not starting with mw) is not split', () => {

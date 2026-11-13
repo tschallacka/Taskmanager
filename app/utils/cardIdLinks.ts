@@ -1,6 +1,12 @@
 // Card ids in a message, a comment or a description become links, but only for a card the reader may open: an id the
 // reader may not open stays plain text, so the link never tells a reader that a hidden card exists. Pure, so the inbox,
 // the task panel and the board messages all split text the same way.
+import { taskPanelPath } from './taskPanelUrl'
+
+/** The address a card id links to: the card's path on its board, /projects/<id>/<task>, never the old ?task= form. */
+export function cardIdHref(projectId: string, id: string): string {
+  return taskPanelPath(projectId, id)
+}
 
 /** A card id as the app writes them: "mw" and 16 to 24 letters or digits, as in mwasus18611939jk1av. */
 export const CARD_ID_PATTERN = /\bmw[a-z0-9]{16,24}\b/g
