@@ -41,6 +41,12 @@ minutes), waiting (a WAITING marker under 45 minutes), idle, and gone (no sessio
 - A worker with a card in In progress, not blocked, idle for 10 minutes gets a poke, one line, with how long it has been
   idle and what its last update says. A waiting worker is never poked: the wait is the answer.
 - A worker whose session is gone is not idle. Its card needs a resume: the line goes to Pia at once.
+- A worker with a card in In progress whose agent is silent (no step for 15 minutes, not listening) is stuck: the line
+  `to pia: stuck: ...` goes to Pia at once. Susy does not poke a stuck worker; Pia checks that agent.
+- A worker with a card in In progress and no transcript in the last 6 hours is not running: the line
+  `to pia: absent: <key> is not running, start them (...)` goes to Pia at once. Pia starts that person as CREW.md says.
+- A listener that exited, or a Monitor that expired, is never a reason for Susy to stop. She keeps ticking, and a worker
+  whose agent went quiet shows up as stuck or absent.
 - Pia has several triggers. Each is named when it is dead, with its own wake step: her listener (3 minutes), her round
   timer (20 minutes with no round post), her mail (undelivered for 5 minutes), her hand-backs (5 minutes), and the cards in
   To do with no assignee while a worker is idle (15 minutes).
