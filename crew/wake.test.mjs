@@ -248,3 +248,24 @@ test('session-wake.sh refuses a metacharacter id before any tool call, and runs 
   assert.equal(existsSync(marker), false, 'the injected command did not run')
   assert.equal(existsSync(mcp.log), false, 'no tool was called')
 })
+
+test('session-wake.sh refuses an id with a newline: a line-based check would pass the first line and run the second', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wake-nl-'))
+  const marker = join(dir, 'pwned')
+  const mcp = fakeMcp([])
+  const id = `a1b2c3d4\ntouch ${marker}`
+  const run = spawnSync('sh', [join(HERE, 'session-wake.sh'), id, 'hello'], { encoding: 'utf8', env: { ...process.env, SESSION_WAKE_MCP: mcp.bin }, timeout: 120000 })
+  assert.equal(run.status, 64)
+  assert.match(run.stderr, /refused: not a session id/)
+  assert.equal(existsSync(marker), false, 'the second line did not run')
+  assert.equal(existsSync(mcp.log), false, 'no tool was called')
+})
+
+test('session-wake.sh refuses a leading dash, which claude would read as an option', () => {
+  const mcp = fakeMcp([])
+  for (const id of ['-x1b2c3d4', '--help']) {
+    const run = spawnSync('sh', [join(HERE, 'session-wake.sh'), id, 'hello'], { encoding: 'utf8', env: { ...process.env, SESSION_WAKE_MCP: mcp.bin }, timeout: 120000 })
+    assert.equal(run.status, 64, `refused: ${id}`)
+  }
+  assert.equal(existsSync(mcp.log), false, 'no tool was called')
+})
