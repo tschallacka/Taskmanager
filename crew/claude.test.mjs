@@ -47,6 +47,12 @@ test('claudeArgs passes the one settings file it is given, and the profile when 
   assert.deepEqual(claudeArgs(kit, ['--continue']), ['--settings', profilePath(kit), '--continue'])
 })
 
+test('mergeSettings joins the hooks of an event both files set, instead of one replacing the other', () => {
+  const merged = mergeSettings({ env: {}, hooks: { Stop: [{ a: 1 }] } }, { hooks: { Stop: [{ b: 2 }], SessionStart: [{ c: 3 }] } })
+  assert.deepEqual(merged.hooks.Stop, [{ b: 2 }, { a: 1 }], 'the session hook and the profile hook are both kept')
+  assert.deepEqual(merged.hooks.SessionStart, [{ c: 3 }])
+})
+
 test('writeMergedSettings writes one file that has both the env and the hooks', () => {
   const dir = mkdtempSync(join(tmpdir(), 'merged-settings-'))
   try {

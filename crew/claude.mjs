@@ -10,15 +10,19 @@ import { fileURLToPath } from 'node:url'
 export const CHECKED_VERSION = '2.1.319'
 export const profilePath = (kit) => join(kit, 'claude-long-run.json')
 
-// Claude Code takes only the last --settings it is given, so two files do not merge. The PM's session needs the
-// profile's env and the PM's hooks in ONE file: this merges them. The env of both is kept (the profile's wins on a
-// name clash); the hooks come from the session file.
+// The PM's session takes one settings file, so the profile's env and the PM's hooks are written into one file: this
+// merges them. The env of both is kept (the profile's wins on a name clash). Hooks are joined per event: when both files
+// set hooks for the same event, the session's come first, then the profile's.
 export function mergeSettings(profile, session) {
+  const hooks = {}
+  for (const event of new Set([...Object.keys(session.hooks ?? {}), ...Object.keys(profile.hooks ?? {})])) {
+    hooks[event] = [...(session.hooks?.[event] ?? []), ...(profile.hooks?.[event] ?? [])]
+  }
   return {
     ...session,
     ...profile,
     env: { ...(session.env ?? {}), ...(profile.env ?? {}) },
-    hooks: { ...(session.hooks ?? {}), ...(profile.hooks ?? {}) },
+    hooks,
   }
 }
 
