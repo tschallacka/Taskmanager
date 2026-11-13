@@ -26,7 +26,7 @@ const kitDir = dirname(fileURLToPath(import.meta.url))
 
 function usage(message) {
   console.error(message)
-  console.error('usage: crew setup --origin <url> --board <board id> --repo <path> [--name <crew name>] [--slug <slug>]')
+  console.error('usage: crew setup --origin <url> --board <board id> --repo <path> --worktree-base <absolute folder> [--name <crew name>] [--slug <slug>]')
   console.error('the management token goes in TASKMANAGER_MANAGEMENT_TOKEN (or stdin), never on the command line')
   process.exit(2)
 }
@@ -37,7 +37,7 @@ function parseArgs(argv) {
     const flag = argv[i]
     if (!flag.startsWith('--')) usage(`unexpected argument "${flag}"`)
     const name = flag.slice(2)
-    if (!['origin', 'board', 'repo', 'name', 'slug'].includes(name)) usage(`unknown flag ${flag}`)
+    if (!['origin', 'board', 'repo', 'name', 'slug', 'worktree-base'].includes(name)) usage(`unknown flag ${flag}`)
     const value = argv[i + 1]
     if (value === undefined || value.startsWith('--')) usage(`${flag} needs a value`)
     out[name] = value
@@ -64,6 +64,9 @@ const args = parseArgs(process.argv.slice(2))
 if (!args.origin) usage('--origin is required')
 if (!args.board) usage('--board is required')
 if (!args.repo) usage('--repo is required')
+// The folder the crew's worktrees go in. It is given, never guessed: prepare worktree needs it in crew.json.
+if (!args['worktree-base'] || !args['worktree-base'].startsWith('/')) usage('--worktree-base is required and must be an absolute folder')
+if (args['worktree-base'].replace(/\/+$/, '') === '') usage('--worktree-base cannot be / (the root); give the folder the worktrees go in')
 const origin = args.origin.replace(/\/+$/, '')
 const token = await readToken()
 if (!token) usage('no management token: set TASKMANAGER_MANAGEMENT_TOKEN, or pipe the token on stdin')
@@ -146,6 +149,7 @@ const crewJson = {
   team: typeof answer.team === 'string' ? answer.team : (answer.team?.name ?? name),
   crew: { slug, name },
   product: { name: boardName, repo: args.repo },
+  worktreeBase: args['worktree-base'].replace(/\/+$/, '') || '/',
   board: { url: shadow.url, id: shadow.board_id, name: shadow.board_name ?? `${boardName} crew board` },
   realBoard: { url: real.url ?? '', id: real.board_id ?? args.board, name: real.board_name ?? boardName, readOnly: true }
 }

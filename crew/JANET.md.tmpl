@@ -53,6 +53,8 @@ Only these, and only what the kit's plan names:
 - the worker's git worktree and its local branch, only when the branch is merged into the base branch and no pull
   request is open. Never the shared checkout, never a branch with unmerged commits, never an open or unknown pull
   request, never a worktree with uncommitted changes.
+- a worktree made by `{{node_kit}}/crew.mjs <who> prepare worktree <task-id>`: `prepare worktree --remove <task-id>`
+  removes it only when it is clean and its branch is on origin with nothing ahead; otherwise it refuses and says why.
 
 Not yours, never touched: the database, credentials, other workers' folders, the repository's own files, Boss's
 branches. A dev process a worker left running is reported, not stopped.

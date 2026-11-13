@@ -30,11 +30,18 @@ import { fileURLToPath } from 'node:url'
 
 const kit = dirname(fileURLToPath(import.meta.url))
 const [first, ...rest] = process.argv.slice(2)
-const scripts = { 'people': 'people.mjs', 'listen': 'listen.mjs', 'watch': 'watch.mjs', 'init': 'init.mjs', 'setup': 'setup.mjs', 'channel': 'channel.mjs', 'update': 'update.mjs', 'mentions': 'mentions.mjs', 'totp': 'totp.mjs', 'janet': 'janet.mjs', 'publish': 'publish.mjs', 'activity': 'activity.mjs', 'watch-crew': 'watch-crew.mjs', 'up': 'up.mjs', 'restart-brief': 'restart-brief.mjs', 'dev-copies': 'dev-copies.mjs' }
+const scripts = { 'people': 'people.mjs', 'listen': 'listen.mjs', 'watch': 'watch.mjs', 'init': 'init.mjs', 'setup': 'setup.mjs', 'channel': 'channel.mjs', 'update': 'update.mjs', 'mentions': 'mentions.mjs', 'totp': 'totp.mjs', 'janet': 'janet.mjs', 'publish': 'publish.mjs', 'activity': 'activity.mjs', 'watch-crew': 'watch-crew.mjs', 'up': 'up.mjs', 'restart-brief': 'restart-brief.mjs', 'dev-copies': 'dev-copies.mjs', 'down': 'down.mjs' }
 
 if (!first || first === '-h' || first === '--help') {
   console.log('usage: crew <who> <command ...> | crew <who> browser <command> | crew browser status|shutdown | crew listen <who> [sec] | crew watch | crew init | crew setup | crew channel <who> | crew mentions [minutes|--follow] | crew publish <slug> <branch> <title> <msg-file> <pr-file> | crew update [--check] [--from <kit folder|kit.tar.gz>] [--kit <folder>] | crew up | crew restart-brief')
   process.exit(first ? 0 : 2)
+}
+
+// Starting a card: `crew <who> prepare worktree <task-id>` sets up the worktree, branch, dependencies and database, and
+// `crew <who> prepare worktree --remove <task-id>` removes it when it is clean and pushed (prepare-worktree-cli.mjs).
+if (rest[0] === 'prepare' && rest[1] === 'worktree') {
+  const run = spawnSync(process.execPath, [join(kit, 'prepare-worktree-cli.mjs'), first, ...rest.slice(2)], { stdio: 'inherit' })
+  process.exit(run.status ?? 1)
 }
 
 // The shared browser: `crew <who> browser ...` and `crew browser status|shutdown`.
