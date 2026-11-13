@@ -142,6 +142,8 @@ test('time-log check: a card entering Verify PM with no time logged goes back to
   assert.equal((await columnOf(t.timed!)).columnId, cols.todo)
   const notes = (await comments(t.timed!)).filter(c => c.body.startsWith('Rule "Crew: time-log check"'))
   assert.equal(notes.length, 1)
+  // The note is written by the crew's Boss account, never the board owner.
+  assert.equal(notes[0]!.userId, people.boss)
   // Entering Verify PM again with still no time: the standard update is already on the card, so nothing more happens.
   await setColumn(t.timed!, pmCol)
   await fireRules(moved(t.timed!, pmCol), newRuleChain())
@@ -245,6 +247,8 @@ test('failing-test clock: a card in Blocked tagged test failing gets one note to
   notes = await comments(t.test!)
   assert.equal(notes.filter(note => /@boss/.test(note.body)).length, 1)
   assert.equal(notes.filter(note => /@pia/.test(note.body)).length, 1)
+  // Every clock note is written by the crew's Boss account, never the board owner.
+  assert.ok(notes.every(note => note.userId === people.boss))
 })
 
 test('failing-test clock: a card that has left Blocked is not noted (negative)', async () => {
