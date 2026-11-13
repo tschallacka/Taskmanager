@@ -12,6 +12,8 @@ import { fileURLToPath } from 'node:url'
 const MIN = 60000
 const T0 = Date.parse('2026-11-12T10:00:00.000Z')
 const CREW = { people: {}, susy: {} }
+// Wick has a running agent id, so the absent line (its own rule) stays out of the poke tests below.
+const RUNNING = { wick: 'crew wick (agent)' }
 
 // A card in In progress by Wick, last changed 30 minutes ago, with no update of its own: a "no update" poke is due.
 function stuckCard(now) {
@@ -24,13 +26,13 @@ function stuckCard(now) {
 test('a poke that is due is logged as would-poke once; the next tick with the same pending action logs nothing new', async () => {
   let now = T0
   const readCards = async () => [stuckCard(now)]
-  const first = await tick({ now, crew: CREW, readCards, state: {} })
+  const first = await tick({ now, crew: CREW, readCards, state: {}, agents: RUNNING })
   assert.equal(first.ok, true)
   const wouldPoke = first.lines.filter(line => line.startsWith('would poke'))
   assert.equal(wouldPoke.length, 1, first.lines.join('\n'))
   assert.match(wouldPoke[0], /in progress, no update|no update/)
   now += 60000
-  const second = await tick({ now, crew: CREW, readCards, state: first.state })
+  const second = await tick({ now, crew: CREW, readCards, state: first.state, agents: RUNNING })
   assert.deepEqual(second.lines.filter(line => line.startsWith('would')), [])
   assert.equal(Object.keys(second.state.pending).length, 1)
 })
@@ -70,12 +72,12 @@ test('a good tick after errors says the board is back, and a new error mails Bos
 test('a pending action that stops being needed drops out of pending, so a later one is logged again', async () => {
   let now = T0
   const readCards = async () => [stuckCard(now)]
-  const first = await tick({ now, crew: CREW, readCards, state: {} })
+  const first = await tick({ now, crew: CREW, readCards, state: {}, agents: RUNNING })
   const key = Object.keys(first.state.pending)[0]
   assert.ok(key)
   assert.equal(key, pendingKey({ kind: 'poke', cardId: 'c1', reason: 'in progress, no update', to: 'wick' }))
   // The card gets an update from Wick: the reason ends.
-  const done = await tick({ now: now + MIN, crew: CREW, readCards: async () => [{ ...stuckCard(now), updatedAt: now + MIN, updates: [{ id: 'u1', author: 'crew wick (agent)', body: 'working', at: new Date(now + MIN).toISOString() }] }], state: first.state })
+  const done = await tick({ now: now + MIN, crew: CREW, agents: RUNNING, readCards: async () => [{ ...stuckCard(now), updatedAt: now + MIN, updates: [{ id: 'u1', author: 'crew wick (agent)', body: 'working', at: new Date(now + MIN).toISOString() }] }], state: first.state })
   assert.equal(Object.keys(done.state.pending).length, 0)
 })
 

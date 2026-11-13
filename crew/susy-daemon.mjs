@@ -16,7 +16,7 @@ import { spawnSync } from 'node:child_process'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { crewHome } from './home.mjs'
-import { DEFAULT_CLEANER, findPokes, keyOfName, makeCall, readBoardCards } from './susy.mjs'
+import { absentActions, DEFAULT_CLEANER, findPokes, keyOfName, makeCall, readBoardCards } from './susy.mjs'
 import { collectActivity, listenerRunning, newActivityLines, readLoad } from './susy-collector.mjs'
 import { projectsRoot, readWorkerRows, workerStates } from './susy-workers.mjs'
 
@@ -29,6 +29,7 @@ export function pendingKey(action) {
 
 /** The text Susy posts for an action on its card: the marker line first (the ledger reads it), then the one thing to say. */
 export function postBody(action) {
+  if (action.kind === 'absent') return `${action.marker}\n${action.say}`
   if (action.kind !== 'poke') return action.marker
   const mention = action.to === 'boss' ? '@cato' : `@${action.to}`
   const say = action.text.replace(/^.*?\. Say: /, '').replace(/^"/, '').replace(/" \(to [^)]*\)$/, '')
@@ -66,13 +67,16 @@ export async function tick({ now, crew, readCards, state = {}, agents = {} }) {
   delete next.errorStreak
   delete next.mailedFor
 
+  const keyOf = keyOfName(crew?.people)
   const round = findPokes(cards, {
     now,
     thresholds: crew?.susy,
-    keyOf: keyOfName(crew?.people),
+    keyOf,
     cleaner: crew?.susy?.cleaner ?? DEFAULT_CLEANER,
     agents
   })
+  // The absent line: a person with open work and no running agent id is named once on their card (Pia starts them).
+  round.actions.push(...absentActions(cards, { agents, keyOf }))
   const current = {}
   const fresh = []
   for (const action of round.actions) {

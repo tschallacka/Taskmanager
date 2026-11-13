@@ -47,6 +47,15 @@ minutes), waiting (a WAITING marker under 45 minutes), idle, and gone (no sessio
 - Escalations the other way: a go not given while the load has been under 14 for 10 minutes goes to Pia; a card in a
   Verify column for 30 minutes goes to Boss; a QUESTION unanswered for 30 minutes goes to Boss.
 
+## The absent line
+
+Each tick checks the standing crew: Pia, the four workers, Tess and Rita, and anyone with a card in their gate or assigned to
+them. A person with open work and no running agent id (`crew susy agent` has no id for them) cannot be reached, so Susy
+posts one line on their first open card: `absent <who> | not running ...` (the marker), then `@pia <who> is not running:
+start them`. For Pia, the line goes to `@cato` and is copied to `@pia` on the same card, because Boss starts her. Susy
+never starts anybody. The line comes back only after a change on that card. When Pia has started them and written their
+agent id, the line stops.
+
 Evidence that cannot be read is no evidence, and is silent. Nothing is a fault because a source is missing.
 
 ## The reasons, and when each one fires
