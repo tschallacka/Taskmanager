@@ -1,12 +1,16 @@
 // The profile routes run as handlers, not read as text: the picture upload (server/api/account/avatar.post.ts) and the
-// display-name change (server/api/account/name.put.ts). Only their refusal paths run here, each before any database write,
-// so no database is reached: the size is refused before the body is read, the type after it, and another person's name
-// or an empty name before the better-auth update. The accepted paths write through the database and are covered by the
-// shots taken on the production build.
+// display-name change (server/api/account/name.put.ts). The refusal paths run without a database: the size is refused
+// before the body is read, the type after it, and another person's name or an empty name before the better-auth update.
+// The accepted upload writes the picture and the user row, so it runs only when DATABASE_URL names a database that has the
+// schema (the scratch database in this worktree); without it, that one test is skipped and says so.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { randomBytes } from 'node:crypto'
+import { existsSync, rmSync } from 'node:fs'
 import { Readable } from 'node:stream'
+import { join } from 'node:path'
 import { createError, createEvent, getHeader, readBody, readMultipartFormData } from 'h3'
+import { avatarDir } from '../server/utils/avatarStore'
 
 // Nitro provides these as globals; the route files use them without importing.
 Object.assign(globalThis, {
@@ -16,7 +20,8 @@ Object.assign(globalThis, {
   readMultipartFormData,
   defineEventHandler: (fn: unknown) => fn
 })
-// Set before the routes load: they import the database module, which reads this at load and is never used here.
+// Whether a real database was named. Set before the routes load: they import the database module, which reads this at load.
+const haveDb = Boolean(process.env.DATABASE_URL)
 process.env.DATABASE_URL ??= 'postgresql://arnotes:arnotes@127.0.0.1:1/unused'
 process.env.BETTER_AUTH_SECRET ??= 'avatar-routes-test-secret-0123456789abcdef'
 
@@ -72,6 +77,35 @@ test('the picture upload refuses a file type that is not a picture, after readin
     assert.match(error.message ?? '', /must be a PNG, JPEG, WebP or SVG file/)
     return true
   })
+})
+
+function multipartBytes(boundary: string, type: string, bytes: Buffer): Buffer {
+  const head = Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="picture"\r\nContent-Type: ${type}\r\n\r\n`)
+  return Buffer.concat([head, bytes, Buffer.from(`\r\n--${boundary}--\r\n`)])
+}
+
+test('the accepted upload stores the picture under the person folder and sets their image', { skip: haveDb ? false : 'DATABASE_URL is not set: the accepted path writes the database' }, async () => {
+  const { db } = await import('../server/db')
+  const { user } = await import('../server/db/schema')
+  const { eq } = await import('drizzle-orm')
+  const id = `avatar-accept-${randomBytes(4).toString('hex')}`
+  const at = new Date()
+  await db.insert(user).values({ id, name: 'Accept Test', email: `${id}@avatar.test`, emailVerified: true, createdAt: at, updatedAt: at })
+  try {
+    const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(64, 1)])
+    const body = multipartBytes('B', 'image/png', png)
+    const { event } = requestAs(id, { 'content-type': 'multipart/form-data; boundary=B', 'content-length': String(body.length) }, body)
+    const result = await uploadHandler(event) as { ok: boolean, image: string }
+    assert.equal(result.ok, true)
+    assert.match(result.image, new RegExp(`^/api/account/avatars/${id}/[a-f0-9]{24}\\.png$`))
+    const stored = result.image.split('/').pop() ?? ''
+    assert.equal(existsSync(join(avatarDir(id), stored)), true, 'the picture is on disk under the person folder')
+    const [row] = await db.select().from(user).where(eq(user.id, id))
+    assert.equal(row?.image, result.image, 'the user row points at the picture')
+  } finally {
+    await db.delete(user).where(eq(user.id, id))
+    rmSync(avatarDir(id), { recursive: true, force: true })
+  }
 })
 
 test('the display-name change refuses another person before the update', async () => {
