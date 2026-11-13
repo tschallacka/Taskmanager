@@ -42,6 +42,34 @@ export function writeRecord(home, key, record) {
   writeFileSync(recordPath(home, key), `${JSON.stringify(record, null, 2)}\n`, { mode: 0o600 })
 }
 
+/** The line every worker role gets (Boss, 2026-11-13: Wren's session created a worktree inside the main checkout). */
+export const WORKTREE_RULE = 'Work only in the worktree you were started in, never create your own. Do not create a worktree, and do not enter one, anywhere else.'
+
+/** The role with the standing rules added: the worktree rule is always the last line of the system prompt. */
+export function withRules(role) {
+  return `${String(role ?? '').trimEnd()}\n\n${WORKTREE_RULE}\n`
+}
+
+/**
+ * The mcp config for one session: only the crew's own taskmanager entry (the channel server for this person), so a
+ * session can never reach a connector. No key is in it: the channel reads creds.json.
+ */
+export function mcpConfig({ key, home, kit }) {
+  return {
+    mcpServers: {
+      'taskmanager-crew': {
+        command: 'node',
+        args: [join(kit, 'channel.mjs'), checkKey(key)],
+        env: { CREW_HOME: home }
+      }
+    }
+  }
+}
+
+export function mcpConfigPath(home, key) {
+  return join(home, 'sessions', `${checkKey(key)}.mcp.json`)
+}
+
 /** The argv of `claude --bg` for one person (not run here). The role goes in as the system prompt, from the file. */
 export function startArgs({ key, folder, home, kit, role, model = MODEL }) {
   return {
@@ -49,9 +77,10 @@ export function startArgs({ key, folder, home, kit, role, model = MODEL }) {
     args: [
       '--bg', '-n', checkKey(key), '--model', model,
       '--setting-sources', 'user', '--settings', NO_REMOTE_SETTINGS,
+      '--strict-mcp-config', '--mcp-config', mcpConfigPath(home, key),
       '--permission-mode', 'auto',
       '--add-dir', home, '--add-dir', kit,
-      '--append-system-prompt', role
+      '--append-system-prompt', withRules(role)
     ]
   }
 }
@@ -104,6 +133,9 @@ export function startSession({ home, kit, key, folder, role, bin, now = Date.now
   const record = readRecord(home, key)
   if (list && liveById(list, record?.id)) return { ok: true, id: record.id, started: false, note: 'already running' }
   const { cwd, args } = startArgs({ key, folder, home, kit, role })
+  // The session's own mcp config, written before the start, so the strict flag always has a file to read.
+  mkdirSync(join(home, 'sessions'), { recursive: true })
+  writeFileSync(mcpConfigPath(home, key), `${JSON.stringify(mcpConfig({ key, home, kit }), null, 2)}\n`, { mode: 0o600 })
   const run = runClaude(args, { bin, cwd })
   if (!run.ok) return { ok: false, reason: `claude did not start the session: ${run.stderr || `exit ${run.status}`}` }
   const after = listAgents({ bin }) ?? []
@@ -127,7 +159,8 @@ export function sessionStatus({ home, key, bin }) {
 export function sessionList({ home, bin }) {
   const dir = join(home, 'sessions')
   if (!existsSync(dir)) return []
-  const keys = readdirSync(dir).filter(f => f.endsWith('.json')).map(f => f.slice(0, -5))
+  // The session records are <key>.json; the mcp configs are <key>.mcp.json and are not records.
+  const keys = readdirSync(dir).filter(f => f.endsWith('.json') && !f.endsWith('.mcp.json')).map(f => f.slice(0, -5))
   return keys.map(key => sessionStatus({ home, key, bin }))
 }
 

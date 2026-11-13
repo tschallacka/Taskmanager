@@ -1,14 +1,46 @@
 // `crew session` with a fake claude (no real session is started). Run: node --test crew/session.test.mjs
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   startArgs, parseAgents, liveById, planWake, checkKey, startSession, sessionStatus, sessionList, stopSession,
-  readRecord, NO_REMOTE_SETTINGS, MODEL
+  readRecord, NO_REMOTE_SETTINGS, MODEL, mcpConfig, mcpConfigPath, withRules, WORKTREE_RULE
 } from './session.mjs'
+
+test('a session starts with strict mcp config, and that config holds only the crew taskmanager entry', () => {
+  const home = mkdtempSync(join(tmpdir(), 'session-mcp-'))
+  const { args } = startArgs({ key: 'wren', folder: '/tmp', home, kit: '/kit', role: 'r' })
+  assert.ok(args.includes('--strict-mcp-config'), 'only the mcp config the session is given, no connectors')
+  assert.equal(args[args.indexOf('--mcp-config') + 1], mcpConfigPath(home, 'wren'))
+  const cfg = mcpConfig({ key: 'wren', home, kit: '/kit' })
+  assert.deepEqual(Object.keys(cfg.mcpServers), ['taskmanager-crew'], 'exactly one server, the crew one')
+  const entry = cfg.mcpServers['taskmanager-crew']
+  assert.deepEqual(entry.args, ['/kit/channel.mjs', 'wren'])
+  assert.equal(entry.env.CREW_HOME, home)
+  assert.ok(!JSON.stringify(cfg).toLowerCase().includes('apikey'), 'no key goes into the config')
+})
+
+test('the worktree rule is the last line of the role the session gets, and the role keeps its text', () => {
+  const prompt = withRules('You are Wren.\nWork on your card.')
+  assert.match(prompt, /You are Wren\.\nWork on your card\./)
+  assert.equal(prompt.trimEnd().split('\n').at(-1), WORKTREE_RULE)
+  assert.match(WORKTREE_RULE, /Work only in the worktree you were started in, never create your own\./)
+  const { args } = startArgs({ key: 'wren', folder: '/tmp', home: '/h', kit: '/k', role: 'You are Wren.' })
+  assert.equal(args[args.indexOf('--append-system-prompt') + 1].trimEnd().split('\n').at(-1), WORKTREE_RULE)
+})
+
+test('a start writes the session mcp config file before it runs claude', () => {
+  const fake = fakeClaude()
+  const home = mkdtempSync(join(tmpdir(), 'session-home-'))
+  const out = startSession({ home, kit: HERE, key: 'wren', folder: '/tmp', role: 'r', bin: fake.bin })
+  assert.equal(out.ok, true)
+  assert.ok(existsSync(mcpConfigPath(home, 'wren')))
+  const cfg = JSON.parse(readFileSync(mcpConfigPath(home, 'wren'), 'utf8'))
+  assert.deepEqual(Object.keys(cfg.mcpServers), ['taskmanager-crew'])
+})
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 
@@ -58,7 +90,7 @@ test('the start argv turns remote control off, names the session, and sets the m
   assert.equal(args[args.indexOf('--model') + 1], MODEL)
   assert.equal(args[args.indexOf('--settings') + 1], NO_REMOTE_SETTINGS)
   assert.equal(JSON.parse(NO_REMOTE_SETTINGS).remoteControlAtStartup, false)
-  assert.equal(args[args.indexOf('--append-system-prompt') + 1], 'you are wren')
+  assert.match(args[args.indexOf('--append-system-prompt') + 1], /^you are wren\n/)
 })
 
 test('a key must be a short lower-case name', () => {
