@@ -4,7 +4,7 @@ All notable changes to Arnotes are documented in this file.
 
 ## 0.25.2 - 2026-11-13
 
-- **Notifications can be archived into a Read box, and the Read box can be emptied.** Every notification in the inbox gets an Archive button, and Archive all takes the shown ones out; archived notifications move to the Read box, where each can be moved back to the inbox. The Read box can be emptied in full or only the notifications archived more than 30 days, 2 months, 6 months or 1 year ago, after the page says how many will go. Emptying deletes for the signed-in person only. A failed archive puts the rows back and says so. Files: `server/utils/notificationBox.ts`, `server/api/notifications/archive.post.ts`, `server/api/notifications/unarchive.post.ts`, `server/api/notifications/empty.post.ts`, `app/pages/projects/inbox.vue`, `app/composables/useNotifications.ts`.
+- **Crew listener: pid files instead of process scans, and a one-hour listener wait.** Pia's listener and the Boss watches now record their pid in `.listen/<name>.pid`, and the Stop hooks and Susy read that file instead of running `pgrep -f` over every process; Pia's listener waits up to 3600 s (was 600 s) before it exits on quiet, so she is woken less often. Files: `crew/pidfile.mjs` (new), `crew/listen.mjs`, `crew/crew.mjs`, `crew/boss-stop-hook.sh`, `crew/pia-listener-hook.sh`, `crew/susy-collector.mjs`, `crew/susy-activity.mjs`, `crew/PROMPTS.md.tmpl`, and their tests.
 
 ## 0.25.1 - 2026-11-13
 
