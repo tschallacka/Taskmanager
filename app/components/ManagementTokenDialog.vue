@@ -4,7 +4,8 @@ import { crewManagePrompt } from '~/utils/crewManagePrompt'
 
 // "Put an AI crew to work on this board": makes the 10-minute token for one board and shows it once, with the copy-paste prompt
 // for the agent. On a crew's own board ("Manage this crew", card mwdd9d2vtgqhfr6izq) the token reaches only that crew, with two
-// prompts: recover the keys, add the missing people. The token lives only in this component.
+// prompts: recover the keys, add the missing people. The token lives only in this component: it is cleared when the dialog
+// closes or the time runs out.
 
 const props = defineProps<{
   open: boolean

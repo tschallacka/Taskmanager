@@ -40,6 +40,7 @@ export default defineEventHandler(async (event) => {
     key: {
       id: created.id,
       name: created.name,
+      nameSuffix: created.nameSuffix ?? '',
       keyPrefix: created.keyPrefix,
       scopes: created.scopes,
       createdAt: created.createdAt,

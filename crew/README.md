@@ -21,7 +21,7 @@ response is the crew's `creds.json`; nothing else is set up by hand.
 3. Run `CREW_HOME=<the crew's home folder> node init.mjs`. It checks the machine (Node, a browser, and the skills and MCP servers the hard rules name, see "Tools the workflow's hard rules need" below),
    renders the agents' documents (`CREW.md`, `PROMPTS.md`, ...) from the `*.tmpl` files, and writes one
    Claude Code agent definition per member into `~/.claude/agents` (`$CLAUDE_CONFIG_DIR/agents` when
-   that is set): `<crew slug>-<person>.md`, such as `acme-pia-planner.md`, with the model from `crew.json` (see "Models"; `haiku` when none is set).
+   that is set): `<crew slug>-<person>.md`, such as `acme-pia-planner.md`, with the model from `crew.json` (see "Models"; `claude-haiku-5-5` when none is set).
    `PROMPTS.md` names each one as the `subagent_type` to launch it with, so Boss can tell the members
    apart. It never overwrites a definition it did not write. **Run init before Boss's Claude Code
    session starts**: Claude Code reads the definitions when a session starts (an open session picks
@@ -55,13 +55,13 @@ Each person runs on the model you choose in `crew.json`. The kit names no model 
 
 ```json
 "models": {
-  "default": { "provider": "claude", "model": "haiku" },
+  "default": { "provider": "claude", "model": "claude-haiku-5-5" },
   "usher": "sonnet",
   "wick": { "provider": "claude", "model": "sonnet" }
 }
 ```
 
-- A person with no entry gets `default`, and without `default` that is `claude` with `haiku`.
+- A person with no entry gets `default`, and without `default` that is `claude` with `claude-haiku-5-5`. The bare alias `haiku` is not used: Claude Code refuses it ("unrecognized model"), which stopped every agent (card mwc5aicfyb9r0fvopvf).
 - A string is a Claude model. An object names the `provider` (`claude`, `openrouter` or `ollama`) and the `model`.
 - The keys are the people: `pia`, `wren`, `wick`, `wynn`, `wade`, `usher`, `nina`, `quincy` and `watcher`. Cato is
   not launched by the kit: he runs on whatever model you chat with.
@@ -102,14 +102,18 @@ The workflow's hard rules (the AI text editor for every document, CodeGraph for 
 
 ## Making the crew by hand
 
-`setup.mjs` is a thin client of the same crew API, for a person who runs the kit without the
-Taskmanager instance's own automation (run from the kit folder):
+`crew setup` (`setup.mjs`) makes one new crew for one board in one go. It is a thin client of the crew
+API, with the management token that "Put an AI crew to work on this board" gives (10 minutes, one board):
 
-    CREW_ADMIN_KEY=<key> node setup.mjs              # needs "crew": { "slug": "..." } in crew.json
-    CREW_ADMIN_KEY=<key> node setup.mjs --rotate    # the crew exists, creds.json is lost
+    TASKMANAGER_MANAGEMENT_TOKEN=<token> node setup.mjs --origin <url> --board <board id> --repo <path> --worktree-base <absolute folder> [--name <crew name>] [--slug <slug>]
 
-The key is read from the environment and is never written to a file. Keys and passwords are shown
-once, in the response that is written to `creds.json`.
+`--worktree-base` is required: the folder the crew's worktrees go in (for example the folder your repository sits in). It is written to crew.json as `worktreeBase`; `/` is refused.
+
+The token comes from `TASKMANAGER_MANAGEMENT_TOKEN`, or from stdin. It is never read from the command line. A
+crews:manage key does not work here: the remote crew API takes a management token. The crew is always new: a taken
+slug stops the command with 409 and nothing is rotated. The crew home is `~/crew-home/<slug>` (or `CREW_HOME`), with
+`creds.json` (mode 600) fetched once, and `crew.json` with the crew's work board, the shadow board, named by its id.
+The command ends with three lines: the crew home, the work board's url, and what to do next.
 
 ## The chat line (optional)
 
@@ -306,6 +310,46 @@ definition says to use its own name wherever those write a member key. **New key
 keys: run `init --forks` again with the new file, which replaces the old one. **Remove the forks** deletes the
 accounts, after which their definitions and the file are yours to delete.
 
+## Claude Code limits
+
+Long crew work (a full suite, a typecheck, waiting for a board event) runs into Claude Code's default limits. The
+kit raises them for the crew's sessions only, with a profile that is passed to one session at a time.
+
+**The profile.** `claude-long-run.json` in this folder. Start a session with it:
+
+    crew claude                       the owner's wrapper: claude --settings <kit>/claude-long-run.json
+    claude --settings <kit>/claude-long-run.json [other flags]
+
+Pia's start line in PROMPTS.md ("Starting Pia") carries the same `--settings`. Agents that Pia starts run inside her
+session and inherit the profile. A session started without `--settings` keeps Claude Code's defaults. The values and
+what each one does are in `claude-long-run.comments.md`.
+
+**The limits.**
+
+| What | Default | Variable | Profile value |
+|---|---|---|---|
+| A shell command that names no timeout | 2 min | `BASH_DEFAULT_TIMEOUT_MS` | 30 min |
+| The longest a shell command may ask for | 10 min | `BASH_MAX_TIMEOUT_MS` | 2 h |
+| A foreground shell command moved to the background (main session) | off | `CLAUDE_CODE_AUTO_BACKGROUND_TIMEOUT_MS` | 30 min |
+| Shell output read back | 30,000 characters | `BASH_MAX_OUTPUT_LENGTH` | 150,000 (the most Claude Code allows) |
+| MCP server start-up | not documented | `MCP_TIMEOUT` | 60 s |
+| An MCP tool call moved to the background | 2 min | `CLAUDE_CODE_MCP_AUTO_BACKGROUND_MS` | 10 min |
+| An MCP tool call with no progress | 30 min (stdio), 5 min (remote) | `CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT` | 30 min |
+| A background agent counted as stalled | about 10 min | `CLAUDE_ASYNC_AGENT_STALL_TIMEOUT_MS` | 1 h |
+| A Monitor watch | 5 min, at most 30 min | none | cannot be raised |
+
+**What cannot be raised.** Monitor stops at 30 minutes: re-arm the watch when it expires, or use `persistent` where the
+session offers it. Shell output is capped at 150,000 characters: write long output to a file and read the part you need.
+
+**Checked against.** Claude Code 2.1.319, on 2026-11-09 (Claude Code's docs and its code). A newer or older Claude Code may
+change these. `crew claude version` prints the installed version and warns when it is older than the one the profile was
+checked against. Run it after a Claude Code update.
+
+**The PM's settings: one merged file.** Pia's listener hooks are also written to her folder's own `.claude/settings.json`
+(`pia-session.mjs`). Her start line in `PROMPTS.md` first runs `node claude.mjs merge` on `pia-session.settings.json`, which
+writes one file, `pia-session/settings.merged.json`, with the profile's `env` and the PM's `hooks` in it (hooks are joined
+per event). The start then passes that one file as its only `--settings`.
+
 ## Commands
 
     crew <who> <command ...>      board tools as one person (tm.mjs)
@@ -317,13 +361,17 @@ accounts, after which their definitions and the file are yours to delete.
     crew janet clean plan|run <who> <card> [--dry-run] [--worktree <path>]   Janet's cleanup of a finished worker: the plan deletes nothing, run needs cleaning granted (janet.mjs, JANET.md)
     crew mentions [minutes|--follow]   Pia's updates that write @cato, each printed once: since the last check, or every 60 s for a Monitor (mentions.mjs)
     crew update [--check] [--from <kit folder|kit.tar.gz>] [--kit <folder>]   bring the kit folder up to date (update.mjs)
-    crew setup                    make the crew by hand (setup.mjs)
+    crew setup                    make one new crew for a board in one go, with its management token (setup.mjs)
     crew people add [--people a,b]   add the crew's missing people, their keys into creds.json (people.mjs, below)
     crew publish <slug> <branch> <title> <msg-file> <pr-file>   the merger's one command: squash a branch onto a fresh base, check the merged tree, push, open the pull request (publish.mjs, below)
     crew <who> browser goto|shot|eval|console|tabs|close-tab|done   the shared browser (browser.mjs)
     crew browser status|shutdown  the shared browser for everyone
 
 The old file names (`tm.mjs`, `listen.mjs`, ...) still work.
+
+**Keeping the machine light.** An idle person can wait with `crew listen <who> 600`: the wait returns early when there is
+news, so a long wait costs almost nothing. A listener may run under `nice -n 10`, which is fine. `tm.mjs` loads Playwright
+only for the commands that open a browser (the `mcp` calls and `update` never load it), so a plain board call starts fast.
 
 ## Adding missing people (`crew people add`)
 
@@ -388,6 +436,18 @@ Limits, which the design does not remove:
 - **`eval` runs in the page.** Do not put secrets in a script. `send` is an allowlist of CDP domains (no downloads, no file chooser, no CSP bypass, no Browser, Target, Fetch or Storage domains).
 - **Dialogs are dismissed** unless asked for. A page can still hold a command for up to two minutes, the request timeout.
 - **`shot` writes PNG or JPEG files only**, never through a link, never over a folder, and never over an existing file without `--overwrite`.
+
+## Dev copies (`crew <who> serve`)
+
+Each worker has one dev copy, on the port `devServers` in `crew.json` gives them (the ports come from the one table in `crew-defaults.mjs`, written into crew.json for the crew's people where they are missing: pia 3100, wren 3101, wick 3102, wynn 3103, wade 3104, quincy 3105, usher 3106, pat 3107, nina 3108). The port registry, `<CREW_HOME>/.listen/ports.json`, records which worktree holds which port (worktree, branch, card, pid, and the commit started from), under one lock file. Stale entries are dropped when their process is gone.
+
+- `crew <who> prepare worktree <task-id>` reserves the port for the new worktree and prints it.
+- `crew <who> serve` starts the worktree's copy with the command in `crew.json` `scripts.serve` (init writes the default, `bunx nuxt dev --host 127.0.0.1 --port {port}`; a project with another stack changes it). A port that another worktree holds is refused, and the message names that worktree and card.
+- `crew <who> serve --replace` stops only your own old copy on the port, and says which one, before it starts the new one.
+- `crew <who> serve --stop` stops the copy and frees the port. `prepare worktree --remove <task-id>` does the same before it removes the folder.
+- `crew <who> serve --check` says which copy answers the port and from which folder. It passes only when that copy serves the worktree's current HEAD, the commit recorded when it started; otherwise it stops with exit 3 and says to run `--replace`. A browser run calls it first.
+
+The listener is found with `lsof`; without `lsof` the `/proc` tables are read instead (`ss` is not used).
 
 ## Updating
 

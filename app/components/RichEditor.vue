@@ -43,11 +43,20 @@ const props = defineProps<{
   modelValue: string
   placeholder?: string
   uploadImage?: (file: File) => Promise<string | null>
+  toolbarOnFocus?: boolean
 }>()
 
 const emit = defineEmits<{ 'update:modelValue': [html: string] }>()
 
 const editorRef = ref()
+
+// With toolbarOnFocus the fixed command row waits until the text has focus. The bubble menu
+// over a selection is separate and shows either way.
+const focused = ref(false)
+function onEditorFocusOut(event: FocusEvent) {
+  const next = event.relatedTarget as Node | null
+  if (!next || !(event.currentTarget as HTMLElement).contains(next)) focused.value = false
+}
 
 // The command row scrolls sideways on a phone. Its edges fade where a command is cut off,
 // so it is clear that the row goes on (the same cue as the project tab row).
@@ -323,6 +332,8 @@ const suggestionItems = computed<any[][]>(() => [
     class="relative flex h-full min-h-0 flex-col"
     @dragover.prevent
     @drop.prevent="onFileDrop"
+    @focusin="focused = true"
+    @focusout="onEditorFocusOut"
   >
     <UEditor
       ref="editorRef"
@@ -340,7 +351,13 @@ const suggestionItems = computed<any[][]>(() => [
     >
       <!-- Fixed toolbar. The commands scroll sideways when the editor is
            narrow (the task drawer, a phone); the context actions stay put. -->
-      <div class="sticky top-0 z-10 flex shrink-0 items-center gap-2 border-b border-default bg-default px-3 py-2">
+      <!-- Kept from taking focus: a press on a command must not move the caret out of the text,
+           or the toolbar would hide under the press. -->
+      <div
+        v-show="!toolbarOnFocus || focused"
+        class="sticky top-0 z-10 flex shrink-0 items-center gap-2 border-b border-default bg-default px-3 py-2"
+        @mousedown.prevent
+      >
         <div
           ref="toolbarEl"
           class="scrollbar-hidden min-w-0 flex-1 overflow-x-auto"

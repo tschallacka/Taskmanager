@@ -1,10 +1,10 @@
-// The "Put an AI crew to work on this board" dialog: the copy-paste prompt an agent is given to manage the crew of one board, and
+// The "Put an AI crew to work on this board" dialog: the copy-paste prompt an agent is given to make one new crew for one board, and
 // the countdown of the 10 minutes the token lives. Pure, so the prompt is tested on its own.
 
 export interface ManagementPromptInput {
   /** The base URL of this Taskmanager, with no trailing slash. */
   origin: string
-  /** The board the crew is managed for: the real board the crew is bound to. */
+  /** The board the crew is made for: the real board the crew is bound to. */
   boardId: string
   boardName: string
   /** The management token, shown once. */
@@ -13,45 +13,38 @@ export interface ManagementPromptInput {
   expiresAt: number
 }
 
-/** The copy-paste prompt for the agent. It carries the token once, in the Authorization header, and the crew calls. */
+/**
+ * The copy-paste prompt for the agent: three steps, one command. The kit comes from this instance, the kit's `setup.mjs`
+ * makes the crew with the token in the environment, and the agent reports the three lines the command prints.
+ */
 export function managementPrompt(input: ManagementPromptInput): string {
-  const api = `${input.origin}/api`
-  return `You put an AI crew to work on one Taskmanager board. The board is "${input.boardName}" (board id ${input.boardId}) at ${input.origin}.
+  const { origin, boardId, token } = input
+  return `You put an AI crew to work on one Taskmanager board. The board is "${input.boardName}" (board id ${boardId}) at ${origin}.
 
-Your management token is below. It works for 10 minutes, until ${new Date(input.expiresAt).toISOString()}, and then it stops. It works for this board only.
-${input.token}
+Your management token works for 10 minutes, until ${new Date(input.expiresAt).toISOString()}, and then it stops. It works for this board only. The token, shown once:
+${token}
 
-Send the token in one place only, the Authorization header of each call:
-  Authorization: Bearer ${input.token}
-Never paste it anywhere else: not into a file, a log, a task, a comment, a chat or another service.
+Do the three steps in order. Ask the user one question only: the path of the repository the crew works on, if you do not know it.
 
-The calls you may make, all on ${api}:
-1. See the boards a crew can be bound to: GET ${api}/crews/targets
-   The answer lists "teams", each with "userboards". Your board is the userboard with "board_id": "${input.boardId}".
-2. Set up the AI crew for this board: POST ${api}/crews
-   Send JSON: {"slug": "<short name, 2 to 63 characters, a to z, 0 to 9 and hyphens>", "name": "<crew name>", "product": {"name": "<product name>"}, "projectId": "${input.boardId}"}
-   Every call makes a new crew. Keep the slug: it names the folder of the keys in step 3. If the slug is already taken the call answers 409: choose another slug and send the call again. Never add "rotate" to this call.
-   The answer has the crew's "slug", its people (id, name, role, email and tag, no keys), "keys_url", "keys_note", and these boards, each with "board_id", "board_name" and "url":
-   - "real_board": the board of the people. Do not write to it.
-   - "shadow_board": the crew's work board. Give the crew this board's "url" as its work board.
-   - "userboard": the real board with its shadow boards.
-   The crew's own board, "crew.boardUrl", is not the work board. Do not give it to the crew, unless the owner decides otherwise.
-   The answer holds no keys and no passwords. They come from the keys route in step 3, once.
-3. Get the keys: POST the "keys_url" with the same token and no body. The answer is plain text: one export line per person and secret. Save it, once, to a file that only the user can read:
-   - The folder is ~/.config/taskmanager/<slug>/ (mode 700) and the file in it is keys.env (mode 600), outside any repository. Make them with:
-     umask 077; mkdir -p -m 700 ~/.config/taskmanager/<slug>; curl -s -f -X POST -H "Authorization: Bearer <token>" "<keys_url>" -o ~/.config/taskmanager/<slug>/keys.env
-   - Never print the file, open it, read it back, or paste a key into a chat, a task, a log or a file of your own. Tell the user the path, and nothing else about the keys.
-   - If keys.env already exists, do not overwrite it. Save the answer to a new name next to it (keys-2.env, keys-3.env, and so on) and tell the user that name.
-   - Each name is TASKMANAGER_CREW_<SLUG>_<PERSON>_API_KEY or TASKMANAGER_CREW_<SLUG>_<PERSON>_PASSWORD, with the slug and the person upper-cased and dashes turned into underscores. The file loads into a shell with: . ~/.config/taskmanager/<slug>/keys.env
-   - Every call to keys_url makes new keys, and the old ones stop working at once. Call it once, and again only when the file was lost.
-4. Remove the AI crew from this board: DELETE ${api}/crews/<slug>
-   The crew's shadow board is archived, and what the crew wrote on it is kept.
+Step 1: get the kit. Keep it in ~/crew-kit-<host>, where <host> is the host name of ${origin}.
+  Download it: curl -sSf -D - -o ~/crew-kit.tar.gz ${origin}/crew/kit.tar.gz
+  If ~/crew-kit-<host> already holds the same version (the x-crew-kit-version header), reuse it.
+  Otherwise: mkdir -p ~/crew-kit-<host> && tar -xzf ~/crew-kit.tar.gz -C ~/crew-kit-<host> && cd ~/crew-kit-<host> && npm install
+
+Step 2: make the crew. In the kit folder, run the setup with the token in the environment variable only:
+  cd ~/crew-kit-<host> && TASKMANAGER_MANAGEMENT_TOKEN=<token> node setup.mjs --origin ${origin} --board ${boardId} --repo <repository path> --worktree-base <folder the repository is in>
+  The crew is always new. If the command says the slug is taken, run it again with --slug <another slug>. Never rotate a crew.
+  The crew gets its own home, ~/crew-<slug> (the slug the command makes, or the one you passed with --slug). Do not set CREW_HOME, and do not use any other folder. If that folder already holds creds.json, the command stops and changes nothing: use another --slug.
+
+Step 3: report. The command prints three lines: the crew home, the work board's address, and what to do next. Tell the user those three lines, and nothing else from the output.
 
 Rules:
-- A crew works only on its shadow_board. Never write to the real board: no tasks, comments, columns or time logs on it.
-- Never paste the token anywhere except the Authorization header.
-- If a call answers 401 with the code token_expired, token_regenerated or token_revoked, stop. Do not retry with this token. Tell your main agent the message the reply gave, word for word, so they can ask the user for a new token.
-- If a call answers 403, tell your main agent the sentence in the reply, word for word, and stop.
+- The token goes only in the TASKMANAGER_MANAGEMENT_TOKEN variable of that command. Never paste it into a file, a log, a task, a chat or another service.
+- Do not open or print any file in the crew home, and print no key or password. The keys are written by the command itself, to creds.json.
+- A crew works only on its work board, the shadow board the command names. Never write to the real board, ${boardId}.
+- A remote call to the crew API needs this management token. A crews:manage key does not work here.
+- If a call answers 401 with the code token_expired, token_regenerated or token_revoked, stop. Do not retry with this token. Tell the user the message the reply gave, word for word, so they can ask for a new token.
+- If a call answers 403, tell the user the sentence in the reply, word for word, and stop.
 - A management token reaches only this board. Any other board or crew is refused or answers 404.`
 }
 

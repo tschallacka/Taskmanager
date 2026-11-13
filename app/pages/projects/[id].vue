@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import type { ProjectTask } from '~/composables/useProjects'
 import { taskCountLabel, terminalColumnIds } from '#shared/utils/board'
+import { boardLoadMessage, isBoardId } from '~/utils/boardLoad'
 import { queryForView } from '~/utils/projectViewQuery'
+import { queryWithoutTask, taskPanelPath } from '~/utils/taskPanelUrl'
 
-definePageMeta({ layout: 'app' })
+// One page for the board and for its task panel addresses: the same key keeps the board mounted while the panel opens.
+definePageMeta({ layout: 'app', key: route => `projects/${route.params.id}` })
 
 const route = useRoute()
 const searchOpen = useSearchModal()
@@ -100,24 +103,37 @@ onMounted(() => {
 onBeforeUnmount(() => window.removeEventListener('resize', updateTabCues))
 
 const loadFailed = ref(false)
+// Why the board did not load, for the sentence the page shows (boardLoad.ts): a bad id, or the HTTP status of the failure.
+const loadInvalidId = ref(false)
+const loadFailStatus = ref<number | null>(null)
 // The team a board that will not open here belongs to, when the caller is in that team.
 const teamHint = ref<{ teamId: string, teamName: string } | null>(null)
 
 async function openBoard(id: string) {
   loadFailed.value = false
+  loadInvalidId.value = false
+  loadFailStatus.value = null
   teamHint.value = null
   try {
     await loadBoard(id)
-  } catch {
-    // Deleted in another tab, or a board from a workspace this session no longer
-    // has: an endless spinner is the one thing that must not happen.
+  } catch (error) {
+    // Deleted in another tab, a board from a workspace this session no longer has, or a request that timed out:
+    // the spinner must never stay. The sentence says which (boardLoadMessage).
+    const failure = error as { statusCode?: number, status?: number } | null
+    loadFailStatus.value = failure?.statusCode ?? failure?.status ?? null
     loadFailed.value = true
     teamHint.value = await $fetch<{ teamId: string, teamName: string }>(`/api/projects/${id}/team-hint`).catch(() => null)
   }
 }
 
 watch(projectId, (id) => {
-  if (!id || !/^[a-z0-9]+$/i.test(id)) return
+  if (!id) return
+  // A bad id (for example a hyphen) is not a board: the page says so instead of spinning.
+  if (!isBoardId(id)) {
+    loadFailed.value = true
+    loadInvalidId.value = true
+    return
+  }
   openBoard(id)
 }, { immediate: true })
 
@@ -132,21 +148,33 @@ async function switchToHintTeam() {
 
 // ─── Task panel ────────────────────────────────────────────
 
-const drawerTaskId = ref<string | null>(null)
+// The open task is in the path: /projects/<id>/<task>. Opening one pushes an entry, so Back and Forward open and close the
+// panel; closing goes back to the plain board address.
+const drawerTaskId = computed<string | null>(() => {
+  const id = route.params.task
+  return typeof id === 'string' && id ? id : null
+})
 
-// Deep link ?task=<id> (global search) opens the panel.
-watch(() => route.query.task, (taskId) => {
-  drawerTaskId.value = typeof taskId === 'string' && taskId ? taskId : null
-}, { immediate: true })
+function openDrawerTask(taskId: string) {
+  navigateTo({ path: taskPanelPath(String(route.params.id), taskId), query: queryWithoutTask(route.query) })
+}
 
 function closeDrawer() {
-  drawerTaskId.value = null
-  if (route.query.task) navigateTo({ path: route.path, replace: true })
+  navigateTo({ path: taskPanelPath(String(route.params.id)), query: queryWithoutTask(route.query) }, { replace: true })
 }
+
+// The old deep link ?task=<id> (global search and the home list) is rewritten to the path form.
+watch(() => route.query.task, (taskId) => {
+  if (typeof taskId !== 'string' || !taskId) return
+  navigateTo({ path: taskPanelPath(String(route.params.id), taskId), query: queryWithoutTask(route.query) }, { replace: true })
+}, { immediate: true })
 
 const drawerTask = computed<ProjectTask | null>(() =>
   drawerTaskId.value ? board.value?.tasks.find(t => t.id === drawerTaskId.value) ?? null : null
 )
+
+// A task URL whose task is not on this board (or cannot be read here): the board opens with no panel, and says so.
+const unknownTask = computed(() => Boolean(drawerTaskId.value && board.value && !drawerTask.value))
 
 // ─── Project name (inline rename) ──────────────────────────
 
@@ -680,6 +708,13 @@ useSeoMeta({
 
     <!-- Board -->
     <div class="min-h-0 flex-1">
+      <p
+        v-if="unknownTask"
+        role="status"
+        class="px-4 pt-3 text-sm text-muted"
+      >
+        That task is not on this board, or you cannot open it here. The board is shown without it.
+      </p>
       <div
         v-if="loadFailed"
         class="flex h-full flex-col items-center justify-center gap-3 px-6 text-center"
@@ -689,7 +724,7 @@ useSeoMeta({
           class="size-6 text-dimmed"
         />
         <p class="text-sm text-muted">
-          {{ teamHint ? `This board is in the team ${teamHint.teamName}.` : "This board is not available in this workspace." }}
+          {{ teamHint ? `This board is in the team ${teamHint.teamName}.` : boardLoadMessage({ invalidId: loadInvalidId, status: loadFailStatus }) }}
         </p>
         <UButton
           v-if="teamHint"
@@ -700,7 +735,15 @@ useSeoMeta({
           @click="switchToHintTeam"
         />
         <UButton
-          label="Back to projects"
+          v-if="!loadInvalidId"
+          label="Try again"
+          size="sm"
+          color="neutral"
+          variant="soft"
+          @click="projectId && openBoard(projectId)"
+        />
+        <UButton
+          label="Back to boards"
           size="sm"
           color="neutral"
           variant="soft"
@@ -715,19 +758,19 @@ useSeoMeta({
         <KanbanBoard
           v-else-if="view === 'board'"
           :project-id="projectId"
-          @open-task="drawerTaskId = $event"
+          @open-task="openDrawerTask($event)"
         />
         <KanbanProjectListView
           v-else-if="view === 'list'"
-          @open-task="drawerTaskId = $event"
+          @open-task="openDrawerTask($event)"
         />
         <KanbanProjectTimelineView
           v-else-if="view === 'timeline'"
-          @open-task="drawerTaskId = $event"
+          @open-task="openDrawerTask($event)"
         />
         <KanbanProjectCalendarView
           v-else-if="view === 'calendar'"
-          @open-task="drawerTaskId = $event"
+          @open-task="openDrawerTask($event)"
         />
         <KanbanProjectDashboardView v-else-if="view === 'dashboard'" />
         <KanbanProjectMessagesView
@@ -746,7 +789,7 @@ useSeoMeta({
         />
         <KanbanProjectFilesView
           v-else
-          @open-task="drawerTaskId = $event"
+          @open-task="openDrawerTask($event)"
         />
       </template>
     </div>
