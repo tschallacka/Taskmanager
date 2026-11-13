@@ -21,7 +21,7 @@ response is the crew's `creds.json`; nothing else is set up by hand.
 3. Run `CREW_HOME=<the crew's home folder> node init.mjs`. It checks the machine (Node, a browser, and the skills and MCP servers the hard rules name, see "Tools the workflow's hard rules need" below),
    renders the agents' documents (`CREW.md`, `PROMPTS.md`, ...) from the `*.tmpl` files, and writes one
    Claude Code agent definition per member into `~/.claude/agents` (`$CLAUDE_CONFIG_DIR/agents` when
-   that is set): `<crew slug>-<person>.md`, such as `acme-pia-planner.md`, with the model from `crew.json` (see "Models"; `haiku` when none is set).
+   that is set): `<crew slug>-<person>.md`, such as `acme-pia-planner.md`, with the model from `crew.json` (see "Models"; `claude-haiku-5-5` when none is set).
    `PROMPTS.md` names each one as the `subagent_type` to launch it with, so Boss can tell the members
    apart. It never overwrites a definition it did not write. **Run init before Boss's Claude Code
    session starts**: Claude Code reads the definitions when a session starts (an open session picks
@@ -55,13 +55,13 @@ Each person runs on the model you choose in `crew.json`. The kit names no model 
 
 ```json
 "models": {
-  "default": { "provider": "claude", "model": "haiku" },
+  "default": { "provider": "claude", "model": "claude-haiku-5-5" },
   "usher": "sonnet",
   "wick": { "provider": "claude", "model": "sonnet" }
 }
 ```
 
-- A person with no entry gets `default`, and without `default` that is `claude` with `haiku`.
+- A person with no entry gets `default`, and without `default` that is `claude` with `claude-haiku-5-5`. The bare alias `haiku` is not used: Claude Code refuses it ("unrecognized model"), which stopped every agent (card mwc5aicfyb9r0fvopvf).
 - A string is a Claude model. An object names the `provider` (`claude`, `openrouter` or `ollama`) and the `model`.
 - The keys are the people: `pia`, `wren`, `wick`, `wynn`, `wade`, `usher`, `nina`, `quincy` and `watcher`. Cato is
   not launched by the kit: he runs on whatever model you chat with.
@@ -436,6 +436,18 @@ Limits, which the design does not remove:
 - **`eval` runs in the page.** Do not put secrets in a script. `send` is an allowlist of CDP domains (no downloads, no file chooser, no CSP bypass, no Browser, Target, Fetch or Storage domains).
 - **Dialogs are dismissed** unless asked for. A page can still hold a command for up to two minutes, the request timeout.
 - **`shot` writes PNG or JPEG files only**, never through a link, never over a folder, and never over an existing file without `--overwrite`.
+
+## Dev copies (`crew <who> serve`)
+
+Each worker has one dev copy, on the port `devServers` in `crew.json` gives them (the ports come from the one table in `crew-defaults.mjs`, written into crew.json for the crew's people where they are missing: pia 3100, wren 3101, wick 3102, wynn 3103, wade 3104, quincy 3105, usher 3106, pat 3107, nina 3108). The port registry, `<CREW_HOME>/.listen/ports.json`, records which worktree holds which port (worktree, branch, card, pid, and the commit started from), under one lock file. Stale entries are dropped when their process is gone.
+
+- `crew <who> prepare worktree <task-id>` reserves the port for the new worktree and prints it.
+- `crew <who> serve` starts the worktree's copy with the command in `crew.json` `scripts.serve` (init writes the default, `bunx nuxt dev --host 127.0.0.1 --port {port}`; a project with another stack changes it). A port that another worktree holds is refused, and the message names that worktree and card.
+- `crew <who> serve --replace` stops only your own old copy on the port, and says which one, before it starts the new one.
+- `crew <who> serve --stop` stops the copy and frees the port. `prepare worktree --remove <task-id>` does the same before it removes the folder.
+- `crew <who> serve --check` says which copy answers the port and from which folder. It passes only when that copy serves the worktree's current HEAD, the commit recorded when it started; otherwise it stops with exit 3 and says to run `--replace`. A browser run calls it first.
+
+The listener is found with `lsof`; without `lsof` the `/proc` tables are read instead (`ss` is not used).
 
 ## Updating
 

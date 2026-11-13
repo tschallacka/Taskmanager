@@ -39,6 +39,11 @@ export interface ConnectPromptBoard {
   scopes: readonly string[]
 }
 
+// The pipe that reads the exchange's reply. On success it writes the token, and only the token, into the variable. On a
+// refusal it prints the server's message to stderr (the message never holds a key) and exits non-zero, so the variable
+// stays empty and the agent sees why, instead of an "undefined" key.
+const EXCHANGE_READER = `node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{let r={};try{r=JSON.parse(s)}catch{}if(r.token){process.stdout.write(r.token);return}console.error("the exchange was refused: "+(r.message||r.statusMessage||"the server gave no message")+". No key was made. Report this message to your main agent and do not retry with this code.");process.exit(1)})'`
+
 export interface ConnectPromptInput {
   /** The base URL of this Taskmanager, with no trailing slash. */
   origin: string
@@ -47,6 +52,12 @@ export interface ConnectPromptInput {
   boards: ConnectPromptBoard[]
   /** How the agent gets its token: the code it exchanges, the token itself, or the browser approval it asks for. */
   access: { kind: 'code', code: string, expiresAt: number } | { kind: 'token', token: string } | { kind: 'browser' }
+  /** A key that reaches every board the owner can open: said in one line, instead of a list of boards. */
+  allBoards?: { scopes: readonly string[] }
+  /** A reconnect: the prompt removes the server that is already there before it adds it again. */
+  replacing?: boolean
+  /** What the agent does once the server is added, said last: the next step for the person, when the tools are not live yet. */
+  afterAdd?: string
 }
 
 /**
@@ -78,8 +89,10 @@ function browserSteps(origin: string, tokenName: string, boards: ConnectPromptBo
  * carries the token, which the owner chose to show.
  */
 export function connectPrompt(input: ConnectPromptInput): string {
-  const boardLines = input.boards.map(board => `- ${board.name} (${board.workspace}): ${permissionList(board.scopes)}`)
-  const allScopes = new Set(input.boards.flatMap(board => board.scopes))
+  const boardLines = input.allBoards
+    ? [`- All the boards you can open, including ones the owner gives later: ${permissionList(input.allBoards.scopes)}`]
+    : input.boards.map(board => `- ${board.name} (${board.workspace}): ${permissionList(board.scopes)}`)
+  const allScopes = new Set([...input.boards.flatMap(board => board.scopes), ...(input.allBoards?.scopes ?? [])])
   const crewLine = allScopes.has('crews:manage')
     ? 'A crew works on its own shadow board and never writes to the real board.\n'
     : ''
@@ -91,13 +104,19 @@ export function connectPrompt(input: ConnectPromptInput): string {
       ? [
           `Your key is a one-time pairing code: ${input.access.code}`,
           `It works once and until ${new Date(input.access.expiresAt).toISOString()}. Exchange it on this machine, and do not print the result:`,
-          `  export TASKMANAGER_API_KEY=$(curl -s -X POST ${input.origin}/api/pair -H 'Content-Type: application/json' -d '{"code":"${input.access.code}"}' | node -pe 'JSON.parse(require("fs").readFileSync(0,"utf8")).token')`,
+          `  export TASKMANAGER_API_KEY=$(curl -s -X POST ${input.origin}/api/pair -H 'Content-Type: application/json' -d '{"code":"${input.access.code}"}' | ${EXCHANGE_READER})`,
           'If that does not give you a key that starts with arn_, stop: the exchange was refused. Report the message the server sent to your main agent, and do not retry with this code.'
         ].join('\n')
       : [
           `Your key is the token below. Put it in the environment variable TASKMANAGER_API_KEY, and do not print it:`,
           `  ${input.access.token}`
         ].join('\n')
+
+  // A reconnect: the server is already there, so it is removed first. The remove fails quietly when nothing is there yet,
+  // and each line is a command of its own, so the add still runs.
+  const replace = input.replacing
+    ? `If Claude Code already has a taskmanager server (this is a reconnect), remove it first, or the add below fails. The remove is quiet when there is nothing to remove:\n  claude mcp remove --scope user taskmanager 2>/dev/null\n`
+    : ''
 
   return `Connect to my Taskmanager at ${input.origin}, as the connection "${input.tokenName}".
 
@@ -107,13 +126,13 @@ ${crewLine}
 Authentication
 ${auth}
 
-Then add the MCP server, exactly as written (the single quotes matter):
+${replace}Then add the MCP server, exactly as written (the single quotes matter):
   claude mcp add --scope user --transport http taskmanager ${endpoint} --header 'Authorization: Bearer \${TASKMANAGER_API_KEY}'
 
 Never echo, print, log or paste the key anywhere else, and never send it to another service.
 
 If a call is refused with 401 and a message, stop. Do not retry with this key. Report that message to your main agent, so they can ask me for a new connection.
-If a board is not in the list above, you have no access to it, and you should not try.`
+If a board is not in the list above, you have no access to it, and you should not try.${input.afterAdd ? `\n\n${input.afterAdd}` : ''}`
 }
 
 /** A board the window can pick from: the boards the person can open. */
@@ -154,4 +173,43 @@ export interface IssuedConnection {
   tokenName: string
   boards: ConnectPromptBoard[]
   access: ConnectPromptInput['access']
+}
+
+/** What a key's prompt needs: the key's name, what it reaches, and the access the agent gets. */
+export interface KeyPromptInput {
+  origin: string
+  /** The key's name, as the owner gave it. */
+  name: string
+  /** The boards the key reaches, or every board the owner can open. */
+  reach: { boards: ConnectPromptBoard[], allBoards?: { scopes: readonly string[] } }
+  /** The one-time pairing code for the key. Null when it could not be made; the prompt then has a placeholder. */
+  pairing: { code: string, expiresAt: number } | null
+  /** The key itself. Written in only when the owner chooses it. */
+  token: string | null
+  mode: 'code' | 'token'
+}
+
+/** Where the key goes when the prompt is shown before any key exists. It is never a real key. */
+export const KEY_PLACEHOLDER = '<paste the key here>'
+
+/**
+ * The one prompt a key gives. Pairing is the default: the prompt carries a one-time code the agent exchanges, so the
+ * key stays out of the chat. The key goes in only when the owner chooses it. The prompt always removes an existing
+ * taskmanager server first, so the same paste fits a first setup and a reconnect.
+ */
+export function keyPrompt(input: KeyPromptInput): string {
+  const access = input.mode === 'token'
+    ? { kind: 'token' as const, token: input.token ?? KEY_PLACEHOLDER }
+    : input.pairing
+      ? { kind: 'code' as const, code: input.pairing.code, expiresAt: input.pairing.expiresAt }
+      : { kind: 'token' as const, token: KEY_PLACEHOLDER }
+  return connectPrompt({
+    origin: input.origin,
+    tokenName: input.name,
+    boards: input.reach.boards,
+    allBoards: input.reach.allBoards,
+    replacing: true,
+    access,
+    afterAdd: 'The new server is not live in this session yet, so its tools do not load here. When the add has worked, tell me to start a new Claude Code session (or to run /mcp reconnect in this one). Claude Code reads TASKMANAGER_API_KEY from the shell that starts it, so the new session must start from a shell where that variable is set (the export above, in the same shell); otherwise the server answers 401. Once the new session is up, ask me which board you should work on, and use only the tools of the new server.'
+  })
 }
