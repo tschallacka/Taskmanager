@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // `crew dev-copies`: after `crew up`, checks the copy of each card that waits in Verify UX or Verify QA. Each worker's
-// dev copy is served on the port devserver-worker.sh gives that worker (wren 3101, wick 3102, wynn 3103, wade 3104).
+// dev copy answers on the port crew.json "devServers" gives that worker (a map from its crew key to its port). The
+// reader, whose key reads the board, is crew.json "reader". Nothing here names a person or a port.
 // For each such card the check prints the owner, the card, the branch linked to the card, the port, and whether a copy
 // answers there. A card with no copy answering gets one more line: `no copy: ask Boss: tester-copy.sh start <owner> <branch>`.
 // It never starts anything: Boss starts the copy. Read only.
@@ -16,15 +17,26 @@ import { boardCall } from './board-call.mjs'
 import { keyOfName } from './susy.mjs'
 
 export const UX_OR_QA_COLUMN = /^Verify (UX|QA)/i
-// The member whose board read this is: a reader, not a worker, so Pia's key.
-export const READER = 'pia'
 // The board's ceiling of cards per column in one get_board answer.
 export const CEILING = 200
 export const GATE_COLUMNS = ['Verify UX', 'Verify QA']
 
-// The port devserver-worker.sh serves each worker's copy on. devserver-worker.sh's own case table is the source: if a
-// port moves there, change it here in the same commit (and in the test that pins these values).
-export const PORTS = { wren: 3101, wick: 3102, wynn: 3103, wade: 3104 }
+/** The crew member whose key reads the board: crew.json "reader" (for example "pia"). No default: a name is config. */
+export function readerOf(crew) {
+  if (typeof crew?.reader !== 'string' || !crew.reader) {
+    throw new Error('crew.json has no "reader" (the crew member whose key reads the board, for example "pia")')
+  }
+  return crew.reader
+}
+
+/**
+ * The port each worker's dev copy answers on: crew.json "devServers", a map from a crew key to a port (the port the
+ * devserver script serves that worker on). Empty when not set: each card then says so, and nothing is guessed.
+ */
+export function devServersOf(crew) {
+  const map = crew?.devServers
+  return map && typeof map === 'object' ? map : {}
+}
 
 /**
  * The working board's id, from crew.json's "board" url (…/projects/<id>). The gate cards sit on this board, not on the
@@ -59,17 +71,23 @@ export function gateCards(board, keyOf) {
   return { cards, cut }
 }
 
-// The branch a card's linked GitHub items name, or null when none does.
-export function branchOf(task) {
-  for (const item of task?.github ?? []) {
-    const branch = item?.branch ?? item?.headRef ?? item?.head_ref ?? item?.pullRequest?.branch
-    if (typeof branch === 'string' && branch) return branch
+/**
+ * The branch a card's GitHub links name, from one real get_task_github answer: { links: [{ kind, owner, repo, ref, url,
+ * data }] } (the fields a real answer has: an issue link has ref "36" and no branch). A branch link names it in `ref`
+ * (the help page: a link to .../tree/<branch>). A pull request link names its head branch in data.headRef. Null when
+ * no link names one.
+ */
+export function branchOf(answer) {
+  for (const link of answer?.links ?? []) {
+    if (link?.kind === 'branch' && typeof link.ref === 'string' && link.ref) return link.ref
+    if (link?.kind === 'pull' && typeof link.data?.headRef === 'string' && link.data.headRef) return link.data.headRef
   }
   return null
 }
 
-// The lines for the cards, and whether every card has a copy up. `probe(port)` says whether a copy answers there.
-export function copyLines(cards, { ports = PORTS, probe, branches = {} }) {
+// The lines for the cards, and whether every card has a copy up. `ports` is crew.json's devServers; `probe(port)` says
+// whether a copy answers there.
+export function copyLines(cards, { ports = {}, probe, branches = {} }) {
   const lines = []
   let ok = true
   for (const card of cards) {
@@ -78,7 +96,7 @@ export function copyLines(cards, { ports = PORTS, probe, branches = {} }) {
     const head = `${card.who}: card ${card.id} [${card.column}]`
     if (!port) {
       ok = false
-      lines.push(`${head}: no port for ${card.who}, cannot check its copy`)
+      lines.push(`${head}: no port for ${card.who} in crew.json "devServers", cannot check its copy`)
       continue
     }
     if (!branch) {
@@ -110,12 +128,15 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   }
   const kit = dirname(fileURLToPath(import.meta.url))
   const readJson = path => (existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : {})
-  const runner = (tool, args) => boardCall(READER, tool, args, kit)
   let cards
   let cut
+  let ports
   const branches = {}
   try {
     const crew = readJson(join(crewHome, 'crew.json'))
+    const reader = readerOf(crew)
+    const runner = (tool, args) => boardCall(reader, tool, args, kit)
+    ports = devServersOf(crew)
     const board = runner('get_board', { board: workingBoardId(crew), detail: 'titles', columns: GATE_COLUMNS, limit: CEILING })
     ;({ cards, cut } = gateCards(board, keyOfName(crew.people)))
     for (const c of cut) console.log(`page cut: ${c.column} shows ${c.shown} of ${c.total}; ${CEILING} is the ceiling per column, the cards past it are not checked`)
@@ -123,12 +144,12 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
       console.log('dev copies: no card in Verify UX or Verify QA; nothing to check')
       process.exit(0)
     }
-    for (const card of cards) branches[card.id] = branchOf(runner('get_task', { id: card.id }))
+    for (const card of cards) branches[card.id] = branchOf(runner('get_task_github', { taskId: card.id }))
   } catch (error) {
     console.error(`crew dev-copies: ${error.message}`)
     process.exit(1)
   }
-  const result = copyLines(cards, { probe: probeHttp, branches })
+  const result = copyLines(cards, { probe: probeHttp, branches, ports })
   for (const line of result.lines) console.log(line)
   process.exit(result.ok && !cut.length ? 0 : 1)
 }

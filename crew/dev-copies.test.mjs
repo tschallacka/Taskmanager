@@ -4,7 +4,7 @@
 //   node --test crew/dev-copies.test.mjs
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { gateCards, branchOf, copyLines, workingBoardId } from './dev-copies.mjs'
+import { gateCards, branchOf, copyLines, workingBoardId, readerOf, devServersOf } from './dev-copies.mjs'
 
 test('the board is the working board from crew.json, not the crew-home board', () => {
   assert.equal(workingBoardId({ board: { name: 'x', url: 'https://taskmanager.tschallacka.dev/projects/mw7vn0cp9pspxfvjru' } }), 'mw7vn0cp9pspxfvjru')
@@ -47,33 +47,44 @@ test('an owner with no crew key is kept by name, not dropped', () => {
   assert.equal(cards[0].who, 'Nobody Known')
 })
 
-test('the branch comes from the card\'s linked GitHub item', () => {
-  assert.equal(branchOf({ github: [{ branch: 'wren/x' }] }), 'wren/x')
-  assert.equal(branchOf({ github: [{ pullRequest: { branch: 'wick/y' } }] }), 'wick/y')
-  assert.equal(branchOf({ github: [] }), null)
+// The one real answer seen on the board (get_task_github on a card with an issue link), copied as it came.
+const REAL_ISSUE_ANSWER = { board: { id: 'mw7vn0cp9pspxfvjru', name: 'Taskmanager Maintenance (crew)' }, task: 'mw86lpq5niwb8lndef', total: 1, links: [{ id: 'mw86lpq7mqdmmtn3gb8', kind: 'issue', owner: 'tschallacka', repo: 'arnotes', ref: '36', url: 'https://github.com/tschallacka/arnotes/issues/36', visibility: 'customer', data: null, error: 'unavailable', message: 'GitHub could not be reached, try again in a moment', nextRetryAt: '2026-11-13T00:10:05.710Z', fetchedAt: '2026-11-08T19:39:36.534Z' }] }
+
+test('an issue link names no branch, as the real answer shows; a branch link names it in ref; a pull link in data.headRef', () => {
+  assert.equal(branchOf(REAL_ISSUE_ANSWER), null, 'the real issue link has no branch')
+  assert.equal(branchOf({ links: [{ kind: 'branch', owner: 'o', repo: 'r', ref: 'wren/x', url: 'https://github.com/o/r/tree/wren/x', data: null }] }), 'wren/x')
+  assert.equal(branchOf({ links: [{ kind: 'pull', owner: 'o', repo: 'r', ref: '99', data: { headRef: 'wick/y' } }] }), 'wick/y')
+  assert.equal(branchOf({ links: [] }), null)
   assert.equal(branchOf({}), null)
 })
 
 test('a copy that answers is reported up; nothing is asked of Boss', () => {
   const cards = [{ who: 'wren', id: 'c1', column: 'Verify QA' }]
-  const result = copyLines(cards, { probe: port => port === 3101, branches: { c1: 'wren/x' } })
+  const result = copyLines(cards, { probe: port => port === 3101, branches: { c1: 'wren/x' }, ports: { wren: 3101 } })
   assert.deepEqual(result.lines, ['wren: card c1 [Verify QA] branch wren/x on :3101: up'])
   assert.equal(result.ok, true)
 })
 
 test('a copy that does not answer gets the line asking Boss to start it, and nothing is started', () => {
   const cards = [{ who: 'wynn', id: 'c3', column: 'Verify UX' }]
-  const result = copyLines(cards, { probe: () => false, branches: { c3: 'wynn/z' } })
+  const result = copyLines(cards, { probe: () => false, branches: { c3: 'wynn/z' }, ports: { wynn: 3103 } })
   assert.equal(result.ok, false)
   assert.equal(result.lines[0], 'wynn: card c3 [Verify UX] branch wynn/z on :3103: not up')
   assert.equal(result.lines[1], 'no copy: ask Boss: tester-copy.sh start wynn wynn/z')
 })
 
-test('a card with no branch or no port is reported, not guessed', () => {
-  const noBranch = copyLines([{ who: 'wade', id: 'c5', column: 'Verify QA' }], { probe: () => true, branches: {} })
+test('a card with no branch or no port in crew.json is reported, not guessed', () => {
+  const noBranch = copyLines([{ who: 'wade', id: 'c5', column: 'Verify QA' }], { probe: () => true, branches: {}, ports: { wade: 3104 } })
   assert.equal(noBranch.ok, false)
   assert.match(noBranch.lines[0], /no branch linked to the card/)
-  const noPort = copyLines([{ who: 'usher', id: 'c6', column: 'Verify UX' }], { probe: () => true, branches: { c6: 'u/q' } })
+  const noPort = copyLines([{ who: 'usher', id: 'c6', column: 'Verify UX' }], { probe: () => true, branches: { c6: 'u/q' }, ports: {} })
   assert.equal(noPort.ok, false)
-  assert.match(noPort.lines[0], /no port for usher/)
+  assert.match(noPort.lines[0], /no port for usher in crew.json "devServers"/)
+})
+
+test('the reader and the ports come from crew.json: no name is built in', () => {
+  assert.throws(() => readerOf({}), /no "reader"/)
+  assert.equal(readerOf({ reader: 'pia' }), 'pia')
+  assert.deepEqual(devServersOf({}), {})
+  assert.deepEqual(devServersOf({ devServers: { wren: 3101 } }), { wren: 3101 })
 })
