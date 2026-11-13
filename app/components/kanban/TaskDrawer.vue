@@ -36,7 +36,9 @@ const linkCopied = ref(false)
 // address) opens it, so the comment and its window buttons are on screen.
 const route = useRoute()
 const activityOpen = ref(activityStartsOpen(route.params.comment))
-watch(() => route.params.comment, comment => { if (activityStartsOpen(comment)) activityOpen.value = true })
+watch(() => route.params.comment, (comment) => {
+  if (activityStartsOpen(comment)) activityOpen.value = true
+})
 // The phone's tap chevron on an editable property row (the grid gets a third column for it). A read-only panel
 // has no chevron: its rows show values only.
 const chevronRow = `max-md:grid-cols-[6rem_1fr_1rem] max-md:after:content-['›'] max-md:after:text-lg max-md:after:leading-none max-md:after:text-dimmed`

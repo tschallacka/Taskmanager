@@ -3,6 +3,9 @@ import type MiniSearch from 'minisearch'
 import { realtimeHeaders } from '~/composables/useRealtime'
 import { mergeCommentPages } from '~/utils/commentMerge'
 import { applyLiveComment } from '~/utils/commentWindowLive'
+import { clearCustomFields, ingestBoardFields } from '~/composables/useCustomFields'
+import type { FieldValues, ProjectField } from '~/composables/useCustomFields'
+import { matchesTagRequirements, type TagRequirement } from '#shared/utils/tags'
 
 // A permalink's window as the API returns it (server/utils/commentWindow.ts): the comments and what is left either side.
 interface CommentWindowPage {
@@ -16,9 +19,6 @@ interface CommentWindowPage {
 function windowCounts(page: CommentWindowPage) {
   return { hasEarlier: page.hasEarlier, earlierCount: page.earlierCount, hasLater: page.hasLater, laterCount: page.laterCount }
 }
-import { clearCustomFields, ingestBoardFields } from '~/composables/useCustomFields'
-import type { FieldValues, ProjectField } from '~/composables/useCustomFields'
-import { matchesTagRequirements, type TagRequirement } from '#shared/utils/tags'
 
 // Mirrors VISIBILITIES in server/db/schema.ts: `internal` is for the
 // organisation only, `customer` is also shown to the project's customer.
@@ -1058,11 +1058,13 @@ export function useProjects() {
         let shown = _comments.value
         let state = _commentWindow.value
         if (state) {
+          let current = state
           for (const live of comments.filter(c => c.createdAt > newest).sort((a, b) => a.createdAt - b.createdAt)) {
-            const next = applyLiveComment(shown, state, live)
-            shown = next.comments
-            state = next.state
+            const applied = applyLiveComment(shown, current, live)
+            shown = applied.comments
+            current = applied.state
           }
+          state = current
         }
         _comments.value = shown
         _commentWindow.value = state

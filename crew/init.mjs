@@ -270,7 +270,8 @@ else {
   } catch (error) { fail(error.message) }
 }
 
-// crew.json's "reader" and "devServers" default from the keys of the crew's people (creds.json); a field already set stays.
+// crew.json is an owner file: init (and so `crew update`) never writes it. When "reader" or "devServers" are missing it
+// says so and prints the values setup would have written, from the keys of the crew's people (creds.json).
 try {
   const crewFile = join(here, 'crew.json')
   const credsFile = join(here, 'creds.json')
@@ -278,8 +279,8 @@ try {
     const creds = JSON.parse(readFileSync(credsFile, 'utf8'))
     const { crew: filled, added } = withCrewDefaults(JSON.parse(readFileSync(crewFile, 'utf8')), Object.keys(creds.people ?? {}))
     if (added.length) {
-      writeFileSync(crewFile, `${JSON.stringify(filled, null, 2)}\n`, { mode: 0o600 })
-      ok(`crew.json: ${added.join(' and ')} set from the crew's people`)
+      const suggestion = Object.fromEntries(added.map(field => [field, filled[field]]))
+      warn(`crew.json has no ${added.join(' and ')}: add ${JSON.stringify(suggestion)} (crew.json is yours, init does not change it)`)
     }
   }
 } catch (error) {

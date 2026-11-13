@@ -8,7 +8,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 export const CHECKED_VERSION = '2.1.319'
-export const profilePath = (kit) => join(kit, 'claude-long-run.json')
+export const profilePath = kit => join(kit, 'claude-long-run.json')
 
 // The PM's session takes one settings file, so the profile's env and the PM's hooks are written into one file: this
 // merges them. The env of both is kept (the profile's wins on a name clash). Hooks are joined per event: when both files
@@ -22,7 +22,7 @@ export function mergeSettings(profile, session) {
     ...session,
     ...profile,
     env: { ...(session.env ?? {}), ...(profile.env ?? {}) },
-    hooks,
+    hooks
   }
 }
 

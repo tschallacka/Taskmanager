@@ -1,10 +1,9 @@
 // Run: cd crew && node --test claude.test.mjs
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, mkdtempSync, rmSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { CHECKED_VERSION, claudeArgs, mergeSettings, profilePath, versionWarning, writeMergedSettings } from './claude.mjs'
 
@@ -28,8 +27,8 @@ test('the output cap is not raised above what Claude Code allows', () => {
 })
 
 test('every variable the README section names is in the profile', () => {
-  const named = [...section.matchAll(/`([A-Z][A-Z0-9_]+)`/g)].map((m) => m[1])
-  const vars = [...new Set(named.filter((n) => n.startsWith('BASH_') || n.startsWith('CLAUDE_') || n.startsWith('MCP_')))]
+  const named = [...section.matchAll(/`([A-Z][A-Z0-9_]+)`/g)].map(m => m[1])
+  const vars = [...new Set(named.filter(n => n.startsWith('BASH_') || n.startsWith('CLAUDE_') || n.startsWith('MCP_')))]
   assert.ok(vars.length >= 8, 'the README names the variables')
   for (const v of vars) assert.ok(v in profile.env, `${v} is named in the README but not in the profile`)
 })
@@ -67,7 +66,7 @@ test('writeMergedSettings writes one file that has both the env and the hooks', 
 
 test('the PM start line makes one merged file and passes it as the only --settings', () => {
   const tmpl = readFileSync(join(kit, 'PROMPTS.md.tmpl'), 'utf8')
-  const line = tmpl.split('\n').find((l) => l.includes('claude --model {{models.pia.model}}'))
+  const line = tmpl.split('\n').find(l => l.includes('claude --model {{models.pia.model}}'))
   assert.ok(line, 'the PM start line is in PROMPTS.md.tmpl')
   assert.equal(line.split('--settings').length - 1, 1, 'Claude Code takes only the last --settings, so there is one')
   assert.ok(line.includes('--settings {{crew_dir}}/pia-session/settings.merged.json'))

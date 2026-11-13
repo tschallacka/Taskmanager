@@ -12,11 +12,11 @@ export interface LaterSide extends WindowSides {
 // A comment that arrives while a permalink's window is shown. It is the newest comment, so it goes at the end, but only
 // when the later side is fully loaded; otherwise the Show later count goes up and the comment waits behind it. A comment
 // already in the window is not added twice and does not count.
-export function applyLiveComment<T extends { id: string }>(
+export function applyLiveComment<T extends { id: string }, S extends LaterSide>(
   comments: readonly T[],
-  state: LaterSide,
+  state: S,
   live: T
-): { comments: T[], state: LaterSide } {
+): { comments: T[], state: S } {
   if (comments.some(c => c.id === live.id)) return { comments: [...comments], state: { ...state } }
   if (state.hasLater) return { comments: [...comments], state: { ...state, laterCount: state.laterCount + 1 } }
   return { comments: [...comments, live], state: { ...state } }
