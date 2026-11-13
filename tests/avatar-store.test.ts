@@ -1,10 +1,13 @@
 // The picture store (server/utils/avatarStore.ts) and its serving route, run as a handler: only a stored name is served,
-// and the content type follows the extension. The route's refusals are tested by calling it; an SVG served under the
-// restrictive policy needs a stored file, so that header is not covered here.
+// the content type follows the extension, an SVG is served under the restrictive policy, and the route's refusals are
+// answered with 404. The SVG test stores a real file under the store (a throwaway user folder, removed after).
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { randomBytes } from 'node:crypto'
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { createError, getRouterParam, setHeader } from 'h3'
-import { AVATAR_EXT, contentTypeOf, safeAvatarName } from '../server/utils/avatarStore'
+import { AVATAR_EXT, avatarDir, contentTypeOf, safeAvatarName } from '../server/utils/avatarStore'
 
 // Nitro provides these as globals; the route file uses them without importing.
 Object.assign(globalThis, {
@@ -56,6 +59,30 @@ test('the picture route refuses a user id with characters a folder name may not 
     assert.equal(error.statusCode, 404)
     return true
   })
+})
+
+test('an SVG picture is served as an image under the restrictive policy, with its bytes', async () => {
+  const userId = `svg-test-${randomBytes(4).toString('hex')}`
+  const dir = avatarDir(userId)
+  const name = `${randomBytes(12).toString('hex')}.svg`
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, name), '<svg xmlns="http://www.w3.org/2000/svg"><rect width="4" height="4"/></svg>')
+  const sent = new Map<string, string>()
+  const res = {
+    setHeader: (key: string, value: string) => {
+      sent.set(key.toLowerCase(), value)
+    },
+    getHeader: () => undefined
+  }
+  try {
+    const body = await pictureRoute({ context: { params: { userId, filename: name } }, node: { req: { headers: {} }, res } })
+    assert.equal(sent.get('content-type'), 'image/svg+xml')
+    assert.equal(sent.get('content-security-policy'), 'default-src \'none\'; style-src \'unsafe-inline\'; img-src data:')
+    assert.match(String(body), /<svg/)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+  assert.equal(existsSync(join(dir, name)), false, 'the throwaway file is removed')
 })
 
 test('the picture route refuses a stored name that is not on disk, with 404', async () => {
