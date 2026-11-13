@@ -3,6 +3,7 @@ import type MiniSearch from 'minisearch'
 import { realtimeHeaders } from '~/composables/useRealtime'
 import { mergeCommentPages } from '~/utils/commentMerge'
 import { applyLiveComment } from '~/utils/commentWindowLive'
+import { BOARD_LOAD_TIMEOUT_MS, boardLoadStateAfter, withTimeout, type BoardLoadError } from '~/utils/boardLoad'
 import { clearCustomFields, ingestBoardFields } from '~/composables/useCustomFields'
 import type { FieldValues, ProjectField } from '~/composables/useCustomFields'
 import { matchesTagRequirements, type TagRequirement } from '#shared/utils/tags'
@@ -214,6 +215,8 @@ const _activeProjectId = ref<string | null>(null)
 // The open project when the list no longer holds it (archived): its page still needs it.
 const _archivedActive = ref<Project | null>(null)
 const _board = ref<{ columns: ProjectColumn[], tasks: ProjectTask[] } | null>(null)
+// Why the open board did not load (boardLoad.ts); null while it loads or once it has.
+const _boardLoadError = ref<BoardLoadError | null>(null)
 // Update counts live beside the board: task PUT responses do not carry them, so
 // folding them into the task would wipe the badge on every edit.
 const _commentCounts = ref<Record<string, number>>({})
@@ -675,6 +678,8 @@ export function useProjects() {
 
   async function loadBoard(id: string) {
     _boardLoading.value = true
+    // A retry clears the error while the board loads again.
+    _boardLoadError.value = boardLoadStateAfter(_boardLoadError.value, { type: 'retry' })
     try {
       if (_activeProjectId.value !== id) {
         if (_activeProjectId.value) cacheBoard(_activeProjectId.value)
@@ -698,7 +703,8 @@ export function useProjects() {
       _activeProjectId.value = id
       await refreshArchivedActive(id)
       const [board, people] = await Promise.all([
-        $fetch<BoardPayload>(boardUrl(id)),
+        // A request that never completes is a failure after the timeout, not a spinner (boardLoad.ts).
+        withTimeout($fetch<BoardPayload>(boardUrl(id)), BOARD_LOAD_TIMEOUT_MS),
         // The picker is not worth failing the board over.
         $fetch<ProjectPerson[]>(`/api/projects/${id}/people`).catch(() => _people.value)
       ])
@@ -714,7 +720,13 @@ export function useProjects() {
         _trashedCount.value = board.trashedCount ?? 0
         ingestBoardFields(id, board.fields ?? [], board.fieldValues ?? {})
       }
+      _boardLoadError.value = boardLoadStateAfter(_boardLoadError.value, { type: 'loaded' })
       return board
+    } catch (error) {
+      // A failure keeps the reason for the page's sentence, and the error still goes to the caller.
+      const failure = error as { statusCode?: number, status?: number } | null
+      _boardLoadError.value = boardLoadStateAfter(_boardLoadError.value, { type: 'fail', status: failure?.statusCode ?? failure?.status ?? null })
+      throw error
     } finally {
       _boardLoading.value = false
     }
@@ -1180,6 +1192,7 @@ export function useProjects() {
     isReadOnlyBoard,
     activeProjectId: _activeProjectId,
     board: _board,
+    boardLoadError: _boardLoadError,
     subtasks: _subtasks,
     people: _people,
     subtasksOf,
