@@ -209,7 +209,6 @@ const claudeCommand = computed(() => {
   return setupCommandFor(issuedToken.value)
 })
 
-
 const origin = import.meta.client ? window.location.origin : ''
 const kitCommands = crewKitCommands(origin)
 const instructions = agentInstructions(origin)
@@ -226,7 +225,6 @@ async function copyKit(text: string, id: string) {
     toast.add({ title: 'Could not copy — select the text and copy it manually', icon: 'i-lucide-alert-triangle', color: 'error' })
   }
 }
-
 
 async function copyWithFeedback(text: string, copiedFlag: Ref<boolean>, title: string) {
   try {
