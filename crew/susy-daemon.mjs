@@ -338,7 +338,11 @@ async function main(argv) {
     return 75
   }
   if (lock.tookOverStale) console.log(`susy-daemon: took over a stale lock (pid ${lock.tookOverStale})`)
-  for (const signal of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(signal, () => { releaseLock(home); process.exit(0) })
+  const stop = () => {
+    releaseLock(home)
+    process.exit(0)
+  }
+  for (const signal of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(signal, stop)
   process.on('exit', () => releaseLock(home))
   if (command === 'once') {
     await runOnce(home, Date.now(), { live: true })
@@ -356,7 +360,7 @@ async function main(argv) {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
-  main(process.argv.slice(2)).then(code => {
+  main(process.argv.slice(2)).then((code) => {
     if (code) process.exitCode = code
   })
 }

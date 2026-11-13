@@ -17,7 +17,7 @@ test('a person is working with activity in the last 5 minutes, idle without, wai
 test('a WAITING marker counts only while it is younger than 45 minutes', () => {
   const fresh = { body: `WAITING Pia's go since ${new Date(NOW - 20 * MIN).toISOString()}` }
   const old = { body: `WAITING Pia's go since ${new Date(NOW - 50 * MIN).toISOString()}` }
-  assert.deepEqual(waitingOf(fresh, NOW), { for: "Pia's go", since: NOW - 20 * MIN })
+  assert.deepEqual(waitingOf(fresh, NOW), { for: 'Pia\'s go', since: NOW - 20 * MIN })
   assert.equal(waitingOf(old, NOW), null)
   assert.equal(waitingOf({ body: 'just a note' }, NOW), null)
 })

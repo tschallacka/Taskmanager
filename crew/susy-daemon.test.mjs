@@ -4,10 +4,9 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtempSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, dirname } from 'node:path'
 import { tick, pendingKey, postBody, postFresh, runOnce, statusLines, heartbeatAgeMinutes, heartbeatFresh, daemonCommand, shellQuote, SESSION, upPart, isDaemonPid, lockState, takeLock, releaseLock, LOCK_NAME } from './susy-daemon.mjs'
 import { spawnSync } from 'node:child_process'
-import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const MIN = 60000
@@ -37,7 +36,9 @@ test('a poke that is due is logged as would-poke once; the next tick with the sa
 })
 
 test('a board that does not answer: one line, one would-mail-Boss line for the streak, then quiet', async () => {
-  const readCards = async () => { throw new Error('get_board answered HTTP 503') }
+  const readCards = async () => {
+    throw new Error('get_board answered HTTP 503')
+  }
   const first = await tick({ now: T0, crew: CREW, readCards, state: {} })
   assert.equal(first.ok, false)
   assert.deepEqual(first.lines, [
@@ -51,7 +52,10 @@ test('a board that does not answer: one line, one would-mail-Boss line for the s
 
 test('a good tick after errors says the board is back, and a new error mails Boss again', async () => {
   let fail = true
-  const readCards = async () => { if (fail) throw new Error('no account yet'); return [] }
+  const readCards = async () => {
+    if (fail) throw new Error('no account yet')
+    return []
+  }
   const bad = await tick({ now: T0, crew: CREW, readCards, state: {} })
   fail = false
   const good = await tick({ now: T0 + MIN, crew: CREW, readCards, state: bad.state })
@@ -147,9 +151,9 @@ test('start puts the dry-run loop in its own detached session through detach.sh;
 })
 
 test('the paths in the loop command are quoted, so a home or kit folder with spaces or quotes is one word each', () => {
-  const [, args] = daemonCommand("/crew home/it's", 'start', { kit: '/my kit', live: true })
+  const [, args] = daemonCommand('/crew home/it\'s', 'start', { kit: '/my kit', live: true })
   assert.equal(args[4], `CREW_HOME='/crew home/it'\\''s' ${shellQuote(process.execPath)} '/my kit/susy-daemon.mjs' loop --live`)
-  assert.equal(shellQuote('plain'), "'plain'")
+  assert.equal(shellQuote('plain'), '\'plain\'')
 })
 
 test('the up part: its check passes on a fresh heartbeat and fails on a stale one; only the live part starts with --live', () => {
