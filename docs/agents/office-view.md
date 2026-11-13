@@ -25,13 +25,13 @@ address by hand shows *No crew works on this board*. A crew that is switched off
 
 ## The desk lights
 
-Each desk has a small light beside the name. It shows what the crew monitor says the person is doing:
+Each desk has a desk lamp on it, the Boss's and Pia's included. It shows whether the person has work in progress, as the crew monitor reports it:
 
-- a **red filled dot** is busy;
-- a **green ring** is idle;
-- a **grey dashed ring** is no status yet. The office never guesses busy or idle.
+- a **green lit shade** (the glow under the lamp) means the person has a card in progress, or a subtask of theirs under one;
+- **no glow** under the shade means the person has nothing in progress (the lamp itself stays the same colour);
+- a **grey dashed outline** means no status yet. The office never guesses in progress or not.
 
-The shape says the state as well as the colour. Hover the light (or tap it on a phone) to read the status text: "Busy: …",
+The glow says the state as well as the colour. Hover the light (or tap it on a phone) to read the status text: "Busy: …",
 "Idle since 21:40", or "No status yet". The light changes while you watch, without a reload. The status comes from the crew monitor, which reads the board (see
 [The crew monitor](/help/agents/crew-monitor)).
 
