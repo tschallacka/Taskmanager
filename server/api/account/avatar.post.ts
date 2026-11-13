@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { eq } from 'drizzle-orm'
 import { db } from '../../db'
 import { user } from '../../db/schema'
-import { mayChangeProfile, svgProblem, uploadProblem } from '../../utils/avatarRules'
+import { mayChangeProfile, requestSizeProblem, svgProblem, uploadProblem } from '../../utils/avatarRules'
 import { avatarDir, AVATAR_EXT } from '../../utils/avatarStore'
 
 // Uploads the signed-in person's own picture: PNG, JPEG, WebP or SVG up to 2 MB. The type comes from the file's MIME type
@@ -12,6 +12,9 @@ import { avatarDir, AVATAR_EXT } from '../../utils/avatarStore'
 export default defineEventHandler(async (event) => {
   const me = event.context.session.user.id
   if (!mayChangeProfile(me, me)) throw createError({ statusCode: 403, message: 'You can change only your own picture.' })
+  // The declared size is checked before the body is read: a too-large or unsized upload is refused without being read.
+  const sizeProblem = requestSizeProblem(getHeader(event, 'content-length'))
+  if (sizeProblem) throw createError(sizeProblem)
   const parts = await readMultipartFormData(event)
   const file = parts?.find(part => part.name === 'file' && part.data)
   if (!file?.data) throw createError({ statusCode: 400, message: 'No picture was sent.' })
