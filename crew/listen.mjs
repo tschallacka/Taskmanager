@@ -14,6 +14,8 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { config, here, loadCreds } from './config.mjs'
+import { parseListenState } from './listen-state.mjs'
+import { writePidFile } from './pidfile.mjs'
 
 const creds = loadCreds()
 const [who, secs] = process.argv.slice(2)
@@ -33,8 +35,11 @@ const CHANNELS = role === 'pia' ? [workChannel, channel] : role === 'usher' ? [c
 const boardId = me.boardId ?? creds.board.id
 
 mkdirSync(`${here}.listen`, { recursive: true })
+// The hooks and watches find this listener by its pid file (CREW_HOME/.listen/<who>.pid), not by a process scan.
+writePidFile(here, who)
 const statePath = `${here}.listen/${who}.json`
-const state = existsSync(statePath) ? JSON.parse(readFileSync(statePath, 'utf8')) : { joined: false, notes: [], tasks: null }
+// A state file with a missing or malformed list reads as empty (listen-state.mjs), so the loop keeps listening.
+const state = parseListenState(existsSync(statePath) ? readFileSync(statePath, 'utf8') : 'null')
 
 function chat(args) {
   if (!CHAT) return ''

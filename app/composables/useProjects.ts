@@ -1,9 +1,25 @@
 import { computed, ref } from 'vue'
 import type MiniSearch from 'minisearch'
 import { realtimeHeaders } from '~/composables/useRealtime'
+import { mergeCommentPages } from '~/utils/commentMerge'
+import { applyLiveComment } from '~/utils/commentWindowLive'
+import { BOARD_LOAD_TIMEOUT_MS, boardLoadStateAfter, withTimeout, type BoardLoadError } from '~/utils/boardLoad'
 import { clearCustomFields, ingestBoardFields } from '~/composables/useCustomFields'
 import type { FieldValues, ProjectField } from '~/composables/useCustomFields'
 import { matchesTagRequirements, type TagRequirement } from '#shared/utils/tags'
+
+// A permalink's window as the API returns it (server/utils/commentWindow.ts): the comments and what is left either side.
+interface CommentWindowPage {
+  comments: TaskComment[]
+  hasEarlier: boolean
+  earlierCount: number
+  hasLater: boolean
+  laterCount: number
+}
+
+function windowCounts(page: CommentWindowPage) {
+  return { hasEarlier: page.hasEarlier, earlierCount: page.earlierCount, hasLater: page.hasLater, laterCount: page.laterCount }
+}
 
 // Mirrors VISIBILITIES in server/db/schema.ts: `internal` is for the
 // organisation only, `customer` is also shown to the project's customer.
@@ -23,11 +39,25 @@ export interface Project {
   archivedAt?: number | null
   // The dashboard widgets this project shows, in order; null is the default set.
   dashboardWidgets?: string[] | null
+  // The workspace the board lives in: a real board the list shows beside a crew's shadow opens after a switch to it.
+  teamId?: string | null
   customerId?: string | null
   customerName?: string | null
   audience?: Audience
   // Set by the server on a crew's shadow board opened by the staff of the real board.
   readOnly?: boolean
+  // On a crew's shadow board: whether this person may delete it (the server's rule, crew-board.delete.ts).
+  crewDeletable?: boolean
+  // The crew tree (server/utils/boardTree.ts): what the board is, and which boards it nests with. Only the list
+  // answers with these; a board opened on its own has none, and the board header reads them from the list.
+  role?: 'board' | 'real' | 'shadow' | 'crew_home'
+  // On a shadow board: the real board it works for. `openable`: this person belongs to that board's workspace, so the
+  // breadcrumb links to it (after a workspace switch).
+  realBoard?: { id: string, name: string, teamId: string | null, openable: boolean } | null
+  // On a real board: its crews' shadow boards that the list shows, each with its crew.
+  shadows?: { id: string, name: string, crewId: string, crewName: string, crewSlug: string }[]
+  // On a shadow board: its crew. On a crew's home board: the crew it is the home of.
+  crew?: { id: string, name: string, slug: string } | null
   // Colours pinned to this board's task labels, keyed by the label. A label
   // with no entry falls back to the colour derived from its own text.
   labelColors?: Record<string, string>
@@ -157,6 +187,8 @@ interface BoardPayload {
   githubBadges?: Record<string, GithubBadge[]>
   // Whether a crew works on this board, so the Office view is offered. Never sent to a customer.
   crewBoard?: boolean
+  // The crews on this board when it is a real board (its Office view picks one). Staff only; never for a customer.
+  linkedCrews?: { id: string, name: string }[]
   // The project's custom fields and each task's values. Staff only; a
   // contact's board carries empty ones.
   fields?: ProjectField[]
@@ -183,11 +215,15 @@ const _activeProjectId = ref<string | null>(null)
 // The open project when the list no longer holds it (archived): its page still needs it.
 const _archivedActive = ref<Project | null>(null)
 const _board = ref<{ columns: ProjectColumn[], tasks: ProjectTask[] } | null>(null)
+// Why the open board did not load (boardLoad.ts); null while it loads or once it has.
+const _boardLoadError = ref<BoardLoadError | null>(null)
 // Update counts live beside the board: task PUT responses do not carry them, so
 // folding them into the task would wipe the badge on every edit.
 const _commentCounts = ref<Record<string, number>>({})
 // Whether the board is a crew's, so its Office view is offered. Set with the board it came with.
 const _crewBoard = ref(false)
+// The crews linked to the open board when it is a real board. Set with the board it came with.
+const _linkedCrews = ref<{ id: string, name: string }[]>([])
 // The open board's GitHub badges, from the board endpoint. Read by each card.
 const _githubBadges = ref<Record<string, GithubBadge[]>>({})
 // The open board's subtasks. Kept beside the cards rather than among them, so
@@ -199,6 +235,10 @@ const _boardLoading = ref(false)
 const _ready = ref(false)
 const _comments = ref<TaskComment[]>([])
 const _commentsTaskId = ref<string | null>(null)
+// What is left on each side of the comments shown, when a permalink opened a window (null: the whole thread).
+// The task whose permalink window is shown (null: none). While it is set, a whole-thread load leaves the window alone.
+let windowTaskId: string | null = null
+const _commentWindow = ref<{ hasEarlier: boolean, earlierCount: number, hasLater: boolean, laterCount: number } | null>(null)
 const _activity = ref<TaskActivityItem[]>([])
 // Label filter for the open board. Kanban labels annotate tasks (priority,
 // workstream, …) rather than group boards, so they act as a board-level filter
@@ -279,6 +319,7 @@ const _boardCache = new Map<string, {
   commentCounts: Record<string, number>
   githubBadges: Record<string, GithubBadge[]>
   crewBoard: boolean
+  linkedCrews: { id: string, name: string }[]
 }>()
 
 function cacheBoard(projectId: string) {
@@ -291,7 +332,8 @@ function cacheBoard(projectId: string) {
     people: _people.value,
     commentCounts: _commentCounts.value,
     githubBadges: _githubBadges.value,
-    crewBoard: _crewBoard.value
+    crewBoard: _crewBoard.value,
+    linkedCrews: _linkedCrews.value
   })
   while (_boardCache.size > BOARD_CACHE_SIZE) _boardCache.delete(_boardCache.keys().next().value!)
 }
@@ -591,8 +633,9 @@ export function useProjects() {
     return updated
   }
 
-  async function deleteProject(id: string) {
-    await $fetch(`/api/projects/${id}`, { method: 'DELETE', headers: realtimeHeaders() })
+  // A crew's shadow board goes through the crew route, which applies the crew rule (crew-board.delete.ts).
+  async function deleteProject(id: string, crewBoard = false) {
+    await $fetch(crewBoard ? `/api/projects/${id}/crew-board` : `/api/projects/${id}`, { method: 'DELETE', headers: realtimeHeaders() })
     _projects.value = _projects.value.filter(p => p.id !== id)
     _allTasks.value = _allTasks.value.filter(t => t.projectId !== id)
     reindexSearch()
@@ -635,6 +678,8 @@ export function useProjects() {
 
   async function loadBoard(id: string) {
     _boardLoading.value = true
+    // A retry clears the error while the board loads again.
+    _boardLoadError.value = boardLoadStateAfter(_boardLoadError.value, { type: 'retry' })
     try {
       if (_activeProjectId.value !== id) {
         if (_activeProjectId.value) cacheBoard(_activeProjectId.value)
@@ -652,12 +697,14 @@ export function useProjects() {
         _commentCounts.value = cached?.commentCounts ?? {}
         _githubBadges.value = cached?.githubBadges ?? {}
         _crewBoard.value = cached?.crewBoard ?? false
+        _linkedCrews.value = cached?.linkedCrews ?? []
         _trashedCount.value = 0
       }
       _activeProjectId.value = id
       await refreshArchivedActive(id)
       const [board, people] = await Promise.all([
-        $fetch<BoardPayload>(boardUrl(id)),
+        // A request that never completes is a failure after the timeout, not a spinner (boardLoad.ts).
+        withTimeout($fetch<BoardPayload>(boardUrl(id)), BOARD_LOAD_TIMEOUT_MS),
         // The picker is not worth failing the board over.
         $fetch<ProjectPerson[]>(`/api/projects/${id}/people`).catch(() => _people.value)
       ])
@@ -669,10 +716,17 @@ export function useProjects() {
         _commentCounts.value = board.commentCounts ?? {}
         _githubBadges.value = board.githubBadges ?? {}
         _crewBoard.value = board.crewBoard ?? false
+        _linkedCrews.value = board.linkedCrews ?? []
         _trashedCount.value = board.trashedCount ?? 0
         ingestBoardFields(id, board.fields ?? [], board.fieldValues ?? {})
       }
+      _boardLoadError.value = boardLoadStateAfter(_boardLoadError.value, { type: 'loaded' })
       return board
+    } catch (error) {
+      // A failure keeps the reason for the page's sentence, and the error still goes to the caller.
+      const failure = error as { statusCode?: number, status?: number } | null
+      _boardLoadError.value = boardLoadStateAfter(_boardLoadError.value, { type: 'fail', status: failure?.statusCode ?? failure?.status ?? null })
+      throw error
     } finally {
       _boardLoading.value = false
     }
@@ -831,6 +885,7 @@ export function useProjects() {
         _commentCounts.value = board.commentCounts ?? {}
         _githubBadges.value = board.githubBadges ?? {}
         _crewBoard.value = board.crewBoard ?? false
+        _linkedCrews.value = board.linkedCrews ?? []
         _trashedCount.value = board.trashedCount ?? 0
         ingestBoardFields(projectId, board.fields ?? [], board.fieldValues ?? {})
       }
@@ -964,13 +1019,69 @@ export function useProjects() {
     if (_commentsTaskId.value === taskId) _activity.value = rows
   }
 
+  // A permalink's window: the comment with 5 either side (the API counts what is left on each side).
+  async function loadCommentWindow(taskId: string, around: string) {
+    _commentsTaskId.value = taskId
+    windowTaskId = taskId
+    const page = await $fetch<CommentWindowPage>(`/api/tasks/${taskId}/comments`, { query: { around } })
+    if (_commentsTaskId.value === taskId) {
+      _comments.value = page.comments
+      _commentWindow.value = windowCounts(page)
+    }
+    return page.comments
+  }
+
+  // "Load earlier comments": every comment before the oldest one shown, joined in front of the window.
+  async function loadEarlierComments(taskId: string) {
+    const current = _comments.value
+    if (!current.length || _commentsTaskId.value !== taskId) return
+    const page = await $fetch<CommentWindowPage>(`/api/tasks/${taskId}/comments`, { query: { before: current[0]!.id } })
+    if (_commentsTaskId.value !== taskId) return
+    _comments.value = mergeCommentPages(page.comments, _comments.value)
+    _commentWindow.value = { ...(_commentWindow.value ?? windowCounts(page)), hasEarlier: false, earlierCount: 0 }
+  }
+
+  // "Show later comments": every comment after the newest one shown, joined after the window.
+  async function loadLaterComments(taskId: string) {
+    const current = _comments.value
+    if (!current.length || _commentsTaskId.value !== taskId) return
+    const page = await $fetch<CommentWindowPage>(`/api/tasks/${taskId}/comments`, { query: { after: current.at(-1)!.id } })
+    if (_commentsTaskId.value !== taskId) return
+    _comments.value = mergeCommentPages(_comments.value, page.comments)
+    _commentWindow.value = { ...(_commentWindow.value ?? windowCounts(page)), hasLater: false, laterCount: 0 }
+  }
+
   async function loadComments(taskId: string) {
+    // A permalink's window stays for its task: the whole-thread load must not replace it.
+    if (windowTaskId !== taskId) {
+      windowTaskId = null
+      _commentWindow.value = null
+    }
     _commentsTaskId.value = taskId
     const [comments] = await Promise.all([
       $fetch<TaskComment[]>(`/api/tasks/${taskId}/comments`),
       loadActivity(taskId).catch(() => {})
     ])
     if (_commentsTaskId.value === taskId) {
+      if (windowTaskId === taskId) {
+        // A window stays as it is. A comment newer than the window joins it only when the later side is loaded;
+        // otherwise the Show later count goes up (commentWindowLive.ts).
+        const newest = _comments.value.at(-1)?.createdAt ?? Number.NEGATIVE_INFINITY
+        let shown = _comments.value
+        let state = _commentWindow.value
+        if (state) {
+          let current = state
+          for (const live of comments.filter(c => c.createdAt > newest).sort((a, b) => a.createdAt - b.createdAt)) {
+            const applied = applyLiveComment(shown, current, live)
+            shown = applied.comments
+            current = applied.state
+          }
+          state = current
+        }
+        _comments.value = shown
+        _commentWindow.value = state
+        return comments
+      }
       _comments.value = comments
       _commentCounts.value = { ..._commentCounts.value, [taskId]: comments.length }
     }
@@ -1021,6 +1132,8 @@ export function useProjects() {
     _comments.value = []
     _activity.value = []
     _commentsTaskId.value = null
+    windowTaskId = null
+    _commentWindow.value = null
   }
 
   // Merged hits for the global search modal: tasks first (title boost), then
@@ -1079,6 +1192,7 @@ export function useProjects() {
     isReadOnlyBoard,
     activeProjectId: _activeProjectId,
     board: _board,
+    boardLoadError: _boardLoadError,
     subtasks: _subtasks,
     people: _people,
     subtasksOf,
@@ -1113,6 +1227,7 @@ export function useProjects() {
     labelColors,
     labelColor,
     setLabelColor,
+    linkedCrews: _linkedCrews,
     showTrashed: _showTrashed,
     trashedCount: _trashedCount,
     crewBoard: _crewBoard,
@@ -1132,6 +1247,10 @@ export function useProjects() {
     deleteTask,
     restoreTask,
     loadComments,
+    loadCommentWindow,
+    loadEarlierComments,
+    loadLaterComments,
+    commentWindow: _commentWindow,
     addComment,
     editComment,
     setCommentVisibility,

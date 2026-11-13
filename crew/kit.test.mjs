@@ -24,6 +24,9 @@ import { crewHome } from './home.mjs'
 import { codeAt, keyOf } from './totp.mjs'
 import { createOTP } from '@better-auth/utils/otp'
 import { CAST, EXTRA_CAST, forkMemberPlan, forkRole } from './cast.mjs'
+import { copyKitFiles, kitListed, writeCrewJson } from './test-fixtures.mjs'
+
+const kitFilesOf = kitListed
 
 test('the extra workers the kit names are the ones the app shares: one list, and this fails when they differ', () => {
   const shared = readFileSync(join(KIT, '..', 'shared', 'utils', 'extraWorkers.ts'), 'utf8')
@@ -45,7 +48,7 @@ test('an extra worker plays its role from its fork, and the plan of a forked mem
 const KIT = dirname(fileURLToPath(import.meta.url))
 const CREW = join(KIT, 'crew.mjs')
 const DRIVER = join(KIT, 'browser-driver.mjs')
-const NOT_SHIPPED = /\.test\.mjs$|^\.|^kit-files\.txt$/
+const NOT_SHIPPED = /\.test\.mjs$|^\.|^kit-files\.txt$|^test-fixtures\.mjs$/
 const SECRET_OR_RUN = /^(creds|crew|crew\.config|package-lock)\.json$|\.log$/
 
 describe('the kit file list', () => {
@@ -388,10 +391,10 @@ describe('CREW_HOME and the agent types', () => {
       'acme-wade-worker.md', 'acme-wick-worker.md', 'acme-wren-worker.md', 'acme-wynn-worker.md'
     ])
     const pia = readFileSync(join(agents, 'acme-pia-planner.md'), 'utf8')
-    assert.match(pia, /^---\nname: acme-pia-planner\ndescription: ".+"\nmodel: haiku\n---\n/)
+    assert.match(pia, /^---\nname: acme-pia-planner\ndescription: ".+"\nmodel: claude-haiku-5-5\n---\n/)
     assert.ok(pia.includes(`CREW_HOME=${dir} node ${KIT}/`), 'the definition carries the resolved CREW_HOME')
     const prompts = readFileSync(join(dir, 'PROMPTS.md'), 'utf8')
-    assert.match(prompts, /\| `wren` \| Wren Worker \| wren \| `acme-wren-worker` \| claude: haiku \|/)
+    assert.match(prompts, /\| `wren` \| Wren Worker \| wren \| `acme-wren-worker` \| claude: claude-haiku-5-5 \|/)
     assert.ok(prompts.includes(`CREW_HOME=${dir} node ${KIT}/listen.mjs pia 60`), 'commands carry CREW_HOME')
   })
 
@@ -403,12 +406,12 @@ describe('CREW_HOME and the agent types', () => {
       team: 'Acme Crew',
       crew: { slug: 'acme' },
       board: { url: 'http://127.0.0.1:9' },
-      models: { default: 'haiku', usher: 'sonnet', wick: { provider: 'ollama', model: 'small-local' }, pm: { model: 'opus' } }
+      models: { default: 'claude-haiku-5-5', usher: 'sonnet', wick: { provider: 'ollama', model: 'small-local' }, pm: { model: 'opus' } }
     }))
     const out = run(home, 'init.mjs', '~/crew-home/acme')
     const agents = join(home, '.claude', 'agents')
     assert.match(readFileSync(join(agents, 'acme-usher-xander.md'), 'utf8'), /\nmodel: sonnet\n/)
-    assert.match(readFileSync(join(agents, 'acme-wren-worker.md'), 'utf8'), /\nmodel: haiku\n/)
+    assert.match(readFileSync(join(agents, 'acme-wren-worker.md'), 'utf8'), /\nmodel: claude-haiku-5-5\n/)
     assert.match(readFileSync(join(agents, 'acme-pia-planner.md'), 'utf8'), /\nmodel: opus\n/, 'an old key in models is read as the new one')
     assert.ok(!readdirSync(agents).includes('acme-wick-worker.md'), 'no definition for a provider the kit does not start')
     assert.match(out.stdout, /WARN acme-wick-worker is set to ollama \(small-local\)/)
@@ -435,7 +438,7 @@ describe('CREW_HOME and the agent types', () => {
     assert.equal(out.status, 1)
     const agents = join(home, '.claude', 'agents')
     for (const file of ['acme-wren-worker.md', 'acme-quincy-average.md', 'acme-usher-xander.md']) {
-      assert.match(readFileSync(join(agents, file), 'utf8'), /\nmodel: haiku\n/, file)
+      assert.match(readFileSync(join(agents, file), 'utf8'), /\nmodel: claude-haiku-5-5\n/, file)
     }
   })
 
@@ -474,7 +477,7 @@ describe('CREW_HOME and the agent types', () => {
     const stored = join(dir, 'forks', 'forks-acme-internal-tools.json')
     assert.equal(statSync(stored).mode & 0o777, 0o600, 'the file holds passwords and keys: owner only')
     const wren = readFileSync(join(home, '.claude', 'agents', 'internal-tools-wren.md'), 'utf8')
-    assert.match(wren, /^---\nname: internal-tools-wren\ndescription: ".+Internal Tools.+"\nmodel: haiku\n---\n/)
+    assert.match(wren, /^---\nname: internal-tools-wren\ndescription: ".+Internal Tools.+"\nmodel: claude-haiku-5-5\n---\n/)
     assert.ok(wren.includes('crew.mjs internal-tools-wren'), 'the definition tells the agent to sign in as itself')
     assert.ok(!wren.includes('arn_forkone') && !wren.includes('pw-one'), 'no secret goes into an agent definition')
     // The crew's own members are written as before, next to the forks.
@@ -513,17 +516,11 @@ describe('CREW_HOME and the agent types', () => {
 // ---------- crew update: the kit folder and the owner files (no browser needed) ----------
 
 describe('crew update: the kit folder and the owner files', () => {
-  const kitFilesOf = dir => readFileSync(join(dir, 'kit-files.txt'), 'utf8').split('\n').map(line => line.trim()).filter(line => line && !line.startsWith('#'))
   const editFile = (path, change) => writeFileSync(path, change(readFileSync(path, 'utf8')))
 
-  // A copy of the kit's listed files, as a folder the crew runs from.
-  function copyKit(dest, from = KIT) {
-    mkdirSync(dest, { recursive: true })
-    for (const name of [...kitFilesOf(from), 'kit-files.txt']) copyFileSync(join(from, name), join(dest, name))
-  }
-  function writeConfig(crew, url) {
-    writeFileSync(join(crew.home, 'crew.json'), JSON.stringify({ team: 'Test Crew', crew: { slug: 'test' }, product: { name: 'Test', repo: '' }, board: { url } }))
-  }
+  // A copy of the kit's listed files, as a folder the crew runs from (the fixture the update tests share).
+  const copyKit = (dest, from = KIT) => copyKitFiles(dest, from)
+  const writeConfig = (crew, url) => writeCrewJson(crew.home, { slug: 'test', url, team: 'Test Crew' })
   function newCrew() {
     const root = mkdtempSync(join(SCRATCH, 'kit-update-'))
     made.push(root)
@@ -575,7 +572,11 @@ describe('crew update: the kit folder and the owner files', () => {
     const out = await updateKit(dirA, crew, ['--from', KIT, '--kit', dirA])
     assert.equal(out.code, 0, out.stderr)
     assert.match(out.stdout, /is up to date/)
-    assert.deepEqual(snapshot(crew.home), before, 'the crew home is the same after the check')
+    // The crew home had no record of its kit (init does not write one), so the check links it to the folder it runs
+    // from. That link is the one change; every owner file and the rest of the home stay as they were.
+    const { '/crew-kit.json': link, ...rest } = snapshot(crew.home)
+    assert.deepEqual(rest, before, 'the crew home is the same after the check, apart from its link')
+    assert.equal(JSON.parse(link).kit, dirA, 'the home now names the kit folder it runs from')
     assert.deepEqual(backupsOf(crew), [], 'no backup when nothing changed')
   })
 
@@ -613,6 +614,40 @@ describe('crew update: the kit folder and the owner files', () => {
     assert.ok(manifest.files['update.mjs'], 'the install is recorded')
     const again = await updateKit(dirA, crew, ['--check', '--from', dirB, '--kit', dirA])
     assert.equal(again.code, 0, again.stdout)
+  })
+
+  test('a real crew keeps its own files through an update: rules, brief, janitor card and creds are untouched', async () => {
+    const crew = newCrew()
+    const dirA = await installedKit(crew)
+    const dirB = newerKit(dirA, crew)
+    // The crew's own filled-in files and its secrets, as a crew that has been running holds them. The secrets are fake.
+    editFile(ownerFile(crew), text => `${text}\nOwner rules kept.\n`)
+    editFile(join(crew.home, 'BRIEF.md'), text => `${text}\nOwner brief kept.\n`)
+    writeFileSync(join(crew.home, 'JANET.md'), '# Janet card\n\nOwner janitor line kept.\n')
+    writeFileSync(join(crew.home, 'creds.json'), JSON.stringify({ people: { wade: { password: 'test-only' } } }))
+    const creds = readFileSync(join(crew.home, 'creds.json'), 'utf8')
+    // The crew.json a running crew holds: its reader, dev ports and start command are already set (init fills in only
+    // what is missing, so a complete crew.json is one it leaves alone).
+    const running = JSON.parse(readFileSync(join(crew.home, 'crew.json'), 'utf8'))
+    writeFileSync(join(crew.home, 'crew.json'), JSON.stringify({
+      ...running,
+      reader: running.reader ?? 'wade',
+      devServers: running.devServers ?? { wade: 3104 },
+      scripts: { ...(running.scripts ?? {}), serve: running.scripts?.serve ?? 'bunx nuxt dev --host 127.0.0.1 --port {port}' }
+    }, null, 2) + '\n')
+    const config = readFileSync(join(crew.home, 'crew.json'), 'utf8')
+    const out = await updateKit(dirA, crew, ['--from', dirB, '--kit', dirA])
+    // init's FAIL line about playwright is expected in a copy with no node_modules, so the exit code is not checked.
+    assert.match(out.stdout, /crew update: the kit in/, out.stdout + out.stderr)
+    assert.doesNotMatch(out.stdout, /CONFLICT:/, out.stdout)
+    assert.equal(readFileSync(join(crew.home, 'creds.json'), 'utf8'), creds, 'creds.json is not touched')
+    assert.equal(readFileSync(join(crew.home, 'crew.json'), 'utf8'), config, 'crew.json is not touched')
+    assert.equal(readFileSync(join(crew.home, 'JANET.md'), 'utf8'), '# Janet card\n\nOwner janitor line kept.\n', 'the janitor card is the crew\'s own')
+    const rules = readFileSync(ownerFile(crew), 'utf8')
+    assert.match(rules, /Owner rules kept\./, 'the rules keep the crew\'s text')
+    assert.match(rules, /Replace the examples here/, 'the new template line is merged in')
+    assert.doesNotMatch(rules, /<<<<<<</)
+    assert.match(readFileSync(join(crew.home, 'BRIEF.md'), 'utf8'), /Owner brief kept\./, 'the brief keeps the crew\'s text')
   })
 
   test('an owner edit on the line the template changed is a conflict: the owner file is kept', async () => {

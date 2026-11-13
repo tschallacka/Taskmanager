@@ -7,7 +7,6 @@ useSeoMeta({ title: 'Crews' })
 
 const { isInstanceAdmin, isPending: sessionPending } = useAuth()
 const toast = useToast()
-const { sidebarOpen } = useSidebar()
 
 function errMsg(e: unknown): string | undefined {
   return (e as { data?: { message?: string } })?.data?.message
@@ -37,17 +36,6 @@ interface WindowState {
 // admin never sends these requests.
 const { data: crewData, refresh: refreshCrews, status: crewStatus } = useFetch<{ crews: CrewRow[] }>('/api/admin/crews', { server: false, immediate: false })
 const { data: windowData, refresh: refreshWindow } = useFetch<WindowState>('/api/settings/crew-api-window', { server: false, immediate: false })
-
-watch([sessionPending, isInstanceAdmin], ([pending, admin]) => {
-  if (pending) return
-  if (!admin) {
-    navigateTo('/settings', { replace: true })
-    return
-  }
-  refreshCrews()
-  refreshWindow()
-  refreshPermission()
-}, { immediate: true })
 
 const crews = computed(() => crewData.value?.crews ?? [])
 
@@ -125,6 +113,18 @@ async function copy(value: string) {
 
 // The instance level of the crew permission: switching it off disables every crew.
 const { data: permissionData, refresh: refreshPermission } = useFetch<{ crewsAllowed: boolean }>('/api/settings/crew-permission', { server: false, immediate: false })
+
+// Declared after refreshPermission: an immediate watch that calls it earlier throws on load.
+watch([sessionPending, isInstanceAdmin], ([pending, admin]) => {
+  if (pending) return
+  if (!admin) {
+    navigateTo('/settings', { replace: true })
+    return
+  }
+  refreshCrews()
+  refreshWindow()
+  refreshPermission()
+}, { immediate: true })
 
 async function setCrewsAllowed(allowed: boolean) {
   busy.value = 'permission'
@@ -240,16 +240,6 @@ function cancelPurge() {
   <div class="h-full overflow-y-auto px-4 pb-10 pt-6 lg:px-6">
     <div class="mx-auto max-w-4xl space-y-8">
       <div class="flex items-center gap-3">
-        <UButton
-          v-if="!sidebarOpen"
-          icon="i-lucide-panel-left"
-          color="neutral"
-          variant="ghost"
-          size="sm"
-          class="lg:hidden"
-          aria-label="Open sidebar"
-          @click="sidebarOpen = true"
-        />
         <div class="flex-1 min-w-0">
           <h1 class="text-xl font-semibold text-default">
             Crews

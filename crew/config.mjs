@@ -6,7 +6,7 @@
 // to the kit folder. crew.json (written by `crew setup`, or by hand) holds the product,
 // URLs, people and chat settings; creds.json holds the accounts and keys the board made.
 import { readFileSync, existsSync, readdirSync } from 'node:fs'
-import { crewHome, kitDir } from './home.mjs'
+import { crewHome, kitDir, shellWord } from './home.mjs'
 import { CAST, EXTRA_CAST, forkMemberPlan, forkRole } from './cast.mjs'
 import { migrateCrewHome, renameKeys } from './keys.mjs'
 
@@ -59,6 +59,8 @@ export const config = {
   // The slug the crew API files this crew under (setup.mjs reads it).
   crew: raw.crew ?? {},
   devLog: raw.devLog ?? `${here}dev.log`,
+  // The folder Boss runs its Claude Code session in: init writes Boss's Stop hook there (boss-session.mjs). Empty: none is written.
+  bossSession: raw.bossSession ? String(raw.bossSession).replace(/\/$/, '') : '',
   // The merger's `crew publish` (publish.mjs validates it and names every problem); the repository defaults to the product's.
   publish: { repo: raw.product?.repo ?? '', ...raw.publish }
 }
@@ -114,11 +116,15 @@ const slugify = text => String(text).toLowerCase().normalize('NFKD').replace(/[^
 export { CAST, EXTRA_CAST, forkMemberPlan, forkRole }
 
 // The model each person runs on is the Owner's choice, set per person in crew.json under "models" (README, "Models").
-// The kit fixes no model name: a person with no entry gets "haiku", which is Claude Code's name for the cheap tier of
-// Claude, not a model version. "default" in crew.json applies to everyone who is not named.
+// A person with no entry gets the cheap Claude model by its full id. The bare alias "haiku" is not used: Claude Code stopped
+// accepting it in 2026-11 ("unrecognized model"), which stopped every agent from starting (card mwc5aicfyb9r0fvopvf).
+// "default" in crew.json applies to everyone who is not named.
 export const PROVIDERS = ['claude', 'openrouter', 'ollama']
-const CHEAP_CLAUDE = { provider: 'claude', model: 'haiku' }
+export const CHEAP_CLAUDE_MODEL = 'claude-haiku-5-5'
+const CHEAP_CLAUDE = { provider: 'claude', model: CHEAP_CLAUDE_MODEL }
 const MODEL_NAME = /^[A-Za-z0-9][\w.:/@-]{0,99}$/
+// The bare alias that Claude Code stopped accepting; crew.json naming it is reported, never written into an agent file.
+const BARE_HAIKU = 'haiku'
 
 /**
  * Every cast member's { provider, model } from the "models" of crew.json. A string is a Claude model
@@ -150,6 +156,10 @@ function parseModel(entry, key, problems) {
     problems.push(`models.${key}: the model must be a name of letters, digits and . _ : / @ - (it is written into an agent definition)`)
     return null
   }
+  if (provider === 'claude' && model === BARE_HAIKU) {
+    problems.push(`models.${key}: "${BARE_HAIKU}" is not a model name Claude Code accepts any more; use "${CHEAP_CLAUDE_MODEL}" or another full model id`)
+    return null
+  }
   return { provider, model }
 }
 
@@ -163,11 +173,12 @@ export const modelProblems = resolvedModels.problems
  */
 export const agentNames = Object.fromEntries(CAST.filter(key => !EXTRA_CAST.includes(key)).map(key => [key, `${slugify(config.crew.slug || config.team)}-${slugify(config.people[key])}`]))
 
-// A path as one shell word, quoted only when it has to be.
-const shellWord = text => (/^[\w@%+=:,./-]+$/.test(text) ? text : `'${text.replace(/'/g, `'\\''`)}'`)
+// shellWord comes from home.mjs (one rule for the kit); config re-exports it for the scripts that import it from here.
+export { shellWord }
 
 // The documents the owner edits by hand. init writes each once and keeps it; update merges the new template into it.
-export const OWNER_FILES = ['PROJECT-RULES.md', 'BRIEF.md']
+// JANET.md is one of them: the janitor's card is filled in by the crew, so a crew's own edits must survive an update.
+export const OWNER_FILES = ['PROJECT-RULES.md', 'BRIEF.md', 'JANET.md']
 
 /** Fills {{key}} from the template values; a key with no value stays as it is. */
 export function renderTemplate(text, values = templateValues()) {

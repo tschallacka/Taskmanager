@@ -19,6 +19,11 @@ A crew may import into its **own** board: its shadow board, or the board it was 
 its work from one instance to another and restore it. A crew key is refused on every other board, and it cannot
 create a new board by import.
 
+A crew's board that you reach through the real board it works for is read-only for everyone, with one exception: the
+**instance admin** can load a backup into it. Open the crew's board; the grey line at the top ("This is a crew's
+board...") has a button, **Load a backup into this board**. It opens the same dialog as Board settings: pick the file,
+read the dry-run report, confirm. Nobody else sees the button, and every other change to that board is still refused.
+
 ## What comes across
 
 - **Cards**, with their columns, labels, due and start dates, completion, visibility (internal or customer),

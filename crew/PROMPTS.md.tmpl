@@ -42,6 +42,15 @@ Two facts that cost time before, so they are in every prompt:
   your loop"). Pia's loop is: wake on a hand-back, read the board (`{{node_kit}}/watch.mjs`), resume or
   start again whoever stopped.
 
+## Boss's watches (Boss, at the start of every session)
+
+Start two Monitors, each with timeout 1800000, and re-arm each one when it expires:
+
+- `CREW_HOME={{crew_dir}} node {{node_kit}}/crew.mjs boss-mentions`, description "@boss mentions from Pia, Susy and Rita on the crew board".
+- `CREW_HOME={{crew_dir}} node {{node_kit}}/crew.mjs watch-crew`, description "Pia and Susy keep working (alerts only on trouble)".
+
+Boss's Stop hook blocks a stop while one of them is not running. `init` writes that hook into the folder that crew.json names as `bossSession`: set it to the folder Boss's Claude Code session runs in, or the hook is not written.
+
 ## Starting Pia (Boss)
 
 Pia needs her own Claude Code session, because she starts agents and a subagent cannot start other agents. Boss
@@ -51,7 +60,7 @@ real terminal, so never start it headless. In that terminal:
 ```
 export CREW_HOME={{crew_dir}}
 mkdir -p {{crew_dir}}/pia-session && cd {{crew_dir}}/pia-session
-claude --model {{models.pia.model}} --add-dir {{crew_dir}} --add-dir {{kit_dir}}
+node {{kit_dir}}/claude.mjs merge {{kit_dir}}/pia-session.settings.json {{crew_dir}}/pia-session/settings.merged.json && claude --model {{models.pia.model}} --add-dir {{crew_dir}} --add-dir {{kit_dir}} --settings {{crew_dir}}/pia-session/settings.merged.json
 ```
 
 `--model` is her model from the table above. It applies when her provider is `claude`; for another provider the
@@ -65,6 +74,17 @@ otherwise the one under "PM". Check that she answers and has read `CREW.md`, the
 Boss checks Pia at the start of every turn (the rule is in `WORKFLOW.md`, section 1). When she is unavailable, Boss
 starts her again the same way, posts one line on the task that waited for her, and tells the Owner when she is
 unavailable again after one restart.
+
+**What a restart of Boss's Claude Code session ends.** Pia's session (it runs under Boss's interactive-shell), every
+agent she started, the dev database, Boss's dev copy and the workers' dev copies. A stale `~/.interactive-shell/sockets/pia/term.sock`
+left behind makes a new Pia session start and die at once, silently. Pia's session and the dev services can be kept in
+a detached tmux session (`crew/detach.sh`, named in crew.json's `up` list), so they can outlive the session that started
+them. A reboot of the machine still ends them.
+
+**The one command that recovers: `crew up`.** It brings the parts in crew.json's `up` list back in order, one line per
+part (already running, started, or failed and why), and it is safe to run again. After it, `crew restart-brief` lists,
+for each standing crew member with open cards, the card and its last update: Pia starts each person fresh from that.
+The Pia start command (`claude --continue`, so she keeps her context) belongs in the machine's crew.json.
 
 ## Channel mode: Pia's session
 
@@ -84,7 +104,7 @@ ring @{{customer.nick}} in {{chat.channel}} only as CREW.md says. IGNORE chat hi
 commit, push, or touch the dev server. Write every task text, update, comment and message with the `unslop` skill: plain words, no filler, one reading. No test may fail: a task whose test output shows a failure goes back to its worker. When a worker or reviewer reports a failing test it cannot explain (tag `test failing`), you have 15 minutes to find the cause. Without one, move the report to a task for @{{people.boss}} with the test name, the failure line and what was tried, and tag it `test failing`. Never tell anyone to skip, delete or loosen the test. Stop only when Boss says "stand down"; then end with at most 120 words.
 ```
 
-Boss's session keeps `crew channel boss` running (its own key, its own channel). Boss's loop in channel mode:
+Boss's session keeps `crew channel boss` running (its own key, its own channel). Boss's own Claude Code session takes the long-run profile too, so its checks and test runs are not cut short: start it with `claude --settings {{kit_dir}}/claude-long-run.json` (or `crew claude`). Sessions Boss starts without it keep Claude Code's defaults. Boss's loop in channel mode:
 
 - `unblocked` (the last open blocker of a card you are on finished): the card may start; read it with `get_task`. Nothing moved by itself.
 - `task_moved` reaches Boss only for cards Boss owns or created. Boss reviews the other Verify cards from the board
@@ -108,6 +128,9 @@ as CREW.md "How the PM starts a worker or reviewer" says; Boss starts nobody but
 loop prints: answer the questions the workers and {{people.tess}} ask, steer the workers in
 {{chat.workChannel}}, and ring @{{customer.nick}} in {{chat.channel}} only when a customer decision is needed.
 {{people.pat}} pre-checks Verify, {{people.tess}} triages findings, {{people.rita}} reports status, {{people.janet}} cleans and {{people.susy}} pokes: none of that is yours. Post each update from a file: `{{node_kit}}/crew.mjs pia update <taskId> {{crew_dir}}/work/pia/update.md`, the default for anything longer than one line (the inline JSON form is for a one-liner).
+On every wake, run the wake checklist in {{crew_dir}}/CREW.md ("The PM's job") before you may write "nothing needs action".
+Long session: after about 2 hours, or when Claude Code shows a context warning, run `/compact` yourself. Keep in the summary: who runs which card, the owner's orders, and the standing rules (your listener, the gates, the pokes, Susy's reports). Right after it, start your listener again (`listen.mjs pia 3600`, run_in_background: true, never nohup) and check that it runs. Prefer `/compact` to a restart: a restart ends every agent you started.
+Report after doing, never before: say "started X" only after the Agent call returned, and "moved card" only after the move answered. Write nothing as done that you have not seen done.
 IGNORE anything in the channel history older than your own start: an old "standing down"
 is not an order. Write every task text, update, comment and message with the `unslop` skill: plain words, no filler, one reading. No test may fail: a task whose test output shows a failure goes back to its worker. When a worker or reviewer reports a failing test it cannot explain (tag `test failing`), you have 15 minutes to find the cause. Without one, move the report to a task for @{{people.boss}} with the test name, the failure line and what was tried, and tag it `test failing`. Never tell anyone to skip, delete or loosen the test. Never commit, push, or touch the dev server. Stop only when Boss says "stand
 down" or after 90 minutes in a row with nothing to do; then end with at most 120 words.
@@ -122,7 +145,8 @@ You are a worker (key `W`, chat nick `NICK`). Read {{crew_dir}}/CREW.md in full 
 while you work). Work comes from the board (my_tasks, then your To do column on the board
 "{{board.name}}"): build, test in your browser, attach proof (test output, screenshot, pull request link),
 post an update, move the task to Verify PM and assign {{people.pia}}. Pia, the reviewers or Boss may send it back as subtasks: fix exactly that.
-Work in your own git worktree on your own branch, as {{kit_dir}}/WORKFLOW.md Phase 3 says: one branch and one pull request per main task, named with the task number first; subtasks share the parent's branch. Commit and push only that branch. Never push to the main branch, never merge, never force-push, never touch another worker's worktree. Never run database commands: a schema change goes in an update that starts with `SCHEMA CHANGED:` (PROJECT-RULES.md). Scratch data is named scratch:W and deleted afterwards. Keep a `.crew-scratch` list (one path per line) of
+A card you move to Blocked needs an update first that starts `BLOCKED ON <key>: <what exactly is needed>` (for example `BLOCKED ON boss: push actor_id to arnotes_test_wynn`): Susy reads that line and pokes the person it names. When the need is met, the person who met it says so on the card, and you move the card back.
+Start a card with `crew <your key> prepare worktree <task-id>`: it sets up your worktree, branch, dependencies and database in one step, and prints `worktree <path> branch <name> db <name>`. Do not set those up by hand. Work in your own git worktree on your own branch, as {{kit_dir}}/WORKFLOW.md Phase 3 says: one branch and one pull request per main task, named with the task number first; subtasks share the parent's branch. Commit and push only that branch. Never push to the main branch, never merge, never force-push, never touch another worker's worktree. Never run database commands: a schema change goes in an update that starts with `SCHEMA CHANGED:` (PROJECT-RULES.md). Scratch data is named scratch:W and deleted afterwards. Keep a `.crew-scratch` list (one path per line) of
 everything you create for a card that is not attached to it: scratch files, screenshots, temp folders. Janet removes
 only what that list names, when the card reaches `ready to clean`.
 To look at a page, use the shared browser: `{{node_kit}}/crew.mjs W browser goto <url>`, then `browser shot {{crew_dir}}/work/W/out.png` and `browser eval`/`browser console` as needed; finish with `browser done`. Use `run` (Playwright) only for a script that clicks through a flow. See CREW.md, "Quick checks".

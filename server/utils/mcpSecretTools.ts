@@ -91,6 +91,7 @@ export const MCP_SECRET_TOOLS: McpToolDefinition[] = [
     name: 'list_project_secrets',
     title: 'List a project\'s secrets',
     description: 'List the secrets of a project by name: each one\'s description, whether it is for managers only or for every member, and when it was last changed and by whom. Values are never listed; get_project_env returns them. Also says your role on the project (manager, member, or null when you have none) and whether encryption is set up on this server.',
+    sensitive: true,
     scope: 'secrets:read',
     readOnly: true,
     inputSchema: {
@@ -110,6 +111,7 @@ export const MCP_SECRET_TOOLS: McpToolDefinition[] = [
     title: 'Get a project\'s .env',
     audit: true,
     description: 'The project\'s secrets as .env text (NAME=value lines, sorted by name): every secret you may read, or only the names given. The server cannot write files on the agent\'s machine, so write the returned text to the project\'s .env yourself, and make sure .env is git-ignored first. Do not paste values into task updates, messages or chat. The download is recorded in the project\'s trail. Written for shells and Docker Compose: the node dotenv package reads backslashes and \\$ differently.',
+    sensitive: true,
     scope: 'secrets:read',
     readOnly: true,
     inputSchema: {
@@ -131,6 +133,7 @@ export const MCP_SECRET_TOOLS: McpToolDefinition[] = [
     name: 'set_project_secrets',
     title: 'Add or change project secrets',
     description: `Add or change secrets by the variable name you choose. Either one: "name" with "value" (and optionally "description" and "access"), or many at once: "variables" as {NAME: "value"} pairs, up to ${MAX_BULK}. A name that exists is updated, a new one is added. Managers only. Returns created or updated for each name, never values. If any name is invalid, nothing is changed and every invalid name is listed in one message.`,
+    sensitive: true,
     scope: 'secrets:write',
     readOnly: false,
     inputSchema: {
@@ -168,6 +171,7 @@ export const MCP_SECRET_TOOLS: McpToolDefinition[] = [
     name: 'delete_project_secret',
     title: 'Delete a project secret',
     description: 'Delete one secret of a project, by name. Managers only. A deleted secret cannot be restored, and its value is gone; the trail keeps a record that it was deleted.',
+    sensitive: true,
     scope: 'secrets:write',
     readOnly: false,
     destructive: true,

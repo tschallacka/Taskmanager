@@ -1,13 +1,18 @@
 <script setup lang="ts">
 import type { ProjectTask } from '~/composables/useProjects'
 import { taskCountLabel, terminalColumnIds } from '#shared/utils/board'
+import { boardLoadMessage, isBoardId } from '~/utils/boardLoad'
 import { queryForView } from '~/utils/projectViewQuery'
+import { queryWithoutTask, taskPanelPath } from '~/utils/taskPanelUrl'
 
-definePageMeta({ layout: 'app' })
+// One page for the board and for its task panel addresses: the same key keeps the board mounted while the panel opens.
+definePageMeta({ layout: 'app', key: route => `projects/${route.params.id}` })
 
 const route = useRoute()
-const { sidebarOpen } = useSidebar()
 const searchOpen = useSearchModal()
+// The instance admin may load a backup into a crew's board, which everyone else only reads (owner, 2026-11-12).
+const { isInstanceAdmin } = useAuth()
+const importOpen = ref(false)
 
 const {
   activeProject,
@@ -28,7 +33,8 @@ const {
   trashedCount,
   toggleShowTrashed,
   isTrashed,
-  crewBoard
+  crewBoard,
+  linkedCrews
 } = useProjects()
 
 const projectId = computed(() => route.params.id as string)
@@ -49,8 +55,8 @@ const VIEWS = [
 
 // Time, messages and settings are the team's own: a customer's contact has no tab for them.
 const STAFF_ONLY_VIEWS: string[] = ['messages', 'time', 'settings']
-// The office is a crew board's: it shows only on one, and only to the team's staff.
-const visibleViews = computed(() => VIEWS.filter(v => (v.key !== 'office' || crewBoard.value) && (!STAFF_ONLY_VIEWS.includes(v.key) || !isCustomerView.value)))
+// The office is a crew's: it shows on a crew board, and on a real board a crew is linked to. Only the team's staff see it.
+const visibleViews = computed(() => VIEWS.filter(v => (v.key !== 'office' || crewBoard.value || linkedCrews.value.length > 0) && (!STAFF_ONLY_VIEWS.includes(v.key) || !isCustomerView.value)))
 
 const tabViews = computed(() => visibleViews.value.filter(v => v.key !== 'settings'))
 // The office is no panel of this page, so ?view=office falls back to the board instead of showing files.
@@ -60,10 +66,16 @@ function setView(key: string) {
   navigateTo({ path: route.path, query: queryForView(route.query, key) }, { replace: true })
 }
 
-// The office is a page of its own, not a view of the board: the tab leads there.
-function openOffice() {
-  navigateTo(`/office/${projectId.value}`)
+// The office is a page of its own, not a view of the board: the tab leads there. On a real board with more than one
+// crew, the tab opens a menu of them instead (see officeCrewItems), and each item leads to that crew's office.
+function openOffice(crewId?: string) {
+  navigateTo(crewId ? `/office/${projectId.value}?crew=${crewId}` : `/office/${projectId.value}`)
 }
+const officeCrewItems = computed(() => linkedCrews.value.map(crew => ({
+  label: crew.name,
+  icon: 'i-lucide-building-2',
+  onSelect: () => openOffice(crew.id)
+})))
 
 // The tab row scrolls sideways on a phone. Its edges fade where tabs are cut off,
 // so it is clear that the row goes on.
@@ -91,24 +103,37 @@ onMounted(() => {
 onBeforeUnmount(() => window.removeEventListener('resize', updateTabCues))
 
 const loadFailed = ref(false)
+// Why the board did not load, for the sentence the page shows (boardLoad.ts): a bad id, or the HTTP status of the failure.
+const loadInvalidId = ref(false)
+const loadFailStatus = ref<number | null>(null)
 // The team a board that will not open here belongs to, when the caller is in that team.
 const teamHint = ref<{ teamId: string, teamName: string } | null>(null)
 
 async function openBoard(id: string) {
   loadFailed.value = false
+  loadInvalidId.value = false
+  loadFailStatus.value = null
   teamHint.value = null
   try {
     await loadBoard(id)
-  } catch {
-    // Deleted in another tab, or a board from a workspace this session no longer
-    // has: an endless spinner is the one thing that must not happen.
+  } catch (error) {
+    // Deleted in another tab, a board from a workspace this session no longer has, or a request that timed out:
+    // the spinner must never stay. The sentence says which (boardLoadMessage).
+    const failure = error as { statusCode?: number, status?: number } | null
+    loadFailStatus.value = failure?.statusCode ?? failure?.status ?? null
     loadFailed.value = true
     teamHint.value = await $fetch<{ teamId: string, teamName: string }>(`/api/projects/${id}/team-hint`).catch(() => null)
   }
 }
 
 watch(projectId, (id) => {
-  if (!id || !/^[a-z0-9]+$/i.test(id)) return
+  if (!id) return
+  // A bad id (for example a hyphen) is not a board: the page says so instead of spinning.
+  if (!isBoardId(id)) {
+    loadFailed.value = true
+    loadInvalidId.value = true
+    return
+  }
   openBoard(id)
 }, { immediate: true })
 
@@ -123,21 +148,33 @@ async function switchToHintTeam() {
 
 // ─── Task panel ────────────────────────────────────────────
 
-const drawerTaskId = ref<string | null>(null)
+// The open task is in the path: /projects/<id>/<task>. Opening one pushes an entry, so Back and Forward open and close the
+// panel; closing goes back to the plain board address.
+const drawerTaskId = computed<string | null>(() => {
+  const id = route.params.task
+  return typeof id === 'string' && id ? id : null
+})
 
-// Deep link ?task=<id> (global search) opens the panel.
-watch(() => route.query.task, (taskId) => {
-  drawerTaskId.value = typeof taskId === 'string' && taskId ? taskId : null
-}, { immediate: true })
+function openDrawerTask(taskId: string) {
+  navigateTo({ path: taskPanelPath(String(route.params.id), taskId), query: queryWithoutTask(route.query) })
+}
 
 function closeDrawer() {
-  drawerTaskId.value = null
-  if (route.query.task) navigateTo({ path: route.path, replace: true })
+  navigateTo({ path: taskPanelPath(String(route.params.id)), query: queryWithoutTask(route.query) }, { replace: true })
 }
+
+// The old deep link ?task=<id> (global search and the home list) is rewritten to the path form.
+watch(() => route.query.task, (taskId) => {
+  if (typeof taskId !== 'string' || !taskId) return
+  navigateTo({ path: taskPanelPath(String(route.params.id), taskId), query: queryWithoutTask(route.query) }, { replace: true })
+}, { immediate: true })
 
 const drawerTask = computed<ProjectTask | null>(() =>
   drawerTaskId.value ? board.value?.tasks.find(t => t.id === drawerTaskId.value) ?? null : null
 )
+
+// A task URL whose task is not on this board (or cannot be read here): the board opens with no panel, and says so.
+const unknownTask = computed(() => Boolean(drawerTaskId.value && board.value && !drawerTask.value))
 
 // ─── Project name (inline rename) ──────────────────────────
 
@@ -221,6 +258,7 @@ const taskCountTitle = computed(() => {
 // Only an organisation's boards can belong to a customer; a personal board has
 // nobody to share with.
 const { activeTeamId, setActiveTeam } = useTeams()
+const { switchWorkspace } = useWorkspace()
 const { refresh: refreshProjects } = useProjects()
 const { customers, ensureLoaded: ensureCustomers } = useCustomers()
 const toast = useToast()
@@ -254,6 +292,29 @@ const customerMenu = computed(() => [
   }))
 ])
 
+// ─── Crew tree ─────────────────────────────────────────────
+
+// The real board of a shadow is a link only when this person belongs to its workspace (the server sets `openable`).
+// Otherwise, a crew's member, the breadcrumb names it without a link.
+const realBoardOpenable = computed(() => activeProject.value?.realBoard?.openable === true)
+
+// Opening the real board: a board in another workspace switches to it first, as the team switcher does.
+async function openRealBoard() {
+  const real = activeProject.value?.realBoard
+  if (!real) return
+  if (real.teamId && real.teamId !== activeTeamId.value) await switchWorkspace(real.teamId)
+  await navigateTo(`/projects/${real.id}`)
+}
+
+// The shadow boards of a real board, one menu entry each. The list brings them (only the ones this person sees).
+const shadowMenu = computed(() => [
+  (activeProject.value?.shadows ?? []).map(shadow => ({
+    label: `crew: ${shadow.crewName}`,
+    icon: 'i-lucide-users-round',
+    onSelect: () => navigateTo(`/projects/${shadow.id}`)
+  }))
+])
+
 // ─── Sharing ───────────────────────────────────────────────
 
 const publicLink = computed(() =>
@@ -279,72 +340,140 @@ useSeoMeta({
       data-readonly-board
     >
       This is a crew's board. You can read it here; only the crew's team changes it.
-    </p>
-    <!-- Board header -->
-    <header class="flex shrink-0 items-center gap-2 border-b border-default px-4 py-3 lg:px-6">
-      <UButton
-        icon="i-lucide-panel-left"
-        color="neutral"
-        variant="ghost"
-        size="sm"
-        class="lg:hidden"
-        aria-label="Open sidebar"
-        @click="sidebarOpen = true"
-      />
-
-      <input
-        v-if="renaming"
-        ref="nameEl"
-        v-model="nameDraft"
-        class="min-w-0 max-w-80 flex-1 rounded bg-elevated px-2 py-1 text-base font-semibold text-default outline-none ring-1 ring-primary"
-        @keydown.enter.prevent="commitRename"
-        @keydown.escape="renaming = false"
-        @blur="commitRename"
-      >
       <button
-        v-else
-        class="min-w-0 flex-1 rounded px-1 py-0.5 text-left text-base font-semibold text-default transition-colors lg:truncate"
-        :class="[isCustomerView ? 'cursor-default' : 'hover:bg-elevated', /\s/.test(activeProject?.name ?? '') ? 'max-lg:line-clamp-2 max-lg:break-normal' : 'max-lg:truncate']"
-        :title="activeProject?.name"
-        @click="startRename"
+        v-if="isInstanceAdmin && activeProject"
+        type="button"
+        class="ml-2 rounded border border-default px-2 py-0.5 text-default transition-colors hover:bg-default"
+        data-load-backup
+        @click="importOpen = true"
       >
-        {{ activeProject?.name ?? 'Board' }}
+        Load a backup into this board
       </button>
-
-      <UDropdownMenu
-        v-if="canPickCustomer"
-        :items="customerMenu"
-        :content="{ align: 'start' }"
+    </p>
+    <UModal
+      v-if="isInstanceAdmin && isReadOnlyBoard && activeProject"
+      v-model:open="importOpen"
+      title="Load a backup into this board"
+      description="Choose a board backup file. You see what it would add before anything is written."
+      :ui="{ content: 'max-w-lg' }"
+    >
+      <template #body>
+        <div data-load-backup-dialog>
+          <KanbanBoardImport
+            :project-id="activeProject.id"
+            @imported="loadBoard(activeProject.id)"
+          />
+        </div>
+      </template>
+    </UModal>
+    <!-- The crew tree: a shadow board links back to the real board it works for -->
+    <nav
+      v-if="activeProject?.realBoard"
+      class="flex min-w-0 shrink-0 flex-wrap items-center gap-x-1 px-4 pt-2 text-xs text-muted lg:px-6"
+      aria-label="Breadcrumb"
+      data-shadow-breadcrumb
+    >
+      <button
+        v-if="realBoardOpenable"
+        type="button"
+        class="inline-flex min-h-11 min-w-0 items-center rounded px-1 transition-colors hover:text-default hover:underline"
+        data-real-board-link
+        @click="openRealBoard"
       >
-        <UButton
-          size="xs"
+        <span class="truncate">{{ activeProject.realBoard.name }}</span>
+      </button>
+      <span
+        v-else
+        class="inline-flex min-h-11 min-w-0 items-center px-1"
+        data-real-board-name
+      >
+        <span class="truncate">{{ activeProject.realBoard.name }}</span>
+      </span>
+      <span aria-hidden="true">›</span>
+      <span class="px-1">(shadow)</span>
+    </nav>
+    <!-- Board header: the name, the crew and customer badges and the task count go into the shared top bar's title;
+         the label filter, settings, share and options go into its actions. -->
+    <Teleport
+      defer
+      to="#app-topbar-title"
+    >
+      <div class="flex min-w-0 flex-1 items-center gap-2">
+        <input
+          v-if="renaming"
+          ref="nameEl"
+          v-model="nameDraft"
+          class="min-w-0 max-w-80 flex-1 rounded bg-elevated px-2 py-1 text-base font-semibold text-default outline-none ring-1 ring-primary"
+          @keydown.enter.prevent="commitRename"
+          @keydown.escape="renaming = false"
+          @blur="commitRename"
+        >
+        <button
+          v-else
+          class="min-w-0 flex-1 rounded px-1 py-0.5 text-left text-base font-semibold text-default transition-colors lg:truncate"
+          :class="[isCustomerView ? 'cursor-default' : 'hover:bg-elevated', /\s/.test(activeProject?.name ?? '') ? 'max-lg:line-clamp-2 max-lg:break-normal' : 'max-lg:truncate']"
+          :title="activeProject?.name"
+          @click="startRename"
+        >
+          {{ activeProject?.name ?? 'Board' }}
+        </button>
+
+        <UDropdownMenu
+          v-if="activeProject?.shadows?.length"
+          :items="shadowMenu"
+          :content="{ align: 'start' }"
+        >
+          <UButton
+            size="sm"
+            color="neutral"
+            variant="soft"
+            icon="i-lucide-users-round"
+            class="min-h-11 shrink-0"
+            data-shadow-entry
+          >
+            Shadow boards ({{ activeProject.shadows.length }})
+          </UButton>
+        </UDropdownMenu>
+
+        <UDropdownMenu
+          v-if="canPickCustomer"
+          :items="customerMenu"
+          :content="{ align: 'start' }"
+        >
+          <UButton
+            size="xs"
+            color="neutral"
+            variant="soft"
+            :icon="activeProject?.customerId ? 'i-lucide-building-2' : 'i-lucide-lock'"
+            class="shrink-0"
+          >
+            {{ activeProject?.customerName ?? 'Team only' }}
+          </UButton>
+        </UDropdownMenu>
+        <UBadge
+          v-else-if="activeProject?.customerName"
+          size="sm"
           color="neutral"
           variant="soft"
-          :icon="activeProject?.customerId ? 'i-lucide-building-2' : 'i-lucide-lock'"
+          icon="i-lucide-building-2"
           class="shrink-0"
         >
-          {{ activeProject?.customerName ?? 'Team only' }}
-        </UButton>
-      </UDropdownMenu>
-      <UBadge
-        v-else-if="activeProject?.customerName"
-        size="sm"
-        color="neutral"
-        variant="soft"
-        icon="i-lucide-building-2"
-        class="shrink-0"
-      >
-        {{ activeProject.customerName }}
-      </UBadge>
+          {{ activeProject.customerName }}
+        </UBadge>
 
-      <span
-        class="shrink-0 text-xs text-dimmed max-sm:hidden"
-        :title="taskCountTitle"
-      >
-        {{ taskCountText }} {{ taskCount === 1 ? 'task' : 'tasks' }}
-      </span>
-
-      <div class="ml-auto flex shrink-0 items-center gap-1">
+        <span
+          class="shrink-0 text-xs text-dimmed max-sm:hidden"
+          :title="taskCountTitle"
+        >
+          {{ taskCountText }} {{ taskCount === 1 ? 'task' : 'tasks' }}
+        </span>
+      </div>
+    </Teleport>
+    <Teleport
+      defer
+      to="#app-topbar-actions"
+    >
+      <div class="flex shrink-0 items-center gap-1">
         <!-- Label filter -->
         <UPopover
           v-if="boardTagCounts.length"
@@ -445,7 +574,7 @@ useSeoMeta({
           />
         </UDropdownMenu>
       </div>
-    </header>
+    </Teleport>
 
     <!-- Archived: out of the lists and its rules are paused; the board itself stays usable -->
     <div
@@ -487,7 +616,23 @@ useSeoMeta({
         v-for="v in tabViews"
         :key="v.key"
       >
+        <UDropdownMenu
+          v-if="v.key === 'office' && linkedCrews.length > 1"
+          :items="officeCrewItems"
+        >
+          <button
+            class="relative flex shrink-0 items-center gap-1.5 px-2.5 py-2 text-sm text-muted transition-colors hover:text-default"
+          >
+            <UIcon
+              :name="v.icon"
+              class="size-4"
+            />
+            {{ v.label }}
+            <span class="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-primary opacity-0" />
+          </button>
+        </UDropdownMenu>
         <button
+          v-else
           class="relative flex shrink-0 items-center gap-1.5 px-2.5 py-2 text-sm transition-colors"
           :class="view === v.key ? 'font-medium text-default' : 'text-muted hover:text-default'"
           :aria-current="view === v.key ? 'page' : undefined"
@@ -508,7 +653,7 @@ useSeoMeta({
           page="agents/office-view"
           label="About the Office view"
         >
-          The office shows this board's crew at work: every task is a folder that moves between the desks as the board changes.
+          The office shows the crew of this board at work: every task is a folder that moves between the desks as the board changes. On a board with more than one crew, the menu picks which crew to watch.
         </HelpHint>
       </template>
     </nav>
@@ -563,6 +708,13 @@ useSeoMeta({
 
     <!-- Board -->
     <div class="min-h-0 flex-1">
+      <p
+        v-if="unknownTask"
+        role="status"
+        class="px-4 pt-3 text-sm text-muted"
+      >
+        That task is not on this board, or you cannot open it here. The board is shown without it.
+      </p>
       <div
         v-if="loadFailed"
         class="flex h-full flex-col items-center justify-center gap-3 px-6 text-center"
@@ -572,7 +724,7 @@ useSeoMeta({
           class="size-6 text-dimmed"
         />
         <p class="text-sm text-muted">
-          {{ teamHint ? `This board is in the team ${teamHint.teamName}.` : "This board is not available in this workspace." }}
+          {{ teamHint ? `This board is in the team ${teamHint.teamName}.` : boardLoadMessage({ invalidId: loadInvalidId, status: loadFailStatus }) }}
         </p>
         <UButton
           v-if="teamHint"
@@ -583,7 +735,15 @@ useSeoMeta({
           @click="switchToHintTeam"
         />
         <UButton
-          label="Back to projects"
+          v-if="!loadInvalidId"
+          label="Try again"
+          size="sm"
+          color="neutral"
+          variant="soft"
+          @click="projectId && openBoard(projectId)"
+        />
+        <UButton
+          label="Back to boards"
           size="sm"
           color="neutral"
           variant="soft"
@@ -598,19 +758,19 @@ useSeoMeta({
         <KanbanBoard
           v-else-if="view === 'board'"
           :project-id="projectId"
-          @open-task="drawerTaskId = $event"
+          @open-task="openDrawerTask($event)"
         />
         <KanbanProjectListView
           v-else-if="view === 'list'"
-          @open-task="drawerTaskId = $event"
+          @open-task="openDrawerTask($event)"
         />
         <KanbanProjectTimelineView
           v-else-if="view === 'timeline'"
-          @open-task="drawerTaskId = $event"
+          @open-task="openDrawerTask($event)"
         />
         <KanbanProjectCalendarView
           v-else-if="view === 'calendar'"
-          @open-task="drawerTaskId = $event"
+          @open-task="openDrawerTask($event)"
         />
         <KanbanProjectDashboardView v-else-if="view === 'dashboard'" />
         <KanbanProjectMessagesView
@@ -629,7 +789,7 @@ useSeoMeta({
         />
         <KanbanProjectFilesView
           v-else
-          @open-task="drawerTaskId = $event"
+          @open-task="openDrawerTask($event)"
         />
       </template>
     </div>
@@ -645,14 +805,6 @@ useSeoMeta({
       class="fixed bottom-0 left-0 right-0 z-20 flex items-center justify-around border-t border-default bg-default/95 px-8 backdrop-blur-sm lg:hidden"
       style="padding-top: 0.5rem; padding-bottom: max(0.5rem, env(safe-area-inset-bottom))"
     >
-      <UButton
-        icon="i-lucide-panel-left"
-        color="neutral"
-        variant="ghost"
-        size="md"
-        aria-label="Open sidebar"
-        @click="sidebarOpen = true"
-      />
       <UButton
         icon="i-lucide-search"
         color="neutral"

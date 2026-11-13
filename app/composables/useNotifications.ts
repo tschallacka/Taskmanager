@@ -18,6 +18,8 @@ export interface NotificationItem {
   body: string
   createdAt: number
   readAt: number | null
+  /** Who did it, so the avatar is the person's own (picture or initials). Null when their account is gone. */
+  actorId: string | null
   actorName: string | null
   actorImage: string | null
 }
@@ -197,6 +199,59 @@ export function useNotifications() {
     await request('/api/notifications/read', { method: 'POST', headers: realtimeHeaders(), body: { all: true } })
   }
 
+  /**
+   * Archive moves notifications out of the inbox into the Read box. An archived one is read too, so the
+   * unread count drops with it. The list is taken out of the inbox at once and the server confirms after.
+   */
+  async function archive(ids: string[]) {
+    const before = { items: _items.value, unread: _unread.value }
+    const unread = _items.value.filter(item => ids.includes(item.id) && !item.readAt).length
+    _items.value = _items.value.filter(item => !ids.includes(item.id))
+    _unread.value = Math.max(0, _unread.value - unread)
+    try {
+      await request('/api/notifications/archive', { method: 'POST', headers: realtimeHeaders(), body: { ids } })
+    } catch (error) {
+      // The server did not confirm: the rows go back where they were, and the caller says so.
+      _items.value = before.items
+      _unread.value = before.unread
+      throw error
+    }
+  }
+
+  async function archiveAll() {
+    const before = { items: _items.value, unread: _unread.value }
+    _items.value = []
+    _unread.value = 0
+    try {
+      await request('/api/notifications/archive', { method: 'POST', headers: realtimeHeaders(), body: { all: true } })
+    } catch (error) {
+      _items.value = before.items
+      _unread.value = before.unread
+      throw error
+    }
+  }
+
+  /** Moves archived notifications back to the inbox. They stay read. */
+  async function unarchive(ids: string[]) {
+    await request('/api/notifications/unarchive', { method: 'POST', headers: realtimeHeaders(), body: { ids } })
+    await load()
+  }
+
+  /** The Read box: the archived notifications, newest first. Read from the server each time it is opened. */
+  async function loadReadBox(): Promise<NotificationItem[]> {
+    const res = await request<{ unread: number, items: NotificationItem[] }>('/api/notifications?box=read')
+    return res?.items ?? []
+  }
+
+  /**
+   * Empties the Read box: everything (`all`), or what was archived more than `olderThanDays` ago. With `dryRun` it
+   * only counts. Answers the count (dry run) or how many were deleted.
+   */
+  async function emptyReadBox(options: { all?: boolean, olderThanDays?: number, dryRun?: boolean }): Promise<{ count?: number, deleted?: number }> {
+    const res = await request<{ count?: number, deleted?: number }>('/api/notifications/empty', { method: 'POST', headers: realtimeHeaders(), body: options })
+    return res ?? {}
+  }
+
   /** Turns a way of being told on or off; a desktop notification needs the browser's permission first. */
   async function setPreference(key: 'email' | 'browser', value: boolean): Promise<string | null> {
     if (key === 'browser' && value) {
@@ -228,5 +283,5 @@ export function useNotifications() {
     })
   }
 
-  return { items: _items, unread: _unread, prefs: _prefs, push: _push, loaded: _loaded, load, markRead, markAllRead, decideGuestRequest, setPreference, setPush, testPush, init }
+  return { items: _items, unread: _unread, prefs: _prefs, push: _push, loaded: _loaded, load, markRead, markAllRead, archive, archiveAll, unarchive, loadReadBox, emptyReadBox, decideGuestRequest, setPreference, setPush, testPush, init }
 }

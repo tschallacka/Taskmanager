@@ -56,7 +56,9 @@ async function pollLive() {
   if (mode.value !== 'live' || unseen.value) return
   if (!document.hidden) {
     try {
-      show(await $fetch<OfficeSnapshot>(`/api/projects/${boardId.value}/office`))
+      // A real board with more than one crew names the one it shows in ?crew=.
+      const crew = typeof route.query.crew === 'string' ? route.query.crew : ''
+      show(await $fetch<OfficeSnapshot>(`/api/projects/${boardId.value}/office`, { query: crew ? { crew } : undefined }))
       error.value = ''
       unseenStrikes.value = 0
     } catch (e) {
@@ -157,98 +159,110 @@ useSeoMeta({ title: computed(() => (boardName.value ? `Office · ${boardName.val
 
 <template>
   <div class="flex min-h-0 min-w-0 flex-1 flex-col">
-    <header class="flex shrink-0 flex-wrap items-center gap-2 border-b border-default px-4 py-2 lg:px-6">
-      <UButton
-        v-if="!demoOnly"
-        :to="`/projects/${boardId}`"
-        icon="i-lucide-arrow-left"
-        size="xs"
-        color="neutral"
-        variant="ghost"
-        aria-label="Back to the board"
-      />
-      <div class="min-w-0 flex-1">
-        <p class="truncate text-sm font-semibold text-default">
-          <NuxtLink
-            v-if="mode === 'live' && boardName"
-            :to="`/projects/${boardId}`"
-            class="hover:underline"
-          >{{ boardName }}</NuxtLink>
-          <template v-else>
-            {{ mode === 'demo' ? 'Demo office' : (boardName || 'Office') }}
-          </template>
-        </p>
-        <p class="truncate text-xs text-muted">
-          {{ mode === 'demo' ? 'A made-up board playing every scene' : (crewName ? `${crewName} at work` : 'Who carries what, live from the board') }}
-        </p>
+    <Teleport
+      defer
+      to="#app-topbar-title"
+    >
+      <div class="flex min-w-0 flex-1 items-center gap-2">
+        <UButton
+          v-if="!demoOnly"
+          :to="`/projects/${boardId}`"
+          icon="i-lucide-arrow-left"
+          size="xs"
+          color="neutral"
+          variant="ghost"
+          aria-label="Back to the board"
+        />
+        <div class="min-w-0">
+          <p class="truncate text-sm font-semibold text-default">
+            <NuxtLink
+              v-if="mode === 'live' && boardName"
+              :to="`/projects/${boardId}`"
+              class="hover:underline"
+            >{{ boardName }}</NuxtLink>
+            <template v-else>
+              {{ mode === 'demo' ? 'Demo office' : (boardName || 'Office') }}
+            </template>
+          </p>
+          <p class="truncate text-xs text-muted">
+            {{ mode === 'demo' ? 'A made-up board playing every scene' : (crewName ? `${crewName} at work` : 'Who carries what, live from the board') }}
+          </p>
+        </div>
       </div>
-      <UFieldGroup
-        v-if="!demoOnly"
-        size="xs"
-      >
-        <UButton
-          :color="mode === 'live' ? 'primary' : 'neutral'"
-          :variant="mode === 'live' ? 'solid' : 'outline'"
-          icon="i-lucide-radio"
-          data-office-live
-          @click="mode = 'live'"
+    </Teleport>
+    <Teleport
+      defer
+      to="#app-topbar-actions"
+    >
+      <div class="flex flex-wrap items-center justify-end gap-2">
+        <UFieldGroup
+          v-if="!demoOnly"
+          size="xs"
         >
-          Live
-        </UButton>
-        <UButton
-          :color="mode === 'demo' ? 'primary' : 'neutral'"
-          :variant="mode === 'demo' ? 'solid' : 'outline'"
-          icon="i-lucide-clapperboard"
-          data-office-demo
-          @click="mode = 'demo'"
+          <UButton
+            :color="mode === 'live' ? 'primary' : 'neutral'"
+            :variant="mode === 'live' ? 'solid' : 'outline'"
+            icon="i-lucide-radio"
+            data-office-live
+            @click="mode = 'live'"
+          >
+            Live
+          </UButton>
+          <UButton
+            :color="mode === 'demo' ? 'primary' : 'neutral'"
+            :variant="mode === 'demo' ? 'solid' : 'outline'"
+            icon="i-lucide-clapperboard"
+            data-office-demo
+            @click="mode = 'demo'"
+          >
+            Demo
+          </UButton>
+        </UFieldGroup>
+        <UFieldGroup size="xs">
+          <UButton
+            v-for="s in [1, 2, 4]"
+            :key="s"
+            :color="speed === s ? 'primary' : 'neutral'"
+            :variant="speed === s ? 'soft' : 'outline'"
+            @click="speed = s"
+          >
+            {{ s }}×
+          </UButton>
+        </UFieldGroup>
+        <UFieldGroup
+          v-if="mode === 'demo'"
+          size="xs"
         >
-          Demo
-        </UButton>
-      </UFieldGroup>
-      <UFieldGroup size="xs">
+          <UButton
+            :icon="paused ? 'i-lucide-play' : 'i-lucide-pause'"
+            color="neutral"
+            variant="outline"
+            data-office-pause
+            @click="paused = !paused"
+          >
+            {{ paused ? 'Play' : 'Pause' }}
+          </UButton>
+          <UButton
+            icon="i-lucide-skip-forward"
+            color="neutral"
+            variant="outline"
+            data-office-step
+            @click="stepOnce"
+          >
+            Next step
+          </UButton>
+        </UFieldGroup>
         <UButton
-          v-for="s in [1, 2, 4]"
-          :key="s"
-          :color="speed === s ? 'primary' : 'neutral'"
-          :variant="speed === s ? 'soft' : 'outline'"
-          @click="speed = s"
-        >
-          {{ s }}×
-        </UButton>
-      </UFieldGroup>
-      <UFieldGroup
-        v-if="mode === 'demo'"
-        size="xs"
-      >
-        <UButton
-          :icon="paused ? 'i-lucide-play' : 'i-lucide-pause'"
+          icon="i-lucide-circle-help"
+          size="xs"
           color="neutral"
-          variant="outline"
-          data-office-pause
-          @click="paused = !paused"
+          :variant="showLegend ? 'soft' : 'ghost'"
+          @click="showLegend = !showLegend"
         >
-          {{ paused ? 'Play' : 'Pause' }}
+          <span class="hidden sm:inline">What happens</span>
         </UButton>
-        <UButton
-          icon="i-lucide-skip-forward"
-          color="neutral"
-          variant="outline"
-          data-office-step
-          @click="stepOnce"
-        >
-          Next step
-        </UButton>
-      </UFieldGroup>
-      <UButton
-        icon="i-lucide-circle-help"
-        size="xs"
-        color="neutral"
-        :variant="showLegend ? 'soft' : 'ghost'"
-        @click="showLegend = !showLegend"
-      >
-        <span class="hidden sm:inline">What happens</span>
-      </UButton>
-    </header>
+      </div>
+    </Teleport>
 
     <div class="relative min-h-0 flex-1 overflow-hidden bg-[#1e2235]">
       <div
