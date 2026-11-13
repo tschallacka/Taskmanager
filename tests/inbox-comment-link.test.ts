@@ -9,9 +9,9 @@ import { taskLink } from '../app/utils/taskLink'
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8')
 
 test('a card link names the comment when there is one, and is the plain card link otherwise', () => {
-  assert.equal(taskLink('p1', 't1'), '/projects/p1?task=t1')
-  assert.equal(taskLink('p1', 't1', null), '/projects/p1?task=t1')
-  assert.equal(taskLink('p1', 't1', 'c9'), '/projects/p1?task=t1&comment=c9')
+  assert.equal(taskLink('p1', 't1'), '/projects/p1/t1')
+  assert.equal(taskLink('p1', 't1', null), '/projects/p1/t1')
+  assert.equal(taskLink('p1', 't1', 'c9'), '/projects/p1/t1/c9')
 })
 
 test('the comment route passes the new comment id to the notification, and the notification stores it', () => {

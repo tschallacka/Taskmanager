@@ -149,10 +149,12 @@ function closeDrawer() {
   navigateTo({ path: taskPanelPath(String(route.params.id)), query: queryWithoutTask(route.query) }, { replace: true })
 }
 
-// The old deep link ?task=<id> (global search and the home list) is rewritten to the path form.
+// The old deep link ?task=<id>[&comment=<id>] (outside links, saved bookmarks) is rewritten to the path form, once.
 watch(() => route.query.task, (taskId) => {
   if (typeof taskId !== 'string' || !taskId) return
-  navigateTo({ path: taskPanelPath(String(route.params.id), taskId), query: queryWithoutTask(route.query) }, { replace: true })
+  const comment = typeof route.query.comment === 'string' && route.query.comment ? route.query.comment : null
+  const { comment: _dropped, ...rest } = route.query
+  navigateTo({ path: taskPanelPath(String(route.params.id), taskId, comment), query: queryWithoutTask(rest) }, { replace: true })
 }, { immediate: true })
 
 const drawerTask = computed<ProjectTask | null>(() =>

@@ -267,7 +267,7 @@ async function copyLink(comment: TaskComment) {
 // A link opens the page on this comment: a cold load, or the query changing while
 // the drawer is already open. Each task and comment pair is jumped to once, so a
 // realtime refresh does not drag the reader back to it.
-const linkedId = computed(() => typeof route.query.comment === 'string' ? route.query.comment : '')
+const linkedId = computed(() => typeof route.params.comment === 'string' ? route.params.comment : '')
 let handled = ''
 
 watch(
