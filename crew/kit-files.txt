@@ -55,6 +55,7 @@ people.mjs
 pia-listener-hook.sh
 pia-session.mjs
 pia-session.settings.json
+pidfile.mjs
 port-registry.mjs
 postbrief.mjs
 prepare-worktree-cli.mjs

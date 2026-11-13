@@ -68,7 +68,7 @@ export function piaTriggerLines(ages) {
       lines.push(`to pia: ${name} trigger silent ${ages[name]} min (over ${limit}): ${step}`)
     }
   }
-  dead('listener', LISTENER_DOWN_MINUTES, 'restart your listener (listen.mjs pia 600)')
+  dead('listener', LISTENER_DOWN_MINUTES, 'restart your listener (listen.mjs pia 3600)')
   dead('roundTimer', ROUND_SILENT_MINUTES, 're-arm your round timer (the Monitor sleep loop)')
   dead('mailUnread', MAIL_UNREAD_MINUTES, 'read your mail (mailbox.mjs read pia)')
   dead('handback', HANDBACK_MINUTES, 'resume the agent that handed back its card (see the card)')
