@@ -27,3 +27,16 @@ test('a Blocked card with no BLOCKED ON line is a finding; a card elsewhere, or 
   ]
   assert.deepEqual(blockedWithoutLine(cards), [{ id: 'c1', column: 'Blocked' }])
 })
+
+test('the rule is in the kit text: CREW.md names the line and the unblock, and the worker prompt says the same', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { fileURLToPath } = await import('node:url')
+  const { dirname, join } = await import('node:path')
+  const here = dirname(fileURLToPath(import.meta.url))
+  const crew = readFileSync(join(here, 'CREW.md.tmpl'), 'utf8')
+  const prompt = readFileSync(join(here, 'PROMPTS.md.tmpl'), 'utf8')
+  assert.match(crew, /BLOCKED ON <key>: <what exactly is needed>/, 'CREW names the line')
+  assert.match(crew, /When the need is met, the person who met it says so on the card in an update, and the worker moves the card back/, 'CREW item 4')
+  assert.match(prompt, /BLOCKED ON <key>: <what exactly is needed>/, 'the worker prompt names the line')
+  assert.match(prompt, /When the need is met, the person who met it says so on the card, and you move the card back/, 'the worker prompt item 4')
+})
