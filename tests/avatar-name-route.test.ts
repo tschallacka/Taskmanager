@@ -11,8 +11,9 @@ test('the name route checks that the change is the person\'s own, and the name b
   assert.match(route, /statusCode: 403/)
 })
 
-test('the name route writes only the signed-in person\'s row', () => {
-  assert.match(route, /\.where\(eq\(user\.id, me\)\)/)
+test('the name route changes the name through better-auth updateUser, with the request headers, and never writes the user row directly', () => {
+  assert.match(route, /await auth\.api\.updateUser\(\{ body: \{ name: parsed\.name \}, headers: event\.headers \}\)/)
+  assert.doesNotMatch(route, /db\.update\(user\)/, 'no direct write: the hooks and the session run in updateUser')
   assert.doesNotMatch(route, /\.where\(eq\(user\.id, target\)\)/)
 })
 
