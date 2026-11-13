@@ -5,6 +5,7 @@ import type { TaskActivityItem, TaskComment, Visibility } from '~/composables/us
 import { dueDayToMs } from '~/utils/dueDate'
 import { commentLink, replyLineText } from '~/utils/taskComments'
 import { commentAuthorName, isGithubUpdate } from '~/utils/commentAuthor'
+import { activityInWindow } from '~/utils/commentWindowLive'
 
 // The conversation under a task's description: its comments and the log of what
 // happened to the task, oldest first, then the box that adds to them. The drawer
@@ -24,10 +25,58 @@ const {
   addComment,
   editComment,
   setCommentVisibility,
-  deleteComment
+  deleteComment,
+  commentWindow,
+  loadCommentWindow,
+  loadEarlierComments,
+  loadLaterComments
 } = useProjects()
 
 const root = ref<HTMLElement | null>(null)
+
+// The permalink's window and its two load buttons. Loading earlier comments puts them in front of what the reader is
+// looking at, so the scroll moves down by exactly the height they add: the reader keeps the same place on screen.
+const loadingMore = ref<'earlier' | 'later' | null>(null)
+
+async function loadEarlier() {
+  const body = scroller()
+  const height = body?.scrollHeight ?? 0
+  const top = body?.scrollTop ?? 0
+  loadingMore.value = 'earlier'
+  try {
+    await loadEarlierComments(props.taskId)
+    await nextTick()
+    if (body) body.scrollTop = top + (body.scrollHeight - height)
+  } catch {
+    toast.add({ title: 'Could not load the earlier comments', icon: 'i-lucide-alert-triangle', color: 'error' })
+  } finally {
+    loadingMore.value = null
+  }
+}
+
+async function loadLater() {
+  loadingMore.value = 'later'
+  try {
+    // The later comments go below the window, so the reader's place does not move.
+    await loadLaterComments(props.taskId)
+  } catch {
+    toast.add({ title: 'Could not load the later comments', icon: 'i-lucide-alert-triangle', color: 'error' })
+  } finally {
+    loadingMore.value = null
+  }
+}
+
+// A permalink opens the window around its comment, and scrolls to it. An unknown or hidden comment (404) leaves the
+// thread as the drawer loaded it.
+watch(() => [props.taskId, route.params.comment] as const, async ([taskId, comment]) => {
+  if (typeof comment !== 'string' || !comment) return
+  try {
+    await loadCommentWindow(taskId, comment)
+    await focusComment(comment)
+  } catch {
+    // Not on the thread for this reader: the plain thread stays.
+  }
+}, { immediate: true })
 
 // The drawer's one scroll body. Every jump scrolls it, never the page behind.
 function scroller(): HTMLElement | null {
@@ -42,13 +91,6 @@ function fullDate(ts: number) {
   return format(new Date(ts), 'PPp')
 }
 
-function initials(name: string | null | undefined) {
-  if (!name) return '?'
-  return name.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase()
-}
-
-const userInitials = computed(() => initials(session.value?.user?.name))
-
 // ─── The thread ────────────────────────────────────────────
 
 const ownComments = computed(() => comments.value.filter(c => c.taskId === props.taskId))
@@ -60,7 +102,7 @@ type StreamEntry
 
 const stream = computed<StreamEntry[]>(() => [
   ...ownComments.value.map(comment => ({ key: `c-${comment.id}`, at: comment.createdAt, comment })),
-  ...activity.value.map(item => ({ key: `a-${item.id}`, at: item.createdAt, activity: item }))
+  ...activityInWindow(activity.value, ownComments.value, commentWindow.value).map(item => ({ key: `a-${item.id}`, at: item.createdAt, activity: item }))
 ].sort((a, b) => a.at - b.at))
 
 // The Activity tabs: Comments shows the conversation, History shows the changes to the task. Both read the same stream.
@@ -466,6 +508,17 @@ defineExpose({ handleEscape })
       </button>
     </div>
 
+    <!-- Load earlier comments: only while a permalink's window has comments before it. -->
+    <button
+      v-if="commentWindow?.hasEarlier"
+      type="button"
+      class="mb-3 w-full rounded-md py-1.5 text-xs font-medium text-muted hover:text-default"
+      data-load-earlier
+      :disabled="loadingMore !== null"
+      @click="loadEarlier"
+    >
+      Load earlier comments ({{ commentWindow.earlierCount }})
+    </button>
     <div class="space-y-4 max-md:flex max-md:min-h-0 max-md:flex-1 max-md:flex-col">
       <p
         v-if="count === 0 && activityTab === 'comments'"
@@ -492,9 +545,10 @@ defineExpose({ handleEscape })
               size="2xs"
               class="mt-0.5 shrink-0"
             />
-            <UAvatar
+            <UserAvatar
               v-else
-              :alt="initials(comment.userName)"
+              :user-id="comment.userId"
+              :name="comment.userName"
               size="2xs"
               class="mt-0.5 shrink-0"
             />
@@ -668,6 +722,18 @@ defineExpose({ handleEscape })
       </template>
     </div>
 
+    <!-- Show later comments: only while a permalink's window has comments after it. -->
+    <button
+      v-if="commentWindow?.hasLater"
+      type="button"
+      class="mt-3 w-full rounded-md py-1.5 text-xs font-medium text-muted hover:text-default"
+      data-show-later
+      :disabled="loadingMore !== null"
+      @click="loadLater"
+    >
+      Show later comments ({{ commentWindow.laterCount }})
+    </button>
+
     <!-- The box is part of the thread, under it, and never only inside a panel. -->
     <div
       class="mt-4 border-t border-default pt-3"
@@ -699,8 +765,10 @@ defineExpose({ handleEscape })
         class="sticky bottom-0 z-10 -mx-5 flex cursor-text items-start gap-2 border-t border-default bg-default px-5 pb-3 pt-2 max-md:mt-auto"
         @click="composer?.focus()"
       >
-        <UAvatar
-          :alt="userInitials"
+        <UserAvatar
+          :user-id="session?.user?.id ?? ''"
+          :name="session?.user?.name"
+          :image="session?.user?.image"
           size="2xs"
           class="mt-0.5 shrink-0"
         />

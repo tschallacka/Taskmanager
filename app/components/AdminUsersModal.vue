@@ -107,8 +107,10 @@ async function setCanCreate(u: InstanceUser, value: boolean) {
           class="flex items-center justify-between gap-3 px-3 py-2.5"
         >
           <div class="flex min-w-0 items-center gap-2.5">
-            <UAvatar
-              :alt="u.name"
+            <UserAvatar
+              :user-id="u.id"
+              :name="u.name"
+              :email="u.email"
               size="xs"
             />
             <div class="min-w-0">
