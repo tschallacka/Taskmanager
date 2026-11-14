@@ -4,6 +4,7 @@ import {
   startOfMonth, startOfWeek
 } from 'date-fns'
 import { calendarKeyDelta, movedDueOn } from '~/utils/calendarKeys'
+import { dayTapMove, togglePick } from '~/utils/calendarTap'
 
 const emit = defineEmits<{ openTask: [taskId: string] }>()
 
@@ -39,6 +40,20 @@ async function dropOn(day: Date, event: DragEvent) {
 
 function dragStart(taskId: string, event: DragEvent) {
   event.dataTransfer?.setData('text/task-id', taskId)
+}
+
+// The tap path: a task's Move control picks it, and a tap on a day puts the picked task there (calendarTap.ts).
+const pickedId = ref<string | null>(null)
+
+function pick(taskId: string) {
+  pickedId.value = togglePick(pickedId.value, taskId)
+}
+
+async function tapDay(day: Date) {
+  const move = dayTapMove(pickedId.value, format(day, 'yyyy-MM-dd'), tasks.value)
+  if (!move) return
+  pickedId.value = null
+  await updateTask(move.id, { dueOn: move.dueOn })
 }
 
 // The keyboard path for a task on a day: the arrow keys move its due day, as a drag of the same days would. Left and right
@@ -132,6 +147,7 @@ const undatedOpen = ref(false)
         :class="isSameMonth(day, cursor) ? '' : 'bg-elevated/30'"
         @dragover.prevent
         @drop.prevent="dropOn(day, $event)"
+        @click="tapDay(day)"
       >
         <span
           class="flex size-6 items-center justify-center self-start rounded-full text-xs tabular-nums"
@@ -140,19 +156,36 @@ const undatedOpen = ref(false)
           {{ format(day, 'd') }}
         </span>
 
-        <button
+        <div
           v-for="task in tasksOn(day).slice(0, 4)"
           :key="task.id"
-          draggable="true"
-          class="truncate rounded-md bg-primary/10 px-1.5 py-1 text-left text-xs text-default transition-colors hover:bg-primary/20"
-          :class="task.completedAt ? 'line-through opacity-60' : ''"
-          :aria-label="`${task.title}, due ${task.dueOn}. Arrow keys move it a day, up and down a week.`"
-          @dragstart="dragStart(task.id, $event)"
-          @keydown="moveWithKeys(task, $event)"
-          @click="emit('openTask', task.id)"
+          class="flex min-w-0 items-center gap-0.5"
         >
-          {{ task.title }}
-        </button>
+          <button
+            draggable="true"
+            class="min-w-0 flex-1 truncate rounded-md bg-primary/10 px-1.5 py-1 text-left text-xs text-default transition-colors hover:bg-primary/20"
+            :class="task.completedAt ? 'line-through opacity-60' : ''"
+            :aria-label="`${task.title}, due ${task.dueOn}. Arrow keys move it a day, up and down a week.`"
+            @dragstart="dragStart(task.id, $event)"
+            @keydown="moveWithKeys(task, $event)"
+            @click="emit('openTask', task.id)"
+          >
+            {{ task.title }}
+          </button>
+          <button
+            type="button"
+            class="shrink-0 rounded-md p-0.5 text-dimmed transition-colors hover:bg-elevated hover:text-default"
+            :class="pickedId === task.id ? 'bg-primary/20 text-default' : ''"
+            aria-label="Move to another day"
+            :aria-pressed="pickedId === task.id ? 'true' : 'false'"
+            @click.stop="pick(task.id)"
+          >
+            <UIcon
+              name="i-lucide-move"
+              class="size-3.5"
+            />
+          </button>
+        </div>
         <span
           v-if="tasksOn(day).length > 4"
           class="px-1.5 text-[0.6875rem] text-dimmed"
