@@ -314,10 +314,12 @@ const hasMeta = computed(() =>
           {{ commentCount }}
         </span>
 
-        <UAvatar
+        <UserAvatar
           v-if="assignee && readonly"
-          :src="assignee.image ?? undefined"
-          :alt="assignee.name || assignee.email || ''"
+          :user-id="assignee.id"
+          :name="assignee.name"
+          :email="assignee.email"
+          :image="assignee.image"
           size="3xs"
           :title="`Assigned to ${assignee.name || assignee.email || ''}`"
         />
@@ -342,10 +344,12 @@ const hasMeta = computed(() =>
           @keydown.enter.stop
           @keydown.space.stop
         >
-          <UAvatar
+          <UserAvatar
             v-if="assignee"
-            :src="assignee.image ?? undefined"
-            :alt="assignee.name || assignee.email || ''"
+            :user-id="assignee.id"
+            :name="assignee.name"
+            :email="assignee.email"
+            :image="assignee.image"
             size="xs"
           />
           <UIcon

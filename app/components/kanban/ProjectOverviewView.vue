@@ -163,9 +163,10 @@ const counts = computed(() => {
             data-status-update
           >
             <div class="flex items-center gap-2">
-              <UAvatar
-                :src="update.author.image ?? undefined"
-                :alt="update.author.name"
+              <UserAvatar
+                :user-id="update.author.id"
+                :name="update.author.name"
+                :image="update.author.image"
                 size="2xs"
               />
               <span class="text-sm font-medium text-default">{{ update.author.name }}</span>

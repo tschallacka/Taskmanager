@@ -2,7 +2,6 @@
 definePageMeta({ layout: 'app' })
 useSeoMeta({ title: 'Connect an AI agent' })
 
-const { sidebarOpen } = useSidebar()
 const toast = useToast()
 
 interface McpTool {
@@ -342,14 +341,6 @@ async function copy(text: string, id: string) {
     class="fixed bottom-0 left-0 right-0 z-20 lg:hidden flex items-center justify-around px-8 border-t border-default bg-default/95 backdrop-blur-sm"
     style="padding-top: 0.5rem; padding-bottom: max(0.5rem, env(safe-area-inset-bottom))"
   >
-    <UButton
-      icon="i-lucide-panel-left"
-      color="neutral"
-      variant="ghost"
-      size="md"
-      aria-label="Open sidebar"
-      @click="sidebarOpen = true"
-    />
     <UButton
       icon="i-lucide-arrow-left"
       color="neutral"

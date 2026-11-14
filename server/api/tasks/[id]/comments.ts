@@ -8,6 +8,7 @@ import { publishFromEvent } from '../../../utils/realtime'
 import { notifyComment } from '../../../utils/notifyEvents'
 import { fireRules, newRuleChain } from '../../../utils/ruleEngine'
 import { attachReplyPreviews, resolveReplyTarget, signedName } from '../../../utils/taskComments'
+import { aroundComment, allEarlierThan, allLaterThan } from '../../../utils/commentWindow'
 
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')!
@@ -38,10 +39,24 @@ export default defineEventHandler(async (event) => {
       .orderBy(asc(taskComments.createdAt))
     // A GitHub copy is signed GitHub here too, not with the owner's account (see signedName).
     // An update imported from another board names its author as it was there, and says it was imported.
-    return attachReplyPreviews(id, rows.map(row => ({
+    const mapped = rows.map(row => ({
       ...row,
       userName: row.authorLabel ? `${row.authorLabel}, imported` : signedName(row)
-    })), project.audience)
+    }))
+    // A permalink opens a window of the thread (commentWindow.ts): 5 comments either side of the comment, or all
+    // of one side when the reader asks to load earlier or later comments. The counts say what is left.
+    const query = getQuery(event)
+    const around = typeof query.around === 'string' ? query.around : null
+    const before = typeof query.before === 'string' ? query.before : null
+    const after = typeof query.after === 'string' ? query.after : null
+    if (around || before || after) {
+      const picked = around
+        ? aroundComment(mapped, around)
+        : before ? allEarlierThan(mapped, before) : allLaterThan(mapped, after!)
+      return { ...picked, comments: await attachReplyPreviews(id, picked.comments, project.audience) }
+    }
+    // Without a window the whole thread is read, as before.
+    return attachReplyPreviews(id, mapped, project.audience)
   }
 
   if (event.method !== 'POST') {

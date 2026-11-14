@@ -264,9 +264,11 @@ async function remove(person: ProjectPerson) {
           :data-member-role="person.role ?? 'none'"
         >
           <div class="flex min-w-0 flex-1 items-center gap-2.5">
-            <UAvatar
-              :src="person.image || undefined"
-              :alt="person.name || person.email || ''"
+            <UserAvatar
+              :user-id="person.id"
+              :name="person.name"
+              :email="person.email"
+              :image="person.image"
               size="xs"
             />
             <div class="min-w-0">

@@ -2,7 +2,6 @@
 definePageMeta({ layout: 'app' })
 useSeoMeta({ title: 'Sprocket' })
 
-const { sidebarOpen } = useSidebar()
 const toast = useToast()
 const { settings, agent, load, save, saveManner } = useSprocketSettings()
 
@@ -106,8 +105,12 @@ async function copySkill() {
 
 <template>
   <div class="flex-1 min-w-0 flex flex-col overflow-hidden pb-14 lg:pb-0">
-    <div class="sticky top-0 z-10 border-b border-default bg-default/95 backdrop-blur-sm shrink-0">
-      <div class="px-4 pt-3 pb-3.5 flex items-center gap-3">
+    <!-- The back arrow and the title go into the shared top bar. -->
+    <Teleport
+      defer
+      to="#app-topbar-title"
+    >
+      <div class="flex min-w-0 items-center gap-3">
         <UButton
           to="/settings"
           icon="i-lucide-arrow-left"
@@ -116,14 +119,14 @@ async function copySkill() {
           size="xs"
           aria-label="Back to settings"
         />
-        <h1 class="flex items-center gap-1.5 font-semibold text-sm">
+        <h1 class="flex items-center gap-1.5 text-base font-semibold text-default">
           Sprocket
           <HelpHint page="agents/sprocket">
             Sprocket answers in the chat panel with exactly your permissions. It can search the help, so ask it how something works.
           </HelpHint>
         </h1>
       </div>
-    </div>
+    </Teleport>
 
     <div class="flex-1 overflow-y-auto">
       <UContainer class="py-6 space-y-4">
@@ -538,14 +541,6 @@ async function copySkill() {
     class="fixed bottom-0 left-0 right-0 z-20 lg:hidden flex items-center justify-around px-8 border-t border-default bg-default/95 backdrop-blur-sm"
     style="padding-top: 0.5rem; padding-bottom: max(0.5rem, env(safe-area-inset-bottom))"
   >
-    <UButton
-      icon="i-lucide-panel-left"
-      color="neutral"
-      variant="ghost"
-      size="md"
-      aria-label="Open sidebar"
-      @click="sidebarOpen = true"
-    />
     <UButton
       to="/settings"
       icon="i-lucide-arrow-left"

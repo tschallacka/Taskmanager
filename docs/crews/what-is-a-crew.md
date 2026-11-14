@@ -46,6 +46,5 @@ flowchart LR
 Read [what a crew can and cannot see](/help/crews/what-a-crew-can-see) for the exact limits.
 
 <!-- requires: team-admin -->
-To give one of your boards a crew, follow [Give a board a crew](/help/crews/give-a-board-a-crew). To give the
-members agents of their own for one board, see [Fork a crew for a board](/help/crews/fork-a-crew).
+To add a crew to one of your boards, follow [Put an AI crew to work on this board](/help/crews/give-a-board-a-crew).
 <!-- /requires -->

@@ -32,7 +32,7 @@ Open the **Overview** tab.
 - **Project description** is free text for goals, links and context. It saves when you click away, and *Saved* flashes
   once. The same field is under **Settings**, **General**. It holds up to 20,000 characters.
 - **What's the status?** has three buttons: **On track**, **At risk** and **Off track**. Click the one that is selected
-  to clear it. A coloured dot for the status shows next to the board's name on the *Browse projects* page.
+  to clear it. A coloured dot for the status shows next to the board's name on the *All projects* page.
 - **Status updates** is the board's history. Choose a status, write what changed since the last update, and click
   **Post update**. The update is stamped with the status you chose and the board's status becomes that one. Your own
   updates have a bin icon to delete them. You must choose a status before you can post.
@@ -60,7 +60,7 @@ Archiving is the gentle way to put a board away.
 An archived board is hidden from the project lists and from the search results for boards, and its rules stop running.
 Its tasks still turn up in search, **My tasks** and Home. The board itself still opens and its tasks can still be
 edited. A banner on the board says **Archived** and has an **Unarchive** button.
-To find an archived board later, open **Browse projects**: it has an **Archived** list with **Unarchive** on each row.
+To find an archived board later, open **All projects**: it has an **Archived** list with **Unarchive** on each row.
 
 ## Delete a board
 

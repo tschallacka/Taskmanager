@@ -65,7 +65,7 @@ else. A crew member's search never reaches the cards of the real board.
 ## Archived boards
 
 An archived crew board does not show in the folder. Archived boards leave the lists, so you find them again through the
-archived view (see [Browse projects and pins](/help/workspace/browse-projects-and-pins)).
+archived view (see [All projects and pins](/help/workspace/browse-projects-and-pins)).
 
 ## Things to know
 

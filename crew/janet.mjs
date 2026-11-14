@@ -21,6 +21,7 @@ import { createHash } from 'node:crypto'
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { boardCall } from './board-call.mjs'
 
 export const SCRATCH_LIST = '.crew-scratch'
 export const PLAN_TITLE = '[Clean plan]'
@@ -615,16 +616,6 @@ export function prStateFromGh(branch, repoRoot) {
   if (rows.some(row => row.state === 'MERGED')) return 'merged'
   if (rows.some(row => row.state === 'CLOSED')) return 'closed'
   return 'none'
-}
-
-function boardCall(who, tool, args, kit) {
-  const run = spawnSync(process.execPath, [join(kit, 'tm.mjs'), who, 'mcp', tool, JSON.stringify(args)], { encoding: 'utf8' })
-  if (run.status !== 0) throw new Error(`board call ${tool} failed: ${(run.stderr || run.stdout).trim().slice(0, 300)}`)
-  try {
-    return JSON.parse(run.stdout)
-  } catch {
-    throw new Error(`board call ${tool} did not return JSON`)
-  }
 }
 
 function postUpdateFile(who, id, text, kit, work) {

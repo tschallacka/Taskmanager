@@ -80,9 +80,10 @@ async function create() {
         <div class="flex flex-wrap items-center gap-2 text-sm text-muted">
           <span>For</span>
           <span class="inline-flex items-center gap-1.5 rounded-md bg-elevated px-2 py-1 text-default">
-            <UAvatar
-              :src="person.image ?? undefined"
-              :alt="person.name"
+            <UserAvatar
+              :user-id="person.id"
+              :name="person.name"
+              :image="person.image"
               size="3xs"
             />
             {{ person.name }}

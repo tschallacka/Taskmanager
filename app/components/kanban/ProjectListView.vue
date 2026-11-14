@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { format } from 'date-fns'
 import { columnDotAttrs } from '~/utils/tagColors'
-import { dueDayToMs, isOverdueDay, todayIso } from '~/utils/dueDate'
 import type { ProjectTask } from '~/composables/useProjects'
-import { errorMessage } from '~/utils/untypedFetch'
+import { errorMessage, untypedFetch } from '~/utils/untypedFetch'
+import { FIELD_WIDTH, fieldColumns, metaColumns } from '~/utils/listColumns'
 
 const emit = defineEmits<{ openTask: [taskId: string] }>()
 
@@ -13,8 +12,6 @@ const { boardColumns, visibleColumnTasks, subtasksOf, personById, updateTask, is
 const toast = useToast()
 const { fields, valueOf, setValues } = useCustomFields(activeProjectId)
 
-const FIELD_WIDTH: Record<string, string> = { select: 'w-28', number: 'w-20', date: 'w-28', text: 'w-32' }
-
 async function setField(taskId: string, fieldId: string, value: string | null) {
   try {
     await setValues(taskId, { [fieldId]: value })
@@ -23,32 +20,139 @@ async function setField(taskId: string, fieldId: string, value: string | null) {
   }
 }
 
+// The title edits in place: a click opens the field, Enter or leaving it saves, Escape keeps the old title.
+// A save that fails says so, and the title keeps what the server has.
+const titleTaskId = ref<string | null>(null)
+const titleDraft = ref('')
+
+function startTitle(task: ProjectTask) {
+  titleDraft.value = task.title
+  titleTaskId.value = task.id
+}
+
+async function commitTitle(task: ProjectTask) {
+  if (titleTaskId.value !== task.id) return
+  titleTaskId.value = null
+  const title = titleDraft.value.trim()
+  if (!title || title === task.title) return
+  try {
+    await updateTask(task.id, { title })
+  } catch (e) {
+    toast.add({ title: errorMessage(e, 'Could not save the title'), icon: 'i-lucide-alert-triangle', color: 'error' })
+  }
+}
+
 const collapsed = ref(new Set<string>())
 
-const sections = computed(() =>
-  boardColumns.value
+// Group and sort are chosen in the header and remembered per board in this browser (the choice is a view setting, not
+// board data, so it is not sent to the server).
+type GroupBy = 'column' | 'assignee'
+type SortBy = 'due' | 'title'
+const groupBy = ref<GroupBy>('column')
+const sortBy = ref<SortBy>('due')
+const VIEW_KEY = (boardId: string | null) => `tm-list-view:${boardId ?? ''}`
+
+// The optional columns of each row. Chosen once per board and remembered; the default shows all three.
+type OptionalColumn = 'assignee' | 'due' | 'labels' | 'time'
+const OPTIONAL_COLUMNS: { id: OptionalColumn, label: string }[] = [
+  { id: 'assignee', label: 'Assignee' },
+  { id: 'due', label: 'Due' },
+  { id: 'labels', label: 'Labels' },
+  { id: 'time', label: 'Time' }
+]
+const shownColumns = ref<Record<OptionalColumn, boolean>>({ assignee: true, due: true, labels: true, time: true })
+
+// The minutes logged on each task of this board, from everyone on the team. Read once per board; a time entry logged
+// in the row moves its task's total at once.
+const taskMinutes = ref<Record<string, number>>({})
+
+async function loadTaskTime() {
+  if (!activeProjectId.value) return
+  try {
+    taskMinutes.value = await untypedFetch<Record<string, number>>(`/api/projects/${activeProjectId.value}/task-time`)
+  } catch {
+    taskMinutes.value = {}
+  }
+}
+
+function onLogged(taskId: string, minutes: number) {
+  taskMinutes.value = { ...taskMinutes.value, [taskId]: (taskMinutes.value[taskId] ?? 0) + minutes }
+}
+
+function loadView() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(VIEW_KEY(activeProjectId.value)) ?? 'null')
+    if (raw?.groupBy === 'column' || raw?.groupBy === 'assignee') groupBy.value = raw.groupBy
+    if (raw?.sortBy === 'due' || raw?.sortBy === 'title') sortBy.value = raw.sortBy
+    const cols = raw?.columns
+    if (cols && typeof cols === 'object') {
+      for (const col of OPTIONAL_COLUMNS) if (typeof cols[col.id] === 'boolean') shownColumns.value[col.id] = cols[col.id]
+    }
+  } catch { /* no storage here: the defaults stand */ }
+}
+
+function saveView() {
+  try {
+    localStorage.setItem(VIEW_KEY(activeProjectId.value), JSON.stringify({
+      groupBy: groupBy.value,
+      sortBy: sortBy.value,
+      columns: shownColumns.value
+    }))
+  } catch { /* the choice lasts this visit */ }
+}
+
+onMounted(() => {
+  loadView()
+  loadTaskTime()
+})
+watch(activeProjectId, () => {
+  loadView()
+  loadTaskTime()
+})
+watch([groupBy, sortBy, shownColumns], saveView, { deep: true })
+
+/** Tasks in the chosen order: by due day (none last) or by title. */
+function sorted(tasks: ProjectTask[]): ProjectTask[] {
+  const copy = [...tasks]
+  if (sortBy.value === 'title') return copy.sort((a, b) => a.title.localeCompare(b.title))
+  // A task with no due day sorts after every dated one.
+  return copy.sort((a, b) => {
+    if (!a.dueOn || !b.dueOn) return a.dueOn ? -1 : b.dueOn ? 1 : 0
+    return a.dueOn.localeCompare(b.dueOn)
+  })
+}
+
+const sections = computed(() => {
+  if (groupBy.value === 'assignee') {
+    // One section per person who has tasks, then the unassigned. Tasks come from every column.
+    const all = boardColumns.value.filter(column => !isTrashed(column)).flatMap(column => visibleColumnTasks(column.id))
+      .filter(task => !isTrashed(task))
+    const people = new Map<string, { id: string, label: string, tasks: ProjectTask[] }>()
+    for (const task of all) {
+      const key = task.assigneeId ?? ''
+      const person = task.assigneeId ? personById(task.assigneeId) : undefined
+      const label = person ? (person.name || person.email || 'Someone') : 'Unassigned'
+      if (!people.has(key)) people.set(key, { id: `person:${key}`, label, tasks: [] })
+      people.get(key)!.tasks.push(task)
+    }
+    return [...people.values()]
+      .sort((a, b) => (a.id === 'person:' ? 1 : b.id === 'person:' ? -1 : a.label.localeCompare(b.label)))
+      .map(group => ({ id: group.id, name: group.label, column: null, tasks: sorted(group.tasks) }))
+  }
+  return boardColumns.value
     .filter(column => !isTrashed(column))
     .map(column => ({
+      id: column.id,
+      name: column.name,
       column,
-      tasks: visibleColumnTasks(column.id).filter(task => !isTrashed(task))
+      tasks: sorted(visibleColumnTasks(column.id).filter(task => !isTrashed(task)))
     }))
-)
+})
 
 function toggleSection(id: string) {
   const next = new Set(collapsed.value)
   if (!next.delete(id)) next.add(id)
   collapsed.value = next
-}
-
-function dueLabel(day: string) {
-  const today = todayIso()
-  if (day === today) return 'Today'
-  if (dueDayToMs(day) - dueDayToMs(today) === 86400000) return 'Tomorrow'
-  return format(dueDayToMs(day), 'MMM d')
-}
-
-function overdue(task: ProjectTask) {
-  return !!task.dueOn && !task.completedAt && isOverdueDay(task.dueOn)
 }
 
 function allSubtasks(taskId: string): ProjectTask[] {
@@ -64,49 +168,106 @@ function subtaskProgress(taskId: string) {
 <template>
   <div class="h-full overflow-y-auto px-4 pb-10 lg:px-6">
     <div
-      v-if="fields.length"
-      class="mt-3 hidden items-center gap-3 px-3 text-[0.6875rem] font-medium uppercase tracking-wide text-dimmed md:flex"
+      class="mt-3 flex flex-wrap items-center gap-3 px-1"
+      data-list-controls
+    >
+      <label class="flex items-center gap-1.5 text-xs text-muted">
+        Group by
+        <select
+          v-model="groupBy"
+          class="rounded-md border border-default bg-default px-2 py-1 text-xs text-default"
+          data-list-group
+        >
+          <option value="column">Column</option>
+          <option value="assignee">Assignee</option>
+        </select>
+      </label>
+      <div
+        class="flex items-center gap-1 text-xs text-muted"
+        role="group"
+        aria-label="Columns"
+      >
+        <span>Columns</span>
+        <button
+          v-for="col in OPTIONAL_COLUMNS"
+          :key="col.id"
+          class="rounded-md border px-2 py-0.5 transition-colors"
+          :class="shownColumns[col.id] ? 'border-primary bg-primary/10 text-default' : 'border-default text-muted'"
+          :aria-pressed="shownColumns[col.id]"
+          :data-list-column-toggle="col.id"
+          @click="shownColumns[col.id] = !shownColumns[col.id]"
+        >
+          {{ col.label }}
+        </button>
+      </div>
+      <label class="flex items-center gap-1.5 text-xs text-muted">
+        Sort
+        <select
+          v-model="sortBy"
+          class="rounded-md border border-default bg-default px-2 py-1 text-xs text-default"
+          data-list-sort
+        >
+          <option value="due">Due date</option>
+          <option value="title">Title</option>
+        </select>
+      </label>
+    </div>
+    <!-- The table's one header row, under the controls, on a wide screen. Its names sit over the cells, which read the
+         same widths (app/utils/listColumns.ts): the task, the custom fields, then the optional columns in row order. -->
+    <div
+      v-if="sections.length"
+      class="mt-4 hidden items-center gap-3 px-3 text-[0.6875rem] font-medium uppercase tracking-wide text-dimmed md:flex"
       data-list-header
     >
-      <span class="flex-1" />
+      <span class="size-5 shrink-0" />
+      <span class="min-w-0 flex-1">Task</span>
       <span
-        v-for="field in fields"
-        :key="field.id"
+        v-for="col in fieldColumns(fields)"
+        :key="col.key"
         class="shrink-0 truncate px-1"
-        :class="FIELD_WIDTH[field.type]"
-      >{{ field.name }}</span>
-      <span class="w-[6.75rem] shrink-0" />
+        :class="col.width"
+        data-list-header-field
+      >{{ col.label }}</span>
+      <span class="flex shrink-0 items-center gap-2">
+        <span
+          v-for="col in metaColumns(shownColumns)"
+          :key="col.key"
+          :class="[col.width, col.key === 'assignee' ? '' : 'text-right']"
+          :data-list-header-cell="col.key"
+        >{{ col.label }}</span>
+      </span>
     </div>
     <div
-      v-for="{ column, tasks } in sections"
-      :key="column.id"
+      v-for="section in sections"
+      :key="section.id"
       class="mt-4"
     >
       <button
         class="flex w-full items-center gap-2 rounded-md px-1 py-1.5 text-left transition-colors hover:bg-elevated"
-        @click="toggleSection(column.id)"
+        @click="toggleSection(section.id)"
       >
         <UIcon
           name="i-lucide-chevron-down"
           class="size-4 text-dimmed transition-transform duration-200"
-          :class="collapsed.has(column.id) ? '-rotate-90' : ''"
+          :class="collapsed.has(section.id) ? '-rotate-90' : ''"
         />
         <span
+          v-if="groupBy === 'column' && section.column"
           class="size-2 rounded-full"
-          :class="columnDotAttrs(column).class"
-          :style="columnDotAttrs(column).style"
+          :class="columnDotAttrs(section.column).class"
+          :style="columnDotAttrs(section.column).style"
         />
-        <span class="text-sm font-semibold text-default">{{ column.name }}</span>
-        <span class="text-xs tabular-nums text-dimmed">{{ tasks.length }}</span>
+        <span class="text-sm font-semibold text-default">{{ section.name }}</span>
+        <span class="text-xs tabular-nums text-dimmed">{{ section.tasks.length }}</span>
       </button>
 
       <Transition name="list-fold">
         <ul
-          v-if="!collapsed.has(column.id)"
+          v-if="!collapsed.has(section.id)"
           class="mt-1 overflow-hidden rounded-xl border border-default bg-default"
         >
           <li
-            v-for="task in tasks"
+            v-for="task in section.tasks"
             :key="task.id"
             data-list-row
             class="group flex cursor-pointer items-center gap-3 border-b border-default px-3 py-2 transition-colors last:border-b-0 hover:bg-elevated/60"
@@ -126,12 +287,37 @@ function subtaskProgress(taskId: string) {
               />
             </button>
 
-            <span
-              class="min-w-0 flex-1 truncate text-sm"
-              :class="task.completedAt ? 'text-dimmed line-through' : 'text-default'"
-            >
-              {{ task.title }}
-            </span>
+            <div class="min-w-0 flex-1">
+              <!-- The title edits in place on a click; Enter or leaving the field saves it, Escape keeps the old title. -->
+              <input
+                v-if="titleTaskId === task.id"
+                v-model="titleDraft"
+                data-list-title-input
+                class="w-full min-w-0 rounded bg-default px-1.5 py-0.5 text-sm text-default outline-none ring-1 ring-primary"
+                @click.stop
+                @keydown.enter.prevent="commitTitle(task)"
+                @keydown.escape="titleTaskId = null"
+                @blur="commitTitle(task)"
+              >
+              <span
+                v-else
+                class="block truncate text-sm"
+                :class="task.completedAt ? 'text-dimmed line-through' : 'text-default'"
+                data-list-title
+                @click.stop="startTitle(task)"
+              >
+                {{ task.title }}
+              </span>
+              <!-- On a phone the extra columns fold under the title; on a wide screen they are columns of their own. -->
+              <KanbanListRowMeta
+                :task="task"
+                :shown="shownColumns"
+                :minutes="taskMinutes[task.id] ?? 0"
+                layout="fold"
+                class="mt-0.5 md:hidden"
+                @logged="onLogged"
+              />
+            </div>
 
             <span
               v-if="subtaskProgress(task.id).total"
@@ -143,15 +329,6 @@ function subtaskProgress(taskId: string) {
                 class="size-3"
               />
               {{ subtaskProgress(task.id).done }}/{{ subtaskProgress(task.id).total }}
-            </span>
-
-            <span class="hidden shrink-0 items-center gap-1 sm:flex">
-              <KanbanLabelChip
-                v-for="tag in task.tags.slice(0, 2)"
-                :key="tag"
-                :tag="tag"
-                chip-class="text-[0.6875rem]"
-              />
             </span>
 
             <span
@@ -168,27 +345,19 @@ function subtaskProgress(taskId: string) {
               />
             </span>
 
-            <span class="flex w-5 shrink-0 justify-center">
-              <UAvatar
-                v-if="personById(task.assigneeId)"
-                :src="personById(task.assigneeId)!.image ?? undefined"
-                :alt="personById(task.assigneeId)!.name || personById(task.assigneeId)!.email || ''"
-                :title="personById(task.assigneeId)!.name || personById(task.assigneeId)!.email || ''"
-                size="2xs"
-                data-list-assignee
-              />
-            </span>
-
-            <span
-              class="w-16 shrink-0 text-right text-xs tabular-nums"
-              :class="overdue(task) ? 'font-medium text-error' : 'text-dimmed'"
-            >
-              {{ task.dueOn ? dueLabel(task.dueOn) : '' }}
-            </span>
+            <!-- The wide-screen cells: the assignee, the due date and the labels, each edited in place. -->
+            <KanbanListRowMeta
+              :task="task"
+              :shown="shownColumns"
+              :minutes="taskMinutes[task.id] ?? 0"
+              layout="column"
+              class="hidden md:flex"
+              @logged="onLogged"
+            />
           </li>
 
           <li
-            v-if="!tasks.length"
+            v-if="!section.tasks.length"
             class="px-3 py-3 text-xs text-dimmed"
           >
             Nothing here yet.

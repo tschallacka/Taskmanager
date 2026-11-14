@@ -174,9 +174,10 @@ async function removeMessage(id: string, isThread: boolean) {
             data-message
           >
             <div class="flex items-center gap-2">
-              <UAvatar
-                :src="message.author.image ?? undefined"
-                :alt="message.author.name"
+              <UserAvatar
+                :user-id="message.author.id"
+                :name="message.author.name"
+                :image="message.author.image"
                 size="xs"
               />
               <span class="text-sm font-medium text-default">{{ message.author.name }}</span>
@@ -215,9 +216,10 @@ async function removeMessage(id: string, isThread: boolean) {
               class="group flex gap-2"
               data-reply
             >
-              <UAvatar
-                :src="reply.author.image ?? undefined"
-                :alt="reply.author.name"
+              <UserAvatar
+                :user-id="reply.author.id"
+                :name="reply.author.name"
+                :image="reply.author.image"
                 size="2xs"
                 class="mt-0.5"
               />

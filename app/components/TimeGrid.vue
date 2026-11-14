@@ -77,10 +77,11 @@ function dayHead(day: string) {
         >
           <td class="px-3 py-2">
             <div class="flex items-center gap-2">
-              <UAvatar
+              <UserAvatar
                 v-if="by === 'person'"
-                :src="row.image ?? undefined"
-                :alt="row.label"
+                :user-id="row.key"
+                :name="row.label"
+                :image="row.image"
                 size="2xs"
               />
               <span class="min-w-0">

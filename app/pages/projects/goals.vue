@@ -7,7 +7,6 @@ import type { Goal } from '~/composables/useGoals'
 
 definePageMeta({ layout: 'app' })
 
-const { sidebarOpen } = useSidebar()
 useSeoMeta({ title: 'Goals' })
 
 const { goals, loading, load, create, update, remove } = useGoals()
@@ -76,20 +75,14 @@ function dueLabel(day: string) {
 
 <template>
   <div class="flex min-w-0 flex-1 flex-col">
-    <header class="flex shrink-0 items-center gap-2 border-b border-default px-4 py-3 lg:px-6">
-      <UButton
-        icon="i-lucide-panel-left"
-        color="neutral"
-        variant="ghost"
-        size="sm"
-        class="lg:hidden"
-        aria-label="Open sidebar"
-        @click="sidebarOpen = true"
-      />
+    <Teleport
+      defer
+      to="#app-topbar-title"
+    >
       <h1 class="text-base font-semibold text-default">
         Goals
       </h1>
-    </header>
+    </Teleport>
 
     <div class="min-h-0 flex-1 overflow-y-auto px-4 py-4 lg:px-6">
       <div class="mx-auto max-w-3xl">

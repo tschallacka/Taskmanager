@@ -1,0 +1,20 @@
+{
+  "outputStyle": "concise",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "sh \"$CREW_HOME/bin/pia-listener-hook.sh\" stop" }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|compact",
+        "hooks": [
+          { "type": "command", "command": "sh \"$CREW_HOME/bin/pia-listener-hook.sh\" sessionstart" }
+        ]
+      }
+    ]
+  }
+}

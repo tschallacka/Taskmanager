@@ -541,6 +541,8 @@ export const notifications = pgTable(
     body: text('body').notNull().default(''),
     createdAt: bigint('created_at', { mode: 'number' }).notNull(),
     readAt: bigint('read_at', { mode: 'number' }),
+    // Set when the person archives it: it leaves the inbox and sits in the Read box until moved back or emptied.
+    archivedAt: bigint('archived_at', { mode: 'number' }),
     emailedAt: bigint('emailed_at', { mode: 'number' })
   },
   table => [
@@ -827,9 +829,20 @@ export const apiKeys = pgTable(
     // Management tokens (the 10-minute crew token) are kept apart from access tokens. Access is the default.
     kind: text('kind').$type<'access' | 'management'>().notNull().default('access'),
     // True once the per-board scopes are stored in api_key_board_scopes. Until then the key's scopes apply to every board.
-    boardScopesSet: boolean('board_scopes_set').notNull().default(false)
+    boardScopesSet: boolean('board_scopes_set').notNull().default(false),
+    // The key's name suffix, stored when the key is made: '' for the plain slug, '-2', '-3' ... for a name that slugs
+    // the same as a key the person already had. NULL only for keys made before it was stored; they get theirs on first
+    // display (shared/utils/keyNameSuffix.ts). Additive and nullable: no data rewrite.
+    nameSuffix: text('name_suffix'),
+    // The key name's slug (lower case, letters and digits, dashes), stored with the suffix. NULL only for keys made before it
+    // was stored. The unique index below is on the person, the slug and the suffix; NULLs are distinct, so legacy keys
+    // with no stored values cannot conflict. Additive and nullable.
+    nameSlug: text('name_slug')
   },
-  table => [index('api_keys_user_idx').on(table.userId)]
+  table => [
+    index('api_keys_user_idx').on(table.userId),
+    uniqueIndex('api_keys_name_suffix_uidx').on(table.userId, table.nameSlug, table.nameSuffix)
+  ]
 )
 
 export type ApiKey = typeof apiKeys.$inferSelect
@@ -1442,6 +1455,30 @@ export const crewBoards = pgTable(
 )
 
 export type CrewBoard = typeof crewBoards.$inferSelect
+
+// The crew's mail, kept until the recipient's mailer has delivered it (acked). A person's mailer fetches its pending
+// mail once a minute and acks each one it delivered. The sender is never taken from the body: from_key is the
+// sender account's person key. Delivered mail older than 7 days and undelivered older than 30 days are deleted on
+// write (see server/utils/crewMail.ts). No `read` column: not needed (Boss, 2026-11-12).
+export const crewMail = pgTable(
+  'crew_mail',
+  {
+    id: text('id').primaryKey(),
+    crewId: text('crew_id').notNull().references(() => crews.id, { onDelete: 'cascade' }),
+    fromKey: text('from_key').notNull(),
+    toKey: text('to_key').notNull(),
+    text: text('text').notNull(),
+    created: bigint('created', { mode: 'number' }).notNull(),
+    delivered: bigint('delivered', { mode: 'number' })
+  },
+  table => [
+    index('crew_mail_pending_idx').on(table.crewId, table.toKey, table.delivered),
+    // The per-minute send count (sendsInLastMinute) filters on the sender and the time: without this it scans the crew.
+    index('crew_mail_sender_idx').on(table.crewId, table.fromKey, table.created)
+  ]
+)
+
+export type CrewMail = typeof crewMail.$inferSelect
 
 // A member of a crew forked for one board (Q36): its own account and key, named for the board
 // (`internal-tools-wren`), with a key limited to that board's shadow board. The account belongs to the

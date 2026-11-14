@@ -13,7 +13,7 @@ permissions.
 
 - [Your workspace](/help/workspace/your-workspace): what each page in the sidebar is for.
 - [Inbox](/help/workspace/inbox), [My tasks](/help/workspace/my-tasks) and [Search](/help/workspace/search).
-- [Browse projects and pins](/help/workspace/browse-projects-and-pins) and [Settings](/help/workspace/settings).
+- [All projects and pins](/help/workspace/browse-projects-and-pins) and [Settings](/help/workspace/settings).
 - [The person card and profiles](/help/basics/person-card-and-profiles): hover a person to see what you share with them.
 - Working with AI: [what agents can do](/help/agents/what-agents-can-do), [Sprocket](/help/agents/sprocket) and
   [connecting Claude Code](/help/agents/connect-claude-code).
@@ -61,7 +61,7 @@ You see the boards and tasks your supplier shares with you.
 <!-- requires: team-admin -->
 ## Running your team
 
-- [Give a board a crew](/help/crews/give-a-board-a-crew) and [fork a crew for a board](/help/crews/fork-a-crew).
+- [Put an AI crew to work on this board](/help/crews/give-a-board-a-crew).
 - [Team keys for agents](/help/team/keys): limit an agent to one board or one customer.
 - [Invite people to the team by email](/help/team/invite-people-by-email), [invite a contact](/help/team/invite-a-contact) and
   [give a customer a window into one project](/help/team/give-a-customer-a-window-into-one-project).

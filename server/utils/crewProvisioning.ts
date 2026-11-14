@@ -15,14 +15,14 @@ import {
 } from '../db/schema'
 import type { ApiKeyScope, Crew } from '../db/schema'
 import { authenticateApiKey, generateApiKey, hasScope } from './api-keys'
-import { createCrewAccount, crewAddress, personKeyOf } from './crewAccounts'
+import { AddressClash, createCrewAccount, crewAddress, personKeyOf } from './crewAccounts'
 import { CREW_SENTENCES, boardOfCrewKey, crewPermissionRefusal, ownsLiveCrew } from './crewPermission'
 import { genId } from './projects'
 
 // The people a crew is made of, in the order the response lists them. `team` is the
 // role in the crew's team; a contact is a customer login and joins no team.
 export const CREW_PEOPLE = [
-  { key: 'boss', name: 'Boss', role: 'owner: reads the reports, owns the bugs column', team: 'admin' },
+  { key: 'boss', name: 'Cato', role: 'owner: reads the reports, owns the bugs column', team: 'admin' },
   { key: 'pia', name: 'Pia Planner', role: 'project manager', team: 'member' },
   { key: 'wren', name: 'Wren Worker', role: 'worker 1', team: 'member' },
   { key: 'wick', name: 'Wick Worker', role: 'worker 2', team: 'member' },
@@ -163,8 +163,10 @@ async function addPeopleTo(crew: Crew, people: readonly CrewPerson[], minted: Mi
   try {
     for (const person of people) {
       const password = secret()
-      const made = await makePersonOf(crew, person, password).catch(() => {
-        throw createError({ statusCode: 409, message: 'An address this crew needs belongs to another account.' })
+      // Only the real address clash is a 409. Any other failure (a database error, say) keeps its own cause.
+      const made = await makePersonOf(crew, person, password).catch((error: unknown) => {
+        if (error instanceof AddressClash) throw createError({ statusCode: 409, message: 'An address this crew needs belongs to another account.' })
+        throw error
       })
       if (made.created) madeUsers.push(made.id)
       const apiKey = await mintKey(made.id, person.team === 'contact' ? null : crew.teamId, `crew ${person.key}`)

@@ -131,6 +131,9 @@ test('a run through the demo: everyone moves once a frame, effects clear up, and
   scene.setSnapshot(snap)
 
   const frame = 1000 / 30
+  // The simulated clock starts at a fixed origin. The scene takes its start from performance.now(), so without this the
+  // frame grid would sit on the process's real clock, and the run would differ from one start to the next.
+  s.last = 0
   let now = s.last
   let nextStep = now + 1500
   const pongXs = new Set<string>()

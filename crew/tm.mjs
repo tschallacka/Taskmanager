@@ -14,7 +14,6 @@
 //                                                  BASE = the board app, APP = the product under test
 //
 // <who> is a key from creds.json: boss pia wren wick wynn wade usher customer contact. Use your own.
-import { chromium } from 'playwright'
 import { readFileSync, mkdirSync, existsSync, lstatSync, openSync, fstatSync, readSync, closeSync, constants } from 'node:fs'
 import { isatty } from 'node:tty'
 import { basename, resolve } from 'node:path'
@@ -228,14 +227,15 @@ process.on('unhandledRejection', (reason) => {
 const profile = `${here}profiles/${who}`
 mkdirSync(profile, { recursive: true })
 const fonts = `${here}fonts.conf`
-launching = chromium.launchPersistentContext(profile, {
+// Playwright is loaded only when a browser is started: the commands that never open one (api, apij, status) do not pay for it.
+launching = import('playwright').then(({ chromium }) => chromium.launchPersistentContext(profile, {
   ...(config.chromium || process.env.CHROMIUM ? { executablePath: config.chromium || process.env.CHROMIUM } : {}),
   headless: true,
   // On a machine without system fonts Chromium exits on some pages; init.mjs writes fonts.conf when "fontDir" is set.
   env: { ...process.env, ...(existsSync(fonts) ? { FONTCONFIG_FILE: fonts } : {}) },
   viewport: { width: 1440, height: 900 },
   args: ['--disable-gpu', '--disable-dev-shm-usage', ...(process.env.CREW_CHROMIUM_NO_SANDBOX === '1' ? ['--no-sandbox'] : [])]
-})
+}))
 const h = { origin: BASE }
 let code = 0
 try {
