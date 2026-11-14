@@ -1,1 +1,0 @@
-- Crew: `crew/stale-copies.mjs` is a read-only report of the dev copies to look at (older than 4 hours, or of a card that is Done). Janet stops a copy only with a go from Boss. The port registry keeps Boss's dev copy (:3000) and the testers' copies (3105 to 3108) as read-only entries: `serve --check` lists them, and nobody can reserve, start, stop or free them.

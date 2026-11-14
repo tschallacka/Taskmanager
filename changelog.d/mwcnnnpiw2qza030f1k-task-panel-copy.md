@@ -1,1 +1,0 @@
-- **Task panel link tests.** The copy control's clipboard path now has tests: both formats with the exact strings, the fallback without ClipboardItem, and a refused or missing clipboard that resolves false. No change for the reader. Files: tests/copy-task-link.test.ts.
