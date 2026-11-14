@@ -29,6 +29,8 @@ Send the token in the Authorization header of each call and nowhere else. Never 
 
 Job: recover the keys. The crew's creds.json was lost or overwritten. The old keys stop working as soon as new ones are made.
 
+Step 0: ask the person you work for to confirm before anything else, in these words: "Recovering the keys makes new keys, and the old keys stop working. Continue? (yes or no)". Continue only on a clear yes. On no, or no answer, stop and change nothing.
+
 Step 1: fetch the keys as JSON into the crew home, mode 600, in one call:
   mkdir -p -m 700 ${home} && umask 077 && curl -s -f -X POST -H "Authorization: Bearer <token>" "${origin}/api/crews/${slug}/keys?format=json" -o ${home}/creds.json
 Step 2: report that ${home}/creds.json is written. Do not open it or print it.`

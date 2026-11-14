@@ -9,6 +9,7 @@ import { db } from '../db'
 import { agentAudit, apiKeys, crewBoards, crews, member, projects } from '../db/schema'
 import type { Crew } from '../db/schema'
 import { generateApiKey } from './api-keys'
+import { SCOPED_TOKEN_SENTENCE } from './crewKeyScope'
 import { storeBoardScopes } from './connectTokens'
 import { isCrewUser } from './crewAccounts'
 import { boardToBind } from './crewBoards'
@@ -88,7 +89,7 @@ export async function issueManagementToken(userId: string, projectId: unknown, n
 export function requireOwnBoardFor(caller: CrewCaller, projectId: unknown): void {
   if (!caller.boardId) return
   if (projectId !== caller.boardId) {
-    throw createError({ statusCode: 403, message: 'This token works on its own board only.' })
+    throw createError({ statusCode: 403, message: SCOPED_TOKEN_SENTENCE })
   }
 }
 
@@ -116,7 +117,7 @@ export async function requireCreateOnOwnBoard(caller: CrewCaller, slug: string, 
 export async function requireCrewOnOwnBoard(caller: CrewCaller, crew: Crew): Promise<void> {
   // A crew-scoped token reaches its own crew only (card mwdd9d2vtgqhfr6izq); any other crew gets the board sentence.
   if (caller.crewId) {
-    if (crew.id !== caller.crewId) throw createError({ statusCode: 403, message: 'This token works on its own board only.' })
+    if (crew.id !== caller.crewId) throw createError({ statusCode: 403, message: SCOPED_TOKEN_SENTENCE })
     return
   }
   if (caller.crewOwner) {

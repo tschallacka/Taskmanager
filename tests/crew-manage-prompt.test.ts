@@ -6,6 +6,16 @@ import { crewManagePrompt } from '../app/utils/crewManagePrompt'
 
 const base = { origin: 'https://tm.example', slug: 'acme', boardName: 'Launch board crew board', token: 'arn_TOKEN_ONCE', expiresAt: Date.UTC(2026, 10, 12, 10) }
 
+test('the recover prompt asks for a confirm before it fetches anything, and says the old keys stop working', () => {
+  const prompt = crewManagePrompt({ ...base, job: 'recover' })
+  assert.match(prompt, /The old keys stop working/)
+  const confirm = prompt.indexOf('Step 0:')
+  const fetch = prompt.indexOf('Step 1:')
+  assert.ok(confirm > 0 && fetch > confirm, 'the confirm comes before the fetch')
+  assert.match(prompt.slice(confirm, fetch), /Continue\? \(yes or no\)/)
+  assert.match(prompt.slice(confirm, fetch), /On no, or no answer, stop and change nothing/)
+})
+
 test('the recover prompt fetches the keys of this crew only, into ~/crew-<slug>, with mode 600', () => {
   const prompt = crewManagePrompt({ ...base, job: 'recover' })
   assert.match(prompt, /Job: recover the keys/)

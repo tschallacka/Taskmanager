@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { db } from '../../../db'
 import { crewBoards } from '../../../db/schema'
 import { issueCrewToken, issueManagementToken } from '../../../utils/managementToken'
@@ -14,7 +14,7 @@ export default defineEventHandler(async (event) => {
   const userId = event.context.session.user.id
   const projectId = typeof body?.projectId === 'string' ? body.projectId : ''
   const [shadow] = projectId
-    ? await db.select({ id: crewBoards.id }).from(crewBoards).where(and(eq(crewBoards.shadowProjectId, projectId)))
+    ? await db.select({ id: crewBoards.id }).from(crewBoards).where(eq(crewBoards.shadowProjectId, projectId))
     : []
   if (shadow) return issueCrewToken(userId, projectId)
   return issueManagementToken(userId, body?.projectId)

@@ -7,7 +7,7 @@ import { createError } from 'h3'
 
 Object.assign(globalThis, { createError })
 
-const { scopedSlugOf, SCOPED_TOKEN_SENTENCE } = await import('../server/utils/crewKeyScope')
+const { scopedAllows, scopedSlugOf, SCOPED_TOKEN_SENTENCE } = await import('../server/utils/crewKeyScope')
 const { requireCrewOnOwnBoard } = await import('../server/utils/managementToken')
 
 test('a scoped token may POST the keys and people routes of a crew, and nothing else', () => {
@@ -28,6 +28,24 @@ test('a scoped token reaches its own crew by id, and another crew gets the board
     requireCrewOnOwnBoard(caller as never, { id: 'crew-b', slug: 'other' } as never),
     (error: { statusCode?: number, message?: string }) => error.statusCode === 403 && error.message === 'This token works on its own board only.'
   )
+})
+
+// The middleware's decision (scopedAllows) is what refuses a route. Every route but the two, and the two for another crew,
+// are refused; the two for the key's own crew are allowed.
+test('the middleware refuses every route but the two of its own crew: other routes, reads, another crew, and no crew', () => {
+  const keyCrewId = 'crew-a'
+  const allowed = (method: string, path: string, slugCrewId: string | null) =>
+    scopedAllows({ method, path, keyCrewId, slugCrewId })
+  assert.equal(allowed('POST', '/api/crews/acme/keys', 'crew-a'), true)
+  assert.equal(allowed('POST', '/api/crews/acme/people', 'crew-a'), true)
+  assert.equal(allowed('POST', '/api/crews/acme/keys', 'crew-b'), false, 'another crew\'s keys route')
+  assert.equal(allowed('POST', '/api/crews/acme/keys', null), false, 'a slug that names no crew')
+  assert.equal(allowed('GET', '/api/crews/acme/keys', 'crew-a'), false, 'a read of its own crew')
+  assert.equal(allowed('POST', '/api/crews/acme', 'crew-a'), false, 'the crew itself')
+  assert.equal(allowed('POST', '/api/crews/acme/rotate', 'crew-a'), false)
+  assert.equal(allowed('POST', '/api/projects/abc/tasks', 'crew-a'), false, 'a board route')
+  assert.equal(allowed('POST', '/api/settings/api-keys/management', 'crew-a'), false, 'the token route itself')
+  assert.equal(allowed('POST', '/api/crews/acme/keys/extra', 'crew-a'), false)
 })
 
 test('the refusal sentence is the board sentence, the same one every other scoped refusal gives', () => {
