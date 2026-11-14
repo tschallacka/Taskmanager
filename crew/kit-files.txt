@@ -75,6 +75,7 @@ session-wake.sh
 session.mjs
 sessions-up.mjs
 setup.mjs
+stale-copies.mjs
 susy-activity.mjs
 susy-collector.mjs
 susy-daemon.mjs
