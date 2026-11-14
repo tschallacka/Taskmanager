@@ -4,6 +4,7 @@ import { taskCountLabel, terminalColumnIds } from '#shared/utils/board'
 import { boardLoadMessage, isBoardId } from '~/utils/boardLoad'
 import { queryForView } from '~/utils/projectViewQuery'
 import { queryWithoutTask, taskPanelPath } from '~/utils/taskPanelUrl'
+import { splitProjectViews } from '~/utils/projectViews'
 
 // One page for the board and for its task panel addresses: the same key keeps the board mounted while the panel opens.
 definePageMeta({ layout: 'app', key: route => `projects/${route.params.id}` })
@@ -59,6 +60,9 @@ const STAFF_ONLY_VIEWS: string[] = ['messages', 'time', 'settings']
 const visibleViews = computed(() => VIEWS.filter(v => (v.key !== 'office' || crewBoard.value || linkedCrews.value.length > 0) && (!STAFF_ONLY_VIEWS.includes(v.key) || !isCustomerView.value)))
 
 const tabViews = computed(() => visibleViews.value.filter(v => v.key !== 'settings'))
+// Overview, Messages, Time and Files sit under the More menu (the owner's design, page06); the rest stay tabs.
+const projectViewSplit = computed(() => splitProjectViews(tabViews.value))
+const moreViewItems = computed(() => projectViewSplit.value.more.map(v => ({ label: v.label, icon: v.icon, onSelect: () => setView(v.key) })))
 // The office is no panel of this page, so ?view=office falls back to the board instead of showing files.
 const view = computed(() => visibleViews.value.filter(v => v.key !== 'office').find(v => v.key === route.query.view)?.key ?? 'board')
 
@@ -613,7 +617,7 @@ useSeoMeta({
       @scroll="updateTabCues"
     >
       <template
-        v-for="v in tabViews"
+        v-for="v in projectViewSplit.primary"
         :key="v.key"
       >
         <UDropdownMenu
@@ -656,6 +660,27 @@ useSeoMeta({
           The office shows the crew of this board at work: every task is a folder that moves between the desks as the board changes. On a board with more than one crew, the menu picks which crew to watch.
         </HelpHint>
       </template>
+      <UDropdownMenu
+        v-if="moreViewItems.length"
+        :items="[moreViewItems]"
+      >
+        <button
+          class="relative flex shrink-0 items-center gap-1.5 px-2.5 py-2 text-sm transition-colors"
+          :class="projectViewSplit.more.some(v => v.key === view) ? 'font-medium text-default' : 'text-muted hover:text-default'"
+          aria-label="More project views"
+          aria-haspopup="menu"
+        >
+          <UIcon
+            name="i-lucide-ellipsis"
+            class="size-4"
+          />
+          More
+          <span
+            class="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-primary transition-opacity duration-200"
+            :class="projectViewSplit.more.some(v => v.key === view) ? 'opacity-100' : 'opacity-0'"
+          />
+        </button>
+      </UDropdownMenu>
     </nav>
 
     <!-- Trash summary. The board itself draws the deleted columns and cards in
