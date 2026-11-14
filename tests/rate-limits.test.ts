@@ -30,11 +30,11 @@ function eventFrom(peer: string | undefined, headers: Record<string, string> = {
 const refusedWith = (promise: Promise<unknown>) => assert.rejects(promise, (e: { statusCode?: number, data?: { code?: string } }) => e.statusCode === 429 && e.data?.code === 'rate_limited')
 
 before(async () => {
-  await db.delete(instanceSettings).where(eq(instanceSettings.id, 'instance'))
+  await db.update(instanceSettings).set({ rateLimits: null }).where(eq(instanceSettings.id, 'instance'))
 })
 
 after(async () => {
-  await db.delete(instanceSettings).where(eq(instanceSettings.id, 'instance'))
+  await db.update(instanceSettings).set({ rateLimits: null }).where(eq(instanceSettings.id, 'instance'))
 })
 
 test('a limits request is checked: known kinds, whole positive numbers, null goes back to the default', () => {
@@ -66,7 +66,7 @@ test('the instance limit set by the admin is what applies, and a team or board a
     .onConflictDoUpdate({ target: instanceSettings.id, set: { rateLimits: { pairing: { max: 3, windowSeconds: 600 } } } })
   assert.deepEqual(await limitsFor('pairing'), [{ max: 3, windowSeconds: 600, level: 'instance' }])
   assert.deepEqual(await limitsFor('tasks'), [{ ...DEFAULT_RATE_LIMITS.tasks, level: 'instance' }], 'a kind the admin did not set keeps its default')
-  await db.delete(instanceSettings).where(eq(instanceSettings.id, 'instance'))
+  await db.update(instanceSettings).set({ rateLimits: null }).where(eq(instanceSettings.id, 'instance'))
 })
 
 test('the counts hold: the call over the limit is refused with a 429 and a Retry-After, the ones before it pass', async () => {

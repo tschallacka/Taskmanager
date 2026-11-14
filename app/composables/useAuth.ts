@@ -51,8 +51,14 @@ export function useAuth() {
     window.location.href = '/login'
   }
 
+  // Re-reads the session after a change to the person's own name or picture, so the shown values update at once.
+  function refreshSession() {
+    authClient.$store.notify('$sessionSignal')
+  }
+
   return {
     session,
+    refreshSession,
     isPending,
     isInstanceAdmin,
     canCreateOrganizations,

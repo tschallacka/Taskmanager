@@ -102,7 +102,13 @@ interface Internals {
   golfBall: THREE.Object3D | null
 }
 
-test('a run through the demo: everyone moves once a frame, effects clear up, and every folder lands', async () => {
+test('a run through the demo: everyone moves once a frame, effects clear up, and every folder lands', async (t) => {
+  // The seeded generator is for this run only: put the real one back when the test ends, pass or fail, so no later
+  // test in this process draws from the seeded sequence.
+  const realRandom = Math.random
+  t.after(() => {
+    Math.random = realRandom
+  })
   Math.random = seeded(7)
   const { OfficeScene } = await import('../app/office/office')
   const { Actor } = await import('../app/office/actor')
@@ -131,6 +137,9 @@ test('a run through the demo: everyone moves once a frame, effects clear up, and
   scene.setSnapshot(snap)
 
   const frame = 1000 / 30
+  // The simulated clock starts at a fixed origin. The scene takes its start from performance.now(), so without this the
+  // frame grid would sit on the process's real clock, and the run would differ from one start to the next.
+  s.last = 0
   let now = s.last
   let nextStep = now + 1500
   const pongXs = new Set<string>()

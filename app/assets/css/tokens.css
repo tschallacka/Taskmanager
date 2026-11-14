@@ -121,6 +121,8 @@
 .light {
   color-scheme: light;
   --tm-accent-text: var(--ui-color-primary-600);
+  /* The 500 step is under 3:1 on white for nine accents. The 700 step is 4.5:1 or more for all seventeen. */
+  --tm-focus: var(--ui-color-primary-700);
   --tm-shadow-control: 0 1px 2px rgba(0, 0, 0, 0.06);
   --tm-shadow-drag: 0 14px 32px rgba(0, 0, 0, 0.18);
 

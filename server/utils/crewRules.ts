@@ -6,9 +6,10 @@
 // They run on a crew board while the board's crew rules switch is on. Each step is written through the
 // rule actions, so it reads in the activity log as done by the rule, not by a person.
 // The pure parts (the gate order, the timings, the tag lines) take no database and are tested on their own.
-import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm'
 import { db } from '../db'
-import { crewBoardMembers, crewBoards, projectColumns, projects, projectTasks, taskActivity, taskComments, taskDependencies, timeEntries } from '../db/schema'
+import { crewBoardMembers, crewBoards, crews, projectColumns, projects, projectTasks, taskActivity, taskComments, taskDependencies, timeEntries, user } from '../db/schema'
+import { personKeyOf } from './crewAccounts'
 import { runAction, type FollowUp, type RuleEvent, type RuleProject, type RuleSource } from './ruleActions'
 import type { ActivityEntry } from './taskActivity'
 
@@ -106,13 +107,30 @@ export async function crewRulesRunFor(project: Pick<RuleProject, 'id'>): Promise
   return isCrewBoard(project.id)
 }
 
-/** The crew members of a board by their crew key (pia, usher, nina, quincy, boss), with their account ids. */
+/**
+ * The crew members of a board by their crew key (pia, usher, nina, quincy, boss), with their account ids.
+ * A crew's own board (crews.boardId) and the shadow board of a fork (crew_boards.shadowProjectId, where the crew's
+ * rules run) have no fork rows, so the crew's accounts are read from their addresses. A board given to a crew is
+ * matched by its real board too. Fork members win where both exist.
+ */
 export async function crewMemberIds(projectId: string): Promise<Map<string, string>> {
+  const members = new Map<string, string>()
+  const ownCrews = await db.select({ id: crews.id, slug: crews.slug }).from(crews)
+    .where(eq(crews.boardId, projectId))
+  const shadowCrews = await db.select({ id: crews.id, slug: crews.slug }).from(crews)
+    .innerJoin(crewBoards, eq(crewBoards.crewId, crews.id))
+    .where(eq(crewBoards.shadowProjectId, projectId))
+  for (const crew of [...ownCrews, ...shadowCrews]) {
+    const accounts = await db.select({ id: user.id, email: user.email }).from(user)
+      .where(eq(user.crewId, crew.id))
+    for (const account of accounts) members.set(personKeyOf(crew.slug, account.email), account.id)
+  }
   const rows = await db.select({ personKey: crewBoardMembers.personKey, userId: crewBoardMembers.userId })
     .from(crewBoardMembers)
     .innerJoin(crewBoards, eq(crewBoards.id, crewBoardMembers.linkId))
-    .where(eq(crewBoards.projectId, projectId))
-  return new Map(rows.map(row => [row.personKey, row.userId]))
+    .where(or(eq(crewBoards.projectId, projectId), eq(crewBoards.shadowProjectId, projectId)))
+  for (const row of rows) members.set(row.personKey, row.userId)
+  return members
 }
 
 /** The account that made the latest activity line adding this tag, or null when none did. */
@@ -129,9 +147,14 @@ async function subtasksOf(taskId: string) {
     .where(and(eq(projectTasks.parentTaskId, taskId), isNull(projectTasks.deletedAt)))
 }
 
-/** The author of a rule's comment and the rule source for its actions: Pia's account, else the board owner's. */
-async function sourceFor(project: RuleProject, name: string, members: Map<string, string>): Promise<RuleSource> {
-  return { id: `crew:${name}`, name, createdBy: members.get('pia') ?? project.userId, mayChangeVisibility: false }
+/** The author of a crew rule's note: the crew's Boss account, else Pia's. Never the board owner. Null when the board has neither. */
+export function noteAuthorFor(members: Map<string, string>): string | null {
+  return members.get('boss') ?? members.get('pia') ?? null
+}
+
+/** The author of a rule's comment and the rule source for its actions: the crew's Boss account, else Pia's. */
+export async function sourceFor(_project: RuleProject, name: string, members: Map<string, string>): Promise<RuleSource> {
+  return { id: `crew:${name}`, name, createdBy: noteAuthorFor(members), mayChangeVisibility: false }
 }
 
 /** Promotion: a Backlog card whose last open blocker just finished goes to To do. */

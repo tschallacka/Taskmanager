@@ -8,6 +8,7 @@ import { isAccentColor } from '#shared/utils/colors'
 import { closeTopic, publicProjectTopic, publishFromEvent } from '../../utils/realtime'
 import { removeTaskAttachments } from '../../utils/attachments'
 import { crewBoardOf, crewShadowToDelete, deleteCrewBoard } from '../../utils/crewBoards'
+import { isCrewShadow } from '../../utils/boardTree'
 import { MAX_PROJECT_DESCRIPTION, parseDashboardWidgets, parseProjectStatus } from '../../utils/taskFields'
 
 export default defineEventHandler(async (event) => {
@@ -40,6 +41,10 @@ export default defineEventHandler(async (event) => {
       ownerId?: string
     }>(event)
     const name = body.name?.trim()
+    // A crew's board is never shared by link: a link is anonymous, and the crew rule needs a person (publicAccess.ts).
+    if (body.isPublic === true && await isCrewShadow(id)) {
+      throw createError({ statusCode: 400, message: 'A crew board cannot be shared by link.' })
+    }
 
     // Moving a board between customers changes who outside the team can read
     // it, so the new customer is checked against the board's own organisation.

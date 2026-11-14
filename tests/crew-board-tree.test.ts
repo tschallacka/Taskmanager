@@ -358,10 +358,10 @@ test('the attachment route serves a hidden shadow\'s files to no one who may not
     writeFileSync(join(taskAttachmentDir(taskId), 'pic.png'), bytes)
   }
   try {
-    // Staff of the real board's team alone are not let in, though isStaffOfShadowedBoard would pass them.
-    await assert.rejects(read(realStaff, tasks.taskmanager), (e: { statusCode?: number }) => e.statusCode === 403)
+    // Staff of the real board's team alone are not let in: the shadow answers as if it did not exist (404).
+    await assert.rejects(read(realStaff, tasks.taskmanager), (e: { statusCode?: number }) => e.statusCode === 404)
     // A member of the crew's team who belongs to another crew is not let in either.
-    await assert.rejects(read(crewMember, tasks.monocode), (e: { statusCode?: number }) => e.statusCode === 403)
+    await assert.rejects(read(crewMember, tasks.monocode), (e: { statusCode?: number }) => e.statusCode === 404)
     // Those who may see the board still read its files.
     assert.deepEqual(await read(crewMember, tasks.taskmanager), bytes)
     assert.deepEqual(await read(owner, tasks.monocode), bytes)

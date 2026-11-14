@@ -48,6 +48,14 @@ export function readCrewsAllowed(body: unknown): boolean {
  * The first refusal the three levels give a user for a board, or null when the crew may work. Pass a null board to
  * check the instance level only. Each level is read from the database on every call.
  */
+/** Whether the person created a crew that is live (not disabled). Such a person's own crews:manage key may use those crews remotely. */
+export async function ownsLiveCrew(userId: string): Promise<boolean> {
+  const [row] = await db.select({ id: crews.id }).from(crews)
+    .where(and(eq(crews.createdBy, userId), isNull(crews.disabledAt)))
+    .limit(1)
+  return Boolean(row)
+}
+
 export async function crewPermissionRefusal(userId: string | null, boardId: string | null): Promise<string | null> {
   // The instance admin is never held by these switches: their crew calls and crews work as they always did.
   // The switches govern the crews of other people only.

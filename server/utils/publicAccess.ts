@@ -5,6 +5,7 @@
 import { db } from '../db'
 import { projects } from '../db/schema'
 import { and, eq, gt, isNull, or } from 'drizzle-orm'
+import { isCrewShadow } from './boardTree'
 
 /** A share is live while it is switched on and its end date has not passed. */
 function liveShare(column: typeof projects.publicUntil) {
@@ -27,5 +28,7 @@ export async function findPublicProject(id: string) {
       eq(projects.isPublic, true),
       liveShare(projects.publicUntil)
     ))
-  return project ?? null
+  // A crew's shadow board is never served by link: the crew rule needs a signed-in person, and a link has none.
+  if (!project || await isCrewShadow(id)) return null
+  return project
 }

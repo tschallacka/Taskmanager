@@ -13,6 +13,7 @@ export default defineEventHandler(async (event) => {
   }
   const patch: SprocketInstancePatch = {}
   if ('forEveryone' in body) patch.forEveryone = body.forEveryone === true
+  if ('claudeForEveryone' in body) patch.claudeForEveryone = body.claudeForEveryone === true
   if ('model' in body) patch.model = String(body.model ?? '')
   if ('apiKey' in body) patch.apiKey = typeof body.apiKey === 'string' || body.apiKey === null ? body.apiKey : undefined
   if ('userDailyLimit' in body) patch.userDailyLimit = Number(body.userDailyLimit)

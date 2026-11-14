@@ -41,6 +41,17 @@ async function waitUntil(check: () => boolean | Promise<boolean>, what: string, 
 }
 
 const never = (): Promise<Disposition> => new Promise<Disposition>(() => {})
+// decide() times out on a timer it unrefs, so with no socket open nothing keeps the event loop alive while a test awaits
+// that timeout: the runner then cancels the test. This holds the loop for the length of one await only. The assertions
+// are unchanged.
+const alive = async <T>(work: Promise<T>): Promise<T> => {
+  const keep = setInterval(() => {}, 1000)
+  try {
+    return await work
+  } finally {
+    clearInterval(keep)
+  }
+}
 
 /** Consumes; the handler for each delivery (n counts from 1) decides. Returns what it received and the stop function. */
 // void is the handler that returns nothing: the adapter fails that delivery.
@@ -475,9 +486,9 @@ describe('decide: every outcome becomes a disposition', () => {
       throw new Error('boom')
     }
     assert.deepEqual(await decide(thrower, deliver, options, quiet), { retry: 'retry30s', reason: 'handler error' })
-    assert.deepEqual(await decide(() => never(), deliver, { ...options, timeoutMs: 20 }, quiet), { retry: 'retry30s', reason: 'handler timeout' })
+    assert.deepEqual(await alive(decide(() => never(), deliver, { ...options, timeoutMs: 20 }, quiet)), { retry: 'retry30s', reason: 'handler timeout' })
     // On the last attempt the same timeout is recorded and failed.
-    assert.deepEqual(await decide(() => never(), { ...deliver, attempt: 2 }, { ...options, timeoutMs: 20 }, quiet), { fail: 'handler timeout' })
+    assert.deepEqual(await alive(decide(() => never(), { ...deliver, attempt: 2 }, { ...options, timeoutMs: 20 }, quiet)), { fail: 'handler timeout' })
   })
 
   test('the log names the delivery and the class only, never the message', async () => {

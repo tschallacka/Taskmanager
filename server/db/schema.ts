@@ -151,6 +151,12 @@ export const instanceSettings = pgTable('instance_settings', {
   sprocketInstanceDailyCap: integer('sprocket_instance_daily_cap').notNull().default(2000),
   // The site default manner, used when a person has picked none (see sprocketManner.ts).
   sprocketDefaultManner: text('sprocket_default_manner').notNull().default('professional'),
+  // Claude Code for everyone (Instance settings). SPROCKET_CLAUDE_FOR_ALL in the environment still decides when it is set.
+  sprocketClaudeForAll: boolean('sprocket_claude_for_all').notNull().default(false),
+  // Branding (Instance settings): the app name shown next to the logo, and an uploaded logo as SVG text. Null means
+  // the defaults: "Taskmanager" and the logo that ships with the app (public/logo.svg).
+  brandName: text('brand_name'),
+  brandLogoSvg: text('brand_logo_svg'),
   updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
   updatedBy: text('updated_by').references(() => user.id, { onDelete: 'set null' })
 })
@@ -528,6 +534,9 @@ export const notifications = pgTable(
     // For a message or a reply: the conversation it belongs to (the first message), so the
     // inbox opens that conversation.
     messageId: text('message_id').references((): AnyPgColumn => projectMessages.id, { onDelete: 'cascade' }),
+    // For a comment or a reply on a task: the comment itself, so the inbox opens the card scrolled to it. Nullable: older
+    // notifications have none, and they open the card at the top.
+    commentId: text('comment_id'),
     // For a guest request: the invitation waiting for a decision, so the inbox can approve it in place.
     invitationId: text('invitation_id').references((): AnyPgColumn => projectGuestInvitations.id, { onDelete: 'cascade' }),
     actorId: text('actor_id').references(() => user.id, { onDelete: 'set null' }),
@@ -535,6 +544,8 @@ export const notifications = pgTable(
     body: text('body').notNull().default(''),
     createdAt: bigint('created_at', { mode: 'number' }).notNull(),
     readAt: bigint('read_at', { mode: 'number' }),
+    // Set when the person archives it: it leaves the inbox and sits in the Read box until moved back or emptied.
+    archivedAt: bigint('archived_at', { mode: 'number' }),
     emailedAt: bigint('emailed_at', { mode: 'number' })
   },
   table => [
@@ -821,9 +832,20 @@ export const apiKeys = pgTable(
     // Management tokens (the 10-minute crew token) are kept apart from access tokens. Access is the default.
     kind: text('kind').$type<'access' | 'management'>().notNull().default('access'),
     // True once the per-board scopes are stored in api_key_board_scopes. Until then the key's scopes apply to every board.
-    boardScopesSet: boolean('board_scopes_set').notNull().default(false)
+    boardScopesSet: boolean('board_scopes_set').notNull().default(false),
+    // The key's name suffix, stored when the key is made: '' for the plain slug, '-2', '-3' ... for a name that slugs
+    // the same as a key the person already had. NULL only for keys made before it was stored; they get theirs on first
+    // display (shared/utils/keyNameSuffix.ts). Additive and nullable: no data rewrite.
+    nameSuffix: text('name_suffix'),
+    // The key name's slug (lower case, letters and digits, dashes), stored with the suffix. NULL only for keys made before it
+    // was stored. The unique index below is on the person, the slug and the suffix; NULLs are distinct, so legacy keys
+    // with no stored values cannot conflict. Additive and nullable.
+    nameSlug: text('name_slug')
   },
-  table => [index('api_keys_user_idx').on(table.userId)]
+  table => [
+    index('api_keys_user_idx').on(table.userId),
+    uniqueIndex('api_keys_name_suffix_uidx').on(table.userId, table.nameSlug, table.nameSuffix)
+  ]
 )
 
 export type ApiKey = typeof apiKeys.$inferSelect
@@ -887,7 +909,9 @@ export const apiKeySecrets = pgTable(
     // 'revoked_management' marks a revoked secret of a management token: the key row goes with the revoke, so the
     // state is the only place its kind survives. A text column, so no migration is needed.
     state: text('state').$type<'replaced' | 'revoked' | 'revoked_management'>().notNull(),
-    changedAt: bigint('changed_at', { mode: 'number' }).notNull()
+    changedAt: bigint('changed_at', { mode: 'number' }).notNull(),
+    // Who made the change (the key's owner, who revoked or regenerated it). Null for rows written before this column.
+    actorId: text('actor_id')
   },
   table => [index('api_key_secrets_token_idx').on(table.tokenId)]
 )
@@ -1434,6 +1458,30 @@ export const crewBoards = pgTable(
 )
 
 export type CrewBoard = typeof crewBoards.$inferSelect
+
+// The crew's mail, kept until the recipient's mailer has delivered it (acked). A person's mailer fetches its pending
+// mail once a minute and acks each one it delivered. The sender is never taken from the body: from_key is the
+// sender account's person key. Delivered mail older than 7 days and undelivered older than 30 days are deleted on
+// write (see server/utils/crewMail.ts). No `read` column: not needed (Boss, 2026-11-12).
+export const crewMail = pgTable(
+  'crew_mail',
+  {
+    id: text('id').primaryKey(),
+    crewId: text('crew_id').notNull().references(() => crews.id, { onDelete: 'cascade' }),
+    fromKey: text('from_key').notNull(),
+    toKey: text('to_key').notNull(),
+    text: text('text').notNull(),
+    created: bigint('created', { mode: 'number' }).notNull(),
+    delivered: bigint('delivered', { mode: 'number' })
+  },
+  table => [
+    index('crew_mail_pending_idx').on(table.crewId, table.toKey, table.delivered),
+    // The per-minute send count (sendsInLastMinute) filters on the sender and the time: without this it scans the crew.
+    index('crew_mail_sender_idx').on(table.crewId, table.fromKey, table.created)
+  ]
+)
+
+export type CrewMail = typeof crewMail.$inferSelect
 
 // A member of a crew forked for one board (Q36): its own account and key, named for the board
 // (`internal-tools-wren`), with a key limited to that board's shadow board. The account belongs to the

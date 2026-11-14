@@ -55,12 +55,21 @@ export function isCrewAddress(email: string): boolean {
   return asciiDomainOf(email) === CREW_DOMAIN
 }
 
+/** The address a crew needs is held by an account that is not this crew's. Only this is an address clash. */
+export class AddressClash extends Error {
+  constructor() {
+    super('That address already has an account that does not belong to this crew')
+    this.name = 'AddressClash'
+  }
+}
+
 /**
  * Makes a crew account, or returns the one already made for this crew. An existing
  * account that is not this crew's (no crew, or another crew) is never touched: the
- * call fails, so a squatter who signed up with the address keeps the account and the
- * crew is provisioned under another name.
+ * call fails with an AddressClash, so a squatter who signed up with the address keeps
+ * the account and the crew is provisioned under another name.
  */
+
 export async function createCrewAccount(input: {
   email: string
   name: string
@@ -78,7 +87,7 @@ export async function createCrewAccount(input: {
     .where(eq(user.email, email))
   if (existing) {
     if (existing.crewId !== input.crewId) {
-      throw new Error('That address already has an account that does not belong to this crew')
+      throw new AddressClash()
     }
     return { id: existing.id, created: false }
   }
@@ -113,7 +122,7 @@ export async function createCrewAccount(input: {
     // overwriting the first account.
     const cause = error as { code?: string, cause?: { code?: string } }
     if ((cause.code ?? cause.cause?.code) === '23505') {
-      throw new Error('That address already has an account that does not belong to this crew')
+      throw new AddressClash()
     }
     throw error
   }

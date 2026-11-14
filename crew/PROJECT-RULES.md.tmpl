@@ -1,12 +1,17 @@
 # Rules of the code: {{product.name}}
 
-This is the one file you edit to make the crew fit your product. `init.mjs` writes it once and
-never overwrites it. Everything the crew does in the repository (`{{product.repo}}`) follows it.
-Replace the examples below with your own facts; delete lines that do not apply.
+Text above the marker line is kit text: `crew update` replaces it with the newest kit text, with no merge and no
+conflict. Text below the marker line is yours: crew never reads or changes it, and where it disagrees with the text
+above, the text below wins. Everything the crew does in the repository (`{{product.repo}}`) follows this file.
+Write your project's own facts below the marker line; delete lines that do not apply.
 
 ## Run it
 
 - Start the dev copy: `<command>` (it must answer at {{product.appUrl}})
+- **A card in Verify UX or QA is served by its worker's dev copy on the card's branch.** The worker starts that copy, waits until `/login` answers 200 (up to 2 minutes), and posts the URL and a test account name on the card. The password goes to the tester by SendMessage, never on the card. The worker stops the copy when the gate is done.
+- **localhost is shared.** Every crew member runs on the same machine, so a copy on localhost is reachable by all of them. "localhost is yours alone" means only that nothing outside this machine can reach it. No answer means not running or still starting.
+- **Dev copy accounts.** A worker that needs an admin on its own dev database runs `crew devadmin show <key>` to see the instance admins and `crew devadmin make-admin <key> <email>` to make one. It works only on `arnotes_dev_<key>` on localhost. Nobody edits the database by hand.
+- **Dev-copy logins (owner agreed, 2026-11-09).** Each dev copy has its own account, and it is kept two ways. (1) `{{crew_dir}}/work/<key>/dev-login` (mode 600, never printed, never on a card) is the source of truth, for curl and API calls, and for signing in again after a reset or an expired session. (2) The worker's own browser profile stays signed in: the command that makes or resets a dev account also signs that profile in once (`crew <who> browser` on /login, with the dev-login values), so the session cookie survives agent restarts and a page check needs no new sign-in. Chrome's password manager is not used: it needs a visible save prompt, agents cannot read it back for curl, and headless Linux has no keyring for it.
 - Dev log: `<command> > {{crew_dir}}/dev.log 2>&1` (the log watcher reads it, optional)
 - Lint (run on your own files before you report): `<for example: npx eslint <files>>`
 - Typecheck / tests (Boss runs them before publishing): `<for example: npm run typecheck && npm test>`
@@ -46,3 +51,8 @@ Replace the examples below with your own facts; delete lines that do not apply.
 3. Typecheck and lint (already part of step 0 on the merged tree): `<command>`
 4. Merge the task's pull request (workers push their own branch; only Boss merges), with `<attribution lines, if any>`: `<command>`
 5. Move the published tasks to Done.
+
+<!-- crew:project-rules below this line: yours; the kit never changes anything after it -->
+
+Your project's own rules go below this line, and they are yours: crew never changes them. Delete this line when you
+write yours.

@@ -11,8 +11,8 @@ import { eq, inArray } from 'drizzle-orm'
 Object.assign(globalThis, { createError })
 
 const { db } = await import('../server/db')
-const { customerMembers, customers, member, organization, projects, user } = await import('../server/db/schema')
-const { listPins, pinBoard, unpinBoard } = await import('../server/utils/boardPins')
+const { boardPins, customerMembers, customers, member, organization, projects, user } = await import('../server/db/schema')
+const { PIN_LIMIT, listPins, pinBoard, unpinBoard } = await import('../server/utils/boardPins')
 const { workspaceOf } = await import('../server/utils/workspaces')
 
 const tag = randomBytes(4).toString('hex')
@@ -112,4 +112,42 @@ test('a board opens in its team for a member, in the personal workspace for a cu
 
 test('pins are personal: someone else sees none of mine', async () => {
   assert.deepEqual(await listPins(other), [])
+})
+
+test('a person has at most eight pins: a ninth is refused with 409, and re-pinning one already pinned is still fine', async () => {
+  const extra = Array.from({ length: PIN_LIMIT + 1 }, (_, i) => id(`cap-${i}`))
+  await db.insert(projects).values(extra.map(pid => ({ id: pid, userId: me, teamId: null, name: pid.slice(-12), createdAt: now, updatedAt: now })))
+  try {
+    // Every pin of mine counts, including ones listPins leaves out (an archived board, a team I left).
+    await db.delete(boardPins).where(eq(boardPins.userId, me))
+    for (const pid of extra.slice(0, PIN_LIMIT)) await pinBoard(me, pid)
+    assert.equal((await listPins(me)).length, PIN_LIMIT)
+    await assert.rejects(pinBoard(me, extra[PIN_LIMIT]!), (e: { statusCode?: number }) => e.statusCode === 409)
+    assert.equal((await listPins(me)).length, PIN_LIMIT, 'the refused pin is not kept')
+    await pinBoard(me, extra[0]!)
+    assert.equal((await listPins(me)).length, PIN_LIMIT, 'pinning an existing pin again changes nothing')
+    await unpinBoard(me, extra[0]!)
+    await pinBoard(me, extra[PIN_LIMIT]!)
+    assert.equal((await listPins(me)).length, PIN_LIMIT, 'after one unpin there is room for one more')
+  } finally {
+    await unpinBoard(me, extra[PIN_LIMIT]!)
+    await db.delete(boardPins).where(eq(boardPins.userId, me))
+    await db.delete(projects).where(inArray(projects.id, extra))
+  }
+})
+
+test('nine pins sent at the same moment leave eight: the cap holds under concurrency', async () => {
+  const racers = Array.from({ length: PIN_LIMIT + 1 }, (_, i) => id(`race-${i}`))
+  await db.insert(projects).values(racers.map(pid => ({ id: pid, userId: me, teamId: null, name: pid.slice(-12), createdAt: now, updatedAt: now })))
+  try {
+    await db.delete(boardPins).where(eq(boardPins.userId, me))
+    const results = await Promise.allSettled(racers.map(pid => pinBoard(me, pid)))
+    const refused = results.filter(r => r.status === 'rejected')
+    assert.equal((await listPins(me)).length, PIN_LIMIT, 'exactly eight pins are kept')
+    assert.equal(refused.length, 1, 'the one pin over the cap is refused')
+    assert.ok(refused.every(r => (r as PromiseRejectedResult).reason?.statusCode === 409))
+  } finally {
+    await db.delete(boardPins).where(eq(boardPins.userId, me))
+    await db.delete(projects).where(inArray(projects.id, racers))
+  }
 })

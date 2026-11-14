@@ -176,10 +176,18 @@ test('a crew key stops when its owner loses the board', async () => {
   }
 })
 
-test('a key of a person who is not the instance admin must be bound to a board, and the levels reach it', async () => {
+test('a key of a person who is not the instance admin is bound to a board, or unbound only with a live crew of their own', async () => {
   await setLevels(true, true, true)
   const event = (userId: string) => ({ context: { session: { user: { id: userId } } } }) as never
-  await rejectsWith(requireCrewKeyRights(event(owner), null).then(() => null), CREW_SENTENCES.noBoard)
+  // An unbound key: the owner of a live crew may hold one; a person with no live crew may not. Earlier tests leave the
+  // owner's crew disabled, so it is turned back on first.
+  await db.update(crews).set({ disabledAt: null }).where(eq(crews.id, crewId))
+  await requireCrewKeyRights(event(owner), null)
+  await rejectsWith(requireCrewKeyRights(event(member_), null).then(() => null), CREW_SENTENCES.noBoard)
+  // With the instance level off, the owner's live crew answers the instance sentence for an unbound key.
+  await setInstanceCrews(false, root)
+  await rejectsWith(requireCrewKeyRights(event(owner), null).then(() => null), CREW_SENTENCES.instance)
+  await setInstanceCrews(true, root)
   await requireCrewKeyRights(event(owner), board.main)
   await setBoardCrews(board.main, false)
   await rejectsWith(requireCrewKeyRights(event(owner), board.main).then(() => null), CREW_SENTENCES.board)

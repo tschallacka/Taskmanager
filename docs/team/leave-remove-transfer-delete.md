@@ -81,7 +81,7 @@ trash and no way to get it back. Everyone in the team loses access at once.
 
 A crew that works on one of its boards loses its link to it. The crew's own board and any members forked for that
 board are not deleted with the team, so take the crew off the board first
-(see [Give a board a crew](/help/crews/give-a-board-a-crew)) if you want its forks removed.
+(see [Put an AI crew to work on this board](/help/crews/give-a-board-a-crew)) if you want its forks removed.
 
 If you only want people out, remove them one by one instead, or transfer ownership and leave, which keeps the team
 for the others.

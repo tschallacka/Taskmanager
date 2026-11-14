@@ -30,7 +30,7 @@ test('each role has a stub template, and the kit ships it', () => {
     assert.ok(existsSync(join(KIT, template)), `${template} exists for ${key}`)
     assert.ok(listed.includes(template), `${template} is listed in kit-files.txt`)
     const first = readFileSync(join(KIT, template), 'utf8').split('\n')[0]
-    assert.equal(first, `# ${NAMES[key]}`, `${template} starts with its title`)
+    assert.ok(first === `# ${NAMES[key]}` || first.startsWith(`# ${NAMES[key]} (`), `${template} starts with its title (a qualifier in brackets may follow)`)
   }
 })
 

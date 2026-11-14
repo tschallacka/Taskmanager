@@ -9,6 +9,7 @@ import { aiUsageRecords, apiKeys, user } from '../db/schema'
 import { issueSprocketRunToken } from './api-keys'
 import { SPROCKET_CHARACTER } from './chatTools'
 import type { WireMessage } from './chatHistory'
+import { claudeForEveryoneOn } from './sprocketInstance'
 import { sprocketPersonOf } from './sprocketPerson'
 import { sprocketRunContext } from './sprocketRun'
 import { promptWithManner } from './sprocketManner'
@@ -70,7 +71,7 @@ export async function claudeVersion(bin: string): Promise<string | null> {
 }
 
 export async function mayUseClaude(userId: string): Promise<boolean> {
-  if (process.env.SPROCKET_CLAUDE_FOR_ALL === 'true') return true
+  if (await claudeForEveryoneOn()) return true
   const [row] = await db.select({ admin: user.isInstanceAdmin }).from(user).where(eq(user.id, userId))
   return row?.admin === true
 }

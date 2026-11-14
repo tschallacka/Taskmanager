@@ -32,10 +32,6 @@ export function listTeamCrews(teamId: string): Promise<TeamCrewsList> {
   return $fetch<TeamCrewsList>(`/api/teams/${teamId}/crews`)
 }
 
-export function attachTeamCrew(teamId: string, crewId: string, projectId: string): Promise<{ id: string, shadowProjectId: string }> {
-  return $fetch<{ id: string, shadowProjectId: string }>(`/api/teams/${teamId}/crews`, { method: 'POST', body: { crewId, projectId } })
-}
-
 export function detachTeamCrew(teamId: string, linkId: string): Promise<{ ok: true }> {
   return $fetch<{ ok: true }>(`/api/teams/${teamId}/crews/${linkId}`, { method: 'DELETE' })
 }
@@ -46,50 +42,4 @@ export interface TeamCrewFork {
   name: string
   agentType: string
   keyLastUsed: number | null
-}
-
-// What a fork or a rotate answers with. The passwords and keys are in it once and are not kept.
-export interface ForkedMember {
-  key: string
-  name: string
-  agentType: string
-  email: string
-  password: string
-  apiKey: string
-}
-
-export interface ForkResult {
-  base: string
-  crew: { slug: string, name: string }
-  board: { id: string, name: string }
-  shadowBoard: { id: string }
-  members: ForkedMember[]
-}
-
-// The extra workers a board can add later: one list, shared with the server and the crew kit.
-export { EXTRA_WORKERS } from '#shared/utils/extraWorkers'
-
-/** `add` names extra workers to fork on a board that is already forked; without a rotate the others stay as they are. */
-export function forkTeamCrew(teamId: string, linkId: string, rotate: boolean, add: string[] = []): Promise<ForkResult> {
-  return $fetch<ForkResult>(`/api/teams/${teamId}/crews/${linkId}/fork`, { method: 'POST', body: { rotate, add } })
-}
-
-/** `forks-<crew>-<board>.json`: the file Boss hands to `init.mjs --forks`. */
-export function forkFileName(result: ForkResult, suffix = ''): string {
-  const board = result.board.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'board'
-  return `forks-${result.crew.slug}-${board}${suffix}.json`
-}
-
-/** Saves the whole answer, passwords included, as the file the crew kit reads. */
-export function downloadForkFile(result: ForkResult, suffix = ''): void {
-  const url = URL.createObjectURL(new Blob([`${JSON.stringify(result, null, 2)}\n`], { type: 'application/json' }))
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = forkFileName(result, suffix)
-  anchor.click()
-  URL.revokeObjectURL(url)
-}
-
-export function unforkTeamCrew(teamId: string, linkId: string): Promise<{ ok: true }> {
-  return $fetch<{ ok: true }>(`/api/teams/${teamId}/crews/${linkId}/fork`, { method: 'DELETE' })
 }

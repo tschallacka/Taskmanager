@@ -9,10 +9,11 @@ import { db } from '../db'
 import { instanceSettings, rateLimitHits } from '../db/schema'
 import { genId } from './projects'
 import { decryptSecret, encryptSecret, secretsUnavailableReason } from './secretCrypto'
+import { INSTANCE_ROW_ID, writeInstanceRow } from './instanceRow'
 import { isSprocketManner, resolveManner, SPROCKET_MANNERS } from './sprocketManner'
 import type { SprocketManner } from './sprocketManner'
 
-export const SPROCKET_INSTANCE_ROW_ID = 'instance'
+export const SPROCKET_INSTANCE_ROW_ID = INSTANCE_ROW_ID
 export const SPROCKET_DEFAULT_MODEL = 'openai/gpt-4o-mini'
 const KEY_CONTEXT = 'instance-settings:sprocket-openrouter-key'
 const INSTANCE_SCOPE = 'sprocket:instance'
@@ -30,10 +31,15 @@ export interface SprocketInstanceView {
   defaultManner: SprocketManner
   /** Why the key cannot be stored or read on this install (SECRETS_ENCRYPTION_KEY), or null. */
   keyProblem: string | null
+  /** The Claude Code for everyone switch as stored. It does not apply while claudeEnvSetting is set. */
+  claudeForEveryone: boolean
+  /** SPROCKET_CLAUDE_FOR_ALL as the server reads it: 'true' or 'false' when set, null when unset. A set value decides. */
+  claudeEnvSetting: 'true' | 'false' | null
 }
 
 export interface SprocketInstancePatch {
   forEveryone?: boolean
+  claudeForEveryone?: boolean
   model?: string
   /** A new key, or null to clear the stored one. Omitted keeps the stored key as it is. */
   apiKey?: string | null
@@ -68,8 +74,27 @@ export async function sprocketInstanceView(): Promise<SprocketInstanceView> {
     userDailyLimit: row?.sprocketUserDailyLimit ?? 200,
     instanceDailyCap: row?.sprocketInstanceDailyCap ?? 2000,
     defaultManner: resolveManner(row?.sprocketDefaultManner, null),
-    keyProblem: secretsUnavailableReason()
+    keyProblem: secretsUnavailableReason(),
+    claudeForEveryone: row?.sprocketClaudeForAll ?? false,
+    claudeEnvSetting: claudeEnvSetting()
   }
+}
+
+/** SPROCKET_CLAUDE_FOR_ALL as set in the environment: 'true' or 'false' when it is set to one of those, else null. */
+export function claudeEnvSetting(): 'true' | 'false' | null {
+  const value = process.env.SPROCKET_CLAUDE_FOR_ALL?.trim().toLowerCase()
+  return value === 'true' || value === 'false' ? value : null
+}
+
+/**
+ * Whether every signed-in user may choose Claude Code. The environment variable decides when it is set (true or
+ * false); otherwise the Instance settings switch does. The instance admin may always choose it (sprocketAgent.ts).
+ */
+export async function claudeForEveryoneOn(): Promise<boolean> {
+  const env = claudeEnvSetting()
+  if (env !== null) return env === 'true'
+  const row = await storedRow()
+  return row?.sprocketClaudeForAll === true
 }
 
 // The masked form needs the last four characters of the key. They are read from the encrypted value, never stored
@@ -93,10 +118,10 @@ function readCount(value: unknown, name: string, max: number): number {
 
 /** Saves the admin's changes. Only the fields sent change. */
 export async function saveSprocketInstance(patch: SprocketInstancePatch, userId: string): Promise<void> {
-  const existing = await storedRow()
-  const update: Partial<typeof instanceSettings.$inferInsert> = { updatedAt: Date.now(), updatedBy: userId }
+  const update: Partial<typeof instanceSettings.$inferInsert> = {}
 
   if (patch.forEveryone !== undefined) update.sprocketForEveryone = Boolean(patch.forEveryone)
+  if (patch.claudeForEveryone !== undefined) update.sprocketClaudeForAll = Boolean(patch.claudeForEveryone)
   if (patch.model !== undefined) {
     const model = patch.model.trim()
     if (!model || model.length > 200) throw createError({ statusCode: 400, message: 'Send the model id, e.g. openai/gpt-4o-mini.' })
@@ -122,16 +147,7 @@ export async function saveSprocketInstance(patch: SprocketInstancePatch, userId:
     }
   }
 
-  const base = {
-    id: SPROCKET_INSTANCE_ROW_ID,
-    crewsAllowed: existing?.crewsAllowed ?? false,
-    rateLimits: existing?.rateLimits ?? null,
-    updatedAt: Date.now(),
-    updatedBy: userId
-  }
-  await db.insert(instanceSettings)
-    .values({ ...base, ...update })
-    .onConflictDoUpdate({ target: instanceSettings.id, set: update })
+  await writeInstanceRow(update, userId)
 }
 
 /** The instance's OpenRouter key and model when Sprocket for everyone is on and a key is stored, else null. */

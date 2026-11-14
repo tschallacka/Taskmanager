@@ -6,6 +6,9 @@ import { fileURLToPath } from 'node:url'
 
 export const kitDir = dirname(fileURLToPath(import.meta.url))
 
+/** A path as one shell word, quoted only when it has to be. Used wherever the kit writes a command for a shell. */
+export const shellWord = text => (/^[\w@%+=:,./-]+$/.test(text) ? text : `'${text.replace(/'/g, `'\\''`)}'`)
+
 /**
  * CREW_HOME as an absolute path, or the kit folder when it is unset. A leading ~ is expanded here:
  * a launcher that sets the variable without a shell passes "~/crew-home" on as it is.

@@ -18,7 +18,7 @@ import { isCrewUser, personKeyOf } from './crewAccounts'
 import { removeForks } from './crewForks'
 import { TEAM_ADMIN_ROLES } from './auth-helpers'
 import { removeTaskAttachments } from './attachments'
-import { hiddenCrewShadows } from './boardTree'
+import { CREW_SHADOW_SUFFIX, TAKEN_OFF_SUFFIX, hiddenCrewShadows } from './boardTree'
 
 export interface CrewChoice {
   id: string
@@ -43,7 +43,7 @@ export interface CrewLinkView {
 
 /** The name the shadow board carries: the real board's, marked as the crew's. */
 export function shadowBoardName(realName: string): string {
-  return `${realName} (crew)`
+  return `${realName}${CREW_SHADOW_SUFFIX}`
 }
 
 /** A crew the caller made and that is live: the only kind they may attach (Q42a). Others read as not found. */
@@ -131,7 +131,7 @@ export async function detachCrew(link: CrewBoard): Promise<void> {
   await removeForks(link.id)
   await db.transaction(async (tx) => {
     await tx.delete(crewBoards).where(eq(crewBoards.id, link.id))
-    await tx.update(projects).set({ archivedAt: Date.now(), name: sql`${projects.name} || ' (taken off)'` }).where(eq(projects.id, link.shadowProjectId))
+    await tx.update(projects).set({ archivedAt: Date.now(), name: sql`${projects.name} || ${TAKEN_OFF_SUFFIX}` }).where(eq(projects.id, link.shadowProjectId))
   })
 }
 

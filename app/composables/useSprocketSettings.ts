@@ -20,6 +20,17 @@ export interface SprocketSettings {
   hasOpenRouterKey: boolean
   openrouterModel: string | null
   agents: SprocketAgent[]
+  /** Which Sprocket answers this person: their Claude Code or own key, the instance's key, or nothing yet. */
+  answersWith?: 'agent' | 'own-key' | 'instance-key' | null
+  /** The manner: the person's pick (null = site default), the site default, and the one that answers. */
+  manner?: {
+    pick: string | null
+    siteDefault: string
+    effective: string
+    options: { id: string, label: string, sample: string }[]
+  }
+  /** The instance's Sprocket for everyone: on when the admin set it and a key is stored, and the model it answers with. */
+  instance?: { on: boolean, model: string, userDailyLimit: number, usedToday: number }
   claude: { allowed: boolean, available: boolean, version: string | null }
   models: string[]
   efforts: string[]
@@ -65,5 +76,11 @@ export function useSprocketSettings() {
     return ['Claude Code', s.model, s.effort, agent.value?.name].filter(Boolean).join(' · ')
   })
 
-  return { settings: _settings, agent, answeredBy, load, save }
+  /** Sets this person's manner (null = the site default), then reloads the settings so the page shows what answers. */
+  async function saveManner(manner: string | null) {
+    await $fetch('/api/settings/sprocket-manner', { method: 'PUT', body: { manner } })
+    await load(true)
+  }
+
+  return { settings: _settings, agent, answeredBy, load, save, saveManner }
 }

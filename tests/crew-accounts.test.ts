@@ -21,6 +21,7 @@ const tag = Date.now().toString(36)
 const PASSWORD = `probe-${randomBytes(18).toString('base64url')}`
 const userEmails: string[] = []
 const crewIds: string[] = []
+const orgIds: string[] = []
 
 async function signUp(email: string) {
   const res = await fetch(`${BASE}/api/auth/sign-up/email`, {
@@ -46,6 +47,7 @@ after(async () => {
   // Sign-up rows by their spelling, so a row that was not refused is still removed.
   await db.delete(user).where(like(user.email, `c%-${tag}@%`))
   if (crewIds.length) await db.delete(crews).where(inArray(crews.id, crewIds))
+  if (orgIds.length) await db.delete(organization).where(inArray(organization.id, orgIds))
   // The postgres pool keeps the process alive; close it or the test file never ends.
   await db.$client.end({ timeout: 1 })
 })
@@ -133,15 +135,17 @@ test('the user update hook refuses an .invalid address too', async () => {
 })
 
 test('the helper makes a crew account that signs in, and refuses what it must', { skip: noServer }, async () => {
-  const [org] = await db.select({ id: organization.id }).from(organization).limit(1)
-  assert.ok(org, 'the dev database needs one organization for the crew row')
+  // The crew row needs an organization. This test makes its own, so it does not depend on what the database holds.
+  const orgId = genId()
+  orgIds.push(orgId)
+  await db.insert(organization).values({ id: orgId, name: `crew accounts ${tag}`, slug: `crew-accounts-${tag}`, createdAt: new Date() })
   const crewId = genId()
   crewIds.push(crewId)
   await db.insert(crews).values({
     id: crewId,
     slug: `scratch-w2-${tag}`,
     name: `scratch:w2 ${tag}`,
-    teamId: org.id,
+    teamId: orgId,
     createdAt: Date.now()
   })
 

@@ -8,7 +8,14 @@ import type { ApiKeyScope } from '../db/schema'
 import { generateApiKey, isApiKeyScope } from './api-keys'
 import { storeReach, teamReachOf } from './keyReach'
 import type { ReachRequest } from './keyReach'
-import { CREW_SENTENCES, crewPermissionRefusal } from './crewPermission'
+import { CREW_SENTENCES, crewPermissionRefusal, ownsLiveCrew } from './crewPermission'
+import { backfillSuffixes, keySlug, nextKeySuffix } from '../../shared/utils/keyNameSuffix'
+
+// A unique-index conflict (Postgres 23505), possibly wrapped by the query layer.
+function isUniqueConflict(error: unknown): boolean {
+  const e = error as { code?: string, cause?: { code?: string } } | null
+  return e?.code === '23505' || e?.cause?.code === '23505'
+}
 
 export const MAX_KEY_NAME_LENGTH = 60
 const MAX_EXPIRY_DAYS = 3650
@@ -23,13 +30,21 @@ export interface KeyRequest {
 /**
  * Whether the signed-in person may hold a crews:manage key limited to this board (or none, for the instance admin).
  * The crew permission decides it: the three levels of crewPermission.ts. A person who is not the instance admin
- * may only hold one bound to a board, so it reaches that board's crews and nothing else.
+ * may hold one bound to a board, so it reaches that board's crews and nothing else. Without a board (an unbound key)
+ * only a person who owns at least one live crew may hold it; it then reaches only the crews that person created
+ * (see remoteCrewOwnerVerdict). Any other non-admin gets the one-board sentence.
  */
 export async function requireCrewKeyRights(event: H3Event, boardId: string | null): Promise<void> {
   const userId = event.context.session.user.id
   const [row] = await db.select({ isInstanceAdmin: user.isInstanceAdmin }).from(user).where(eq(user.id, userId))
   const ownerIsAdmin = Boolean(row?.isInstanceAdmin)
-  if (!ownerIsAdmin && !boardId) throw createError({ statusCode: 403, message: CREW_SENTENCES.noBoard })
+  if (!ownerIsAdmin && !boardId) {
+    // The instance switch first: switching it off disables the owner's crew too, and the sentence should say why.
+    const ownRefusal = await crewPermissionRefusal(userId, null)
+    if (ownRefusal) throw createError({ statusCode: 403, message: ownRefusal })
+    if (!(await ownsLiveCrew(userId))) throw createError({ statusCode: 403, message: CREW_SENTENCES.noBoard })
+    return
+  }
   const refusal = await crewPermissionRefusal(userId, ownerIsAdmin ? null : boardId)
   if (refusal) throw createError({ statusCode: 403, message: refusal })
 }
@@ -106,7 +121,14 @@ export async function issueKey(input: { userId: string, teamId: string | null, r
   const reach = input.reach
     ?? (input.teamId ? teamReachOf(input.teamId, limit) : { allBoards: false, workspaceTeamIds: [null], boardIds: [] })
   const now = Date.now()
-  const created = await db.transaction(async (tx) => {
+  const attempt = () => db.transaction(async (tx) => {
+    // The new key's suffix is counted over every key the person has now, after any older key without one has got its own.
+    const rows = await tx.select({ id: apiKeys.id, name: apiKeys.name, createdAt: apiKeys.createdAt, nameSuffix: apiKeys.nameSuffix })
+      .from(apiKeys).where(eq(apiKeys.userId, input.userId))
+    // Older keys without a stored suffix are counted as the list endpoint would give them (in memory only; the list stores them).
+    const filled = backfillSuffixes(rows)
+    const known = rows.map(row => ({ name: row.name, nameSuffix: row.nameSuffix ?? filled[row.id] ?? '' }))
+    const nameSuffix = nextKeySuffix(input.request.name, known)
     const [row] = await tx.insert(apiKeys).values({
       id: Date.now().toString(36) + Math.random().toString(36).slice(2),
       userId: input.userId,
@@ -120,10 +142,21 @@ export async function issueKey(input: { userId: string, teamId: string | null, r
       expiresAt: input.request.expiresAt,
       createdAt: now,
       allBoards: reach.allBoards,
-      boardReachSet: true
+      boardReachSet: true,
+      nameSuffix,
+      nameSlug: keySlug(input.request.name) || 'key'
     }).returning()
     await storeReach(tx, row!.id, reach, now)
     return row!
   })
+  // Two keys made at the same moment can take the same suffix; the unique index refuses the second. Its transaction reads
+  // the rows again and tries once more, so it takes the next free suffix.
+  let created
+  try {
+    created = await attempt()
+  } catch (error) {
+    if (!isUniqueConflict(error)) throw error
+    created = await attempt()
+  }
   return { token: generated.token, key: created }
 }

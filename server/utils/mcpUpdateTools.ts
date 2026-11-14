@@ -209,7 +209,8 @@ export const MCP_UPDATE_TOOLS: McpToolDefinition[] = [
         createdAt: Date.now()
       }).returning()
 
-      await notifyComment(board, task, context.userId, body, visibility === 'internal')
+      // The reply target is not passed here, as before (it would change who hears the reply); only the comment id is new.
+      await notifyComment(board, task, context.userId, body, visibility === 'internal', null, comment!.id)
       // A new update is a comment to the rules, as it is in the app.
       await fireRules({ type: 'comment_added', projectId: board.id, taskId: task.id, actorId: context.userId, actorIsAgent: true, detail: null }, newRuleChain()).catch(() => {})
       return {

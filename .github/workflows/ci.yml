@@ -1,10 +1,14 @@
 name: ci
 
 on:
-  push:
-    # With only tags-ignore given, GitHub runs nothing for branch pushes: the branches are named too.
+  # Pull requests run the checks; a branch push on its own runs nothing (owner, 2026-11-11).
+  pull_request:
     branches:
-      - '**'
+      - master
+  # Master runs them again after a merge, because the tag and release job below needs a green master.
+  push:
+    branches:
+      - master
     # The release tags this workflow creates are pushes too; they must not run it again.
     tags-ignore:
       - 'v*'
@@ -65,6 +69,28 @@ jobs:
             }
             console.log(`package.json says ${process.argv[1]}, master is at ${process.argv[2]}: the version is raised`)
           ' "$mine" "$master"
+
+  # A push to any branch other than master: the change adds a changelog fragment (changelog.d/<card-id>-<slug>.md),
+  # or is the merger's publish pull request that folded them into CHANGELOG.md. The rule is in bump-version.mjs,
+  # which prints the rule that passed (CONTRIBUTING.md, Changelog).
+  changelog-fragment:
+    if: github.ref != 'refs/heads/master'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Require a changelog fragment or the folded changelog
+        run: |
+          git fetch --quiet origin "+refs/heads/master:refs/remotes/origin/master"
+          {
+            git diff --name-status origin/master...HEAD
+            echo "--- CHANGELOG.md diff"
+            git diff origin/master...HEAD -- CHANGELOG.md
+          } | node scripts/bump-version.mjs changelog-check
 
   # Only a green master is tagged: this job runs after ci and only for a push to master.
   tag:

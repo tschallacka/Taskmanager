@@ -193,7 +193,7 @@ async function confirmDelete() {
 </script>
 
 <template>
-  <div class="space-y-8">
+  <div class="min-w-0 space-y-8 break-words">
     <div>
       <label
         for="project-settings-name"

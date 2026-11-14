@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { relativeTime } from '~/composables/useRelativeTime'
+import CardIdText from '~/components/CardIdText.vue'
 
 // The project's conversations: post a message, answer one, and read them newest
 // first. Replies stay under the message they answer. With a threadId it shows that one
@@ -174,9 +175,10 @@ async function removeMessage(id: string, isThread: boolean) {
             data-message
           >
             <div class="flex items-center gap-2">
-              <UAvatar
-                :src="message.author.image ?? undefined"
-                :alt="message.author.name"
+              <UserAvatar
+                :user-id="message.author.id"
+                :name="message.author.name"
+                :image="message.author.image"
                 size="xs"
               />
               <span class="text-sm font-medium text-default">{{ message.author.name }}</span>
@@ -201,7 +203,7 @@ async function removeMessage(id: string, isThread: boolean) {
               {{ message.title }}
             </h3>
             <p class="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-default">
-              {{ message.body }}
+              <CardIdText :text="message.body" />
             </p>
           </div>
 
@@ -215,9 +217,10 @@ async function removeMessage(id: string, isThread: boolean) {
               class="group flex gap-2"
               data-reply
             >
-              <UAvatar
-                :src="reply.author.image ?? undefined"
-                :alt="reply.author.name"
+              <UserAvatar
+                :user-id="reply.author.id"
+                :name="reply.author.name"
+                :image="reply.author.image"
                 size="2xs"
                 class="mt-0.5"
               />
@@ -239,7 +242,7 @@ async function removeMessage(id: string, isThread: boolean) {
                   </button>
                 </p>
                 <p class="mt-0.5 whitespace-pre-wrap text-sm leading-relaxed text-default">
-                  {{ reply.body }}
+                  <CardIdText :text="reply.body" />
                 </p>
               </div>
             </li>

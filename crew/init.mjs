@@ -7,9 +7,13 @@
 // PROJECT-RULES.md or BRIEF.md once they exist.
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, chmodSync, copyFileSync } from 'node:fs'
 import { execSync } from 'node:child_process'
+import { withServeCommand } from './port-registry.mjs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { CAST, OWNER_FILES, agentNames, config, forkMemberPlan, here, kitDir, loadForks, modelProblems, renderTemplate, templateValues } from './config.mjs'
+import { writePiaHooks } from './pia-session.mjs'
+import { writeBossHooks } from './boss-session.mjs'
+import { withCrewDefaults } from './crew-defaults.mjs'
 
 const ok = m => console.log(`  ok   ${m}`)
 const warn = m => console.log(`  WARN ${m}`)
@@ -106,6 +110,8 @@ const render = text => renderTemplate(text, values)
 
 // The templates ship in the kit folder; the documents are written to CREW_HOME.
 for (const file of readdirSync(kitDir).filter(f => f.endsWith('.tmpl'))) {
+  // Pia's standing order is not a crew document: it goes into her session folder, below.
+  if (file === 'PIA-CLAUDE.md.tmpl') continue
   const out = file.replace(/\.tmpl$/, '')
   if (out === 'fonts.conf') {
     if (!config.fontDir) continue
@@ -118,10 +124,6 @@ for (const file of readdirSync(kitDir).filter(f => f.endsWith('.tmpl'))) {
   const text = render(readFileSync(`${kitDir}/${file}`, 'utf8'))
   const left = text.match(/\{\{[^}]+\}\}/g)
   writeFileSync(`${here}${out}`, text)
-  if (OWNER_FILES.includes(out)) {
-    mkdirSync(`${here}kit-base`, { recursive: true, mode: 0o700 })
-    writeFileSync(`${here}kit-base/${out}`, text, { mode: 0o600 })
-  }
   ok(`${out}${left ? `  (unfilled: ${[...new Set(left)].join(' ')})` : ''}`)
 }
 
@@ -238,6 +240,69 @@ Your role is the one ${base} has in the crew documents in ${here} (CREW.md, PROM
 `)
     ok(`${name}  (${boardName})`)
   }
+}
+
+// Pia's own session: its Stop and SessionStart hooks keep her board listener running (pia-listener-hook.sh). Written
+// only when she runs on Claude, the provider the kit can start. Other keys in her settings file are kept.
+console.log('\nPia session')
+if (!skipsProvider('pia', config.models.pia)) {
+  try {
+    const { file, changed } = writePiaHooks(`${here}pia-session`, { crewHome: here.replace(/\/$/, ''), kitDir: kitDir.replace(/\/$/, '') })
+    ok(`${file} ${changed ? 'written: her listener hooks' : 'kept, hooks already current'}`)
+  } catch (error) { fail(error.message) }
+}
+
+// Pia's standing order (her CLAUDE.md) is written once, from the kit's template. An existing file is the owner's edit
+// and is never changed here, and update does not touch it. Until the marker-line card ships, it is write-once.
+if (!skipsProvider('pia', config.models.pia)) {
+  const piaClaude = `${here}pia-session/CLAUDE.md`
+  if (existsSync(piaClaude)) {
+    ok(`${piaClaude} exists, kept`)
+  } else {
+    mkdirSync(`${here}pia-session`, { recursive: true })
+    writeFileSync(piaClaude, render(readFileSync(`${kitDir}/PIA-CLAUDE.md.tmpl`, 'utf8')))
+    ok(`${piaClaude} written from the template`)
+  }
+}
+
+// The worktree folder: prepare worktree needs it; init does not guess it, setup writes it from --worktree-base.
+if (typeof config.worktreeBase !== 'string' || !config.worktreeBase.startsWith('/')) {
+  warn('crew.json has no "worktreeBase" (an absolute folder): set it, or "crew <who> prepare worktree" stops with a clear message')
+}
+
+// The dev copies' start command (scripts.serve): crew.json is the owner's, so init only says what to add when it is missing.
+{
+  const serveDefault = withServeCommand(config)
+  if (serveDefault.changed) warn(`crew.json has no scripts.serve: add ${JSON.stringify({ serve: serveDefault.config.scripts.serve })} under "scripts" (crew.json is yours, init does not change it)`)
+}
+
+// Boss's session: its Stop hook keeps the two crew watches running (boss-stop-hook.sh). Written into the folder that
+// crew.json names as "bossSession"; without one, init says so and writes nothing, because a hook in a folder Boss does
+// not run in does nothing.
+console.log('\nBoss session')
+if (!config.bossSession) warn('crew.json has no "bossSession": set it to the folder Boss runs its Claude Code session in, then run init again, or Boss\'s Stop hook is not written')
+else {
+  try {
+    const { file, changed, excluded } = writeBossHooks(config.bossSession, { crewHome: here.replace(/\/$/, ''), kitDir: kitDir.replace(/\/$/, '') })
+    ok(`${file} ${changed ? 'written: the watch hook' : 'kept, hook already current'}${excluded ? ' (kept out of git)' : ''}`)
+  } catch (error) { fail(error.message) }
+}
+
+// crew.json is an owner file: init (and so `crew update`) never writes it. When "reader" or "devServers" are missing it
+// says so and prints the values setup would have written, from the keys of the crew's people (creds.json).
+try {
+  const crewFile = join(here, 'crew.json')
+  const credsFile = join(here, 'creds.json')
+  if (existsSync(crewFile) && existsSync(credsFile)) {
+    const creds = JSON.parse(readFileSync(credsFile, 'utf8'))
+    const { crew: filled, added } = withCrewDefaults(JSON.parse(readFileSync(crewFile, 'utf8')), Object.keys(creds.people ?? {}))
+    if (added.length) {
+      const suggestion = Object.fromEntries(added.map(field => [field, filled[field]]))
+      warn(`crew.json has no ${added.join(' and ')}: add ${JSON.stringify(suggestion)} (crew.json is yours, init does not change it)`)
+    }
+  }
+} catch (error) {
+  fail(`crew.json defaults: ${error.message}`)
 }
 
 const next = existsSync(`${here}creds.json`)

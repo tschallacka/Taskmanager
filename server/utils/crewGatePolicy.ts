@@ -6,6 +6,8 @@ import type { H3Event } from 'h3'
 
 export const CREW_API_PATH = '/api/crews'
 export const CREW_KEY_SCOPE = 'crews:manage'
+// The 403 a remote crews:manage key gets when its owner has no live crew of their own (see remoteCrewOwnerVerdict).
+export const NO_LIVE_CREW_SENTENCE = 'This key may manage crews, but its owner has no live crew here. Use a management token from the board\'s sidebar to make one.'
 // Headers nginx sets on a proxied request. Presence counts, whatever the value or casing.
 export const FORWARDING_HEADERS = ['x-forwarded-for', 'x-real-ip', 'forwarded'] as const
 
@@ -15,8 +17,11 @@ export type Peer = { kind: 'tcp', address: string } | { kind: 'unix' } | { kind:
 // `management` is set when the presented key is a management token (kind 'management') or was one: only such a
 // key may pass the gate from a remote peer, and only such a key's refusal sentence reaches a remote caller.
 // `boardId` is the one board a passing management token works on, for its rate limit.
-export type KeyVerdict = { ok: true, keyId: string, management?: boolean, boardId?: string | null }
-  | { ok: false, reason: 'bad key' | 'expired' | 'wrong scope' | 'not admin', message?: string, management?: boolean }
+export type KeyVerdict = { ok: true, keyId: string, management?: boolean, boardId?: string | null, crewOwner?: boolean }
+  | { ok: false, reason: 'bad key' | 'expired' | 'wrong scope' | 'not admin', message?: string, management?: boolean, noCrew?: boolean }
+// `crewOwner` is set for a remote crews:manage key of a person who created a live crew of their own: it reaches
+// that crew's routes only (see requireCrewOnOwnBoard). `noCrew` is set for the same kind of key when its owner has
+// no live crew: the gate answers it with a 403 sentence, not the plain 404.
 
 export function isCrewApiPath(path: string): boolean {
   const bare = path.split('?')[0] ?? ''
@@ -165,6 +170,8 @@ export function decide(input: GateInput): GateStep {
   const verdict = input.verdict
   // A remote caller with a live management token passes whatever the window says: the one remote key the gate lets through.
   if (!input.local && verdict?.ok && verdict.management) return { pass: true }
+  // A remote crew owner's own crews:manage key passes for its own crews only; the route checks which crew.
+  if (!input.local && verdict?.ok && verdict.crewOwner) return { pass: true }
   if (!input.local && !input.windowOpen) {
     // A management token that expired or was regenerated answers its own sentence; any other remote call is the plain 404.
     if (verdict && !verdict.ok && verdict.management) {
