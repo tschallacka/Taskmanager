@@ -4,7 +4,7 @@
 // Without --from the kit is the one the board serves (/crew/kit.tar.gz). A kit folder that already matches
 // it changes nothing. Otherwise the kit files that differ are backed up into CREW_HOME/backups/update-<time>/kit,
 // the files the new kit no longer ships are removed, and the new kit finishes the job: the owner's files
-// (PROJECT-RULES.md, BRIEF.md) are merged from the template they came from (kept in CREW_HOME/kit-base),
+// (PROJECT-RULES.md, BRIEF.md, JANET.md) follow the marker line: the kit text above it is replaced, the project's text below it is kept,
 // the skill copies are refreshed only where they still match the old kit, init renders the documents, and the
 // server-side changes in CHANGELOG.md are listed, never made. CREW_HOME's own files (creds.json, crew.json,
 // forks, profiles, logs) are never touched. A copy that fails puts the kit folder back from the backup.
@@ -277,7 +277,7 @@ async function finish(planFile) {
     copyFileSync(join(here, out), join(plan.backupDir, out))
     writeFileSync(join(here, out), result.text)
     lines.push(result.status === 'migrated'
-      ? `${out}: migrated once: the new kit text is above the marker line and your file is kept below it (your file before: ${join(plan.backupDir, out)})`
+      ? `${out}: migrated once: the new kit text is above the marker line and your file is kept below it; delete the kit text in it by hand (your file before: ${join(plan.backupDir, out)})`
       : `${out}: the kit text above the marker line is replaced; your text below it is kept (your file before: ${join(plan.backupDir, out)})`)
   }
   // The skill copies in the Claude skills folder are refreshed only while they still match the old kit.
