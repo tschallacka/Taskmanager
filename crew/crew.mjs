@@ -66,6 +66,17 @@ if (first === 'browser' || rest[0] === 'browser') {
   process.exit(run.status ?? 1)
 }
 
+// The lab (card mwdkxbr0thtrcnc7mbi, slice 1): `crew <who> lab submit <branch> [--file f] [--repeat n]`, `crew <who> lab
+// status`, `crew <who> lab cancel <branch>` (lab.mjs); and the runner, its own process: `crew lab runner once|loop`.
+if (first === 'lab' && rest[0] === 'runner') {
+  const run = spawnSync(process.execPath, [join(kit, 'lab-runner.mjs'), ...rest.slice(1)], { stdio: 'inherit' })
+  process.exit(run.status ?? 1)
+}
+if (rest[0] === 'lab') {
+  const run = spawnSync(process.execPath, [join(kit, 'lab.mjs'), first, ...rest.slice(1)], { stdio: 'inherit' })
+  process.exit(run.status ?? 1)
+}
+
 // Susy's round and her agent ids: `crew susy check`, `crew susy agent <key> <id|->`. Any other `crew susy ...` is the
 // person Susy's own board commands, as for every other person.
 if (first === 'susy' && (rest[0] === 'check' || rest[0] === 'agent')) {
