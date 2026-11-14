@@ -3,6 +3,7 @@ import type { ProjectTask } from '~/composables/useProjects'
 import { taskCountLabel, terminalColumnIds } from '#shared/utils/board'
 import { boardLoadMessage, isBoardId } from '~/utils/boardLoad'
 import { queryForView } from '~/utils/projectViewQuery'
+import { initialsOf } from '~/utils/avatarInitials'
 import { tagChipAttrs } from '~/utils/tagColors'
 import { boardLabelColor } from '~/composables/useProjects'
 import { queryWithoutTask, taskPanelPath } from '~/utils/taskPanelUrl'
@@ -324,16 +325,16 @@ const boardPeople = ref<{ id: string, name: string, image?: string | null }[]>([
 async function loadBoardPeople(id: string) {
   try {
     const res = await $fetch<{ people: { id: string, name: string, image?: string | null }[] }>(`/api/projects/${id}/members`)
-    boardPeople.value = res.people ?? []
+    // A reply for a board the page has left is dropped, so a quick switch cannot show one board's people on another.
+    if (projectId.value === id) boardPeople.value = res.people ?? []
   } catch {
-    boardPeople.value = []
+    if (projectId.value === id) boardPeople.value = []
   }
 }
 watch(projectId, (id) => {
   if (id && !isCustomerView.value) loadBoardPeople(id)
   else boardPeople.value = []
 }, { immediate: true })
-const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase()
 const { switchWorkspace } = useWorkspace()
 const { refresh: refreshProjects } = useProjects()
 const { customers, ensureLoaded: ensureCustomers } = useCustomers()
@@ -579,7 +580,7 @@ useSeoMeta({
             :key="person.id"
             :src="person.image || undefined"
             :alt="person.name"
-            :text="initials(person.name)"
+            :text="initialsOf(person.name, null)"
             size="xs"
             class="-ml-1.5 ring-2 ring-default"
             :title="person.name"
