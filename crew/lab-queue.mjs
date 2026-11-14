@@ -4,7 +4,8 @@
 // functions here are pure except the two file helpers at the bottom, so the tests need no process.
 import fs from 'node:fs'
 import { join } from 'node:path'
-import { withLock, writeRegistry } from './port-registry.mjs'
+import { dirname } from 'node:path'
+import { withLock } from './port-registry.mjs'
 
 export const QUEUE_LIMIT = 50
 export const MAX_REPEAT = 20
@@ -150,6 +151,14 @@ export function readQueue(file) {
   return emptyQueue()
 }
 
+/** Writes the queue file atomically (a temp file, then a rename), mode 600. */
+export function writeQueueFile(file, queue) {
+  fs.mkdirSync(dirname(file), { recursive: true })
+  const tmp = `${file}.${process.pid}.tmp`
+  fs.writeFileSync(tmp, `${JSON.stringify(queue, null, 2)}\n`, { mode: 0o600 })
+  fs.renameSync(tmp, file)
+}
+
 /**
  * Runs fn(queue) under the queue lock. fn returns { result, queue? }: when it returns a queue, it is written. Returns the
  * result. The lock is the same one the port registry uses (a lock file next to the queue, stale locks taken over).
@@ -159,7 +168,7 @@ export function withQueue(home, fn) {
   fs.mkdirSync(labDir(home), { recursive: true })
   return withLock(file, () => {
     const out = fn(readQueue(file))
-    if (out.queue) writeRegistry(file, out.queue)
+    if (out.queue) writeQueueFile(file, out.queue)
     return out.result
   })
 }
