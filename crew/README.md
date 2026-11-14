@@ -449,6 +449,15 @@ Each worker has one dev copy, on the port `devServers` in `crew.json` gives them
 
 The listener is found with `lsof`; without `lsof` the `/proc` tables are read instead (`ss` is not used).
 
+## The lab (full-suite samples, slice 1)
+
+A sample is a branch to test on its own: `crew <who> lab submit <branch>` tests the whole suite, and `--file tests/x.test.ts --repeat n` runs one test file n times alone. The command writes a request file under `<CREW_HOME>/lab/requests/`; it runs nothing itself. `crew <who> lab status` shows the running sample and the queue, and `crew <who> lab cancel <branch>` removes a queued sample (a running one is only stopped by Boss).
+
+- The runner is its own process, `crew lab runner loop`, in its own tmux session (started by `crew up`, as the Susy daemon is). It takes the heavy-job slot (`heavy-slot.json`) before each run and releases it after; it refreshes the grant every 5 minutes while the run goes on. One runner at a time: a second start is refused while the first one is alive (`lab/runner.pid`).
+- Each run is `crew/lab-run.sh`: a fresh detached worktree of `origin/<branch>`, install, `eslint .`, typecheck, a scratch database `lab_<id>` (dropped after), then the tests. The run gets only `PATH`, `HOME`, `CREW_HOME` and the `LAB_*` settings. Its logs are in `<CREW_HOME>/lab/<id>/`, and its last line is one `RESULT:` line.
+- The sample id is `lab-<base36 time>-<6 hex>`. The runner and the script refuse any other id before a folder is made or removed.
+- `lab-run.sh` runs `git worktree add` and `remove` in the repository named by `LAB_REPO` (the shared checkout by default). Those folders are added and removed there, so point `LAB_REPO` at a clone if the shared checkout must not change.
+
 ## Updating
 
 To update a crew's kit, run this one line, with the crew home (the folder that holds `crew.json`) as the argument:
