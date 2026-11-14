@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.31.0 - 2026-11-14
+
+- Crew: the lab, slice 1. `crew <who> lab submit <branch> [--file tests/x.test.ts] [--repeat n]` writes a request; the lab runner (`crew lab runner loop`, its own process) queues it, takes the heavy-job slot, runs `crew/lab-run.sh` (a fresh worktree of the branch: install, eslint, typecheck, a scratch database lab_<id>, the tests, test:crew), records one RESULT line in `CREW_HOME/lab/<id>/`, and releases the slot. `lab status` and `lab cancel <branch>` read and cancel queued samples. Nothing is pushed, merged or committed.
+
 ## 0.30.0 - 2026-11-14
 
 - **A comment in the Inbox opens its card scrolled to the reply, and card ids in text become links.** Clicking a comment or reply notification opens the card at that comment, highlighted for a moment; a card or comment link is the path `/projects/<id>/<task>/<comment>`, and an old `?task=` link is rewritten to it once. A card id in an inbox item, a board message, a reply or a comment links to the card only when you may open it (`POST /api/tasks/openable` says which). `notifications.comment_id` is new (nullable), and `GET /api/notifications` now returns it, so the Inbox knows the comment; the card panel reads the comment from `?comment=` as well as from the path. An old `?task=&comment=` link opens `/projects/<id>/<task>/<comment>`. On a phone the Inbox opens the card, but the scroll to the reply is not guaranteed yet (filed as its own card). `server/api/notifications/index.get.ts`, `app/components/kanban/TaskComments.vue`, `app/pages/projects/inbox.vue`, `app/components/CardIdText.vue`, `app/components/InlineMarkdown.vue`, `app/composables/useOpenableCards.ts`, `app/components/kanban/ProjectMessagesView.vue`, `server/api/tasks/openable.post.ts`, `server/utils/notifyEvents.ts`, `app/utils/cardIdLinks.ts`, `app/utils/taskLink.ts`, `app/utils/taskComments.ts`, `app/pages/projects/[id].vue`, `docs/workspace/inbox.md`.
