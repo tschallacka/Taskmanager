@@ -4,6 +4,7 @@ import { dueDayToMs } from '~/utils/dueDate'
 import { errorMessage } from '~/utils/untypedFetch'
 import { timelineKeyAction } from '~/utils/timelineKeys'
 import { nudgePatch } from '~/utils/dateNudge'
+import { TIMELINE_TAP_ITEMS, tapItemAction, type TimelineTapItem } from '~/utils/timelineTap'
 
 const emit = defineEmits<{ openTask: [taskId: string] }>()
 
@@ -149,6 +150,22 @@ function onBarClick(task: DatedTask) {
   if (!justDragged) emit('openTask', task.id)
 }
 
+// The tap path: a row's Move-the-bar menu gives the same four moves as the keys (timelineTap.ts), through the same date rule.
+function barMenuItems(task: DatedTask) {
+  return [TIMELINE_TAP_ITEMS.map(item => ({ label: item.label, onSelect: () => tapBar(task, item.id) }))]
+}
+
+async function tapBar(task: DatedTask, id: TimelineTapItem['id']) {
+  const action = tapItemAction(id)
+  const patch = nudgePatch(task, action.mode, action.delta)
+  if (!Object.keys(patch).length) return
+  try {
+    await updateTask(task.id, patch)
+  } catch (e) {
+    toast.add({ title: errorMessage(e, 'Could not change the dates'), icon: 'i-lucide-alert-triangle', color: 'error' })
+  }
+}
+
 // The keyboard path for a focused bar: a plain arrow moves it a day, Shift changes its end, Alt its start (timelineKeys.ts).
 // The dates come from the same rule the drag uses (dateNudge.ts), so a key move lands where a drag would.
 async function onBarKey(task: DatedTask, event: KeyboardEvent) {
@@ -237,12 +254,26 @@ watch(() => sections.value.length, () => nextTick(scrollToToday), { once: true }
             :key="task.id"
             class="flex h-9 border-b border-default"
           >
-            <button
-              class="sticky left-0 z-10 w-48 shrink-0 truncate border-r border-default bg-default px-3 text-left text-sm text-default transition-colors hover:bg-elevated"
-              @click="emit('openTask', task.id)"
-            >
-              {{ task.title }}
-            </button>
+            <div class="sticky left-0 z-10 flex w-48 shrink-0 items-center gap-1 border-r border-default bg-default pr-1 transition-colors hover:bg-elevated">
+              <button
+                class="min-w-0 flex-1 truncate px-3 text-left text-sm text-default"
+                @click="emit('openTask', task.id)"
+              >
+                {{ task.title }}
+              </button>
+              <UDropdownMenu
+                :items="barMenuItems(task)"
+                :content="{ align: 'end' }"
+              >
+                <UButton
+                  icon="i-lucide-move-horizontal"
+                  size="xs"
+                  color="neutral"
+                  variant="ghost"
+                  aria-label="Move the bar"
+                />
+              </UDropdownMenu>
+            </div>
             <div class="relative flex-1">
               <button
                 class="group absolute top-1.5 h-6 select-none rounded-md px-2 text-left text-xs"
