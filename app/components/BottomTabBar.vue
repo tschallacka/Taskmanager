@@ -17,9 +17,27 @@ function isActive(to: string | null) {
   if (!to) return false
   return route.path === to || route.path.startsWith(`${to}/`)
 }
+
+// The floating New sits above the bar, as the sidebar's New does: it opens the new-project dialog.
+function onNew() {
+  navigateTo('/projects?new=1')
+}
 </script>
 
 <template>
+  <button
+    type="button"
+    data-testid="floating-new"
+    aria-label="New"
+    class="fixed right-4 z-40 flex size-14 items-center justify-center rounded-full bg-primary text-inverted shadow-lg lg:hidden bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))]"
+    @click="onNew"
+  >
+    <UIcon
+      name="i-lucide-plus"
+      class="size-6"
+    />
+  </button>
+
   <nav
     data-testid="bottom-tab-bar"
     aria-label="Main"
