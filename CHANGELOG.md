@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.32.0 - 2026-11-14
+
+- **The task card is one summary (redesign 4/9).** The whole card opens the panel; the hover-only chevron and the empty assignee slot are gone, and an assignee's picture shows only once someone is set. The chips row is in a fixed order: the first two labels then "+N", the select fields, then the state chips (Overdue, Due soon within two days, Waits for N, Team only, Shared with customer), each shown only with a reason, and none on a finished task. Right-click (long press on a touchscreen) opens the menu: Open, Mark done, Assign to..., Move to column..., Set due date..., Copy link, Delete. Space ticks a focused card done. The trash's button reads "Delete now". Deviations from the card: no Undo toast, no hint strip, no compact cards, no drag tilt yet; a waiting card does not name its blockers on hover. `app/components/kanban/KanbanCard.vue`, `app/components/kanban/KanbanBoard.vue`, `app/utils/cardChips.ts`, `app/utils/dueDate.ts`, `app/utils/taskBlockers.ts`, `tests/card-chips.test.ts`, `tests/task-blockers-ui.test.ts`, `docs/basics/tasks.md`.
+
 ## 0.31.0 - 2026-11-14
 
 - Crew: the stale dev-copy report now checks each live copy's own card, not one page of the Done column, so a copy of a finished card is no longer missed.
