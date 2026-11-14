@@ -87,11 +87,19 @@ export async function waitForIdle({ id, readList, now = Date.now, sleep = ms => 
 export function recordWake(wake = {}, ok, error = '') {
   if (ok) return { failures: 0, mailedBoss: false, lastError: null }
   const failures = (wake.failures ?? 0) + 1
-  return { failures, mailedBoss: wake.mailedBoss ?? false, lastError: String(error).slice(0, 200), mailBossNow: failures >= FAILURES_TO_MAIL_BOSS && !(wake.mailedBoss ?? false) }
+  // A dialog or an unreadable screen is a hold, not a flake: Boss hears of it at once, not after three tries.
+  const hold = BLOCKING.test(String(error))
+  return { failures, mailedBoss: wake.mailedBoss ?? false, lastError: String(error).slice(0, 200), mailBossNow: (hold || failures >= FAILURES_TO_MAIL_BOSS) && !(wake.mailedBoss ?? false) }
 }
 
-/** The mail to Boss after three failures: name, card and last error, once per streak. */
+/** The reasons that hold a wake without typing: a dialog on the session's screen, or a screen that cannot be read. */
+export const BLOCKING = /^(PERSON-DIALOG|SCREEN-UNREADABLE)/
+
+/** The mail to Boss: a hold at once (the dialog or the unreadable screen), or three failures in a row, once per streak. */
 export function bossMailText({ key, cardId, lastError }) {
+  if (BLOCKING.test(String(lastError ?? ''))) {
+    return `wake held for ${key} on card ${cardId}: ${logCut(lastError)}. Nothing was typed. The sender waits until the screen can be read and has no dialog.`
+  }
   return `wake failed three times in a row for ${key} on card ${cardId}; last error: ${logCut(lastError)}. The sender stays quiet until a wake works.`
 }
 
@@ -113,7 +121,9 @@ export async function wakeOnce({ record, list, text, cardId, key, type, readList
     await type({ id: record.id, text })
     return finish(true, `woke ${record.id} with "${logCut(text)}"`, record, { key, cardId })
   } catch (error) {
-    return finish(false, `paste failed: ${error.message}`, record, { key, cardId })
+    // The hold reasons come through as they are (the caller reads them from stderr); anything else is a paste failure.
+    const why = String(error?.message ?? error)
+    return finish(false, BLOCKING.test(why) ? why : `paste failed: ${why}`, record, { key, cardId })
   }
 }
 
@@ -121,7 +131,8 @@ function finish(ok, reason, record, { key, cardId }, counts = true) {
   const prior = record?.wake ?? {}
   const wake = counts ? recordWake(prior, ok, ok ? '' : reason) : prior
   const mailBoss = Boolean(wake.mailBossNow)
-  const out = { ok, reason: logCut(reason), wake: { failures: wake.failures ?? 0, mailedBoss: wake.mailedBoss ?? false, lastError: wake.lastError ?? null } }
+  // mailedBoss is kept once Boss has been mailed, so a hold that lasts mails once, not on every tick.
+  const out = { ok, reason: logCut(reason), wake: { failures: wake.failures ?? 0, mailedBoss: (wake.mailedBoss ?? false) || mailBoss, lastError: wake.lastError ?? null } }
   if (mailBoss) {
     out.mailBoss = bossMailText({ key, cardId, lastError: wake.lastError })
     out.wake.mailedBoss = true

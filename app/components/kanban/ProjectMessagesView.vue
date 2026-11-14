@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { relativeTime } from '~/composables/useRelativeTime'
+import CardIdText from '~/components/CardIdText.vue'
 
 // The project's conversations: post a message, answer one, and read them newest
 // first. Replies stay under the message they answer. With a threadId it shows that one
@@ -202,7 +203,7 @@ async function removeMessage(id: string, isThread: boolean) {
               {{ message.title }}
             </h3>
             <p class="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-default">
-              {{ message.body }}
+              <CardIdText :text="message.body" />
             </p>
           </div>
 
@@ -241,7 +242,7 @@ async function removeMessage(id: string, isThread: boolean) {
                   </button>
                 </p>
                 <p class="mt-0.5 whitespace-pre-wrap text-sm leading-relaxed text-default">
-                  {{ reply.body }}
+                  <CardIdText :text="reply.body" />
                 </p>
               </div>
             </li>

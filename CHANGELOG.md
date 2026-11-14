@@ -2,6 +2,28 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.32.0 - 2026-11-14
+
+- **The task card is one summary (redesign 4/9).** The whole card opens the panel; the hover-only chevron and the empty assignee slot are gone, and an assignee's picture shows only once someone is set. The chips row is in a fixed order: the first two labels then "+N", the select fields, then the state chips (Overdue, Due soon within two days, Waits for N, Team only, Shared with customer), each shown only with a reason, and none on a finished task. Right-click (long press on a touchscreen) opens the menu: Open, Mark done, Assign to..., Move to column..., Set due date..., Copy link, Delete. Space ticks a focused card done. The trash's button reads "Delete now". Deviations from the card: no Undo toast, no hint strip, no compact cards, no drag tilt yet; a waiting card does not name its blockers on hover. `app/components/kanban/KanbanCard.vue`, `app/components/kanban/KanbanBoard.vue`, `app/utils/cardChips.ts`, `app/utils/dueDate.ts`, `app/utils/taskBlockers.ts`, `tests/card-chips.test.ts`, `tests/task-blockers-ui.test.ts`, `docs/basics/tasks.md`.
+
+## 0.31.0 - 2026-11-14
+
+- Crew: the stale dev-copy report now checks each live copy's own card, not one page of the Done column, so a copy of a finished card is no longer missed.
+
+- Crew: the lab, slice 1. `crew <who> lab submit <branch> [--file tests/x.test.ts] [--repeat n]` writes a request; the lab runner (`crew lab runner loop`, its own process) queues it, takes the heavy-job slot, runs `crew/lab-run.sh` (a fresh worktree of the branch: install, eslint, typecheck, a scratch database lab_<id>, the tests, test:crew), records one RESULT line in `CREW_HOME/lab/<id>/`, and releases the slot. `lab status` and `lab cancel <branch>` read and cancel queued samples. Nothing is pushed, merged or committed.
+
+## 0.30.0 - 2026-11-14
+
+- **A comment in the Inbox opens its card scrolled to the reply, and card ids in text become links.** Clicking a comment or reply notification opens the card at that comment, highlighted for a moment; a card or comment link is the path `/projects/<id>/<task>/<comment>`, and an old `?task=` link is rewritten to it once. A card id in an inbox item, a board message, a reply or a comment links to the card only when you may open it (`POST /api/tasks/openable` says which). `notifications.comment_id` is new (nullable), and `GET /api/notifications` now returns it, so the Inbox knows the comment; the card panel reads the comment from `?comment=` as well as from the path. An old `?task=&comment=` link opens `/projects/<id>/<task>/<comment>`. On a phone the Inbox opens the card, but the scroll to the reply is not guaranteed yet (filed as its own card). `server/api/notifications/index.get.ts`, `app/components/kanban/TaskComments.vue`, `app/pages/projects/inbox.vue`, `app/components/CardIdText.vue`, `app/components/InlineMarkdown.vue`, `app/composables/useOpenableCards.ts`, `app/components/kanban/ProjectMessagesView.vue`, `server/api/tasks/openable.post.ts`, `server/utils/notifyEvents.ts`, `app/utils/cardIdLinks.ts`, `app/utils/taskLink.ts`, `app/utils/taskComments.ts`, `app/pages/projects/[id].vue`, `docs/workspace/inbox.md`.
+
+- **Owner documents get a marker line: kit text above it, the project's own text below it.** `crew update` replaces the kit text above the marker and never reads or changes the text below, so the update no longer reports a CONFLICT for PROJECT-RULES.md, BRIEF.md or JANET.md. A document with no marker is migrated once, with its old content kept entirely below the marker and a backup made first. `crew/owner-file.mjs` (new, listed in `kit-files.txt`), `crew/update.mjs`, `crew/PROJECT-RULES.md.tmpl`, `crew/BRIEF.md.tmpl`, `crew/JANET.md.tmpl`, `crew/README.md`, `crew/kit.test.mjs`, `crew/owner-file.test.mjs`.
+
+## 0.29.0 - 2026-11-14
+
+- **Task panel link tests.** The copy control's clipboard path now has tests: both formats with the exact strings, the fallback without ClipboardItem, and a refused or missing clipboard that resolves false. No change for the reader. Files: tests/copy-task-link.test.ts.
+
+- Crew: `crew/stale-copies.mjs` is a read-only report of the dev copies to look at (older than 4 hours, or of a card that is Done). Janet stops a copy only with a go from Boss. The port registry keeps Boss's dev copy (:3000) and the testers' copies (3105 to 3108) as read-only entries: `serve --check` lists them, and nobody can reserve, start, stop or free them.
+
 ## 0.28.2 - 2026-11-14
 
 - **The task panel's copy-link mark no longer writes after the panel is gone.** The "Copied" mark clears its two-second timer when the panel closes, and a second click restarts the two seconds. The tasks help page now says that a read-only panel (a customer's view) hides the custom fields and shows the other properties as values only. Files: `app/components/kanban/TaskDrawer.vue`, `docs/basics/tasks.md`, `tests/copy-task-link.test.ts`.

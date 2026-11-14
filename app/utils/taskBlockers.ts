@@ -10,9 +10,9 @@ export interface BlockerView {
   finished: boolean | null
 }
 
-/** The chip on a card: "Blocked by 2" when the count is known, "Blocked" when only the state is. */
-export function blockedChipLabel(count: number | null): string {
-  return count && count > 0 ? `Blocked by ${count}` : 'Blocked'
+/** The chip on a card: "Waits for 2" when the count is known, "Waits" when only the state is. The one copy of the words. */
+export function waitsChipLabel(count: number | null): string {
+  return count && count > 0 ? `Waits for ${count}` : 'Waits'
 }
 
 /** The sentence under the section heading. */

@@ -124,10 +124,6 @@ for (const file of readdirSync(kitDir).filter(f => f.endsWith('.tmpl'))) {
   const text = render(readFileSync(`${kitDir}/${file}`, 'utf8'))
   const left = text.match(/\{\{[^}]+\}\}/g)
   writeFileSync(`${here}${out}`, text)
-  if (OWNER_FILES.includes(out)) {
-    mkdirSync(`${here}kit-base`, { recursive: true, mode: 0o700 })
-    writeFileSync(`${here}kit-base/${out}`, text, { mode: 0o600 })
-  }
   ok(`${out}${left ? `  (unfilled: ${[...new Set(left)].join(' ')})` : ''}`)
 }
 
