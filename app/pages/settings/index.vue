@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { format } from 'date-fns'
 import { colorHex } from '#shared/utils/colors'
+import { formatContextLength, formatMoney, formatPricePerMillion } from '~/utils/aiSettingsFormat'
 
 definePageMeta({ layout: 'app' })
 
@@ -48,18 +49,6 @@ const modelsRefreshing = ref(false)
 
 const { data: aiHistory } = useFetch<{ totals: { prompts: number, cost: number } }>('/api/settings/ai-history', { server: false, lazy: true })
 
-function formatContextLength(tokens: number | null): string | null {
-  if (!tokens) return null
-  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(tokens % 1_000_000 ? 1 : 0)}M context`
-  return `${Math.round(tokens / 1000)}k context`
-}
-
-function formatPricePerMillion(price: number | null): string | null {
-  if (typeof price !== 'number' || !Number.isFinite(price)) return null
-  const perMillion = price * 1_000_000
-  return `$${perMillion.toLocaleString(undefined, { maximumFractionDigits: 4 })}/M`
-}
-
 async function forceRefreshModelCatalog() {
   modelsRefreshing.value = true
   try {
@@ -72,9 +61,6 @@ async function forceRefreshModelCatalog() {
   }
 }
 
-function formatMoney(amount: number): string {
-  return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 4 }).format(amount)
-}
 
 const modelOptions = computed(() => {
   const catalog = modelCatalog.value?.models
