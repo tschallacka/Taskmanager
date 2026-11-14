@@ -39,6 +39,7 @@ const emit = defineEmits<{
   purge: [taskId: string]
   toggleComplete: [taskId: string]
   assign: [taskId: string, personId: string | null]
+  menu: [taskId: string]
 }>()
 
 // A card in the board's trash is drawn in place, faded, so it is obvious both
@@ -161,7 +162,22 @@ const hasMeta = computed(() =>
       class="-mx-3 -mt-2.5 mb-2 aspect-[16/9] w-[calc(100%+1.5rem)] max-w-none rounded-t-lg object-cover"
     >
 
-    <div class="flex items-start gap-1.5">
+    <div class="relative flex items-start gap-1.5">
+      <!-- The phone's three-dot: opens the bottom sheet (9/9). Desktop has the card's own menus, so it is hidden there. -->
+      <button
+        v-if="!trashed && !readonly"
+        type="button"
+        class="absolute -top-1 -right-1 flex size-11 items-center justify-center rounded-full text-dimmed lg:hidden"
+        aria-label="More actions"
+        @click.stop="$emit('menu', task.id)"
+        @keydown.enter.stop
+        @keydown.space.stop
+      >
+        <UIcon
+          name="i-lucide-ellipsis"
+          class="size-5"
+        />
+      </button>
       <!-- The done mark, Asana's circle. A button for staff, so ticking a task
            off does not mean opening it; `.stop` keeps the click off the card. -->
       <button
