@@ -9,7 +9,6 @@ import { queryWithoutTask, taskPanelPath } from '~/utils/taskPanelUrl'
 definePageMeta({ layout: 'app', key: route => `projects/${route.params.id}` })
 
 const route = useRoute()
-const searchOpen = useSearchModal()
 // The instance admin may load a backup into a crew's board, which everyone else only reads (owner, 2026-11-12).
 const { isInstanceAdmin } = useAuth()
 const importOpen = ref(false)
@@ -800,29 +799,5 @@ useSeoMeta({
       @close="closeDrawer"
     />
 
-    <!-- Mobile bottom nav -->
-    <div
-      class="fixed bottom-0 left-0 right-0 z-20 flex items-center justify-around border-t border-default bg-default/95 px-8 backdrop-blur-sm lg:hidden"
-      style="padding-top: 0.5rem; padding-bottom: max(0.5rem, env(safe-area-inset-bottom))"
-    >
-      <UButton
-        icon="i-lucide-search"
-        color="neutral"
-        variant="ghost"
-        size="md"
-        aria-label="Search"
-        @click="searchOpen = true"
-      />
-      <UButton
-        icon="i-lucide-kanban"
-        color="primary"
-        variant="soft"
-        size="md"
-        aria-label="Projects"
-        @click="navigateTo('/projects')"
-      />
-    </div>
-
-    <div class="h-14 lg:hidden" />
   </div>
 </template>
