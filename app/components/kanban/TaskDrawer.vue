@@ -94,7 +94,6 @@ const open = computed({
 // given rather than the prop, so closing it doesn't empty it mid-animation.
 const shownTask = ref<Task | null>(props.task)
 // Opened from the Inbox, the panel offers "Open on board": the card on its board, at the comment the notification is about.
-const route = useRoute()
 const openOnBoardTo = computed(() => {
   const task = shownTask.value
   if (!task?.projectId || route.path !== '/projects/inbox') return null
