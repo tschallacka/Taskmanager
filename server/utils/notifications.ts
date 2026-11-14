@@ -19,6 +19,8 @@ interface NotifyInput {
   task?: { id: string, title: string, visibility: 'internal' | 'customer' }
   /** For a message or a reply: the conversation's first message, which the inbox opens. */
   messageId?: string
+  /** For a comment or a reply on the task: the comment, which the inbox opens the card scrolled to. */
+  commentId?: string
   actorId: string | null
   type: NotificationType
   recipients: string[]
@@ -72,6 +74,7 @@ export async function notify(input: NotifyInput): Promise<number> {
     projectId: input.project.id,
     taskId: input.task?.id ?? null,
     messageId: input.messageId ?? null,
+    commentId: input.commentId ?? null,
     actorId: input.actorId,
     title: input.title,
     body: input.body ?? '',

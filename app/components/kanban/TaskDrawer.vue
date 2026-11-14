@@ -6,6 +6,7 @@ import type { Visibility, ProjectTask } from '~/composables/useProjects'
 import { dueDayToMs, isOverdueDay } from '~/utils/dueDate'
 import { absoluteUrl, copyTaskLink } from '~/utils/copyTaskLink'
 import { activityStartsOpen, taskPanelPath } from '~/utils/taskPanelUrl'
+import { taskLink } from '~/utils/taskLink'
 
 interface Task {
   id: string
@@ -92,6 +93,23 @@ const open = computed({
 // The panel slides out over ~half a second. It renders the last task it was
 // given rather than the prop, so closing it doesn't empty it mid-animation.
 const shownTask = ref<Task | null>(props.task)
+// Opened from the Inbox, the panel offers "Open on board": the card on its board, at the comment the notification is about.
+const route = useRoute()
+const openOnBoardTo = computed(() => {
+  const task = shownTask.value
+  if (!task?.projectId || route.path !== '/projects/inbox') return null
+  const comment = typeof route.params.comment === 'string' ? route.params.comment : null
+  return taskLink(task.projectId, task.id, comment)
+})
+// A link to a comment (the path form, or ?comment= from the Inbox) opens the activity. On a phone the thread sits
+// behind the Activity button, so without this the reply has no height and the jump lands on nothing.
+const linkedComment = computed(() => {
+  if (typeof route.params.comment === 'string') return route.params.comment
+  return typeof route.query.comment === 'string' ? route.query.comment : ''
+})
+watch(linkedComment, (comment) => {
+  if (comment) activityOpen.value = true
+}, { immediate: true })
 
 watch(() => props.task, (task) => {
   if (task) shownTask.value = task
@@ -683,6 +701,28 @@ const menuItems = computed(() => [[
               aria-label="Task options"
             />
           </UDropdownMenu>
+          <!-- On a phone the card is full screen: a back arrow returns to the Inbox list (closing the panel). -->
+          <UButton
+            v-if="openOnBoardTo"
+            icon="i-lucide-arrow-left"
+            size="xs"
+            color="neutral"
+            variant="ghost"
+            aria-label="Back to the inbox"
+            class="md:hidden"
+            data-inbox-back
+            @click="emit('close')"
+          />
+          <UButton
+            v-if="openOnBoardTo"
+            label="Open on board"
+            icon="i-lucide-external-link"
+            size="xs"
+            color="neutral"
+            variant="ghost"
+            :to="openOnBoardTo"
+            data-open-on-board
+          />
           <UButton
             icon="i-lucide-x"
             size="xs"

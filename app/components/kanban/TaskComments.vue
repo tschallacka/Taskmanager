@@ -17,6 +17,7 @@ const props = defineProps<{
 }>()
 
 const route = useRoute()
+const router = useRouter()
 const toast = useToast()
 const { session } = useAuth()
 const {
@@ -309,7 +310,12 @@ async function copyLink(comment: TaskComment) {
 // A link opens the page on this comment: a cold load, or the query changing while
 // the drawer is already open. Each task and comment pair is jumped to once, so a
 // realtime refresh does not drag the reader back to it.
-const linkedId = computed(() => typeof route.query.comment === 'string' ? route.query.comment : '')
+// The Inbox keeps its own path and names the comment in the query (?task=&comment=); the board's path form is
+// /projects/<id>/<task>/<comment>. Either one jumps.
+const linkedId = computed(() => {
+  if (typeof route.params.comment === 'string') return route.params.comment
+  return typeof route.query.comment === 'string' ? route.query.comment : ''
+})
 let handled = ''
 
 watch(
@@ -320,6 +326,12 @@ watch(
     if (!ownComments.value.some(c => c.id === commentId)) return
     handled = key
     focusComment(commentId)
+    // The comment in the query is used once: the panel takes it out of the address (replace, not push), so a reload
+    // does not jump again. The path form is left as it is.
+    if (typeof route.query.comment === 'string') {
+      const { comment: _used, ...rest } = route.query
+      router.replace({ query: rest })
+    }
   },
   { immediate: true }
 )

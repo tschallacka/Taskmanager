@@ -5,6 +5,7 @@ import { dueDayToMs } from '~/utils/dueDate'
 import { agentAuditLink } from '~/composables/useAgentAudit'
 import type { AgentAuditItem } from '~/composables/useAgentAudit'
 import type { NotificationItem } from '~/composables/useNotifications'
+import CardIdText from '~/components/CardIdText.vue'
 
 definePageMeta({ layout: 'app' })
 
@@ -182,6 +183,10 @@ const openTaskId = ref<string | null>(null)
 const drawerTask = computed(() => (openTaskId.value ? board.value?.tasks.find(t => t.id === openTaskId.value) ?? null : null))
 // threadId null shows the board's whole conversation list: older notifications did not keep the message.
 const openThread = ref<{ projectId: string, projectName: string, threadId: string | null } | null>(null)
+// "Open board" from the message panel: the board's Messages, at this conversation (or the whole list when none is open).
+const messageBoardLink = computed(() => openThread.value
+  ? notificationLink({ type: 'message', projectId: openThread.value.projectId, taskId: null, messageId: openThread.value.threadId })
+  : '/projects')
 const opening = ref<string | null>(null)
 
 function isOpen(item: NotificationItem) {
@@ -206,6 +211,10 @@ async function open(item: NotificationItem) {
         return
       }
       openTaskId.value = item.taskId
+      // The card opens on its comment: the comments list scrolls to it and highlights it, as it does for a shared link.
+      if (item.commentId) {
+        await router.replace({ query: { ...route.query, task: item.taskId, comment: item.commentId } })
+      }
     } else if (item.type === 'message' || item.type === 'reply') {
       openThread.value = { projectId: item.projectId, projectName: item.projectName, threadId: item.messageId ?? null }
     } else {
@@ -561,7 +570,7 @@ async function sendTest() {
                     v-if="item.body"
                     class="mt-0.5 line-clamp-2 text-xs text-muted"
                   >
-                    {{ item.body }}
+                    <CardIdText :text="item.body" />
                   </p>
                   <p class="mt-1 text-xs text-dimmed">
                     {{ item.projectName }}
@@ -778,6 +787,20 @@ async function sendTest() {
       @update:open="(value: boolean) => { if (!value) openThread = null }"
     >
       <template #body>
+        <div
+          v-if="openThread"
+          class="flex justify-end px-4 pt-3"
+        >
+          <UButton
+            label="Open board"
+            icon="i-lucide-external-link"
+            size="xs"
+            color="neutral"
+            variant="ghost"
+            :to="messageBoardLink"
+            data-open-board
+          />
+        </div>
         <KanbanProjectMessagesView
           v-if="openThread"
           :project-id="openThread.projectId"
