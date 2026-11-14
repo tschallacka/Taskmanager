@@ -42,7 +42,7 @@ function stubGlobals(values: Globals): () => void {
   return () => {
     for (const [key, descriptor] of saved) {
       if (descriptor) Object.defineProperty(globalThis, key, descriptor)
-      else delete (globalThis as Globals)[key]
+      else Reflect.deleteProperty(globalThis, key)
     }
   }
 }
@@ -86,12 +86,20 @@ test('a refused clipboard resolves false and never throws', async () => {
 
 test('without ClipboardItem the html is copied through a selection, and the holder is removed afterwards', async () => {
   const commands: string[] = []
-  const holders: { innerHTML: string; removed: boolean }[] = []
+  const holders: { innerHTML: string, removed: boolean }[] = []
   const fakeDocument = {
-    body: { appendChild: (node: { innerHTML: string; removed: boolean }) => { holders.push(node); return node } },
+    body: {
+      appendChild: (node: { innerHTML: string, removed: boolean }) => {
+        holders.push(node)
+        return node
+      }
+    },
     createElement: () => ({ innerHTML: '', removed: false, style: {}, setAttribute: () => {}, remove() { this.removed = true } }),
     createRange: () => ({ selectNodeContents: () => {} }),
-    execCommand: (command: string) => { commands.push(command); return true }
+    execCommand: (command: string) => {
+      commands.push(command)
+      return true
+    }
   }
   const restore = stubGlobals({
     ClipboardItem: undefined,
