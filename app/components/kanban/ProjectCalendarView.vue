@@ -112,17 +112,30 @@ const undatedOpen = ref(false)
         <template #content>
           <div class="max-h-72 w-64 overflow-y-auto p-1.5">
             <p class="px-1.5 pb-1 text-xs text-dimmed">
-              Drag onto a day to schedule.
+              Drag onto a day, or pick a task with its Move control and tap a day.
             </p>
             <div
               v-for="task in undated"
               :key="task.id"
               draggable="true"
-              class="cursor-grab truncate rounded-md px-1.5 py-1 text-xs text-default hover:bg-elevated"
+              class="flex cursor-grab items-center gap-1 rounded-md px-1.5 py-1 text-xs text-default hover:bg-elevated"
               @dragstart="dragStart(task.id, $event)"
               @click="emit('openTask', task.id)"
             >
-              {{ task.title }}
+              <span class="min-w-0 flex-1 truncate">{{ task.title }}</span>
+              <button
+                type="button"
+                class="shrink-0 rounded-md p-0.5 text-dimmed transition-colors hover:bg-elevated hover:text-default"
+                :class="pickedId === task.id ? 'bg-primary/20 text-default' : ''"
+                aria-label="Move to another day"
+                :aria-pressed="pickedId === task.id ? 'true' : 'false'"
+                @click.stop="pick(task.id)"
+              >
+                <UIcon
+                  name="i-lucide-move"
+                  class="size-3.5"
+                />
+              </button>
             </div>
           </div>
         </template>
