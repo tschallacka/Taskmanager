@@ -2,6 +2,7 @@
 // kit text and is replaced on each update; the text below is the project's and is kept byte for byte. Pure: no files, no
 // network. Run from the repo root: node --test crew/owner-file.test.mjs
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { describe, test } from 'node:test'
 import { MARKER, splitOwnerFile, updateOwnerFile } from './owner-file.mjs'
 
@@ -24,6 +25,27 @@ describe('the marker line', () => {
 
   test('a file without the marker has no split', () => {
     assert.equal(splitOwnerFile(OLD_TEMPLATE), null)
+  })
+})
+
+describe('the owner templates', () => {
+  const crewDir = new URL('.', import.meta.url)
+  for (const name of ['PROJECT-RULES.md.tmpl', 'BRIEF.md.tmpl', 'JANET.md.tmpl']) {
+    test(`${name} has the marker line exactly once, with kit text above it and the project's own text below`, () => {
+      const text = readFileSync(new URL(name, crewDir), 'utf8')
+      assert.equal(text.split(MARKER).length - 1, 1, 'one marker line')
+      const { kit, own } = splitOwnerFile(text)
+      assert.match(kit, /Text above the marker line is kit text/, 'the note that says what the kit may replace')
+      assert.match(own, /yours/, 'the placeholder below says the project writes there')
+    })
+  }
+
+  test('a template with the marker migrates a file that has none, and keeps the file below it', () => {
+    const template = readFileSync(new URL('PROJECT-RULES.md.tmpl', crewDir), 'utf8')
+    const project = '# Rules\n\nOur command: bun test\n'
+    const migrated = updateOwnerFile(project, template)
+    assert.equal(migrated.status, 'migrated')
+    assert.equal(migrated.text.endsWith(project), true, 'the project text is kept entirely below the marker')
   })
 })
 

@@ -1,8 +1,9 @@
 # Rules of the code: {{product.name}}
 
-This is the one file you edit to make the crew fit your product. `init.mjs` writes it once and
-never overwrites it. Everything the crew does in the repository (`{{product.repo}}`) follows it.
-Replace the examples below with your own facts; delete lines that do not apply.
+Text above the marker line is kit text: `crew update` replaces it with the newest kit text, with no merge and no
+conflict. Text below the marker line is yours: crew never reads or changes it, and where it disagrees with the text
+above, the text below wins. Everything the crew does in the repository (`{{product.repo}}`) follows this file.
+Write your project's own facts below the marker line; delete lines that do not apply.
 
 ## Run it
 
@@ -50,3 +51,8 @@ Replace the examples below with your own facts; delete lines that do not apply.
 3. Typecheck and lint (already part of step 0 on the merged tree): `<command>`
 4. Merge the task's pull request (workers push their own branch; only Boss merges), with `<attribution lines, if any>`: `<command>`
 5. Move the published tasks to Done.
+
+<!-- crew:project-rules below this line: yours; the kit never changes anything after it -->
+
+Your project's own rules go below this line, and they are yours: crew never changes them. Delete this line when you
+write yours.
