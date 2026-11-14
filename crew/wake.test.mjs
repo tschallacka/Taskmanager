@@ -27,7 +27,7 @@ fs.appendFileSync(${JSON.stringify(log)}, (name || 'init') + '\\n')
 const fail = ${JSON.stringify(failOn)}.includes(name)
 const screen = ${JSON.stringify(screen)}
 let text = 'ok'
-if (name === 'view' && screen !== null) text = JSON.stringify({ responses: [{ text: screen }] })
+if (name === 'view') text = JSON.stringify({ responses: [{ text: screen ?? '> ready' }] })
 process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: 2, result: fail ? { isError: true, content: [{ type: 'text', text: 'refused' }] } : { content: [{ type: 'text', text }] } }) + '\\n')
 `)
   chmodSync(bin, 0o755)
@@ -208,13 +208,44 @@ test('session-wake.sh exits 1 when the paste is refused, so the caller counts a 
   assert.ok(!run.stdout.includes('typed into'), 'nothing reports a typed wake')
 })
 
-test('session-wake.sh types nothing while a dialog is on the screen: it prints the PERSON-DIALOG line and exits 3', () => {
+test('session-wake.sh types nothing while a dialog is on the screen: the PERSON-DIALOG line goes to stderr and it exits 3', () => {
   const mcp = fakeMcp([], '? Teach auto mode about your environment?\n  ❯ Continue\n  Enter to continue · Esc to cancel')
   const run = spawnSync('sh', [join(HERE, 'session-wake.sh'), '1f592988', 'hello'], { encoding: 'utf8', env: { ...process.env, SESSION_WAKE_MCP: mcp.bin }, timeout: 120000 })
   assert.equal(run.status, 3, run.stderr)
-  assert.equal(run.stdout.trim(), 'PERSON-DIALOG 1f592988: ? Teach auto mode about your environment?')
+  assert.equal(run.stdout.trim(), '', 'nothing on stdout')
+  assert.equal(run.stderr.trim().split('\n').pop(), 'PERSON-DIALOG 1f592988: ? Teach auto mode about your environment?')
   const calls = readFileSync(mcp.log, 'utf8').trim().split('\n')
   assert.ok(!calls.includes('paste') && !calls.includes('key'), 'no paste and no Enter went into the session')
+})
+
+test('session-wake.sh fails closed when the screen cannot be read: the view call fails, exits 3, and types nothing', () => {
+  const mcp = fakeMcp(['view'])
+  const run = spawnSync('sh', [join(HERE, 'session-wake.sh'), '1f592988', 'hello'], { encoding: 'utf8', env: { ...process.env, SESSION_WAKE_MCP: mcp.bin }, timeout: 120000 })
+  assert.equal(run.status, 3, run.stderr)
+  assert.match(run.stderr.trim().split('\n').pop(), /^SCREEN-UNREADABLE session 1f592988/)
+  const calls = readFileSync(mcp.log, 'utf8').trim().split('\n')
+  assert.ok(!calls.includes('paste') && !calls.includes('key'), 'nothing typed when the screen is unreadable')
+})
+
+test('session-wake.sh fails closed on an empty screen: an empty read is not a clear screen', () => {
+  const mcp = fakeMcp([], '')
+  const run = spawnSync('sh', [join(HERE, 'session-wake.sh'), '1f592988', 'hello'], { encoding: 'utf8', env: { ...process.env, SESSION_WAKE_MCP: mcp.bin }, timeout: 120000 })
+  assert.equal(run.status, 3, run.stderr)
+  assert.match(run.stderr, /SCREEN-UNREADABLE/)
+  const calls = readFileSync(mcp.log, 'utf8').trim().split('\n')
+  assert.ok(!calls.includes('paste') && !calls.includes('key'), 'nothing typed on an empty read')
+})
+
+test('a hold (dialog or unreadable screen) mails Boss on the first failure, and only once while it lasts', () => {
+  const first = recordWake({}, false, 'PERSON-DIALOG 1f592988: ? Teach auto mode')
+  assert.equal(first.mailBossNow, true, 'a dialog mails at once')
+  const unreadable = recordWake({}, false, 'SCREEN-UNREADABLE session 1f592988: x')
+  assert.equal(unreadable.mailBossNow, true, 'an unreadable screen mails at once')
+  const plain = recordWake({}, false, 'paste failed: refused')
+  assert.equal(plain.mailBossNow, false, 'an ordinary failure waits for three')
+  const already = recordWake({ failures: 1, mailedBoss: true }, false, 'PERSON-DIALOG 1f592988: ? x')
+  assert.equal(already.mailBossNow, false, 'no second mail for the same streak')
+  assert.match(bossMailText({ key: 'wren', cardId: 'mwx', lastError: 'PERSON-DIALOG 1f592988: ? Teach' }), /wake held for wren on card mwx: .*Nothing was typed/)
 })
 
 test('session-wake.sh exits 0 only when every step answers without an error', () => {
