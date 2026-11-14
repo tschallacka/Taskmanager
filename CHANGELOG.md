@@ -4,6 +4,8 @@ All notable changes to Arnotes are documented in this file.
 
 ## 0.31.0 - 2026-11-14
 
+- Crew: the stale dev-copy report now checks each live copy's own card, not one page of the Done column, so a copy of a finished card is no longer missed.
+
 - Crew: the lab, slice 1. `crew <who> lab submit <branch> [--file tests/x.test.ts] [--repeat n]` writes a request; the lab runner (`crew lab runner loop`, its own process) queues it, takes the heavy-job slot, runs `crew/lab-run.sh` (a fresh worktree of the branch: install, eslint, typecheck, a scratch database lab_<id>, the tests, test:crew), records one RESULT line in `CREW_HOME/lab/<id>/`, and releases the slot. `lab status` and `lab cancel <branch>` read and cancel queued samples. Nothing is pushed, merged or committed.
 
 ## 0.30.0 - 2026-11-14
