@@ -418,6 +418,17 @@ function phoneHidden(columnId: string) {
   return columnId !== phoneActiveId.value
 }
 
+// The phone's bottom sheet for one card (9/9). The sheet only emits; these handlers call the board's own functions.
+// Assign and due date have no picker yet, and Delete waits for a live-card trash action, so the sheet does not wire them.
+const phoneSheetTaskId = ref<string | null>(null)
+const phoneSheetTask = computed(() => board.value?.tasks.find(t => t.id === phoneSheetTaskId.value) ?? null)
+function onPhoneDone() {
+  if (phoneSheetTaskId.value) onToggleComplete(phoneSheetTaskId.value)
+}
+function onPhoneMove(columnId: string) {
+  if (phoneSheetTaskId.value) moveTask(phoneSheetTaskId.value, columnId, null, null)
+}
+
 // A live column counts the cards on it, as it always has; the trashed cards
 // sitting in it are not part of the board. A trashed column counts what
 // restoring it would bring back, which is everything still inside it.
@@ -681,6 +692,16 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onBoardKeydown))
     :active-id="phoneActiveId"
     @select="phoneColumnId = $event"
   />
+  <PhoneCardSheet
+    v-if="board"
+    :open="phoneSheetTask !== null"
+    :title="phoneSheetTask?.title ?? ''"
+    :columns="phoneColumns"
+    :current-column-id="phoneSheetTask?.columnId ?? ''"
+    @update:open="(open: boolean) => { if (!open) phoneSheetTaskId = null }"
+    @done="onPhoneDone"
+    @move="onPhoneMove"
+  />
   <div
     v-if="board"
     ref="boardEl"
@@ -831,6 +852,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onBoardKeydown))
             :readonly="isCustomerView"
             @open="emit('openTask', $event)"
             @toggle-complete="onToggleComplete"
+            @menu="phoneSheetTaskId = $event"
             @assign="onAssign"
             @restore="onRestoreTask"
             @purge="askPurgeTask"
