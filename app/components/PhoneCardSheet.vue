@@ -15,11 +15,11 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:open': [value: boolean]
-  done: []
-  move: [columnId: string]
-  assign: [personId: string | null]
-  due: [dueOn: string | null]
-  delete: []
+  'done': []
+  'move': [columnId: string]
+  'assign': [personId: string | null]
+  'due': [dueOn: string | null]
+  'delete': []
 }>()
 
 // The sheet has three steps: the actions, the assignee list, and the due date. Each step resets when the sheet opens.

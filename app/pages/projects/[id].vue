@@ -800,6 +800,5 @@ useSeoMeta({
       :task="drawerTask"
       @close="closeDrawer"
     />
-
   </div>
 </template>
