@@ -90,12 +90,12 @@ describe('the listener hook script', () => {
     const answer = JSON.parse(run.stdout)
     assert.equal(answer.decision, 'block')
     assert.match(answer.reason, /run_in_background: true \(never nohup\)/)
-    assert.match(answer.reason, /listen\.mjs' pia 600/)
+    assert.match(answer.reason, /listen\.mjs' pia 3600/)
   })
 
   test('the command in the answer keeps the crew home with a space in it, quoted', () => {
     const answer = JSON.parse(runHook('stop', '{}', '/srv/crew home/acme').stdout)
-    assert.match(answer.reason, /CREW_HOME='\/srv\/crew home\/acme' node '\/srv\/kit\/listen\.mjs' pia 600/)
+    assert.match(answer.reason, /CREW_HOME='\/srv\/crew home\/acme' node '\/srv\/kit\/listen\.mjs' pia 3600/)
   })
 
   test('stop again after a block (stop_hook_active) lets her stop, so it never loops', () => {
@@ -113,14 +113,18 @@ describe('the listener hook script', () => {
   test('a listener that is a child of the session lets the stop through', async () => {
     // A stand-in for Claude Code: a shell whose command line names "claude" starts a fake listener, then the hook.
     const dir = tempDir('pia-hook-')
+    const crew = tempDir('pia-crew-')
     const fake = join(dir, 'claude')
     writeFileSync(fake, [
       '#!/bin/sh',
-      'node -e "setTimeout(() => {}, 15000)" listen.mjs pia 600 &',
-      // The background listener starts a moment after the shell launches it: wait until it shows up, or a loaded machine
-      // runs the hook first and the test sees no listener.
-      'for i in $(seq 1 40); do pgrep -f "listen.mjs pia" >/dev/null && break; sleep 0.25; done',
-      `sh '${HOOK}' stop '${CREW}' /srv/kit < /dev/null`,
+      'node -e "setTimeout(() => {}, 120000)" listen.mjs pia 3600 &',
+      // The listener records its pid in CREW_HOME/.listen/pia.pid (the real listener does this itself; the stand-in does it here).
+      `mkdir -p '${crew}/.listen' && echo $! > '${crew}/.listen/pia.pid'`,
+      // The background listener starts a moment after the shell launches it: wait until its command shows up (a fork is
+      // still the shell until exec), or a loaded machine runs the hook first and the test sees no listener.
+      `for i in $(seq 1 240); do tr '\\0' ' ' < "/proc/$(cat '${crew}/.listen/pia.pid')/cmdline" 2>/dev/null | grep -q "listen.mjs pia" && break; sleep 0.25; done`,
+      `sh '${HOOK}' stop '${crew}' /srv/kit < /dev/null`,
+      `kill "$(cat '${crew}/.listen/pia.pid')"`,
       'wait'
     ].join('\n') + '\n')
     chmodSync(fake, 0o755)

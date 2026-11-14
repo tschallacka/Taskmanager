@@ -21,6 +21,7 @@
 //   crew claude [args...]      Claude Code with the long-run profile for this one session; `crew claude version` checks it (claude.mjs)
 //   crew setup                 make one new crew for a board in one go, with the board's management token (setup.mjs)
 //   crew people add [--people a,b]   add the crew's missing people; the token comes from TASKMANAGER_MANAGEMENT_TOKEN (people.mjs)
+//   crew devadmin show|make-admin <key> [email]   list or set the instance admin of your own dev database only (devadmin.mjs)
 //   crew channel <who>         the Claude Code channel server for one person (channel.mjs)
 //   crew <who> prepare worktree <task-id>   the worktree, branch and port for a card; --remove frees them (prepare-worktree-cli.mjs)
 //   crew <who> serve [--replace|--stop|--check]   the dev copy of your worktree on your port, checked and recorded (serve.mjs)
@@ -31,10 +32,14 @@
 import { spawnSync } from 'node:child_process'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { crewHome } from './home.mjs'
+import { writePidFile } from './pidfile.mjs'
 
 const kit = dirname(fileURLToPath(import.meta.url))
 const [first, ...rest] = process.argv.slice(2)
-const scripts = { 'people': 'people.mjs', 'listen': 'listen.mjs', 'watch': 'watch.mjs', 'init': 'init.mjs', 'setup': 'setup.mjs', 'channel': 'channel.mjs', 'update': 'update.mjs', 'mentions': 'mentions.mjs', 'totp': 'totp.mjs', 'claude': 'claude.mjs', 'janet': 'janet.mjs', 'publish': 'publish.mjs', 'activity': 'activity.mjs', 'watch-crew': 'watch-crew.mjs', 'up': 'up.mjs', 'restart-brief': 'restart-brief.mjs', 'dev-copies': 'dev-copies.mjs', 'down': 'down.mjs', 'susy-daemon': 'susy-daemon.mjs' }
+// Boss's two watches record their pid for the Stop hook (boss-stop-hook.sh reads CREW_HOME/.listen/<name>.pid).
+if (first === 'boss-mentions' || first === 'watch-crew') writePidFile(crewHome(), first)
+const scripts = { 'people': 'people.mjs', 'listen': 'listen.mjs', 'watch': 'watch.mjs', 'init': 'init.mjs', 'setup': 'setup.mjs', 'channel': 'channel.mjs', 'update': 'update.mjs', 'mentions': 'mentions.mjs', 'totp': 'totp.mjs', 'devadmin': 'devadmin.mjs', 'claude': 'claude.mjs', 'janet': 'janet.mjs', 'publish': 'publish.mjs', 'activity': 'activity.mjs', 'watch-crew': 'watch-crew.mjs', 'up': 'up.mjs', 'restart-brief': 'restart-brief.mjs', 'dev-copies': 'dev-copies.mjs', 'down': 'down.mjs', 'susy-daemon': 'susy-daemon.mjs', 'session': 'session.mjs' }
 
 if (!first || first === '-h' || first === '--help') {
   console.log('usage: crew <who> <command ...> | crew <who> browser <command> | crew browser status|shutdown | crew listen <who> [sec] | crew watch | crew init | crew setup | crew channel <who> | crew mentions [minutes|--follow] | crew publish <slug> <branch> <title> <msg-file> <pr-file> | crew update [--check] [--from <kit folder|kit.tar.gz>] [--kit <folder>] | crew up | crew restart-brief')

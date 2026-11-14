@@ -2,6 +2,34 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.28.1 - 2026-11-13
+
+- **`crew up` starts the crew's background sessions and `crew down` stops them.** `crew up` reads `CREW_HOME/sessions/*.json` and starts every recorded person whose session is not running, with the same strict start as `crew session start` (the role file is the person's PROMPTS section plus the CREW.md standing rules, written to `sessions/<key>.role.md`, mode 600); a person with no card is started idle and waits for mail. `crew down` stops them. The daemon's API-error check now reads each person's session transcript in the session's own folder. Files: `crew/sessions-up.mjs`, `crew/up.mjs`, `crew/down.mjs`, `crew/session.mjs`, `crew/session-errors.mjs`, `crew/kit-files.txt`.
+
+- **The person settings file also carries the long-run profile.** `CREW_HOME/settings/<key>.json` now includes the claude-long-run environment (longer command, MCP and stall timeouts); the person's own `CREW_HOME` is set last, so the profile cannot override it. A change to the profile reaches a session on its next start. Files: `crew/session-settings.mjs`, `crew/session-settings.test.mjs`.
+
+- **`crew init` writes Pia's `CLAUDE.md` from a mechanics-only template.** `crew/PIA-CLAUDE.md.tmpl` says how Pia reads her mail and mentions and where the crew documents are; it grants no authority and names no one. Init writes `pia-session/CLAUDE.md` only when the file does not exist; an existing copy is never changed, and `crew update` never touches it. Files: `crew/PIA-CLAUDE.md.tmpl`, `crew/init.mjs`, `crew/kit-files.txt`.
+
+## 0.28.0 - 2026-11-13
+
+- **Set up a crew by approval: the setup prompt carries no token.** On the Crews page, an instance admin picks a board and copies a prompt. The agent asks for a connection, the admin approves the link in the browser with one click, and the agent gets its key once. A link that expires is refused with one sentence. The old management-token prompt keeps working for one release. Files: `app/utils/approvalSetupPrompt.ts`, `app/utils/approvalSetupBoard.ts`, `app/pages/admin/crews/index.vue`, `app/utils/connectPrompt.ts`, `app/pages/connect-approve.vue`, `docs/crews/give-a-board-a-crew.md`, `tests/approval-setup-prompt.test.ts`, `tests/approval-setup-board.test.ts`, `tests/connect-permission-wording.test.ts`.
+
+## 0.27.0 - 2026-11-13
+
+- **Every crew session starts with its own settings file.** Each background session gets `CREW_HOME/settings/<key>.json` (mode 600): the `mcp__git__restart_self` tool is denied for every agent, the person's own crew home is set, and remote control is off. The start passes that one file as its `--settings`. Files: `crew/session-settings.mjs`, `crew/session.mjs`, `crew/session.test.mjs`, `crew/session-settings.test.mjs`, `crew/kit-files.txt`.
+
+- **The crew's role texts say it: never restart or reconfigure an agent (CREW.md rule 14).** Every role template, the PROMPTS and the Susy text name the rule, and a kit test pins it, so a crew agent no longer calls `restart_self` by habit. The enforcing deny rule is in the settings file above.
+
+- **The crew's shared browser no longer fails its own tests under load.** It gets a lock so two users do not start it at the same time, one cleanup removes its temporary profile after Chromium has exited (retrying), and a dropped command is retried only when it is read-only (status, tabs, console, shot), never a click or a submit. Files: `crew/browser-driver.mjs`, `crew/browser-driver.test.mjs`.
+
+## 0.26.0 - 2026-11-13
+
+- **A crew person can run as its own background session.** `crew session start <key> <folder>` starts one person as a `claude --bg` session with remote control off and the crew's own strict mcp config, and records its id in `sessions/<key>.json`; `status`, `list` and `stop` read that record by id. Only the crew kit changes: `crew/session.mjs`, `crew/crew.mjs`, `crew/kit-files.txt`, `crew/session.test.mjs`.
+
+## 0.25.2 - 2026-11-13
+
+- **Crew listener: pid files instead of process scans, and a one-hour listener wait.** Pia's listener and the Boss watches now record their pid in `.listen/<name>.pid`, and the Stop hooks and Susy read that file instead of running `pgrep -f` over every process; Pia's listener waits up to 3600 s (was 600 s) before it exits on quiet, so she is woken less often. Files: `crew/pidfile.mjs` (new), `crew/listen.mjs`, `crew/crew.mjs`, `crew/boss-stop-hook.sh`, `crew/pia-listener-hook.sh`, `crew/susy-collector.mjs`, `crew/susy-activity.mjs`, `crew/PROMPTS.md.tmpl`, and their tests.
+
 ## 0.25.1 - 2026-11-13
 
 - **A session that stops on an API error is reported as blocked, and Boss gets one mail.** The daemon reads the last transcript line of each person's session. A line that is an API error (a 403, a login request, or the account limit) shows the session as `blocked: api error` with the error text, not as stuck. Boss gets one mail per distinct error, and a later normal line clears the block. A dry run only reports and never marks a mail as sent.

@@ -75,12 +75,10 @@ test('the mail age comes from the folder; no folder is null, not a fault', () =>
 })
 
 test('the listener is a sampled heartbeat, not a file: running is age 0; stopped is the minutes since last seen', () => {
-  assert.equal(listenerRunning(() => ({ status: 0 })), true)
-  assert.equal(listenerRunning(() => ({ status: 1 })), false)
-  const noPgrep = () => {
-    throw new Error('no pgrep')
-  }
-  assert.equal(listenerRunning(noPgrep), null)
+  // Running is read from the listener's pid file (crew/pidfile.test.mjs covers a live process); no file is not running.
+  const home = mkdtempSync(join(tmpdir(), 'listener-running-'))
+  assert.equal(listenerRunning({ home }), false, 'no pid file: not running')
+  assert.equal(listenerRunning({}), null, 'no crew home: cannot be asked')
   assert.deepEqual(listenerHeartbeat({ running: true, lastSeenAt: NOW - 30 * MIN, now: NOW }), { age: 0, seenAt: NOW })
   assert.deepEqual(listenerHeartbeat({ running: false, lastSeenAt: NOW - 5 * MIN, now: NOW }), { age: 5, seenAt: NOW - 5 * MIN })
   assert.deepEqual(listenerHeartbeat({ running: false, lastSeenAt: null, now: NOW }), { age: null, seenAt: null }, 'never seen is no evidence')

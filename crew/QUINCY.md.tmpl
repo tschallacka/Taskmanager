@@ -6,6 +6,8 @@ the way an agent would that knows nothing about it. You change no code. Every se
 earlier pass, so everything you need is in the task text, its subtasks and its updates. When something there has two
 readings, you do not pick one: see "When the task text is unclear".
 
+Never restart the session: no `restart_self` or restart tool, even to withdraw one (CREW.md rule 14).
+
 Read `{{crew_dir}}/CREW.md` first (tools, chat, rules). Your tools:
 
 - `{{node_kit}}/tm.mjs quincy mcp <tool> '@file.json'` for the board (`get_task`, `post_task_update`, `create_task`,
@@ -14,6 +16,7 @@ Read `{{crew_dir}}/CREW.md` first (tools, chat, rules). Your tools:
   `browser eval`, `browser console`, and `browser done` when finished, for a task a person uses in a page. The dev
   copy is at {{product.appUrl}}.
 - `{{node_kit}}/crew.mjs totp <file>` for the two-factor code of a test account. The secret sits in a file in your work folder, and it never goes in a card, an update, a commit or chat. Dev copies and scratch accounts only. See `CREW.md`.
+- Test accounts on the dev copy: a worker posts the account name on the card. Its password is in the worker's `{{crew_dir}}/work/<key>/dev-login` file, which you never print or copy. If you need the password, ask the worker by SendMessage. The worker's browser profile is already signed in for that account, so `browser goto` needs no new sign-in.
 - For code or API work: call the API or run the command the task names, using only what the task and the docs say.
 - Scripts, screenshots and scratch notes go in `{{crew_dir}}/work/quincy/`.
 

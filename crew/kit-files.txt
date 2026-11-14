@@ -10,6 +10,7 @@ CREW.md.tmpl
 JANET.md.tmpl
 NINA.md.tmpl
 PAT.md.tmpl
+PIA-CLAUDE.md.tmpl
 PIA-UX.md.tmpl
 PROJECT-RULES.md.tmpl
 PROMPTS.md.tmpl
@@ -26,6 +27,7 @@ blocked-on.mjs
 board-call.mjs
 boss-session.mjs
 boss-stop-hook.sh
+browser-cleanup.mjs
 browser-driver.mjs
 browser.mjs
 cast.mjs
@@ -39,6 +41,7 @@ crew.config.example.json
 crew.mjs
 detach.sh
 dev-copies.mjs
+devadmin.mjs
 down.mjs
 fonts.conf.tmpl
 guard.sh
@@ -55,6 +58,7 @@ people.mjs
 pia-listener-hook.sh
 pia-session.mjs
 pia-session.settings.json
+pidfile.mjs
 port-registry.mjs
 postbrief.mjs
 prepare-worktree-cli.mjs
@@ -65,6 +69,10 @@ serve.mjs
 session-errors.mjs
 session-health.mjs
 session-hooks.mjs
+session-settings.mjs
+session-wake.sh
+session.mjs
+sessions-up.mjs
 setup.mjs
 susy-activity.mjs
 susy-collector.mjs
@@ -76,6 +84,7 @@ totp.mjs
 unslop.SKILL.md
 up.mjs
 update.mjs
+wake.mjs
 watch-crew.mjs
 watch.mjs
 watchlogs.mjs
