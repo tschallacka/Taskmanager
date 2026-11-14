@@ -2,6 +2,8 @@
 import { addDays, differenceInCalendarDays, format, startOfDay, startOfWeek } from 'date-fns'
 import { dueDayToMs } from '~/utils/dueDate'
 import { errorMessage } from '~/utils/untypedFetch'
+import { timelineKeyAction } from '~/utils/timelineKeys'
+import { nudgePatch } from '~/utils/dateNudge'
 
 const emit = defineEmits<{ openTask: [taskId: string] }>()
 
@@ -147,6 +149,21 @@ function onBarClick(task: DatedTask) {
   if (!justDragged) emit('openTask', task.id)
 }
 
+// The keyboard path for a focused bar: a plain arrow moves it a day, Shift changes its end, Alt its start (timelineKeys.ts).
+// The dates come from the same rule the drag uses (dateNudge.ts), so a key move lands where a drag would.
+async function onBarKey(task: DatedTask, event: KeyboardEvent) {
+  const action = timelineKeyAction(event.key, { shift: event.shiftKey, alt: event.altKey })
+  if (!action) return
+  event.preventDefault()
+  const patch = nudgePatch(task, action.mode, action.delta)
+  if (!Object.keys(patch).length) return
+  try {
+    await updateTask(task.id, patch)
+  } catch (e) {
+    toast.add({ title: errorMessage(e, 'Could not change the dates'), icon: 'i-lucide-alert-triangle', color: 'error' })
+  }
+}
+
 const scroller = ref<HTMLElement | null>(null)
 
 function scrollToToday() {
@@ -236,6 +253,8 @@ watch(() => sections.value.length, () => nextTick(scrollToToday), { once: true }
                 :style="bar(task)"
                 data-timeline-bar
                 :title="task.title"
+                :aria-label="`${task.title}. Arrow keys move it a day; Shift and an arrow change its end; Alt and an arrow change its start.`"
+                @keydown="onBarKey(task, $event)"
                 @pointerdown="onDragStart($event, task, 'move')"
                 @pointermove="onDragMove"
                 @pointerup="onDragEnd(task)"
