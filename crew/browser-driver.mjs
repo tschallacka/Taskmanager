@@ -81,6 +81,8 @@ const LOAD_MS = 30000 // how long goto waits for the load event
 const CLIENT_REPLY_MS = 150000 // the longest the server can take is a goto plus two 60 s calls
 const SPAWN_RETRY_MS = 10000
 const START_DEADLINE_MS = 40000
+// How long a caller waits for a folder's lock before it answers busy.
+const LOCK_WAIT_MS = 30000
 
 export class BrowserError extends Error {
   constructor(message) {
@@ -93,6 +95,25 @@ class CdpError extends Error {
   constructor(message) {
     super(message)
     this.name = 'CdpError'
+  }
+}
+
+// Chrome forgets a page's session when the page is detached under a command (the reply reads "Session with given id not
+// found"). The page is still there, so the same target is attached again and the command repeated.
+export function isSessionGone(error) {
+  return error?.name === 'CdpError' && /Session with given id not found/.test(error.message ?? '')
+}
+
+// Runs task(); when the session is gone, runs reattach() and repeats task(), at most maxRetries times. Any other error
+// is thrown at once, and so is the error after the last retry.
+export async function retryAfterReattach(task, reattach, maxRetries = 2) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await task()
+    } catch (error) {
+      if (!isSessionGone(error) || attempt >= maxRetries) throw error
+      await reattach()
+    }
   }
 }
 
@@ -612,6 +633,19 @@ export async function acquireLock(dir, sock = join(dir, SOCKET_NAME)) {
 }
 
 /**
+ * Waits for the lock: tries acquireLock every pollMs until it is taken or timeoutMs has passed. False means the lock
+ * is still held by a live driver, which is the "busy, try again later" answer.
+ */
+export async function acquireLockWaiting(dir, sock = join(dir, SOCKET_NAME), { timeoutMs = LOCK_WAIT_MS, pollMs = 100 } = {}) {
+  const until = Date.now() + timeoutMs
+  for (;;) {
+    if (await acquireLock(dir, sock)) return true
+    if (Date.now() >= until) return false
+    await sleep(pollMs)
+  }
+}
+
+/**
  * Creates the lock, then checks the socket. A live driver whose lock a takeover caught still answers
  * on its socket: this driver gives the lock back and leaves that socket alone.
  */
@@ -1000,7 +1034,22 @@ class Pool {
       })
     }
     const tab = await this.tab(person, args.tab ?? DEFAULT_TAB, browser)
-    return tab.mutex.run(() => this.tabCommand(cmd, browser, tab, args))
+    return tab.mutex.run(() => retryAfterReattach(
+      () => this.tabCommand(cmd, browser, tab, args),
+      () => this.reattach(browser, tab)
+    ))
+  }
+
+  // Attaches again to the tab's own target, enables the page domains on the new session, and forgets the old one.
+  async reattach(browser, tab) {
+    const old = tab.session
+    const { sessionId } = await browser.call('Target.attachToTarget', { targetId: tab.target, flatten: true })
+    this.sessions.delete(old)
+    tab.session = sessionId
+    this.sessions.set(sessionId, tab)
+    for (const method of ['Page.enable', 'Runtime.enable', 'Log.enable']) {
+      await browser.call(method, {}, sessionId)
+    }
   }
 
   async tabCommand(cmd, browser, tab, args) {
@@ -1324,7 +1373,32 @@ function exchange(conn, message) {
  * Sends one command. Resolves { result, note }, or null when nothing is running and start is false.
  * Starts the driver when none is running and start is true. Throws when the command fails.
  */
-export async function request({ dir = defaultDir(), who = null, cmd, args = {}, start = true, chromium = '', seam = true }) {
+// A driver that is shutting down closes its socket under a call that has just connected. The call then gets a dropped
+// connection and no reply. A read-only call is retried. When every try is dropped, the answer depends on start: with
+// start false, nothing answers, so the answer is null; with start true the error is thrown. A command that may change
+// the page (goto, eval, send, close-tab, done) is never resent: a dropped one may have run already, and running it twice
+// could click or submit twice. Such a command gets the same answer as a drop after the last try, without a retry.
+const DROPPED = /connection failed|closed the connection/
+const READ_ONLY = new Set(['status', 'tabs', 'console', 'shot'])
+const DROP_RETRIES = 5
+const DROP_RETRY_MS = 300
+
+export async function request(options) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await requestOnce(options)
+    } catch (error) {
+      if (!(error instanceof BrowserError) || !DROPPED.test(error.message)) throw error
+      if (!READ_ONLY.has(options.cmd) || attempt >= DROP_RETRIES) {
+        if ((options.start ?? true) === false) return null
+        throw error
+      }
+      await sleep(DROP_RETRY_MS)
+    }
+  }
+}
+
+async function requestOnce({ dir = defaultDir(), who = null, cmd, args = {}, start = true, chromium = '', seam = true }) {
   const sock = join(dir, SOCKET_NAME)
   let conn = await connectTo(sock, 500)
   if (!conn) {

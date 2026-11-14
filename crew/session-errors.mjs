@@ -3,6 +3,7 @@
 // error (403, login, the account limit) makes the session "blocked: api error" with the error text (cut to 80 characters),
 // and Boss gets one mail per distinct error text. A later normal line clears the state, so a later error mails again.
 import { existsSync, readdirSync, readFileSync, statSync, openSync, readSync, closeSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { blockedReason, errorMailOnce, errorMailText } from './session-health.mjs'
 
@@ -65,11 +66,29 @@ export function transcriptOf(root, id) {
 }
 
 /**
- * One tick of the API-error check over every recorded session. `state` is the daemon state (its sessionErrors map keeps
- * the mailed error texts per person). Returns the log lines, the mail texts to send to Boss (only for the new errors), and
- * the next sessionErrors map.
+ * The transcript of one recorded session. A background session writes its transcript into the folder of the directory it
+ * was started in, encoded the way Claude Code encodes it (every "/" and "." becomes "-"), so the record's folder finds it
+ * directly. When that folder does not hold it, the whole projects base is searched. Null when neither has it.
  */
-export function sessionErrorReport({ home, root, state = {}, live = false }) {
+export function transcriptForRecord(base, record) {
+  if (record?.folder) {
+    const dir = join(base, String(record.folder).replace(/[/.]/g, '-'))
+    if (existsSync(dir) && record.id) {
+      const hit = readdirSync(dir).find(n => n.startsWith(record.id) && n.endsWith('.jsonl'))
+      if (hit) return join(dir, hit)
+    }
+  }
+  return transcriptOf(base, record?.id)
+}
+
+/**
+ * One tick of the API-error check over every recorded session. `state` is the daemon state (its sessionErrors map keeps
+ * the mailed error texts per person). `base` is Claude Code's projects folder (every project's transcripts are under it);
+ * it defaults to the user's own. `root` is the folder the daemon was given for Pia's own transcripts: it is searched only
+ * when the base has no transcript for a session. Returns the log lines, the mail texts to send to Boss (only for the new
+ * errors), and the next sessionErrors map.
+ */
+export function sessionErrorReport({ home, root, base = join(homedir(), '.claude', 'projects'), state = {}, live = false }) {
   const dir = join(home, 'sessions')
   const next = {}
   const lines = []
@@ -83,7 +102,8 @@ export function sessionErrorReport({ home, root, state = {}, live = false }) {
     } catch {
       continue
     }
-    const file = transcriptOf(root, record.id)
+    // A record with a folder is looked up under the base first; a record without one, or not found there, under the root.
+    const file = (record.folder ? transcriptForRecord(base, record) : null) ?? transcriptOf(root, record.id)
     const last = file ? lastLineOf(file) : null
     const health = blockedReason(textOf(last))
     const prior = state.sessionErrors?.[key] ?? { seen: [] }

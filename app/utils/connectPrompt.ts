@@ -7,7 +7,7 @@ export const CONNECT_PERMISSIONS = [
   { scope: 'boards:write', label: 'Change tasks', description: 'Create, edit, move and delete tasks, comment, log time' },
   { scope: 'secrets:read', label: 'Read project secrets', description: 'Names and values of a project\'s secrets. Every read is recorded' },
   { scope: 'secrets:write', label: 'Change project secrets', description: 'Add, change and delete a project\'s secrets, where you are a project manager' },
-  { scope: 'crews:manage', label: 'Manage crews', description: 'Create and change crews. Only the instance admin can give this' }
+  { scope: 'crews:manage', label: 'Let this agent make a crew for this board', description: 'The crew gets its own accounts and keys, and can read and write its own board. Only the instance admin can give this' }
 ] as const
 
 export type ConnectScope = typeof CONNECT_PERMISSIONS[number]['scope']

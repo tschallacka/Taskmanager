@@ -110,6 +110,8 @@ const render = text => renderTemplate(text, values)
 
 // The templates ship in the kit folder; the documents are written to CREW_HOME.
 for (const file of readdirSync(kitDir).filter(f => f.endsWith('.tmpl'))) {
+  // Pia's standing order is not a crew document: it goes into her session folder, below.
+  if (file === 'PIA-CLAUDE.md.tmpl') continue
   const out = file.replace(/\.tmpl$/, '')
   if (out === 'fonts.conf') {
     if (!config.fontDir) continue
@@ -252,6 +254,19 @@ if (!skipsProvider('pia', config.models.pia)) {
     const { file, changed } = writePiaHooks(`${here}pia-session`, { crewHome: here.replace(/\/$/, ''), kitDir: kitDir.replace(/\/$/, '') })
     ok(`${file} ${changed ? 'written: her listener hooks' : 'kept, hooks already current'}`)
   } catch (error) { fail(error.message) }
+}
+
+// Pia's standing order (her CLAUDE.md) is written once, from the kit's template. An existing file is the owner's edit
+// and is never changed here, and update does not touch it. Until the marker-line card ships, it is write-once.
+if (!skipsProvider('pia', config.models.pia)) {
+  const piaClaude = `${here}pia-session/CLAUDE.md`
+  if (existsSync(piaClaude)) {
+    ok(`${piaClaude} exists, kept`)
+  } else {
+    mkdirSync(`${here}pia-session`, { recursive: true })
+    writeFileSync(piaClaude, render(readFileSync(`${kitDir}/PIA-CLAUDE.md.tmpl`, 'utf8')))
+    ok(`${piaClaude} written from the template`)
+  }
 }
 
 // The worktree folder: prepare worktree needs it; init does not guess it, setup writes it from --worktree-base.
