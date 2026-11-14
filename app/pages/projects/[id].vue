@@ -141,8 +141,9 @@ const drawerTaskId = computed<string | null>(() => {
   return typeof id === 'string' && id ? id : null
 })
 
-function openDrawerTask(taskId: string) {
-  navigateTo({ path: taskPanelPath(String(route.params.id), taskId), query: queryWithoutTask(route.query) })
+// Opens a card's panel. A comment, when given, stays in the path (/projects/<id>/<task>/<comment>), so the panel jumps to it.
+function openDrawerTask(taskId: string, commentId?: string | null) {
+  navigateTo({ path: taskPanelPath(String(route.params.id), taskId, commentId), query: queryWithoutTask(route.query) })
 }
 
 function closeDrawer() {

@@ -27,11 +27,12 @@ test('the query keeps its view and filters, and drops only the old task paramete
   assert.deepEqual(queryWithoutTask({}), {})
 })
 
-test('the old form ?task=&comment= becomes the path form, with the comment kept in the query', () => {
+test('the old form ?task=&comment= becomes the path form /projects/<pid>/<task>/<comment>, never ?comment=', () => {
   assert.deepEqual(taskQueryAsPanelAddress('p1', { task: 't1', comment: 'c9' }), {
-    path: '/projects/p1/t1',
-    query: { comment: 'c9' }
+    path: '/projects/p1/t1/c9',
+    query: {}
   })
+  assert.doesNotMatch(taskQueryAsPanelAddress('p1', { task: 't1', comment: 'c9' })?.path ?? '', /\?/)
 })
 
 test('the rewrite keeps the other query parameters, and drops only the task', () => {

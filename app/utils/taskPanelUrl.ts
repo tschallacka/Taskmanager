@@ -20,11 +20,13 @@ export function queryWithoutTask(query: LocationQuery): LocationQueryRaw {
   return Object.fromEntries(Object.entries(query).filter(([key]) => key !== 'task')) as LocationQueryRaw
 }
 
-// The old deep link ?task=<id>[&comment=<id>] as the address the board goes to: the path form /projects/<id>/<task>, with
-// the comment kept in the query (?comment=<id>) and every other query parameter kept. The panel reads the comment once and
-// then removes it from the address, so a reload does not jump again. Null when the query has no task.
+// The old deep link ?task=<id>[&comment=<id>] as the address the board goes to: the path form
+// /projects/<id>/<task>/<comment> (or /projects/<id>/<task> without a comment), with every other query parameter kept.
+// Null when the query has no task.
 export function taskQueryAsPanelAddress(projectId: string, query: LocationQuery): { path: string, query: LocationQueryRaw } | null {
   const taskId = typeof query.task === 'string' ? query.task : ''
   if (!taskId) return null
-  return { path: taskPanelPath(projectId, taskId), query: queryWithoutTask(query) }
+  const comment = typeof query.comment === 'string' && query.comment ? query.comment : null
+  const { comment: _comment, ...rest } = queryWithoutTask(query) as Record<string, unknown>
+  return { path: taskPanelPath(projectId, taskId, comment), query: rest as LocationQueryRaw }
 }
