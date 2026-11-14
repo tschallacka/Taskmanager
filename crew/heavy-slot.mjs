@@ -4,8 +4,11 @@
 //
 // A process counts as heavy by its executable, not by words in its command line:
 //   - chromium or chrome (the executable named by /proc/<pid>/comm);
-//   - node or bun whose script is `--test` (node --test), `run test` or `run typecheck` (bun run ...), or `test` (bun test);
+//   - node with the flag `--test` before its script (node --test, node --import tsx --test tests/x.ts), `run test` or
+//     `run typecheck` (bun run ...), or `test` (bun test). A `--test` after the script belongs to the script;
 //   - vue-tsc, run as its script (node .../vue-tsc.js).
+// Only the crew user's processes count: the scan keeps a process whose real uid is the user the daemon runs as. Heavy
+// work by the Owner or another user on the same server does not hold the crew's slot.
 // A grant lives in CREW_HOME/heavy-slot.json (mode 600) and expires 60 minutes after its `since`. An expired grant no longer
 // counts, and the daemon logs "grant expired" for it.
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
@@ -15,17 +18,47 @@ export const GRANT_MINUTES = 60
 export const GRANT_MS = GRANT_MINUTES * 60 * 1000
 const HEAVY_COMMS = new Set(['chromium', 'chrome'])
 
-/** The heavy processes among a list of { pid, comm, argv }. Words elsewhere in a command line never match. */
-export function heavyProcesses(procs) {
+/** The user the daemon runs as: only processes with this real uid count. */
+export function myUid() {
+  return typeof process.getuid === 'function' ? process.getuid() : null
+}
+
+// Node options that take a separate value: the value is not a script or a flag.
+const NODE_VALUE_OPTIONS = new Set(['--import', '--require', '-r', '--loader', '--env-file', '--conditions', '-C'])
+
+/**
+ * Whether `--test` is a flag of node itself: it comes before the script (the first argument that is a file). Node's
+ * options may come first: `node --test`, `node --import tsx --test tests/x.ts`. `node tool.mjs --test` is not node's flag.
+ */
+export function isNodeTestFlag(argv) {
+  for (let i = 1; i < argv.length; i += 1) {
+    const arg = argv[i]
+    if (arg === '--test') return true
+    if (NODE_VALUE_OPTIONS.has(arg)) {
+      i += 1
+      continue
+    }
+    if (arg.startsWith('-')) continue
+    return false // the script: from here on, the arguments are its own
+  }
+  return false
+}
+
+/**
+ * The heavy processes among a list of { pid, comm, uid, argv }, counting only the processes of `uid` (default: this
+ * user). Words elsewhere in a command line never match.
+ */
+export function heavyProcesses(procs, uid = myUid()) {
   const out = []
   for (const proc of procs) {
+    if (uid == null || proc?.uid !== uid) continue
     const comm = String(proc?.comm ?? '')
     const argv = Array.isArray(proc?.argv) ? proc.argv.map(String) : []
     const exe = basename(argv[0] ?? '')
     const script = basename(argv[1] ?? '')
     if (HEAVY_COMMS.has(comm)) {
       out.push({ pid: proc.pid, name: comm })
-    } else if ((exe === 'node' || comm === 'node') && (argv[1] === '--test' || argv[2] === '--test')) {
+    } else if ((exe === 'node' || comm === 'node') && isNodeTestFlag(argv)) {
       out.push({ pid: proc.pid, name: 'node --test' })
     } else if ((exe === 'bun' || comm === 'bun') && argv[1] === 'run' && ['test', 'typecheck'].includes(argv[2])) {
       out.push({ pid: proc.pid, name: `bun run ${argv[2]}` })
@@ -38,14 +71,16 @@ export function heavyProcesses(procs) {
   return out
 }
 
-/** Reads /proc into { pid, comm, argv } rows. A process that ends while it is read is left out. */
+/** Reads /proc into { pid, comm, uid, argv } rows (uid: the real uid, from status). A process that ends while it is read is left out. */
 export function readProcs(procDir = '/proc') {
   const out = []
   for (const pid of readdirSync(procDir).filter(p => /^\d+$/.test(p))) {
     try {
       const comm = readFileSync(join(procDir, pid, 'comm'), 'utf8').trim()
       const argv = readFileSync(join(procDir, pid, 'cmdline'), 'utf8').split('\0').filter(Boolean)
-      out.push({ pid: Number(pid), comm, argv })
+      const uid = Number(/^Uid:\s+(\d+)/m.exec(readFileSync(join(procDir, pid, 'status'), 'utf8'))?.[1])
+      if (!Number.isInteger(uid)) continue
+      out.push({ pid: Number(pid), comm, uid, argv })
     } catch {
       // Ended while being read.
     }
@@ -93,7 +128,7 @@ export function releaseGrant(home, asker) {
  * The decision for one ask: grant, or say who holds it. Pure apart from the grant write on a grant.
  * Returns { granted, holder?, mail, log[] }. The mail is the text to send the asker. Nothing else is started or stopped.
  */
-export function decideSlot({ home, asker, purpose = '', procs = [], now = Date.now() }) {
+export function decideSlot({ home, asker, purpose = '', procs = [], now = Date.now(), uid = myUid() }) {
   const log = []
   const found = readGrant(home, now)
   if (found?.expired) log.push(`grant expired: ${found.grant.holder} (since ${new Date(found.grant.since).toISOString()})`)
@@ -103,7 +138,7 @@ export function decideSlot({ home, asker, purpose = '', procs = [], now = Date.n
   if (found && !found.expired && found.grant.holder === asker) {
     return { granted: true, holder: asker, mail: 'slot granted', log }
   }
-  const busy = heavyProcesses(procs)
+  const busy = heavyProcesses(procs, uid)
   if (busy.length) {
     const holder = `process ${busy[0].name} (pid ${busy[0].pid})`
     return { granted: false, holder, mail: `slot busy: ${holder}`, log }

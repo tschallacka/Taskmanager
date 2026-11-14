@@ -5,11 +5,12 @@ import assert from 'node:assert/strict'
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { GRANT_MS, decideSlot, heavyProcesses, readGrant, readProcs, releaseGrant, writeGrant } from './heavy-slot.mjs'
+import { GRANT_MS, decideSlot, heavyProcesses, isNodeTestFlag, myUid, readGrant, readProcs, releaseGrant, writeGrant } from './heavy-slot.mjs'
 
 const T0 = 1_700_000_000_000
 const home = () => mkdtempSync(join(tmpdir(), 'heavy-slot-'))
-const proc = (pid, comm, argv) => ({ pid, comm, argv })
+const ME = myUid()
+const proc = (pid, comm, argv, uid = ME) => ({ pid, comm, uid, argv })
 
 test('a chromium or chrome executable is heavy, by its comm', () => {
   assert.deepEqual(heavyProcesses([proc(10, 'chromium', ['chromium', '--headless'])]).map(p => p.name), ['chromium'])
@@ -38,17 +39,37 @@ test('words in a command line never match: a grep or an editor that names a heav
   assert.equal(heavyProcesses(words).length, 0)
 })
 
-test('readProcs reads comm and argv from a /proc-shaped folder, and skips a process that ended', () => {
+test('readProcs reads comm, uid and argv from a /proc-shaped folder, and skips a process that ended', () => {
   const procDir = mkdtempSync(join(tmpdir(), 'fake-proc-'))
   mkdirSync(join(procDir, '501'))
   writeFileSync(join(procDir, '501', 'comm'), 'node\n')
   writeFileSync(join(procDir, '501', 'cmdline'), 'node\0--test\0x.test.mjs\0')
+  writeFileSync(join(procDir, '501', 'status'), `Name:\tnode\nUid:\t${ME}\t${ME}\t${ME}\t${ME}\n`)
   mkdirSync(join(procDir, '502'))
-  writeFileSync(join(procDir, '502', 'comm'), 'sleep\n')
+  writeFileSync(join(procDir, '502', 'comm'), 'sleep\n') // no cmdline, no status: it ended while read
   mkdirSync(join(procDir, 'self'))
   const rows = readProcs(procDir)
-  assert.deepEqual(rows, [{ pid: 501, comm: 'node', argv: ['node', '--test', 'x.test.mjs'] }])
+  assert.deepEqual(rows, [{ pid: 501, comm: 'node', uid: ME, argv: ['node', '--test', 'x.test.mjs'] }])
   assert.equal(heavyProcesses(rows)[0].name, 'node --test')
+})
+
+test('only the crew user\'s processes count: a chromium or a test run of another user does not hold the slot', () => {
+  const other = ME + 1
+  assert.equal(heavyProcesses([proc(90, 'chromium', ['chromium'], other)]).length, 0)
+  assert.equal(heavyProcesses([proc(91, 'node', ['node', '--test'], other)]).length, 0)
+  const h = home()
+  const out = decideSlot({ home: h, asker: 'wade', procs: [proc(92, 'chromium', ['chromium'], other)], now: T0 })
+  assert.equal(out.granted, true, 'the Owner\'s browser does not block the crew')
+  assert.equal(heavyProcesses([proc(93, 'chromium', ['chromium'])]).length, 1, 'our own still counts')
+})
+
+test('the --test flag counts only before the script: node --test, and node --import tsx --test file; not a --test after the script', () => {
+  assert.equal(isNodeTestFlag(['node', '--test']), true)
+  assert.equal(isNodeTestFlag(['node', '--env-file-if-exists=.env', '--import', 'tsx', '--test', 'tests/x.test.ts']), true)
+  assert.equal(isNodeTestFlag(['node', 'tools/explain.mjs', '--test']), false)
+  assert.equal(isNodeTestFlag(['node', 'server.js']), false)
+  assert.equal(heavyProcesses([proc(100, 'node', ['node', 'tools/runner.mjs', '--test'])]).length, 0)
+  assert.equal(heavyProcesses([proc(101, 'node', ['node', '--import', 'tsx', '--test', 'tests/x.test.ts'])])[0].name, 'node --test')
 })
 
 test('no heavy process and no grant: the ask is granted, the grant file is mode 600 and names the asker', () => {
