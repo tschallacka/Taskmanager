@@ -405,6 +405,19 @@ function columnMenu(column: ProjectColumn): DropdownMenuItem[][] {
 // there is nothing trashed in state to draw.
 const liveColumns = computed(() => boardColumns.value.filter(column => !isTrashed(column)))
 
+// The phone shows one column at a time (redesign 9/9). The picker sets `phoneColumnId`; until it is set, the first
+// live column shows. Below lg only: on desktop every column stays visible, as it always was.
+const phoneColumnId = ref<string | null>(null)
+const phoneActiveId = computed(() => phoneColumnId.value ?? liveColumns.value[0]?.id ?? '')
+const phoneColumns = computed(() => liveColumns.value.map(column => ({
+  id: column.id,
+  name: column.name,
+  count: visibleColumnTasks(column.id).length
+})))
+function phoneHidden(columnId: string) {
+  return columnId !== phoneActiveId.value
+}
+
 // A live column counts the cards on it, as it always has; the trashed cards
 // sitting in it are not part of the board. A trashed column counts what
 // restoring it would bring back, which is everything still inside it.
@@ -662,6 +675,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onBoardKeydown))
 </script>
 
 <template>
+  <PhoneColumnPicker
+    v-if="board"
+    :columns="phoneColumns"
+    :active-id="phoneActiveId"
+    @select="phoneColumnId = $event"
+  />
   <div
     v-if="board"
     ref="boardEl"
@@ -672,9 +691,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onBoardKeydown))
       :key="column.id"
       :data-column-id="column.id"
       class="kanban-column flex h-full w-[19rem] shrink-0 flex-col rounded-xl"
-      :class="isTrashed(column)
-        ? 'kanban-column-trashed border border-dashed border-default bg-elevated/20 opacity-60 transition-opacity hover:opacity-100'
-        : 'bg-elevated/50'"
+      :class="[
+        phoneHidden(column.id) ? 'max-lg:hidden' : '',
+        isTrashed(column)
+          ? 'kanban-column-trashed border border-dashed border-default bg-elevated/20 opacity-60 transition-opacity hover:opacity-100'
+          : 'bg-elevated/50'
+      ]"
     >
       <!-- A trashed column is a header and its cards, and nothing that edits
            them: the two ways out are restoring it or removing it for good. -->
