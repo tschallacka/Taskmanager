@@ -2,7 +2,7 @@
 import type { ProjectTask } from '~/composables/useProjects'
 import { taskCountLabel, terminalColumnIds } from '#shared/utils/board'
 import { queryForView } from '~/utils/projectViewQuery'
-import { queryWithoutTask, taskPanelPath } from '~/utils/taskPanelUrl'
+import { queryWithoutTask, taskPanelPath, taskQueryAsPanelAddress } from '~/utils/taskPanelUrl'
 
 // One page for the board and for its task panel addresses: the same key keeps the board mounted while the panel opens.
 definePageMeta({ layout: 'app', key: route => `projects/${route.params.id}` })
@@ -149,12 +149,11 @@ function closeDrawer() {
   navigateTo({ path: taskPanelPath(String(route.params.id)), query: queryWithoutTask(route.query) }, { replace: true })
 }
 
-// The old deep link ?task=<id>[&comment=<id>] (outside links, saved bookmarks) is rewritten to the path form, once.
-watch(() => route.query.task, (taskId) => {
-  if (typeof taskId !== 'string' || !taskId) return
-  const comment = typeof route.query.comment === 'string' && route.query.comment ? route.query.comment : null
-  const { comment: _dropped, ...rest } = route.query
-  navigateTo({ path: taskPanelPath(String(route.params.id), taskId, comment), query: queryWithoutTask(rest) }, { replace: true })
+// The old deep link ?task=<id>[&comment=<id>] (outside links, saved bookmarks) is rewritten to the path form, once. The
+// comment stays in the query, so the panel can jump to it; the panel removes it after the jump.
+watch(() => route.query.task, () => {
+  const address = taskQueryAsPanelAddress(String(route.params.id), route.query)
+  if (address) navigateTo({ path: address.path, query: address.query }, { replace: true })
 }, { immediate: true })
 
 const drawerTask = computed<ProjectTask | null>(() =>

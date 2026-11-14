@@ -16,6 +16,7 @@ const props = defineProps<{
 }>()
 
 const route = useRoute()
+const router = useRouter()
 const toast = useToast()
 const { session } = useAuth()
 const {
@@ -283,6 +284,12 @@ watch(
     if (!ownComments.value.some(c => c.id === commentId)) return
     handled = key
     focusComment(commentId)
+    // The comment in the query is used once: the panel takes it out of the address (replace, not push), so a reload
+    // does not jump again. The path form is left as it is.
+    if (typeof route.query.comment === 'string') {
+      const { comment: _used, ...rest } = route.query
+      router.replace({ query: rest })
+    }
   },
   { immediate: true }
 )

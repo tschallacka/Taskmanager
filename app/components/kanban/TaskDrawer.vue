@@ -93,6 +93,15 @@ const openOnBoardTo = computed(() => {
   const comment = typeof route.params.comment === 'string' ? route.params.comment : null
   return taskLink(task.projectId, task.id, comment)
 })
+// A link to a comment (the path form, or ?comment= from the Inbox) opens the activity. On a phone the thread sits
+// behind the Activity button, so without this the reply has no height and the jump lands on nothing.
+const linkedComment = computed(() => {
+  if (typeof route.params.comment === 'string') return route.params.comment
+  return typeof route.query.comment === 'string' ? route.query.comment : ''
+})
+watch(linkedComment, (comment) => {
+  if (comment) activityOpen.value = true
+}, { immediate: true })
 
 watch(() => props.task, (task) => {
   if (task) shownTask.value = task

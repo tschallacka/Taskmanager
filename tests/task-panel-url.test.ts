@@ -3,7 +3,7 @@
 //   node --import tsx --test tests/task-panel-url.test.ts
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { queryWithoutTask, taskPanelPath } from '../app/utils/taskPanelUrl'
+import { queryWithoutTask, taskPanelPath, taskQueryAsPanelAddress } from '../app/utils/taskPanelUrl'
 
 test('the board, the task and the comment are the three path forms', () => {
   assert.equal(taskPanelPath('p1'), '/projects/p1')
@@ -25,4 +25,23 @@ test('the query keeps its view and filters, and drops only the old task paramete
   assert.deepEqual(queryWithoutTask({ view: 'list', task: 't1', q: 'x' }), { view: 'list', q: 'x' })
   assert.deepEqual(queryWithoutTask({ view: 'list' }), { view: 'list' })
   assert.deepEqual(queryWithoutTask({}), {})
+})
+
+test('the old form ?task=&comment= becomes the path form, with the comment kept in the query', () => {
+  assert.deepEqual(taskQueryAsPanelAddress('p1', { task: 't1', comment: 'c9' }), {
+    path: '/projects/p1/t1',
+    query: { comment: 'c9' }
+  })
+})
+
+test('the rewrite keeps the other query parameters, and drops only the task', () => {
+  assert.deepEqual(taskQueryAsPanelAddress('p1', { view: 'list', task: 't1', q: 'x' }), {
+    path: '/projects/p1/t1',
+    query: { view: 'list', q: 'x' }
+  })
+})
+
+test('a query with no task is not rewritten, and a comment alone is not a panel address', () => {
+  assert.equal(taskQueryAsPanelAddress('p1', { comment: 'c9' }), null)
+  assert.equal(taskQueryAsPanelAddress('p1', {}), null)
 })
