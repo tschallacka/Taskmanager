@@ -50,6 +50,10 @@ home.mjs
 init.mjs
 janet.mjs
 keys.mjs
+lab-queue.mjs
+lab-run.sh
+lab-runner.mjs
+lab.mjs
 listen-state.mjs
 listen.mjs
 mail-client.mjs

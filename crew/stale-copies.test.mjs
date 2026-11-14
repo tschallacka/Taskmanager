@@ -2,7 +2,7 @@
 // fake ports and a fake clock. No process is started and no port is opened.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { doneCards, MAX_AGE_MS, staleCopies, staleLines } from './stale-copies.mjs'
+import { copyTasks, doneIdsOf, MAX_AGE_MS, staleCopies, staleLines } from './stale-copies.mjs'
 import { planRelease, planReserve, pruned, readOnlyEntries, readOnlyLines, readRegistry } from './port-registry.mjs'
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -57,12 +57,29 @@ test('the lines name the port, the person, the worktree, the card and the reason
   assert.deepEqual(staleLines([]), ['stale dev copies: none'])
 })
 
-test('the Done column is read from one board answer; a cut column is reported as cut', () => {
-  const board = { id: 'b', name: 'Crew', columns: [{ name: 'Verify UX', tasks: [{ id: 'x' }] }, { name: 'Done', taskCount: 3, tasks: [{ id: 'a' }, { id: 'b' }] }] }
-  const done = doneCards(board)
-  assert.deepEqual([...done.ids], ['a', 'b'])
-  assert.deepEqual(done.cut, { shown: 2, total: 3 })
-  assert.throws(() => doneCards({ name: 'x', columns: [{ name: 'To do', tasks: [] }] }), /no Done column/)
+test('the cards checked are the live copies cards: a reservation, a read-only entry and a dead copy add none', () => {
+  const reg = {
+    ports: {
+      3101: copy({ task: 'mwa' }),
+      3102: copy({ task: 'mwb', pid: 999 }),
+      3103: copy({ task: 'mwc', pid: null }),
+      3000: { ...copy({ task: 'mwd' }), readonly: true, label: 'Boss\'s dev copy' },
+      3104: copy({ task: 'mwa', pid: 4300 })
+    }
+  }
+  assert.deepEqual(copyTasks(reg, alive).sort(), ['mwa'], 'one card for both live copies of mwa, none for the others')
+})
+
+test('a card is Done when its own answer says so, however many cards the Done column holds', () => {
+  const answers = [{ id: 'mwa', column: 'Done' }, { id: 'mwb', column: 'Verify UX' }, { id: 'mwc', column: 'done' }]
+  assert.deepEqual([...doneIdsOf(answers)].sort(), ['mwa', 'mwc'])
+  assert.equal(doneIdsOf([{ id: 'mwx', column: 'Done (cut)' }]).has('mwx'), false, 'only the Done column counts')
+})
+
+test('a copy whose card is Done is reported when the card answer says Done; the Done list is not read at all', () => {
+  const reg = { ports: { 3101: copy({ task: 'mwdone', started: new Date(NOW - 10 * 60 * 1000).toISOString() }) } }
+  assert.equal(staleCopies(reg, { now: NOW, alive, doneIds: doneIdsOf([{ id: 'mwdone', column: 'Done' }]) })[0].reason, 'its card is Done')
+  assert.equal(staleCopies(reg, { now: NOW, alive, doneIds: doneIdsOf([{ id: 'mwdone', column: 'Verify QA' }]) }).length, 0)
 })
 
 test('read-only entries are always in the registry, and no planning step can take, stop or free them', () => {
