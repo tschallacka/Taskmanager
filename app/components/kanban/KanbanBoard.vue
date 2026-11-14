@@ -497,7 +497,6 @@ async function submitColumn() {
 const isFiltering = computed(() => activeTags.value.length > 0 || searchText.value.trim() !== '')
 
 // The Done column gets the dashed drop slot when it is empty: finished work lands here.
-const isDoneColumn = (column: { name: string }) => isDoneColumnName(column.name)
 
 // Filtered once per render instead of three times per column (header count,
 // list and empty state each asked for the same list).
@@ -843,7 +842,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onBoardKeydown))
         </p>
 
         <p
-          v-else-if="!isFiltering && isDoneColumn(column) && tasksOf(column.id).length === 0"
+          v-else-if="!isFiltering && isDoneColumnName(column.name) && tasksOf(column.id).length === 0"
           class="rounded-lg border border-dashed border-default px-3 py-4 text-center text-sm leading-5 text-muted"
           data-done-drop-slot
         >

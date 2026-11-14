@@ -56,8 +56,8 @@ test('row 2 has New task at its right end, on the board view, opening the first 
   assert.match(page, /data-new-task/)
   assert.match(page, /label="New task"/)
   // The row is drawn on the board view only (its wrapper), so New task needs only the read-only and customer checks here.
-  assert.match(page, /<div\n      v-if="view === 'board'"/)
-  assert.match(page, /v-if="!isReadOnlyBoard && !isCustomerView"\n        label="New task"/)
+  assert.match(page, /<div\n\s+v-if="view === 'board'"/)
+  assert.match(page, /v-if="!isReadOnlyBoard && !isCustomerView"\n\s+label="New task"/)
   assert.match(page, /@click="boardRef\?\.newTask\(\)"/)
   const board = readFileSync(join(process.cwd(), 'app', 'components', 'kanban', 'KanbanBoard.vue'), 'utf8')
   assert.match(board, /function newTask\(\) \{\s*const first = liveColumns\.value\[0\]\s*if \(first\) startCompose\(first\.id\)/)

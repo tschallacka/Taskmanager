@@ -25,11 +25,12 @@ test('the Done name rule is written once, in tagColors.ts', () => {
 
 test('KanbanBoard uses the shared Done rule for the drop slot', () => {
   assert.match(board, /import \{[^}]*isDoneColumnName[^}]*\} from '~\/utils\/tagColors'/)
-  assert.match(board, /const isDoneColumn = \(column: \{ name: string \}\) => isDoneColumnName\(column\.name\)/)
+  // The rule is called where it is used: no one-line wrapper that adds nothing (Nina's CQ nit).
+  assert.doesNotMatch(board, /const isDoneColumn = /)
 })
 
 test('the drop slot shows only in an empty Done column with no filter on, and says what to do', () => {
-  assert.match(board, /v-else-if="!isFiltering && isDoneColumn\(column\) && tasksOf\(column\.id\)\.length === 0"/)
+  assert.match(board, /v-else-if="!isFiltering && isDoneColumnName\(column\.name\) && tasksOf\(column\.id\)\.length === 0"/)
   assert.match(board, /data-done-drop-slot/)
   assert.match(board, /Drag a finished task here, or tick its circle\./)
 })

@@ -654,13 +654,13 @@ useSeoMeta({
     <!-- Archived: out of the lists and its rules are paused; the board itself stays usable -->
     <div
       v-if="activeProject?.archivedAt"
-      class="flex flex-wrap items-center gap-3 border-b border-primary/40 bg-primary/10 px-4 py-2 text-sm text-default lg:px-6"
+      class="flex flex-wrap items-center gap-3 border-b border-warning/40 bg-warning/10 px-4 py-2 text-sm text-default lg:px-6"
       data-archived-banner
     >
       <span class="inline-flex items-center gap-1.5 font-medium">
         <UIcon
           name="i-lucide-archive"
-          class="size-4 text-primary"
+          class="size-4 text-warning"
         />
         Archived
       </span>
@@ -681,187 +681,187 @@ useSeoMeta({
 
     <!-- The view row: the tabs scroll on a phone; Filter, search in this board and New task stay in view at the right. -->
     <div class="flex shrink-0 items-center gap-2 border-b border-default px-4 lg:px-6">
-    <nav
-      ref="tabsEl"
-      class="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto py-1"
-      aria-label="Project views"
-      :style="tabsMaskStyle"
-      @scroll="updateTabCues"
-    >
-      <template
-        v-for="v in primaryViews"
-        :key="v.key"
+      <nav
+        ref="tabsEl"
+        class="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto py-1"
+        aria-label="Project views"
+        :style="tabsMaskStyle"
+        @scroll="updateTabCues"
       >
-        <UDropdownMenu
-          v-if="v.key === 'office' && linkedCrews.length > 1"
-          :items="officeCrewItems"
+        <template
+          v-for="v in primaryViews"
+          :key="v.key"
         >
+          <UDropdownMenu
+            v-if="v.key === 'office' && linkedCrews.length > 1"
+            :items="officeCrewItems"
+          >
+            <button
+              class="relative flex shrink-0 items-center gap-1.5 px-2.5 py-2 text-sm text-muted transition-colors hover:text-default"
+            >
+              <UIcon
+                :name="v.icon"
+                class="size-4"
+              />
+              {{ v.label }}
+              <span class="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-primary opacity-0" />
+            </button>
+          </UDropdownMenu>
           <button
-            class="relative flex shrink-0 items-center gap-1.5 px-2.5 py-2 text-sm text-muted transition-colors hover:text-default"
+            v-else
+            class="relative flex shrink-0 items-center gap-1.5 px-2.5 py-2 text-sm transition-colors"
+            :class="view === v.key ? 'font-medium text-default' : 'text-muted hover:text-default'"
+            :aria-current="view === v.key ? 'page' : undefined"
+            @click="v.key === 'office' ? openOffice() : setView(v.key)"
           >
             <UIcon
               :name="v.icon"
               class="size-4"
             />
             {{ v.label }}
-            <span class="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-primary opacity-0" />
+            <span
+              class="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-primary transition-opacity duration-200"
+              :class="view === v.key ? 'opacity-100' : 'opacity-0'"
+            />
+          </button>
+        </template>
+        <!-- The other views: Overview, Messages, Time, Files and Office sit under More, so the row stays one line. -->
+        <UDropdownMenu
+          v-if="moreItems.length"
+          :items="moreItems"
+        >
+          <button
+            class="relative flex shrink-0 items-center gap-1.5 px-2.5 py-2 text-sm transition-colors"
+            :class="moreViews.some(v => v.key === view) ? 'font-medium text-default' : 'text-muted hover:text-default'"
+            data-view-more
+          >
+            More
+            <UIcon
+              name="i-lucide-chevron-down"
+              class="size-4"
+            />
+            <span
+              class="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-primary transition-opacity duration-200"
+              :class="moreViews.some(v => v.key === view) ? 'opacity-100' : 'opacity-0'"
+            />
           </button>
         </UDropdownMenu>
-        <button
-          v-else
-          class="relative flex shrink-0 items-center gap-1.5 px-2.5 py-2 text-sm transition-colors"
-          :class="view === v.key ? 'font-medium text-default' : 'text-muted hover:text-default'"
-          :aria-current="view === v.key ? 'page' : undefined"
-          @click="v.key === 'office' ? openOffice() : setView(v.key)"
+        <HelpHint
+          v-if="moreViews.some(v => v.key === 'office')"
+          page="agents/office-view"
+          label="About the Office view"
         >
-          <UIcon
-            :name="v.icon"
-            class="size-4"
-          />
-          {{ v.label }}
-          <span
-            class="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-primary transition-opacity duration-200"
-            :class="view === v.key ? 'opacity-100' : 'opacity-0'"
-          />
-        </button>
-      </template>
-      <!-- The other views: Overview, Messages, Time, Files and Office sit under More, so the row stays one line. -->
-      <UDropdownMenu
-        v-if="moreItems.length"
-        :items="moreItems"
+          The office shows the crew of this board at work: every task is a folder that moves between the desks as the board changes. On a board with more than one crew, the menu picks which crew to watch.
+        </HelpHint>
+      </nav>
+      <div
+        v-if="view === 'board'"
+        class="flex shrink-0 items-center gap-2 py-1.5"
       >
-        <button
-          class="relative flex shrink-0 items-center gap-1.5 px-2.5 py-2 text-sm transition-colors"
-          :class="moreViews.some(v => v.key === view) ? 'font-medium text-default' : 'text-muted hover:text-default'"
-          data-view-more
-        >
-          More
-          <UIcon
-            name="i-lucide-chevron-down"
-            class="size-4"
-          />
-          <span
-            class="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-primary transition-opacity duration-200"
-            :class="moreViews.some(v => v.key === view) ? 'opacity-100' : 'opacity-0'"
-          />
-        </button>
-      </UDropdownMenu>
-      <HelpHint
-        v-if="moreViews.some(v => v.key === 'office')"
-        page="agents/office-view"
-        label="About the Office view"
-      >
-        The office shows the crew of this board at work: every task is a folder that moves between the desks as the board changes. On a board with more than one crew, the menu picks which crew to watch.
-      </HelpHint>
-    </nav>
-    <div
-      v-if="view === 'board'"
-      class="flex shrink-0 items-center gap-2 py-1.5"
-    >
-      <!-- Filter: labels, and Show deleted (the trash, which the design puts here too). On the board view on every board, so a fresh one has it. -->
-      <UPopover :content="{ align: 'end', sideOffset: 6 }">
-        <UButton
-          icon="i-lucide-filter"
-          size="xs"
-          :color="activeTags.length ? 'primary' : 'neutral'"
-          :variant="activeTags.length ? 'soft' : 'ghost'"
-          data-filter-button
-        >
-          <span class="hidden sm:inline">Filter</span>
-          <!-- Active filters show as chips inside the button: the first two by name, then a count. -->
-          <!-- The chip takes the label's own colour, as LabelChip draws it everywhere else. -->
-          <span
-            v-for="tag in activeTags.slice(0, 2)"
-            :key="tag"
-            class="max-w-28 truncate rounded-full px-2 py-0.5 text-[length:var(--tm-font-size-label)] font-medium ring-1 ring-inset"
-            :class="tagChipAttrs(tag, boardLabelColor(tag)).class"
-            :style="tagChipAttrs(tag, boardLabelColor(tag)).style"
-            data-filter-chip
-          >{{ tag }}</span>
-          <span
-            v-if="activeTags.length > 2"
-            class="tm-chip"
-            data-filter-more
-          >+{{ activeTags.length - 2 }}</span>
-        </UButton>
-
-        <template #content>
-          <div class="w-56 p-1.5">
-            <div class="flex items-center justify-between px-1.5 pb-1.5">
-              <span class="text-xs font-semibold text-muted">Filter by label</span>
-              <button
-                v-if="activeTags.length"
-                class="text-xs text-primary hover:underline"
-                @click="clearTagFilter"
-              >
-                Clear
-              </button>
-            </div>
-            <p
-              v-if="!boardTagCounts.length"
-              class="px-1.5 py-1.5 text-xs text-muted"
-            >
-              No labels on this board yet.
-            </p>
-            <button
-              v-for="[tag, count] in boardTagCounts"
+        <!-- Filter: labels, and Show deleted (the trash, which the design puts here too). On the board view on every board, so a fresh one has it. -->
+        <UPopover :content="{ align: 'end', sideOffset: 6 }">
+          <UButton
+            icon="i-lucide-filter"
+            size="xs"
+            :color="activeTags.length ? 'primary' : 'neutral'"
+            :variant="activeTags.length ? 'soft' : 'ghost'"
+            data-filter-button
+          >
+            <span class="hidden sm:inline">Filter</span>
+            <!-- Active filters show as chips inside the button: the first two by name, then a count. -->
+            <!-- The chip takes the label's own colour, as LabelChip draws it everywhere else. -->
+            <span
+              v-for="tag in activeTags.slice(0, 2)"
               :key="tag"
-              class="flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-elevated"
-              @click="toggleTagFilter(tag)"
-            >
-              <UIcon
-                :name="activeTags.includes(tag) ? 'i-lucide-square-check' : 'i-lucide-square'"
-                class="size-3.5 shrink-0"
-                :class="activeTags.includes(tag) ? 'text-primary' : 'text-dimmed'"
-              />
-              <KanbanLabelChip
-                :tag="tag"
-                :editable="!isCustomerView"
-                chip-class="min-w-0 flex-1 text-xs"
-              />
-              <span class="shrink-0 text-xs tabular-nums text-dimmed">{{ count }}</span>
-            </button>
-            <div
-              class="mt-1 border-t border-default pt-1.5"
-            >
+              class="max-w-28 truncate rounded-full px-2 py-0.5 text-[length:var(--tm-font-size-label)] font-medium ring-1 ring-inset"
+              :class="tagChipAttrs(tag, boardLabelColor(tag)).class"
+              :style="tagChipAttrs(tag, boardLabelColor(tag)).style"
+              data-filter-chip
+            >{{ tag }}</span>
+            <span
+              v-if="activeTags.length > 2"
+              class="tm-chip"
+              data-filter-more
+            >+{{ activeTags.length - 2 }}</span>
+          </UButton>
+
+          <template #content>
+            <div class="w-56 p-1.5">
+              <div class="flex items-center justify-between px-1.5 pb-1.5">
+                <span class="text-xs font-semibold text-muted">Filter by label</span>
+                <button
+                  v-if="activeTags.length"
+                  class="text-xs text-primary hover:underline"
+                  @click="clearTagFilter"
+                >
+                  Clear
+                </button>
+              </div>
+              <p
+                v-if="!boardTagCounts.length"
+                class="px-1.5 py-1.5 text-xs text-muted"
+              >
+                No labels on this board yet.
+              </p>
               <button
-                class="flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left text-xs transition-colors hover:bg-elevated"
-                data-show-deleted
-                @click="toggleShowTrashed"
+                v-for="[tag, count] in boardTagCounts"
+                :key="tag"
+                class="flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-elevated"
+                @click="toggleTagFilter(tag)"
               >
                 <UIcon
-                  :name="showTrashed ? 'i-lucide-square-check' : 'i-lucide-square'"
+                  :name="activeTags.includes(tag) ? 'i-lucide-square-check' : 'i-lucide-square'"
                   class="size-3.5 shrink-0"
-                  :class="showTrashed ? 'text-primary' : 'text-dimmed'"
+                  :class="activeTags.includes(tag) ? 'text-primary' : 'text-dimmed'"
                 />
-                <span>Show deleted</span>
-                <span class="ml-auto shrink-0 tabular-nums text-dimmed">{{ trashedCount }}</span>
+                <KanbanLabelChip
+                  :tag="tag"
+                  :editable="!isCustomerView"
+                  chip-class="min-w-0 flex-1 text-xs"
+                />
+                <span class="shrink-0 text-xs tabular-nums text-dimmed">{{ count }}</span>
               </button>
+              <div
+                class="mt-1 border-t border-default pt-1.5"
+              >
+                <button
+                  class="flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left text-xs transition-colors hover:bg-elevated"
+                  data-show-deleted
+                  @click="toggleShowTrashed"
+                >
+                  <UIcon
+                    :name="showTrashed ? 'i-lucide-square-check' : 'i-lucide-square'"
+                    class="size-3.5 shrink-0"
+                    :class="showTrashed ? 'text-primary' : 'text-dimmed'"
+                  />
+                  <span>Show deleted</span>
+                  <span class="ml-auto shrink-0 tabular-nums text-dimmed">{{ trashedCount }}</span>
+                </button>
+              </div>
             </div>
-          </div>
-        </template>
-      </UPopover>
-      <!-- Search in this board: the cards whose title matches, on the board view. -->
-      <input
-        :value="searchText"
-        type="search"
-        placeholder="Search this board"
-        aria-label="Search this board"
-        class="w-32 min-w-0 shrink rounded-md border border-default bg-default px-2 py-1 text-xs text-default outline-none placeholder:text-dimmed focus:border-primary sm:w-40"
-        data-board-search
-        @input="setSearchText(($event.target as HTMLInputElement).value)"
-      >
-      <!-- New task, at the right end of the view row, on the board view. It opens the composer in the first column. -->
-      <UButton
-        v-if="!isReadOnlyBoard && !isCustomerView"
-        label="New task"
-        icon="i-lucide-plus"
-        size="xs"
-        class="shrink-0"
-        data-new-task
-        @click="boardRef?.newTask()"
-      />
-    </div>
+          </template>
+        </UPopover>
+        <!-- Search in this board: the cards whose title matches, on the board view. -->
+        <input
+          :value="searchText"
+          type="search"
+          placeholder="Search this board"
+          aria-label="Search this board"
+          class="w-32 min-w-0 shrink rounded-md border border-default bg-default px-2 py-1 text-xs text-default outline-none placeholder:text-dimmed focus:border-primary sm:w-40"
+          data-board-search
+          @input="setSearchText(($event.target as HTMLInputElement).value)"
+        >
+        <!-- New task, at the right end of the view row, on the board view. It opens the composer in the first column. -->
+        <UButton
+          v-if="!isReadOnlyBoard && !isCustomerView"
+          label="New task"
+          icon="i-lucide-plus"
+          size="xs"
+          class="shrink-0"
+          data-new-task
+          @click="boardRef?.newTask()"
+        />
+      </div>
     </div>
 
     <!-- Trash summary. The board itself draws the deleted columns and cards in
