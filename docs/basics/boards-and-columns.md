@@ -42,7 +42,7 @@ tabs, in this order: **Board**, **List**, **Calendar**, **Timeline** and **Dashb
 | **Files** (under More) | Every image pasted into a task description on the board. |
 | **Office** (under More, on a crew's board) | The crew of this board at work. With more than one crew, More lists each one. |
 
-At the right end of the row, on the Board view, **New task** opens the composer in the first column.
+At the right end of the row, on the Board view, there are three things. **Filter** narrows the cards by label; its list shows each label on the board with a count, and **Show deleted** puts the trash on the board. **Search this board** narrows the cards by title, and an empty result says so. **New task** opens the composer in the first column. On a phone the tabs scroll sideways; Filter, search and New task stay in view.
 
 The top bar shows the board's team and name (**Team › Project**; click the project name to rename it), the board's
 health (**On track**, **At risk** or **Off track**, when it has one, set on **Overview**), and the people on the board

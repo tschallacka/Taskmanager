@@ -597,88 +597,6 @@ useSeoMeta({
       to="#app-topbar-actions"
     >
       <div class="flex shrink-0 items-center gap-1">
-        <!-- Filter: labels, and Show deleted (the trash, which the design puts here too). -->
-        <!-- Label filter -->
-        <UPopover
-          v-if="boardTagCounts.length || trashedCount > 0 || showTrashed"
-          :content="{ align: 'end', sideOffset: 6 }"
-        >
-          <UButton
-            icon="i-lucide-filter"
-            size="xs"
-            :color="activeTags.length ? 'primary' : 'neutral'"
-            :variant="activeTags.length ? 'soft' : 'ghost'"
-          >
-            <span class="hidden sm:inline">Filter</span>
-            <!-- Active filters show as chips inside the button: the first two by name, then a count. -->
-            <!-- The chip takes the label's own colour, as LabelChip draws it everywhere else. -->
-            <span
-              v-for="tag in activeTags.slice(0, 2)"
-              :key="tag"
-              class="max-w-28 truncate rounded-full px-2 py-0.5 text-[length:var(--tm-font-size-label)] font-medium ring-1 ring-inset"
-              :class="tagChipAttrs(tag, boardLabelColor(tag)).class"
-              :style="tagChipAttrs(tag, boardLabelColor(tag)).style"
-              data-filter-chip
-            >{{ tag }}</span>
-            <span
-              v-if="activeTags.length > 2"
-              class="tm-chip"
-              data-filter-more
-            >+{{ activeTags.length - 2 }}</span>
-          </UButton>
-
-          <template #content>
-            <div class="w-56 p-1.5">
-              <div class="flex items-center justify-between px-1.5 pb-1.5">
-                <span class="text-xs font-semibold text-muted">Filter by label</span>
-                <button
-                  v-if="activeTags.length"
-                  class="text-xs text-primary hover:underline"
-                  @click="clearTagFilter"
-                >
-                  Clear
-                </button>
-              </div>
-              <button
-                v-for="[tag, count] in boardTagCounts"
-                :key="tag"
-                class="flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-elevated"
-                @click="toggleTagFilter(tag)"
-              >
-                <UIcon
-                  :name="activeTags.includes(tag) ? 'i-lucide-square-check' : 'i-lucide-square'"
-                  class="size-3.5 shrink-0"
-                  :class="activeTags.includes(tag) ? 'text-primary' : 'text-dimmed'"
-                />
-                <KanbanLabelChip
-                  :tag="tag"
-                  :editable="!isCustomerView"
-                  chip-class="min-w-0 flex-1 text-xs"
-                />
-                <span class="shrink-0 text-xs tabular-nums text-dimmed">{{ count }}</span>
-              </button>
-              <div
-                v-if="trashedCount > 0 || showTrashed"
-                class="mt-1 border-t border-default pt-1.5"
-              >
-                <button
-                  class="flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left text-xs transition-colors hover:bg-elevated"
-                  data-show-deleted
-                  @click="toggleShowTrashed"
-                >
-                  <UIcon
-                    :name="showTrashed ? 'i-lucide-square-check' : 'i-lucide-square'"
-                    class="size-3.5 shrink-0"
-                    :class="showTrashed ? 'text-primary' : 'text-dimmed'"
-                  />
-                  <span>Show deleted</span>
-                  <span class="ml-auto shrink-0 tabular-nums text-dimmed">{{ trashedCount }}</span>
-                </button>
-              </div>
-            </div>
-          </template>
-        </UPopover>
-
         <!-- Settings lives here, not in the tab row: at 1280 px the last tab was cut off -->
         <UButton
           v-if="activeProject && !isCustomerView"
@@ -760,10 +678,11 @@ useSeoMeta({
       />
     </div>
 
-    <!-- View tabs -->
+    <!-- The view row: the tabs scroll on a phone; Filter, search in this board and New task stay in view at the right. -->
+    <div class="flex shrink-0 items-center gap-2 border-b border-default px-4 lg:px-6">
     <nav
       ref="tabsEl"
-      class="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-default px-4 lg:px-6"
+      class="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto py-1"
       aria-label="Project views"
       :style="tabsMaskStyle"
       @scroll="updateTabCues"
@@ -833,20 +752,107 @@ useSeoMeta({
       >
         The office shows the crew of this board at work: every task is a folder that moves between the desks as the board changes. On a board with more than one crew, the menu picks which crew to watch.
       </HelpHint>
+    </nav>
+    <div
+      v-if="view === 'board'"
+      class="flex shrink-0 items-center gap-2 py-1.5"
+    >
+      <!-- Filter: labels, and Show deleted (the trash, which the design puts here too). On the board view on every board, so a fresh one has it. -->
+      <UPopover :content="{ align: 'end', sideOffset: 6 }">
+        <UButton
+          icon="i-lucide-filter"
+          size="xs"
+          :color="activeTags.length ? 'primary' : 'neutral'"
+          :variant="activeTags.length ? 'soft' : 'ghost'"
+          data-filter-button
+        >
+          <span class="hidden sm:inline">Filter</span>
+          <!-- Active filters show as chips inside the button: the first two by name, then a count. -->
+          <!-- The chip takes the label's own colour, as LabelChip draws it everywhere else. -->
+          <span
+            v-for="tag in activeTags.slice(0, 2)"
+            :key="tag"
+            class="max-w-28 truncate rounded-full px-2 py-0.5 text-[length:var(--tm-font-size-label)] font-medium ring-1 ring-inset"
+            :class="tagChipAttrs(tag, boardLabelColor(tag)).class"
+            :style="tagChipAttrs(tag, boardLabelColor(tag)).style"
+            data-filter-chip
+          >{{ tag }}</span>
+          <span
+            v-if="activeTags.length > 2"
+            class="tm-chip"
+            data-filter-more
+          >+{{ activeTags.length - 2 }}</span>
+        </UButton>
+
+        <template #content>
+          <div class="w-56 p-1.5">
+            <div class="flex items-center justify-between px-1.5 pb-1.5">
+              <span class="text-xs font-semibold text-muted">Filter by label</span>
+              <button
+                v-if="activeTags.length"
+                class="text-xs text-primary hover:underline"
+                @click="clearTagFilter"
+              >
+                Clear
+              </button>
+            </div>
+            <p
+              v-if="!boardTagCounts.length"
+              class="px-1.5 py-1.5 text-xs text-muted"
+            >
+              No labels on this board yet.
+            </p>
+            <button
+              v-for="[tag, count] in boardTagCounts"
+              :key="tag"
+              class="flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-elevated"
+              @click="toggleTagFilter(tag)"
+            >
+              <UIcon
+                :name="activeTags.includes(tag) ? 'i-lucide-square-check' : 'i-lucide-square'"
+                class="size-3.5 shrink-0"
+                :class="activeTags.includes(tag) ? 'text-primary' : 'text-dimmed'"
+              />
+              <KanbanLabelChip
+                :tag="tag"
+                :editable="!isCustomerView"
+                chip-class="min-w-0 flex-1 text-xs"
+              />
+              <span class="shrink-0 text-xs tabular-nums text-dimmed">{{ count }}</span>
+            </button>
+            <div
+              class="mt-1 border-t border-default pt-1.5"
+            >
+              <button
+                class="flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left text-xs transition-colors hover:bg-elevated"
+                data-show-deleted
+                @click="toggleShowTrashed"
+              >
+                <UIcon
+                  :name="showTrashed ? 'i-lucide-square-check' : 'i-lucide-square'"
+                  class="size-3.5 shrink-0"
+                  :class="showTrashed ? 'text-primary' : 'text-dimmed'"
+                />
+                <span>Show deleted</span>
+                <span class="ml-auto shrink-0 tabular-nums text-dimmed">{{ trashedCount }}</span>
+              </button>
+            </div>
+          </div>
+        </template>
+      </UPopover>
       <!-- Search in this board: the cards whose title matches, on the board view. -->
       <input
-        v-if="view === 'board'"
         :value="searchText"
         type="search"
         placeholder="Search this board"
         aria-label="Search this board"
-        class="ml-auto w-40 min-w-0 shrink rounded-md border border-default bg-default px-2 py-1 text-xs text-default outline-none placeholder:text-dimmed focus:border-primary"
+        class="w-32 min-w-0 shrink rounded-md border border-default bg-default px-2 py-1 text-xs text-default outline-none placeholder:text-dimmed focus:border-primary sm:w-40"
         data-board-search
         @input="setSearchText(($event.target as HTMLInputElement).value)"
       >
       <!-- New task, at the right end of the view row, on the board view. It opens the composer in the first column. -->
       <UButton
-        v-if="view === 'board' && !isReadOnlyBoard && !isCustomerView"
+        v-if="!isReadOnlyBoard && !isCustomerView"
         label="New task"
         icon="i-lucide-plus"
         size="xs"
@@ -854,7 +860,8 @@ useSeoMeta({
         data-new-task
         @click="boardRef?.newTask()"
       />
-    </nav>
+    </div>
+    </div>
 
     <!-- Trash summary. The board itself draws the deleted columns and cards in
          place; this says what is being looked at and how long it has left. -->

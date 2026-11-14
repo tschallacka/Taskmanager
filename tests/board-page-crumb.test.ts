@@ -55,7 +55,9 @@ test('row 2 has New task at its right end, on the board view, opening the first 
   assert.match(page, /ref="boardRef"/)
   assert.match(page, /data-new-task/)
   assert.match(page, /label="New task"/)
-  assert.match(page, /view === 'board' && !isReadOnlyBoard && !isCustomerView/)
+  // The row is drawn on the board view only (its wrapper), so New task needs only the read-only and customer checks here.
+  assert.match(page, /<div\n      v-if="view === 'board'"/)
+  assert.match(page, /v-if="!isReadOnlyBoard && !isCustomerView"\n        label="New task"/)
   assert.match(page, /@click="boardRef\?\.newTask\(\)"/)
   const board = readFileSync(join(process.cwd(), 'app', 'components', 'kanban', 'KanbanBoard.vue'), 'utf8')
   assert.match(board, /function newTask\(\) \{\s*const first = liveColumns\.value\[0\]\s*if \(first\) startCompose\(first\.id\)/)
@@ -74,7 +76,9 @@ test('search in this board: a box in row 2 narrows the cards by title, and count
 
 test('the Filter button holds the labels and Show deleted, and opens with the trash or a label present', () => {
   assert.match(page, /<span class="hidden sm:inline">Filter<\/span>/)
-  assert.match(page, /v-if="boardTagCounts\.length \|\| trashedCount > 0 \|\| showTrashed"/)
+  // The Filter button is on every board (a fresh one included), so its popover has no v-if; the list says when no label is set.
+  assert.match(page, /<UPopover :content="\{ align: 'end', sideOffset: 6 \}">/)
+  assert.match(page, /No labels on this board yet\./)
   assert.match(page, /data-show-deleted/)
   assert.match(page, /@click="toggleShowTrashed"/)
   assert.match(page, /<span>Show deleted<\/span>/)
