@@ -53,6 +53,7 @@ listen-state.mjs
 listen.mjs
 mail-client.mjs
 mentions.mjs
+modal-detect.mjs
 package.json
 people.mjs
 pia-listener-hook.sh

@@ -13,7 +13,8 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 
 // A fake interactive-shell MCP for session-wake.sh: every tool call answers with a result, except the tools named in
 // `failOn`, which answer with an error. Calls are appended to a log so a test can see the order.
-function fakeMcp(failOn = []) {
+// `screen`, when given, is the text the `view` tool shows: the wake reads it before it types.
+function fakeMcp(failOn = [], screen = null) {
   const dir = mkdtempSync(join(tmpdir(), 'wake-mcp-'))
   const log = join(dir, 'calls.log')
   const bin = join(dir, 'mcp')
@@ -24,7 +25,10 @@ const last = JSON.parse(lines[lines.length - 1])
 const name = last.params && last.params.name
 fs.appendFileSync(${JSON.stringify(log)}, (name || 'init') + '\\n')
 const fail = ${JSON.stringify(failOn)}.includes(name)
-process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: 2, result: fail ? { isError: true, content: [{ type: 'text', text: 'refused' }] } : { content: [{ type: 'text', text: 'ok' }] } }) + '\\n')
+const screen = ${JSON.stringify(screen)}
+let text = 'ok'
+if (name === 'view' && screen !== null) text = JSON.stringify({ responses: [{ text: screen }] })
+process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: 2, result: fail ? { isError: true, content: [{ type: 'text', text: 'refused' }] } : { content: [{ type: 'text', text }] } }) + '\\n')
 `)
   chmodSync(bin, 0o755)
   return { bin, log }
@@ -202,6 +206,15 @@ test('session-wake.sh exits 1 when the paste is refused, so the caller counts a 
   assert.equal(run.status, 1)
   assert.match(run.stderr, /paste into session 1f592988 failed/)
   assert.ok(!run.stdout.includes('typed into'), 'nothing reports a typed wake')
+})
+
+test('session-wake.sh types nothing while a dialog is on the screen: it prints the PERSON-DIALOG line and exits 3', () => {
+  const mcp = fakeMcp([], '? Teach auto mode about your environment?\n  ❯ Continue\n  Enter to continue · Esc to cancel')
+  const run = spawnSync('sh', [join(HERE, 'session-wake.sh'), '1f592988', 'hello'], { encoding: 'utf8', env: { ...process.env, SESSION_WAKE_MCP: mcp.bin }, timeout: 120000 })
+  assert.equal(run.status, 3, run.stderr)
+  assert.equal(run.stdout.trim(), 'PERSON-DIALOG 1f592988: ? Teach auto mode about your environment?')
+  const calls = readFileSync(mcp.log, 'utf8').trim().split('\n')
+  assert.ok(!calls.includes('paste') && !calls.includes('key'), 'no paste and no Enter went into the session')
 })
 
 test('session-wake.sh exits 0 only when every step answers without an error', () => {

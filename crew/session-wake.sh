@@ -33,6 +33,13 @@ leave() { tool shutdown "{\"session\":\"$S\"}" >/dev/null 2>&1 || true; }
 out=$(tool start "{\"session\":\"$S\",\"command\":[\"bash\",\"-c\",\"exec claude attach $ID\"]}")
 ok "$out" || { echo "could not start the attach for session $ID" >&2; leave; exit 1; }
 sleep 7
+# A dialog on the session's screen (crew/modal-detect.mjs) takes the key presses: type nothing, print the PERSON-DIALOG
+# line for the caller to mail Boss, and leave with exit 3. The screen is read by the same attach.
+screen=$(tool view "{\"session\":\"$S\",\"row_ranges\":[\"1-60\"]}" | node -e 'let t="";process.stdin.on("data",d=>t+=d).on("end",()=>{try{const r=JSON.parse(t);const inner=JSON.parse(r.result.content[0].text);for(const x of inner.responses) if(x.text) console.log(x.text)}catch{}})')
+dialog=$(printf '%s\n' "$screen" | node "$(dirname "$0")/modal-detect.mjs" "$ID" 2>/dev/null)
+case "$dialog" in
+  PERSON-DIALOG*) echo "$dialog"; leave; exit 3 ;;
+esac
 args=$(node -e 'console.log(JSON.stringify({session:process.argv[1],text:process.argv[2]}))' "$S" "$TEXT")
 out=$(tool paste "$args")
 ok "$out" || { echo "paste into session $ID failed" >&2; leave; exit 1; }
