@@ -3,6 +3,7 @@ import {
   addMonths, eachDayOfInterval, endOfMonth, endOfWeek, format, isSameMonth, isToday,
   startOfMonth, startOfWeek
 } from 'date-fns'
+import { calendarKeyDelta, movedDueOn } from '~/utils/calendarKeys'
 
 const emit = defineEmits<{ openTask: [taskId: string] }>()
 
@@ -38,6 +39,17 @@ async function dropOn(day: Date, event: DragEvent) {
 
 function dragStart(taskId: string, event: DragEvent) {
   event.dataTransfer?.setData('text/task-id', taskId)
+}
+
+// The keyboard path for a task on a day: the arrow keys move its due day, as a drag of the same days would. Left and right
+// a day, up and down a week (calendarKeys.ts). Any other key is left to the browser.
+async function moveWithKeys(task: { id: string, dueOn?: string | null }, event: KeyboardEvent) {
+  const delta = calendarKeyDelta(event.key)
+  if (delta === null) return
+  const next = movedDueOn(task.dueOn, delta)
+  if (!next) return
+  event.preventDefault()
+  await updateTask(task.id, { dueOn: next })
 }
 
 const undatedOpen = ref(false)
@@ -134,7 +146,9 @@ const undatedOpen = ref(false)
           draggable="true"
           class="truncate rounded-md bg-primary/10 px-1.5 py-1 text-left text-xs text-default transition-colors hover:bg-primary/20"
           :class="task.completedAt ? 'line-through opacity-60' : ''"
+          :aria-label="`${task.title}, due ${task.dueOn}. Arrow keys move it a day, up and down a week.`"
           @dragstart="dragStart(task.id, $event)"
+          @keydown="moveWithKeys(task, $event)"
           @click="emit('openTask', task.id)"
         >
           {{ task.title }}
