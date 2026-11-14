@@ -12,6 +12,13 @@
 set -u
 ID="$1"; BRANCH="$2"; FILE="${3:-}"; REPEAT="${4:-1}"
 : "${CREW_HOME:?CREW_HOME is not set}"
+# The id is a folder name and the script removes folders under it (rm -rf), so it must be the shape lab.mjs writes,
+# checked before anything is made or removed.
+case "$ID" in
+  lab-[0-9a-z]*-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;
+  *) echo "RESULT: fail stage=id pass=0 fail=0"; exit 0 ;;
+esac
+case "$ID" in *[!a-z0-9-]*) echo "RESULT: fail stage=id pass=0 fail=0"; exit 0 ;; esac
 REPO="${LAB_REPO:-/srv/agents/taskmanager-maintenance/taskmanager}"
 BASE="${LAB_DB_BASE:-postgresql://arnotes@localhost:55433}"
 PGOPTS="${LAB_PG:--h localhost -p 55433 -U arnotes}"

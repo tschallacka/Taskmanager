@@ -11,11 +11,12 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { parseResult, finish, labDir, markRunning, nextJob, requeueRunning, requestDir, validSample, enqueue, withQueue } from './lab-queue.mjs'
+import { parseResult, finish, labDir, markRunning, nextJob, requeueRunning, requestDir, validId, validSample, enqueue, withQueue } from './lab-queue.mjs'
 import { aliveProcess } from './port-registry.mjs'
 
 export const TICK_MS = 20_000
 export const RUN_TIMEOUT_MS = 60 * 60 * 1000
+export const GRANT_BEAT_MS = 5 * 60 * 1000
 const kit = dirname(fileURLToPath(import.meta.url))
 
 /**
@@ -37,10 +38,16 @@ export function drainRequests(home, { now = new Date().toISOString(), withQueueF
       lines.push(`rejected ${label}: not JSON`)
       continue
     }
+    // The id becomes a folder name (lab/<id>): it must be the shape lab.mjs writes, checked before anything else.
+    if (!validId(request.id)) {
+      moveTo(dir, 'rejected', name, 'the id is not a sample id')
+      lines.push(`rejected ${label}: the id is not a sample id`)
+      continue
+    }
     const check = validSample(request)
     if (!check.ok) {
       moveTo(dir, 'rejected', name, check.message)
-      lines.push(`rejected ${request.id ?? label}: ${check.message}`)
+      lines.push(`rejected ${request.id}: ${check.message}`)
       continue
     }
     const id = String(request.id)
@@ -76,12 +83,15 @@ export function recoverAfterRestart(home, now = new Date().toISOString()) {
  * One tick: runs the first queued sample if the slot is granted. `slot` is { acquire(purpose) -> { granted, holder? },
  * release() }; `runJob(job)` -> { stdout, timedOut }. Returns what happened, for the log and the tests.
  */
-export async function runOne(home, { slot, runJob, now = () => new Date().toISOString() }) {
+export async function runOne(home, { slot, runJob, now = () => new Date().toISOString(), beatMs = GRANT_BEAT_MS }) {
   const job = withQueue(home, queue => ({ result: nextJob(queue) }))
   if (!job) return { idle: true }
   const got = slot.acquire(job.id)
   if (!got.granted) return { waiting: true, job: job.id, holder: got.holder ?? null }
   let result
+  // The grant lasts 60 minutes and a run may last as long as RUN_TIMEOUT_MS: the grant is refreshed while the run goes on,
+  // so another asker is not granted the slot while lab still runs.
+  const beat = setInterval(() => slot.refresh?.(), beatMs)
   try {
     withQueue(home, queue => ({ result: null, queue: markRunning(queue, job.id, now()) }))
     const out = await runJob(job)
@@ -89,6 +99,7 @@ export async function runOne(home, { slot, runJob, now = () => new Date().toISOS
     fs.writeFileSync(join(labDir(home), job.id, 'runner.log'), out.stdout ?? '')
     result = out.timedOut ? { status: 'fail', stage: 'timeout', pass: 0, fail: 0 } : parseResult(out.stdout)
   } finally {
+    clearInterval(beat)
     slot.release()
   }
   fs.writeFileSync(join(labDir(home), job.id, 'result.json'), `${JSON.stringify({ id: job.id, branch: job.branch, ...result, finished: now() }, null, 2)}\n`)
@@ -96,24 +107,51 @@ export async function runOne(home, { slot, runJob, now = () => new Date().toISOS
   return { done: job.id, result }
 }
 
-/** Runs crew/lab-run.sh for one job and collects its output. A run over RUN_TIMEOUT_MS is killed. */
-export function runJobScript(home, job, { script = join(kit, 'lab-run.sh'), timeoutMs = RUN_TIMEOUT_MS, env = process.env } = {}) {
+/** The variables a lab run gets: PATH and HOME, the lab's own settings, and CREW_HOME. Nothing else from the runner's environment. */
+export function jobEnv(home, base = process.env) {
+  const keep = ['PATH', 'HOME', 'LAB_REPO', 'LAB_DB_BASE', 'LAB_PG', 'LAB_DRY']
+  const env = {}
+  for (const key of keep) if (base[key] !== undefined) env[key] = base[key]
+  env.CREW_HOME = home
+  return env
+}
+
+/**
+ * Runs crew/lab-run.sh for one job and collects its output. A run over timeoutMs is killed. A spawn that fails (the shell
+ * cannot start) is a failed run at stage spawn, not a crash of the runner. The child gets jobEnv(), nothing more.
+ */
+export function runJobScript(home, job, { script = join(kit, 'lab-run.sh'), timeoutMs = RUN_TIMEOUT_MS, shell = 'sh', base = process.env } = {}) {
   return new Promise(resolve => {
     const args = [script, job.id, job.branch]
     if (job.file) args.push(job.file, String(job.repeat ?? 1))
-    const child = spawn('sh', args, { env: { ...env, CREW_HOME: home }, stdio: ['ignore', 'pipe', 'pipe'] })
     let stdout = ''
-    child.stdout.on('data', d => { stdout += d })
-    child.stderr.on('data', d => { stdout += d })
     let timedOut = false
-    const timer = setTimeout(() => {
+    let finished = false
+    let timer = null
+    const done = out => {
+      if (finished) return
+      finished = true
+      if (timer) clearTimeout(timer)
+      resolve(out)
+    }
+    let child
+    try {
+      child = spawn(shell, args, { env: jobEnv(home, base), stdio: ['ignore', 'pipe', 'pipe'] })
+    } catch (error) {
+      done({ stdout: `spawn failed: ${error.message}\nRESULT: fail stage=spawn pass=0 fail=0\n`, timedOut: false })
+      return
+    }
+    timer = setTimeout(() => {
       timedOut = true
       child.kill('SIGTERM')
     }, timeoutMs)
-    child.on('close', () => {
-      clearTimeout(timer)
-      resolve({ stdout, timedOut })
+    child.stdout.on('data', d => { stdout += d })
+    child.stderr.on('data', d => { stdout += d })
+    child.on('error', error => {
+      stdout += `spawn failed: ${error.message}\nRESULT: fail stage=spawn pass=0 fail=0\n`
+      done({ stdout, timedOut: false })
     })
+    child.on('close', () => done({ stdout, timedOut }))
   })
 }
 
@@ -126,7 +164,12 @@ export async function realSlot(home) {
       const out = heavy.decideSlot({ home, asker: 'lab', purpose: `lab ${purpose}`, procs })
       return { granted: out.granted, holder: out.holder ?? null }
     },
-    release: () => heavy.releaseGrant(home, 'lab')
+    release: () => heavy.releaseGrant(home, 'lab'),
+    // Moves the grant's `since` forward, only while lab still holds it: an expired or someone else's grant is left alone.
+    refresh: () => {
+      const found = heavy.readGrant(home)
+      if (found && !found.expired && found.grant.holder === 'lab') heavy.writeGrant(home, { ...found.grant, since: Date.now() })
+    }
   }
 }
 

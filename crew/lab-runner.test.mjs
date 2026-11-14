@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
-import { claimRunner, drainRequests, recoverAfterRestart, runOne, runJobScript } from './lab-runner.mjs'
+import { claimRunner, drainRequests, jobEnv, recoverAfterRestart, runOne, runJobScript } from './lab-runner.mjs'
 import { main as labMain, parseSubmit, writeRequest } from './lab.mjs'
 import { emptyQueue, enqueue, nextJob, parseResult, queueFile, readQueue, requestDir, withQueue } from './lab-queue.mjs'
 
@@ -37,20 +37,20 @@ const fakeSlot = (granted, holder = null) => {
 test('a valid request is queued and moved to done; a bad one is rejected with its reason; a duplicate branch is rejected', () => {
   const h = home()
   const dir = requestDir(h)
-  request(dir, 'lab-1', { branch: 'wade/a', by: 'wade' })
-  request(dir, 'lab-2', { branch: '--evil', by: 'wade' })
-  request(dir, 'lab-3', { branch: 'wade/a', by: 'wren' })
-  request(dir, 'lab-4', '{ not json')
+  request(dir, 'lab-1-aaaaaa', { branch: 'wade/a', by: 'wade' })
+  request(dir, 'lab-2-bbbbbb', { branch: '--evil', by: 'wade' })
+  request(dir, 'lab-3-cccccc', { branch: 'wade/a', by: 'wren' })
+  request(dir, 'lab-4-dddddd', '{ not json')
   const lines = drainRequests(h, { now: NOW })
   assert.deepEqual(lines, [
-    'queued lab-1 at 1: wade/a',
-    'rejected lab-2: branch "--evil" is not a branch name',
-    'rejected lab-3: branch wade/a is already in the lab as lab-1 (queued)',
-    'rejected lab-4: not JSON'
+    'queued lab-1-aaaaaa at 1: wade/a',
+    'rejected lab-2-bbbbbb: branch "--evil" is not a branch name',
+    'rejected lab-3-cccccc: branch wade/a is already in the lab as lab-1-aaaaaa (queued)',
+    'rejected lab-4-dddddd: not JSON'
   ])
-  assert.deepEqual(readQueue(queueFile(h)).jobs.map(j => j.id), ['lab-1'])
-  assert.ok(existsSync(join(dir, 'done', 'lab-1.json')))
-  assert.ok(existsSync(join(dir, 'rejected', 'lab-2.json.reason')))
+  assert.deepEqual(readQueue(queueFile(h)).jobs.map(j => j.id), ['lab-1-aaaaaa'])
+  assert.ok(existsSync(join(dir, 'done', 'lab-1-aaaaaa.json')))
+  assert.ok(existsSync(join(dir, 'rejected', 'lab-2-bbbbbb.json.reason')))
   assert.equal(readdirSync(dir).filter(n => n.endsWith('.json')).length, 0, 'nothing is left to read twice')
 })
 
@@ -139,7 +139,7 @@ test('runJobScript collects the output of the job script and reports a timeout a
 
 test('the job script in dry mode answers one RESULT line and runs no step', () => {
   const h = home()
-  const run = spawnSync('sh', [join(HERE, 'lab-run.sh'), 'lab-dry-1', 'wade/a'], { encoding: 'utf8', env: { ...process.env, CREW_HOME: h, LAB_DRY: '1' } })
+  const run = spawnSync('sh', [join(HERE, 'lab-run.sh'), 'lab-dry-abcdef', 'wade/a'], { encoding: 'utf8', env: { ...process.env, CREW_HOME: h, LAB_DRY: '1' } })
   assert.equal(run.status, 0, run.stderr)
   const results = run.stdout.trim().split('\n').filter(l => l.startsWith('RESULT: '))
   assert.deepEqual(results, ['RESULT: pass stage=dry pass=0 fail=0'])
@@ -189,4 +189,63 @@ test('writeRequest makes the id and the file, and the file is the only one the r
   assert.ok(fs.existsSync(join(requestDir(h), `${id}.json`)))
   assert.equal(emptyQueue().jobs.length, 0)
   assert.ok(enqueue(emptyQueue(), { branch: 'x/y', file: null, repeat: 1 }, { id, by: 'wade', now: NOW }).ok)
+})
+
+// ── Nina's CQ fixes on slice 1 ───────────────────────────────────────────
+
+test('fix 1: a request whose id is not a sample id is rejected before anything is made from it; a sample id passes', () => {
+  const h = home()
+  const dir = requestDir(h)
+  request(dir, 'x', { id: '../../escape', branch: 'wade/a', by: 'wade' })
+  request(dir, 'y', { id: 'lab-1-abcdef', branch: 'wade/b', by: 'wade' })
+  const lines = drainRequests(h, { now: NOW })
+  assert.equal(lines[0], 'rejected x: the id is not a sample id')
+  assert.equal(lines[1], 'queued lab-1-abcdef at 1: wade/b')
+  assert.equal(existsSync(join(h, 'escape')), false, 'no folder was made from the bad id')
+  assert.equal(existsSync(join(h, 'lab', '..', '..', 'escape')), false)
+})
+
+test('fix 1 in the job script: a bad id is refused before any folder is made or removed', () => {
+  const h = home()
+  const run = spawnSync('sh', [join(HERE, 'lab-run.sh'), '../../x', 'wade/a'], { encoding: 'utf8', env: { ...process.env, CREW_HOME: h, LAB_DRY: '1' } })
+  assert.equal(run.status, 0)
+  assert.equal(parseResult(run.stdout).stage, 'id')
+  assert.equal(parseResult(run.stdout).status, 'fail')
+  assert.equal(existsSync(join(h, 'lab')), false, 'the script made no lab folder')
+})
+
+test('fix 2: a shell that cannot start is a failed run at stage spawn; the runner keeps running', async () => {
+  const h = home()
+  const out = await runJobScript(h, { id: 'lab-1-abcdef', branch: 'wade/a' }, { shell: '/nonexistent/shell-for-lab-test' })
+  const r = parseResult(out.stdout)
+  assert.equal(r.status, 'fail')
+  assert.equal(r.stage, 'spawn')
+})
+
+test('fix 3: the job gets only PATH, HOME, CREW_HOME and the lab settings, not the rest of the runner environment', async () => {
+  const h = home()
+  const script = join(h, 'env-run.sh')
+  writeFileSync(script, 'echo "secret=${LAB_SECRET_TEST:-none} path=${PATH:+set} home=${HOME:+set} repo=${LAB_REPO:-unset} crew=${CREW_HOME:+set}"\necho "RESULT: pass stage=done pass=0 fail=0"\n')
+  const out = await runJobScript(h, { id: 'lab-1-abcdef', branch: 'wade/a' }, { script, base: { PATH: process.env.PATH, HOME: '/h', LAB_REPO: '/r', LAB_SECRET_TEST: 'leak-me', GITHUB_TOKEN: 'tok' } })
+  assert.match(out.stdout, /secret=none path=set home=set repo=\/r crew=set/)
+  assert.equal(out.stdout.includes('leak-me'), false)
+  assert.equal(out.stdout.includes('tok'), false)
+  assert.deepEqual(Object.keys(jobEnv(h, { PATH: '/bin', HOME: '/h', LAB_REPO: '/r', TOKEN: 'x' })).sort(), ['CREW_HOME', 'HOME', 'LAB_REPO', 'PATH'])
+})
+
+test('fix 4: the grant is refreshed while the run goes on, and not after it ends', async () => {
+  const h = home()
+  withQueue(h, q => ({ result: null, queue: enqueue(q, { branch: 'wade/a', file: null, repeat: 1 }, { id: 'lab-1-abcdef', by: 'wade', now: NOW }).queue }))
+  let refreshes = 0
+  const slot = { acquire: () => ({ granted: true }), release: () => {}, refresh: () => { refreshes += 1 } }
+  await runOne(h, {
+    slot,
+    now: () => NOW,
+    beatMs: 5,
+    runJob: () => new Promise(resolve => setTimeout(() => resolve({ stdout: 'RESULT: pass stage=done pass=1 fail=0\n', timedOut: false }), 60))
+  })
+  assert.ok(refreshes >= 2, `refreshed ${refreshes} times while the run went on`)
+  const atEnd = refreshes
+  await new Promise(resolve => setTimeout(resolve, 40))
+  assert.equal(refreshes, atEnd, 'no refresh once the run has ended')
 })

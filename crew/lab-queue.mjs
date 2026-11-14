@@ -23,6 +23,14 @@ export function requestDir(home) {
   return join(labDir(home), 'requests')
 }
 
+/**
+ * A sample id is the one lab.mjs writes: lab-<base36 time>-<6 hex>. It becomes a folder name (lab/<id>) and a path in the
+ * runner's and the script's work, so nothing else is accepted: no dots, no slashes.
+ */
+export function validId(id) {
+  return typeof id === 'string' && /^lab-[0-9a-z]{1,12}-[0-9a-f]{6}$/.test(id)
+}
+
 /** Checks one sample request. Returns { ok, sample } with the normal form, or { ok: false, message }. */
 export function validSample(input) {
   const branch = String(input?.branch ?? '')
