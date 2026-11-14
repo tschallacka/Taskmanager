@@ -22,7 +22,7 @@ import { genId } from './projects'
 // The people a crew is made of, in the order the response lists them. `team` is the
 // role in the crew's team; a contact is a customer login and joins no team.
 export const CREW_PEOPLE = [
-  { key: 'boss', name: 'Boss', role: 'owner: reads the reports, owns the bugs column', team: 'admin' },
+  { key: 'boss', name: 'Cato', role: 'owner: reads the reports, owns the bugs column', team: 'admin' },
   { key: 'pia', name: 'Pia Planner', role: 'project manager', team: 'member' },
   { key: 'wren', name: 'Wren Worker', role: 'worker 1', team: 'member' },
   { key: 'wick', name: 'Wick Worker', role: 'worker 2', team: 'member' },

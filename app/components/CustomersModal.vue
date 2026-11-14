@@ -356,8 +356,10 @@ function confirmRevoke(customerId: string, invitation: CustomerInvitation) {
                       class="flex items-center justify-between gap-2"
                     >
                       <div class="flex min-w-0 items-center gap-2">
-                        <UAvatar
-                          :alt="contact.name || contact.email"
+                        <UserAvatar
+                          :user-id="contact.userId"
+                          :name="contact.name"
+                          :email="contact.email"
                           size="2xs"
                         />
                         <span class="truncate text-xs text-default">{{ contact.name || contact.email }}</span>

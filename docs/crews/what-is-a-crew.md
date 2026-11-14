@@ -46,5 +46,5 @@ flowchart LR
 Read [what a crew can and cannot see](/help/crews/what-a-crew-can-see) for the exact limits.
 
 <!-- requires: team-admin -->
-To add a crew to one of your boards, follow [Add a crew to this board](/help/crews/give-a-board-a-crew).
+To add a crew to one of your boards, follow [Put an AI crew to work on this board](/help/crews/give-a-board-a-crew).
 <!-- /requires -->

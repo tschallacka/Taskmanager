@@ -33,6 +33,26 @@ test('author keys: a crew agent is its key, a person is not', () => {
   assert.equal(authorKey('Maria Pia'), null)
 })
 
+test('a Blocked card with a BLOCKED ON line pokes the named person after the threshold; without a line, nobody is poked for it', () => {
+  const named = card('b1', { column: 'Blocked', updates: [update(agent('pia'), 'BLOCKED ON wynn: push actor_id to arnotes_test_wynn', 30)] })
+  const pokes = run([named]).actions.filter(a => a.kind === 'poke' && a.reason === 'blocked, waiting on wynn')
+  assert.equal(pokes.length, 1)
+  assert.equal(pokes[0].to, 'wynn')
+  const unnamed = card('b2', { column: 'Blocked', updates: [update(agent('pia'), 'waiting', 30)] })
+  assert.equal(run([unnamed]).actions.filter(a => a.kind === 'poke' && a.reason.startsWith('blocked, waiting on')).length, 0)
+})
+
+test('a BLOCKED ON line that names no one we know (a typo such as bos) is flagged to the PM, not left silent', () => {
+  const typo = card('b3', { column: 'Blocked', updates: [update(agent('pia'), 'BLOCKED ON bos: push actor_id', 30)] })
+  const { actions } = run([typo])
+  // The warning names the key: the PM sees the typo in the finding itself.
+  const flagged = actions.filter(a => a.kind === 'poke' && a.reason === 'blocked, BLOCKED ON names no one known: bos')
+  assert.equal(flagged.length, 1)
+  assert.match(flagged[0].text, /names no crew member/, 'the suggested message says what to fix')
+  assert.equal(flagged[0].to, 'pia')
+  assert.equal(actions.filter(a => a.kind === 'poke' && a.reason.startsWith('blocked, waiting on')).length, 0, 'nobody is poked for an unknown name')
+})
+
 test('thresholds: defaults, overridden by crew.json, a bad value falls back', () => {
   assert.deepEqual(thresholdsFrom({}), { questionMinutes: 10, idleMinutes: 10, gateMinutes: 15, cleanGrantMinutes: 5, cleanPlanMinutes: 10, cleanDoneMinutes: 15, stuckMinutes: 240 })
   assert.equal(thresholdsFrom({ susy: { questionMinutes: 3, idleMinutes: -1 } }).questionMinutes, 3)
@@ -42,7 +62,8 @@ test('thresholds: defaults, overridden by crew.json, a bad value falls back', ()
 test('a question to Pia with no answer after 10 minutes is poked once, to Pia', () => {
   const q = card('q1', { column: 'Blocked', assignee: 'Wynn Worker', updates: [update(agent('wynn'), 'QUESTION: which column?', 12)] })
   const { actions } = run([q])
-  const pokes = actions.filter(a => a.kind === 'poke')
+  // The Blocked card here has no BLOCKED ON line, so it is also flagged for the PM; this test is about the question poke.
+  const pokes = actions.filter(a => a.kind === 'poke' && a.reason === 'unanswered question')
   assert.equal(pokes.length, 1)
   assert.equal(pokes[0].to, 'pia')
   assert.equal(pokes[0].reason, 'unanswered question')
@@ -78,7 +99,8 @@ test('a poke is not repeated while the reason holds and the threshold has not pa
       update(agent('susy'), 'poked pia | unanswered question | at ' + at(3), 3)
     ]
   })
-  assert.deepEqual(run([q]).actions, [])
+  // Only the question's poke is in question: the Blocked card with no BLOCKED ON line is flagged for the PM as well.
+  assert.deepEqual(run([q]).actions.filter(a => a.reason === 'unanswered question'), [])
 })
 
 test('the second poke comes a threshold after the first; two ignored pokes go up to Pia', () => {
@@ -87,7 +109,8 @@ test('the second poke comes a threshold after the first; two ignored pokes go up
     column: 'Blocked', assignee: 'Wynn Worker',
     updates: [...base, update(agent('susy'), 'poked pia | unanswered question | at ' + at(12), 12)]
   })
-  const again = run([first]).actions.filter(a => a.kind === 'poke')
+  // Each question's poke is counted by its own reason: the Blocked cards here are also flagged for the PM (no BLOCKED ON line).
+  const again = run([first]).actions.filter(a => a.kind === 'poke' && a.reason === 'unanswered question')
   assert.equal(again.length, 1, 'one threshold after the poke: poke again to the same rung')
   assert.equal(again[0].to, 'pia')
 
@@ -99,7 +122,7 @@ test('the second poke comes a threshold after the first; two ignored pokes go up
       update(agent('susy'), 'poked pia | unanswered question | at ' + at(12), 12)
     ]
   })
-  const escalated = run([ignored]).actions.filter(a => a.kind === 'poke')
+  const escalated = run([ignored]).actions.filter(a => a.kind === 'poke' && a.reason === 'unanswered question')
   assert.equal(escalated.length, 1)
   assert.equal(escalated[0].to, 'boss', 'after two pokes to Pia with no change: one step up')
   assert.match(escalated[0].text, /@cato/)
@@ -109,7 +132,7 @@ test('after the last rung the card is quiet', () => {
   const updates = [update(agent('wynn'), 'QUESTION: x', 200)]
   for (let i = 6; i >= 1; i--) updates.push(update(agent('susy'), `poked ${i > 4 ? 'boss' : 'pia'} | unanswered question | at ${at(i * 10 + 20)}`, i * 10 + 20))
   const c = card('q7', { column: 'Blocked', assignee: 'Wynn Worker', updatedAt: NOW - 250 * MIN, updates })
-  assert.equal(run([c]).actions.filter(a => a.kind === 'poke').length, 0)
+  assert.equal(run([c]).actions.filter(a => a.kind === 'poke' && a.reason === 'unanswered question').length, 0)
 })
 
 test('a change on the card after the poke makes the poke stale: it is cleared, then poked anew', () => {
@@ -124,7 +147,7 @@ test('a change on the card after the poke makes the poke stale: it is cleared, t
   })
   const { actions } = run([c])
   assert.equal(actions.filter(a => a.kind === 'clear').length, 1)
-  const pokes = actions.filter(a => a.kind === 'poke')
+  const pokes = actions.filter(a => a.kind === 'poke' && a.reason === 'unanswered question')
   assert.equal(pokes.length, 1, 'the new question is poked from zero')
   assert.equal(pokes[0].to, 'pia')
 })
@@ -263,7 +286,8 @@ test('stuck in column: not when the card is young, not when only as old as its n
   assert.equal(run([young, ...few]).actions.filter(a => a.cardId === 't2').length, 0, 'under four hours')
   const resting = card('t3', { column: 'Blocked', updatedAt: NOW - 600 * MIN })
   const restPeers = [1, 2, 3].map(n => card(`u${n}`, { column: 'Blocked', updatedAt: NOW - 5 * MIN }))
-  assert.equal(run([resting, ...restPeers]).actions.filter(a => a.cardId === 't3').length, 0, 'Blocked is resting')
+  // Blocked is resting for this rule; the same card is flagged for its missing BLOCKED ON line, a separate reason.
+  assert.equal(run([resting, ...restPeers]).actions.filter(a => a.cardId === 't3' && a.reason === 'stuck in column').length, 0, 'Blocked is resting')
 })
 
 test('stuck in column needs at least two other cards in the column', () => {

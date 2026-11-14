@@ -15,9 +15,16 @@ monitor() {
   printf 'Monitor(command: "CREW_HOME=%s node %s/crew.mjs %s", description: "%s", timeout_ms: 1800000);' "$CREW" "$KIT" "$1" "$2"
 }
 
+# A watch is up when its pid file (CREW_HOME/.listen/<name>.pid, written by crew.mjs) names a live process whose command
+# line is still that watch. No process scan (pgrep) is run.
+up() {
+  p=$(cat "$CREW/.listen/$1.pid" 2>/dev/null | tr -d ' \n')
+  [ -n "$p" ] && [ -r "/proc/$p/cmdline" ] && tr '\0' ' ' < "/proc/$p/cmdline" | grep -q -F "$2"
+}
+
 missing=""
-pgrep -f "crew.mjs boss-mentions" >/dev/null || missing="$missing $(monitor boss-mentions "@boss mentions from Pia, Susy and Rita on the crew board")"
-pgrep -f "crew.mjs watch-crew" >/dev/null || missing="$missing $(monitor watch-crew "Pia and Susy keep working (alerts only on trouble)")"
+up boss-mentions "crew.mjs boss-mentions" || missing="$missing $(monitor boss-mentions "@boss mentions from Pia, Susy and Rita on the crew board")"
+up watch-crew "crew.mjs watch-crew" || missing="$missing $(monitor watch-crew "Pia and Susy keep working (alerts only on trouble)")"
 [ -z "$missing" ] && exit 0
 case "$INPUT" in *'"stop_hook_active":true'*|*'"stop_hook_active": true'*) exit 0 ;; esac
 

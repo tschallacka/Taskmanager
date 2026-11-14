@@ -25,7 +25,7 @@ test('the absolute address has one slash between the origin and the path, with o
 test('the Copied timer is cleared on a second click and on unmount', () => {
   const drawer = readFileSync(new URL('../app/components/kanban/TaskDrawer.vue', import.meta.url), 'utf8')
   // A second click clears the running timer before it starts a new one.
-  assert.match(drawer, /clearTimeout\(copiedTimer\)\n  linkCopied\.value = true\n  copiedTimer = setTimeout/)
+  assert.match(drawer, /clearTimeout\(copiedTimer\)\n {2}linkCopied\.value = true\n {2}copiedTimer = setTimeout/)
   // The unmount hook clears it, so no timer writes after the panel is gone.
-  assert.match(drawer, /onBeforeUnmount\(\(\) => \{\n  clearTimeout\(copiedTimer\)/)
+  assert.match(drawer, /onBeforeUnmount\(\(\) => \{\n {2}clearTimeout\(copiedTimer\)/)
 })

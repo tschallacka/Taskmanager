@@ -63,9 +63,10 @@ useSeoMeta({ title: computed(() => view.value?.person.name ?? 'Profile') })
 
       <template v-else-if="view">
         <div class="flex items-center gap-5">
-          <UAvatar
-            :src="view.person.image ?? undefined"
-            :alt="view.person.name"
+          <UserAvatar
+            :user-id="view.person.id"
+            :name="view.person.name"
+            :image="view.person.image"
             size="3xl"
           />
           <div class="min-w-0">
