@@ -2,6 +2,12 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.30.0 - 2026-11-14
+
+- **A comment in the Inbox opens its card scrolled to the reply, and card ids in text become links.** Clicking a comment or reply notification opens the card at that comment, highlighted for a moment; a card or comment link is the path `/projects/<id>/<task>/<comment>`, and an old `?task=` link is rewritten to it once. A card id in an inbox item, a board message, a reply or a comment links to the card only when you may open it (`POST /api/tasks/openable` says which). `notifications.comment_id` is new (nullable), and `GET /api/notifications` now returns it, so the Inbox knows the comment; the card panel reads the comment from `?comment=` as well as from the path. An old `?task=&comment=` link opens `/projects/<id>/<task>/<comment>`. On a phone the Inbox opens the card, but the scroll to the reply is not guaranteed yet (filed as its own card). `server/api/notifications/index.get.ts`, `app/components/kanban/TaskComments.vue`, `app/pages/projects/inbox.vue`, `app/components/CardIdText.vue`, `app/components/InlineMarkdown.vue`, `app/composables/useOpenableCards.ts`, `app/components/kanban/ProjectMessagesView.vue`, `server/api/tasks/openable.post.ts`, `server/utils/notifyEvents.ts`, `app/utils/cardIdLinks.ts`, `app/utils/taskLink.ts`, `app/utils/taskComments.ts`, `app/pages/projects/[id].vue`, `docs/workspace/inbox.md`.
+
+- **Owner documents get a marker line: kit text above it, the project's own text below it.** `crew update` replaces the kit text above the marker and never reads or changes the text below, so the update no longer reports a CONFLICT for PROJECT-RULES.md, BRIEF.md or JANET.md. A document with no marker is migrated once, with its old content kept entirely below the marker and a backup made first. `crew/owner-file.mjs` (new, listed in `kit-files.txt`), `crew/update.mjs`, `crew/PROJECT-RULES.md.tmpl`, `crew/BRIEF.md.tmpl`, `crew/JANET.md.tmpl`, `crew/README.md`, `crew/kit.test.mjs`, `crew/owner-file.test.mjs`.
+
 ## 0.29.0 - 2026-11-14
 
 - **Task panel link tests.** The copy control's clipboard path now has tests: both formats with the exact strings, the fallback without ClipboardItem, and a refused or missing clipboard that resolves false. No change for the reader. Files: tests/copy-task-link.test.ts.
