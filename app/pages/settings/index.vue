@@ -325,20 +325,27 @@ function swatchStyle(color: string, selected: boolean) {
                     </div>
                   </div>
                   <div class="flex flex-wrap gap-2 pl-12">
-                    <button
+                    <div
                       v-for="color in PRIMARY_COLORS"
                       :key="color"
-                      :title="color"
-                      class="size-7 rounded-full transition-transform hover:scale-110 focus:outline-none"
-                      :style="swatchStyle(color, primaryColor === color)"
-                      @click="setPrimaryColor(color as any)"
+                      class="flex flex-col items-center gap-1"
                     >
-                      <UIcon
-                        v-if="primaryColor === color"
-                        name="i-lucide-check"
-                        class="size-3.5 text-white mx-auto drop-shadow"
-                      />
-                    </button>
+                      <button
+                        :title="color"
+                        :aria-label="`Accent ${color}`"
+                        :aria-pressed="primaryColor === color"
+                        class="size-7 rounded-full transition-transform hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                        :style="swatchStyle(color, primaryColor === color)"
+                        @click="setPrimaryColor(color as any)"
+                      >
+                        <UIcon
+                          v-if="primaryColor === color"
+                          name="i-lucide-check"
+                          class="size-3.5 text-white mx-auto drop-shadow"
+                        />
+                      </button>
+                      <span class="text-xs text-muted capitalize">{{ color }}</span>
+                    </div>
                   </div>
                 </div>
 
@@ -361,20 +368,27 @@ function swatchStyle(color: string, selected: boolean) {
                     </div>
                   </div>
                   <div class="flex flex-wrap gap-2 pl-12">
-                    <button
+                    <div
                       v-for="color in NEUTRAL_COLORS"
                       :key="color"
-                      :title="color"
-                      class="size-7 rounded-full transition-transform hover:scale-110 focus:outline-none"
-                      :style="swatchStyle(color, neutralColor === color)"
-                      @click="setNeutralColor(color as any)"
+                      class="flex flex-col items-center gap-1"
                     >
-                      <UIcon
-                        v-if="neutralColor === color"
-                        name="i-lucide-check"
-                        class="size-3.5 text-white mx-auto drop-shadow"
-                      />
-                    </button>
+                      <button
+                        :title="color"
+                        :aria-label="`Neutral ${color}`"
+                        :aria-pressed="neutralColor === color"
+                        class="size-7 rounded-full transition-transform hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                        :style="swatchStyle(color, neutralColor === color)"
+                        @click="setNeutralColor(color as any)"
+                      >
+                        <UIcon
+                          v-if="neutralColor === color"
+                          name="i-lucide-check"
+                          class="size-3.5 text-white mx-auto drop-shadow"
+                        />
+                      </button>
+                      <span class="text-xs text-muted capitalize">{{ color }}</span>
+                    </div>
                   </div>
                 </div>
               </div>
