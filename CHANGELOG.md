@@ -2,6 +2,12 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.29.0 - 2026-11-14
+
+- **Task panel link tests.** The copy control's clipboard path now has tests: both formats with the exact strings, the fallback without ClipboardItem, and a refused or missing clipboard that resolves false. No change for the reader. Files: tests/copy-task-link.test.ts.
+
+- Crew: `crew/stale-copies.mjs` is a read-only report of the dev copies to look at (older than 4 hours, or of a card that is Done). Janet stops a copy only with a go from Boss. The port registry keeps Boss's dev copy (:3000) and the testers' copies (3105 to 3108) as read-only entries: `serve --check` lists them, and nobody can reserve, start, stop or free them.
+
 ## 0.28.2 - 2026-11-14
 
 - **The task panel's copy-link mark no longer writes after the panel is gone.** The "Copied" mark clears its two-second timer when the panel closes, and a second click restarts the two seconds. The tasks help page now says that a read-only panel (a customer's view) hides the custom fields and shows the other properties as values only. Files: `app/components/kanban/TaskDrawer.vue`, `docs/basics/tasks.md`, `tests/copy-task-link.test.ts`.
