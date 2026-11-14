@@ -20,6 +20,8 @@ test('the comment route passes the new comment id to the notification, and the n
   assert.match(read('server/utils/notifyEvents.ts'), /\.\.\.\(commentId \? \{ commentId \} : \{\}\)/)
   assert.match(read('server/utils/notifications.ts'), /commentId: input\.commentId \?\? null/)
   assert.match(read('server/db/schema.ts'), /commentId: text\('comment_id'\)/)
+  // The Inbox reads its list from this route: without commentId in the select the item never names its comment.
+  assert.match(read('server/api/notifications/index.get.ts'), /commentId: notifications\.commentId/)
 })
 
 test('the message panel offers Open board to the conversation, and the phone card has a back arrow to the Inbox', () => {
