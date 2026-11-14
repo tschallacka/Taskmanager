@@ -44,7 +44,7 @@ test('a copy whose process is gone, a reservation (pid null), and a read-only en
     ports: {
       3101: copy({ pid: 999, started: new Date(NOW - 9 * HOURS).toISOString() }),
       3102: copy({ pid: null, started: new Date(NOW - 9 * HOURS).toISOString() }),
-      3000: { ...copy({ started: new Date(NOW - 9 * HOURS).toISOString() }), readonly: true, label: "Boss's dev copy" }
+      3000: { ...copy({ started: new Date(NOW - 9 * HOURS).toISOString() }), readonly: true, label: 'Boss\'s dev copy' }
     }
   }
   assert.deepEqual(staleCopies(reg, { now: NOW, alive, doneIds: new Set() }), [])
@@ -71,7 +71,7 @@ test('read-only entries are always in the registry, and no planning step can tak
   writeFileSync(file, JSON.stringify({ ports: { 3000: { worktree: '/work/mine', who: 'wren', pid: 1, started: null } } }))
   const reg = readRegistry(file)
   assert.equal(reg.ports[3000].readonly, true, 'the stored entry for 3000 is replaced by the read-only one')
-  assert.equal(reg.ports[3105].label, "quincy's tester copy")
+  assert.equal(reg.ports[3105].label, 'quincy\'s tester copy')
   const reserve = planReserve({ reg, port: 3000, who: 'wren', worktree: '/work/x', branch: 'b', task: 't', pid: 5, alive, replace: true })
   assert.equal(reserve.ok, false)
   assert.match(reserve.message, /read-only: Boss's dev copy\. Nobody can take it\./)

@@ -30,11 +30,11 @@ export function taskOfBranch(branch) {
 // Ports that belong to copies the crew does not start or stop: Boss's dev copy and the testers' copies (tester-copy.sh).
 // Their entries are read-only and never pruned: nobody reserves, starts, stops or releases them.
 export const READ_ONLY_PORTS = {
-  3000: "Boss's dev copy",
-  3105: "quincy's tester copy",
-  3106: "usher's tester copy",
-  3107: "pat's tester copy",
-  3108: "nina's tester copy"
+  3000: 'Boss\'s dev copy',
+  3105: 'quincy\'s tester copy',
+  3106: 'usher\'s tester copy',
+  3107: 'pat\'s tester copy',
+  3108: 'nina\'s tester copy'
 }
 
 /** The read-only entries, one per port in READ_ONLY_PORTS. Pid null, so they always hold their port. */

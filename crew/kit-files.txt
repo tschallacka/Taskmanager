@@ -45,6 +45,7 @@ devadmin.mjs
 down.mjs
 fonts.conf.tmpl
 guard.sh
+heavy-slot.mjs
 home.mjs
 init.mjs
 janet.mjs

@@ -38,11 +38,16 @@ export function dialogMail(who, screen) {
 if (import.meta.url === `file://${process.argv[1]}`) {
   let text = ''
   process.stdin.setEncoding('utf8')
-  process.stdin.on('data', chunk => { text += chunk })
+  process.stdin.on('data', (chunk) => {
+    text += chunk
+  })
   process.stdin.on('end', () => {
     const who = process.argv[2] || 'session'
     const mail = dialogMail(who, text)
-    if (mail) { console.log(mail); process.exit(0) }
+    if (mail) {
+      console.log(mail)
+      process.exit(0)
+    }
     console.log('NO-DIALOG')
     process.exit(1)
   })
