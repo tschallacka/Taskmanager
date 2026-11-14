@@ -429,6 +429,33 @@ function onPhoneMove(columnId: string) {
   if (phoneSheetTaskId.value) moveTask(phoneSheetTaskId.value, columnId, null, null)
 }
 
+// Delete on the phone sheet: a confirm first, then the same trash the task drawer uses (restorable from the toast).
+// The sheet closes right after its action, which clears phoneSheetTaskId, so the card is kept in its own ref.
+const phoneDeleteOpen = ref(false)
+const phoneDeleteTaskId = ref<string | null>(null)
+function onPhoneDelete() {
+  phoneDeleteTaskId.value = phoneSheetTaskId.value
+  phoneDeleteOpen.value = true
+}
+async function confirmPhoneDelete() {
+  const id = phoneDeleteTaskId.value
+  phoneDeleteOpen.value = false
+  phoneDeleteTaskId.value = null
+  phoneSheetTaskId.value = null
+  if (!id) return
+  try {
+    await deleteTask(id)
+    toast.add({
+      title: 'Task moved to Trash',
+      icon: 'i-lucide-trash-2',
+      duration: 10000,
+      actions: [{ label: 'Undo', onClick: () => void onRestoreTask(id) }]
+    })
+  } catch {
+    toast.add({ title: 'Could not delete the task', icon: 'i-lucide-alert-triangle', color: 'error' })
+  }
+}
+
 // A live column counts the cards on it, as it always has; the trashed cards
 // sitting in it are not part of the board. A trashed column counts what
 // restoring it would bring back, which is everything still inside it.
@@ -701,7 +728,29 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onBoardKeydown))
     @update:open="(open: boolean) => { if (!open) phoneSheetTaskId = null }"
     @done="onPhoneDone"
     @move="onPhoneMove"
+    @delete="onPhoneDelete"
   />
+  <UModal
+    v-if="board"
+    v-model:open="phoneDeleteOpen"
+    title="Delete task?"
+    description="It moves to the board's trash with its updates. Project options > Show trashed can restore it for the next 7 days."
+    :ui="{ footer: 'justify-end' }"
+  >
+    <template #footer>
+      <UButton
+        label="Cancel"
+        color="neutral"
+        variant="ghost"
+        @click="phoneDeleteOpen = false"
+      />
+      <UButton
+        label="Delete task"
+        color="error"
+        @click="confirmPhoneDelete"
+      />
+    </template>
+  </UModal>
   <div
     v-if="board"
     ref="boardEl"
