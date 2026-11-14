@@ -102,7 +102,11 @@ interface Internals {
   golfBall: THREE.Object3D | null
 }
 
-test('a run through the demo: everyone moves once a frame, effects clear up, and every folder lands', async () => {
+test('a run through the demo: everyone moves once a frame, effects clear up, and every folder lands', async (t) => {
+  // The seeded generator is for this run only: put the real one back when the test ends, pass or fail, so no later
+  // test in this process draws from the seeded sequence.
+  const realRandom = Math.random
+  t.after(() => { Math.random = realRandom })
   Math.random = seeded(7)
   const { OfficeScene } = await import('../app/office/office')
   const { Actor } = await import('../app/office/actor')
