@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.28.2 - 2026-11-14
+
+- **Task panel redesign (5/9).** The properties are in two columns in the order Assignee, Due date, Start date, Labels, custom fields, with Time, Blocked by and GitHub as full-width blocks below; on a phone they are rows with a chevron, and a read-only panel shows values only. The description's command row shows while its text has focus. Activity has Comments and History tabs and opens as a sheet on a phone, with the composer at its bottom. The panel's address is /projects/<id>/<task>, and the router now fails loudly if the board route is missing. TaskDrawer.vue is about 980 lines. Files: app/components/RichEditor.vue, app/components/kanban/SubtaskList.vue, app/components/kanban/TaskComments.vue, app/components/kanban/TaskDrawer.vue, app/components/kanban/TaskFields.vue, app/pages/projects/[id].vue, app/router.options.ts, app/utils/copyTaskLink.ts, app/utils/taskPanelUrl.ts, docs/basics/comments-and-updates.md, docs/basics/tasks.md, tests/copy-task-link.test.ts, tests/task-panel-url.test.ts, changelog.d/mwc4jeh2v7fyfk2qi2-task-panel.md.
+
 ## 0.28.1 - 2026-11-13
 
 - **`crew up` starts the crew's background sessions and `crew down` stops them.** `crew up` reads `CREW_HOME/sessions/*.json` and starts every recorded person whose session is not running, with the same strict start as `crew session start` (the role file is the person's PROMPTS section plus the CREW.md standing rules, written to `sessions/<key>.role.md`, mode 600); a person with no card is started idle and waits for mail. `crew down` stops them. The daemon's API-error check now reads each person's session transcript in the session's own folder. Files: `crew/sessions-up.mjs`, `crew/up.mjs`, `crew/down.mjs`, `crew/session.mjs`, `crew/session-errors.mjs`, `crew/kit-files.txt`.
