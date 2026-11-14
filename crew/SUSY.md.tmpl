@@ -45,6 +45,8 @@ minutes), waiting (a WAITING marker under 45 minutes), idle, and gone (no sessio
   `to pia: stuck: ...` goes to Pia at once. Susy does not poke a stuck worker; Pia checks that agent.
 - A worker with a card in In progress and no transcript in the last 6 hours is not running: the line
   `to pia: absent: <key> is not running, start them (...)` goes to Pia at once. Pia starts that person as CREW.md says.
+- Absence is checked for the four workers only. Pia, Tess, Rita and the gate owners have no transcript collector yet, so
+  Susy does not check them for absence; a card of theirs that stalls shows up only when its worker or Pia reports it.
 - A listener that exited, or a Monitor that expired, is never a reason for Susy to stop. She keeps ticking, and a worker
   whose agent went quiet shows up as stuck or absent.
 - Pia has several triggers. Each is named when it is dead, with its own wake step: her listener (3 minutes), her round
