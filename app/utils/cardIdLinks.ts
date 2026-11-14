@@ -1,0 +1,59 @@
+// Card ids in a message, a comment or a description become links, but only for a card the reader may open: an id the
+// reader may not open stays plain text, so the link never tells a reader that a hidden card exists. Pure, so the inbox,
+// the task panel and the board messages all split text the same way.
+import { taskPanelPath } from './taskPanelUrl'
+
+/** The address a card id links to: the card's path on its board, /projects/<id>/<task>, never the old ?task= form. */
+export function cardIdHref(projectId: string, id: string): string {
+  return taskPanelPath(projectId, id)
+}
+
+/** A card id as the app writes them: "mw" and 16 to 24 letters or digits, as in mwasus18611939jk1av. */
+export const CARD_ID_PATTERN = /\bmw[a-z0-9]{16,24}\b/g
+
+export type TextPiece = { text: string } | { id: string, openable: true }
+
+/**
+ * Splits `text` into plain pieces and card ids. `mayOpen(id)` says whether the reader may open that card; an id the reader
+ * may not open is kept as plain text, not as a link.
+ */
+export function splitCardIds(text: string, mayOpen: (id: string) => boolean): TextPiece[] {
+  const pieces: TextPiece[] = []
+  let last = 0
+  for (const match of text.matchAll(CARD_ID_PATTERN)) {
+    const id = match[0]
+    const at = match.index ?? 0
+    if (!mayOpen(id)) continue
+    if (at > last) pieces.push({ text: text.slice(last, at) })
+    pieces.push({ id, openable: true })
+    last = at + id.length
+  }
+  if (last < text.length) pieces.push({ text: text.slice(last) })
+  return pieces
+}
+
+/** The card ids in a text, in order, as written (before any check of who may open them). */
+export function cardIdsIn(text: string): string[] {
+  return [...text.matchAll(CARD_ID_PATTERN)].map(match => match[0])
+}
+
+/**
+ * The same rule for rendered HTML (a comment's Markdown): card ids in its text become links, and the tags around them are
+ * left as they are. `openable(id)` gives the card's board and title, or null when the reader may not open it.
+ */
+export function linkCardIdsInHtml(html: string, openable: (id: string) => { projectId: string, title: string } | null): string {
+  return html.replace(/(<[^>]*>)|([^<]+)/g, (segment: string, tag: string | undefined, text: string | undefined) => {
+    if (tag !== undefined || text === undefined) return segment
+    return splitCardIds(text, id => openable(id) !== null).map((piece) => {
+      if (!('id' in piece)) return piece.text
+      const card = openable(piece.id)
+      if (!card) return piece.id
+      const href = escapeHtml(cardIdHref(card.projectId, piece.id))
+      return `<a href="${href}" title="${escapeHtml(card.title)}" data-card-id-link>${piece.id}</a>`
+    }).join('')
+  })
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+}

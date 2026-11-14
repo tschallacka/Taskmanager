@@ -29,8 +29,12 @@ Items are grouped by the day they arrived, newest first. An unread item has a do
 1. Open **Inbox** in the sidebar.
 2. Use **All** or **Unread** above the list to filter.
 3. Click an item. It is marked read and the task opens over the inbox, in the same panel it has on its board. If the
-   board lives in another workspace, Taskmanager switches to that workspace first.
+   board lives in another workspace, Taskmanager switches to that workspace first. For a comment or a reply, the task
+   opens scrolled to that comment and highlighted for a moment, so you land on the reply itself.
 4. **Mark all read** in the header clears the whole list at once. It only shows while something is unread.
+
+A card id written in a message, a comment or a task (such as `mwasus18611939jk1av`) is a link to that card, with the card's
+title as its tooltip. An id of a card you cannot open stays plain text.
 
 If the board is no longer available to you, or the task is gone, you get a short message saying so instead of the
 task.

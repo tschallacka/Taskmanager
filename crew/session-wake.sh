@@ -33,6 +33,25 @@ leave() { tool shutdown "{\"session\":\"$S\"}" >/dev/null 2>&1 || true; }
 out=$(tool start "{\"session\":\"$S\",\"command\":[\"bash\",\"-c\",\"exec claude attach $ID\"]}")
 ok "$out" || { echo "could not start the attach for session $ID" >&2; leave; exit 1; }
 sleep 7
+# Fail closed. The screen is read through the same attach. If it cannot be read, or a dialog is on it
+# (crew/modal-detect.mjs), nothing is typed: the reason goes to stderr, the last line of which the caller mails to Boss,
+# and the script leaves with exit 3.
+view_out=$(tool view "{\"session\":\"$S\",\"row_ranges\":[\"1-60\"]}")
+screen=''
+if ok "$view_out"; then
+  screen=$(printf '%s' "$view_out" | node -e 'let t="";process.stdin.on("data",d=>t+=d).on("end",()=>{try{const r=JSON.parse(t);const inner=JSON.parse(r.result.content[0].text);for(const x of inner.responses) if(x.text) console.log(x.text)}catch{process.exitCode=1}})' 2>/dev/null)
+fi
+if [ -z "$screen" ]; then
+  echo "SCREEN-UNREADABLE session $ID: the screen could not be read; nothing typed" >&2
+  leave
+  exit 3
+fi
+dialog=$(printf '%s\n' "$screen" | node "$(dirname "$0")/modal-detect.mjs" "$ID" 2>/dev/null)
+case "$dialog" in
+  PERSON-DIALOG*) echo "$dialog" >&2; leave; exit 3 ;;
+  NO-DIALOG) ;;
+  *) echo "SCREEN-UNREADABLE session $ID: the dialog check did not answer; nothing typed" >&2; leave; exit 3 ;;
+esac
 args=$(node -e 'console.log(JSON.stringify({session:process.argv[1],text:process.argv[2]}))' "$S" "$TEXT")
 out=$(tool paste "$args")
 ok "$out" || { echo "paste into session $ID failed" >&2; leave; exit 1; }

@@ -25,3 +25,14 @@ export function activityStartsOpen(comment: unknown): boolean {
 export function queryWithoutTask(query: LocationQuery): LocationQueryRaw {
   return Object.fromEntries(Object.entries(query).filter(([key]) => key !== 'task')) as LocationQueryRaw
 }
+
+// The old deep link ?task=<id>[&comment=<id>] as the address the board goes to: the path form
+// /projects/<id>/<task>/<comment> (or /projects/<id>/<task> without a comment), with every other query parameter kept.
+// Null when the query has no task.
+export function taskQueryAsPanelAddress(projectId: string, query: LocationQuery): { path: string, query: LocationQueryRaw } | null {
+  const taskId = typeof query.task === 'string' ? query.task : ''
+  if (!taskId) return null
+  const comment = typeof query.comment === 'string' && query.comment ? query.comment : null
+  const { comment: _comment, ...rest } = queryWithoutTask(query) as Record<string, unknown>
+  return { path: taskPanelPath(projectId, taskId, comment), query: rest as LocationQueryRaw }
+}

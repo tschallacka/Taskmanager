@@ -3,7 +3,7 @@ import type { ProjectTask } from '~/composables/useProjects'
 import { taskCountLabel, terminalColumnIds } from '#shared/utils/board'
 import { boardLoadMessage, isBoardId } from '~/utils/boardLoad'
 import { queryForView } from '~/utils/projectViewQuery'
-import { queryWithoutTask, taskPanelPath } from '~/utils/taskPanelUrl'
+import { queryWithoutTask, taskPanelPath, taskQueryAsPanelAddress } from '~/utils/taskPanelUrl'
 
 // One page for the board and for its task panel addresses: the same key keeps the board mounted while the panel opens.
 definePageMeta({ layout: 'app', key: route => `projects/${route.params.id}` })
@@ -154,18 +154,20 @@ const drawerTaskId = computed<string | null>(() => {
   return typeof id === 'string' && id ? id : null
 })
 
-function openDrawerTask(taskId: string) {
-  navigateTo({ path: taskPanelPath(String(route.params.id), taskId), query: queryWithoutTask(route.query) })
+// Opens a card's panel. A comment, when given, stays in the path (/projects/<id>/<task>/<comment>), so the panel jumps to it.
+function openDrawerTask(taskId: string, commentId?: string | null) {
+  navigateTo({ path: taskPanelPath(String(route.params.id), taskId, commentId), query: queryWithoutTask(route.query) })
 }
 
 function closeDrawer() {
   navigateTo({ path: taskPanelPath(String(route.params.id)), query: queryWithoutTask(route.query) }, { replace: true })
 }
 
-// The old deep link ?task=<id> (global search and the home list) is rewritten to the path form.
-watch(() => route.query.task, (taskId) => {
-  if (typeof taskId !== 'string' || !taskId) return
-  navigateTo({ path: taskPanelPath(String(route.params.id), taskId), query: queryWithoutTask(route.query) }, { replace: true })
+// The old deep link ?task=<id>[&comment=<id>] (outside links, saved bookmarks) is rewritten to the path form, once. The
+// comment stays in the query, so the panel can jump to it; the panel removes it after the jump.
+watch(() => route.query.task, () => {
+  const address = taskQueryAsPanelAddress(String(route.params.id), route.query)
+  if (address) navigateTo({ path: address.path, query: address.query }, { replace: true })
 }, { immediate: true })
 
 const drawerTask = computed<ProjectTask | null>(() =>

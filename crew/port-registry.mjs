@@ -27,15 +27,40 @@ export function taskOfBranch(branch) {
   return match ? match[1] : null
 }
 
-/** Reads the registry; a missing or broken file is an empty registry. */
+// Ports that belong to copies the crew does not start or stop: Boss's dev copy and the testers' copies (tester-copy.sh).
+// Their entries are read-only and never pruned: nobody reserves, starts, stops or releases them.
+export const READ_ONLY_PORTS = {
+  3000: 'Boss\'s dev copy',
+  3105: 'quincy\'s tester copy',
+  3106: 'usher\'s tester copy',
+  3107: 'pat\'s tester copy',
+  3108: 'nina\'s tester copy'
+}
+
+/** The read-only entries, one per port in READ_ONLY_PORTS. Pid null, so they always hold their port. */
+export function readOnlyEntries() {
+  const ports = {}
+  for (const [port, label] of Object.entries(READ_ONLY_PORTS)) {
+    ports[port] = { worktree: `(read-only: ${label})`, branch: null, task: null, who: 'read-only', pid: null, started: null, readonly: true, label }
+  }
+  return ports
+}
+
+/** Reads the registry; a missing or broken file is an empty registry. The read-only entries are always present. */
 export function readRegistry(file) {
+  let reg = { ports: {} }
   try {
-    const reg = JSON.parse(fs.readFileSync(file, 'utf8'))
-    if (reg && typeof reg === 'object' && reg.ports && typeof reg.ports === 'object') return reg
+    const parsed = JSON.parse(fs.readFileSync(file, 'utf8'))
+    if (parsed && typeof parsed === 'object' && parsed.ports && typeof parsed.ports === 'object') reg = parsed
   } catch {
     // no registry yet, or a broken one: start from empty
   }
-  return { ports: {} }
+  return { ...reg, ports: { ...reg.ports, ...readOnlyEntries() } }
+}
+
+/** The read-only lines for `serve --check`: one per port, with whose copy it is. */
+export function readOnlyLines() {
+  return Object.entries(READ_ONLY_PORTS).map(([port, label]) => `read-only :${port} ${label}: nobody can take it`)
 }
 
 export function writeRegistry(file, reg) {
@@ -67,6 +92,7 @@ export function pruned(reg, alive) {
  */
 export function planReserve({ reg, port, who, worktree, branch, task, pid = null, alive, replace = false, now = new Date() }) {
   const current = reg.ports[port]
+  if (current?.readonly) return { ok: false, message: `port ${port} is read-only: ${current.label}. Nobody can take it.` }
   if (current && current.worktree === worktree && held(current, alive)) {
     return { ok: true, same: true, stop: null, next: { ...reg, ports: { ...reg.ports, [port]: { ...current, pid: pid ?? current.pid } } } }
   }
@@ -88,6 +114,7 @@ export function planReserve({ reg, port, who, worktree, branch, task, pid = null
 /** Plans a release: only the holder of a port (its worktree) frees it. */
 export function planRelease({ reg, port, worktree }) {
   const current = reg.ports[port]
+  if (current?.readonly) return { ok: false, message: `port ${port} is read-only: ${current.label}. It is not freed, and nothing is stopped.` }
   if (!current) return { ok: true, noop: true, stop: null, next: reg }
   if (current.worktree !== worktree) {
     return { ok: false, message: `port ${port} is held by ${current.worktree}, not by ${worktree}; it is not freed.` }
