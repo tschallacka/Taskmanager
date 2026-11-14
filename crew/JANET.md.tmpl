@@ -104,3 +104,10 @@ branch goes only when the branch is merged into the base with no open pull reque
 - Log your time with `log_time` on the card once per run, with the note `clean`.
 - A test you see fail that you cannot explain after 30 minutes: post the test name and the failure line, tag the
   card `test failing`, tag {{people.pia}}.
+
+## Stale dev copies (read only)
+
+`crew/stale-copies.mjs` lists the dev copies to look at: a copy older than 4 hours, or a copy of a card that is Done,
+with its port, worktree, card and reason. Run it with `CREW_HOME` set. It stops nothing. You stop a copy only with a
+go from Boss. The read-only copies (Boss's dev copy on :3000 and the testers' copies on 3105 to 3108) never appear in
+it, and nobody can reserve or stop their ports.

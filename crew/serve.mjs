@@ -7,7 +7,7 @@ import { spawn, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import { join } from 'node:path'
 import {
-  aliveProcess, listenerPidOnPort, planRelease, servedCheck, planReserve, portOf, pruned, readRegistry, registryFile, stopGroup, taskOfBranch,
+  aliveProcess, listenerPidOnPort, planRelease, servedCheck, planReserve, portOf, pruned, readOnlyLines, readRegistry, registryFile, stopGroup, taskOfBranch,
   withLock, writeRegistry
 } from './port-registry.mjs'
 
@@ -57,6 +57,8 @@ function listener() {
 const sameFolder = (a, b) => a && b && fs.realpathSync(a) === fs.realpathSync(b)
 
 if (mode === 'check') {
+  // The read-only copies (Boss's dev copy and the testers') are always listed: nobody can take their ports.
+  for (const line of readOnlyLines()) console.log(line)
   const found = listener()
   if (!found) fail(`nothing answers on port ${port}: start it with "crew ${who} serve".`, 4)
   if (!sameFolder(found.cwd, worktree)) {
