@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.28.2 - 2026-11-14
+
+- **The task panel's copy-link mark no longer writes after the panel is gone.** The "Copied" mark clears its two-second timer when the panel closes, and a second click restarts the two seconds. The tasks help page now says that a read-only panel (a customer's view) hides the custom fields and shows the other properties as values only. Files: `app/components/kanban/TaskDrawer.vue`, `docs/basics/tasks.md`, `tests/copy-task-link.test.ts`.
+
 ## 0.28.1 - 2026-11-13
 
 - **`crew up` starts the crew's background sessions and `crew down` stops them.** `crew up` reads `CREW_HOME/sessions/*.json` and starts every recorded person whose session is not running, with the same strict start as `crew session start` (the role file is the person's PROMPTS section plus the CREW.md standing rules, written to `sessions/<key>.role.md`, mode 600); a person with no card is started idle and waits for mail. `crew down` stops them. The daemon's API-error check now reads each person's session transcript in the session's own folder. Files: `crew/sessions-up.mjs`, `crew/up.mjs`, `crew/down.mjs`, `crew/session.mjs`, `crew/session-errors.mjs`, `crew/kit-files.txt`.

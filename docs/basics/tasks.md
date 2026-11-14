@@ -36,7 +36,8 @@ From top to bottom the panel has:
   with the customer** select, the **...** menu and the **X**.
 - The **title**.
 - Two columns, always in this order: **Assignee**, **Due date**, **Start date**, **Labels**, then any custom fields
-  such as **Priority**. An empty field shows its placeholder; click it to edit in place.
+  such as **Priority**. An empty field shows its placeholder; click it to edit in place. A read-only panel (a customer's
+  view) hides the custom fields and shows the other properties as values only.
 - Full-width blocks, in this order: **Time** (with **Start timer** and **Log time**), **Blocked by** and **GitHub**.
 - The **description**, in a rich editor. Its command row appears while the text has focus: see
   [Write in the editor](/help/basics/the-editor).
