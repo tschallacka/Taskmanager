@@ -6,6 +6,7 @@ import { columnDotAttrs } from '~/utils/tagColors'
 import { ACCENT_COLORS, colorHex } from '#shared/utils/colors'
 import { relativeTime } from '~/composables/useRelativeTime'
 import { deletionSourceLabel } from '#shared/utils/board'
+import { boardPeople } from '~/composables/useProjects'
 
 const props = defineProps<{ projectId: string }>()
 const emit = defineEmits<{ openTask: [taskId: string] }>()
@@ -428,6 +429,20 @@ function onPhoneDone() {
 function onPhoneMove(columnId: string) {
   if (phoneSheetTaskId.value) moveTask(phoneSheetTaskId.value, columnId, null, null)
 }
+// Assignee and due date from the sheet: the board's own calls, with the same error toasts.
+const phonePeople = computed(() => boardPeople().map(person => ({ id: person.id, name: person.name || person.email || '' })))
+function onPhoneAssign(personId: string | null) {
+  if (phoneSheetTaskId.value) void onAssign(phoneSheetTaskId.value, personId)
+}
+async function onPhoneDue(dueOn: string | null) {
+  const id = phoneSheetTaskId.value
+  if (!id) return
+  try {
+    await updateTask(id, { dueOn })
+  } catch {
+    toast.add({ title: 'Could not change the due date', icon: 'i-lucide-alert-triangle', color: 'error' })
+  }
+}
 
 // Delete on the phone sheet: a confirm first, then the same trash the task drawer uses (restorable from the toast).
 // The sheet closes right after its action, which clears phoneSheetTaskId, so the card is kept in its own ref.
@@ -725,9 +740,14 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onBoardKeydown))
     :title="phoneSheetTask?.title ?? ''"
     :columns="phoneColumns"
     :current-column-id="phoneSheetTask?.columnId ?? ''"
+    :people="phonePeople"
+    :current-assignee-id="phoneSheetTask?.assigneeId ?? null"
+    :due-on="phoneSheetTask?.dueOn ?? null"
     @update:open="(open: boolean) => { if (!open) phoneSheetTaskId = null }"
     @done="onPhoneDone"
     @move="onPhoneMove"
+    @assign="onPhoneAssign"
+    @due="onPhoneDue"
     @delete="onPhoneDelete"
   />
   <UModal
