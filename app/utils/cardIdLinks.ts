@@ -31,3 +31,29 @@ export function splitCardIds(text: string, mayOpen: (id: string) => boolean): Te
   if (last < text.length) pieces.push({ text: text.slice(last) })
   return pieces
 }
+
+/** The card ids in a text, in order, as written (before any check of who may open them). */
+export function cardIdsIn(text: string): string[] {
+  return [...text.matchAll(CARD_ID_PATTERN)].map(match => match[0])
+}
+
+/**
+ * The same rule for rendered HTML (a comment's Markdown): card ids in its text become links, and the tags around them are
+ * left as they are. `openable(id)` gives the card's board and title, or null when the reader may not open it.
+ */
+export function linkCardIdsInHtml(html: string, openable: (id: string) => { projectId: string, title: string } | null): string {
+  return html.replace(/(<[^>]*>)|([^<]+)/g, (segment: string, tag: string | undefined, text: string | undefined) => {
+    if (tag !== undefined || text === undefined) return segment
+    return splitCardIds(text, id => openable(id) !== null).map((piece) => {
+      if (!('id' in piece)) return piece.text
+      const card = openable(piece.id)
+      if (!card) return piece.id
+      const href = escapeHtml(cardIdHref(card.projectId, piece.id))
+      return `<a href="${href}" title="${escapeHtml(card.title)}" data-card-id-link>${piece.id}</a>`
+    }).join('')
+  })
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+}

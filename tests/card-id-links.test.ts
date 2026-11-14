@@ -2,7 +2,7 @@
 // reader may not open stays plain text, and text around the ids is kept in order.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { cardIdHref, splitCardIds } from '../app/utils/cardIdLinks'
+import { cardIdHref, cardIdsIn, linkCardIdsInHtml, splitCardIds } from '../app/utils/cardIdLinks'
 
 const openable = new Set(['mwasus18611939jk1av', 'mwddksx8b69fx30jn18'])
 const mayOpen = (id: string) => openable.has(id)
@@ -47,4 +47,24 @@ test('a card id links to the card in the path form on its board, never the old ?
 
 test('a word that only looks like an id (too short, or not starting with mw) is not split', () => {
   assert.deepEqual(splitCardIds('mw123 and xmwasus18611939jk1av', () => true), [{ text: 'mw123 and xmwasus18611939jk1av' }])
+})
+
+test('cardIdsIn lists the ids in a text in order, as written', () => {
+  assert.deepEqual(cardIdsIn('a mwasus18611939jk1av, then mwddksx8b69fx30jn18.'), ['mwasus18611939jk1av', 'mwddksx8b69fx30jn18'])
+  assert.deepEqual(cardIdsIn('none here'), [])
+})
+
+test('in rendered HTML, an openable id becomes a link with the card title, and the tags stay as they are', () => {
+  const card = { projectId: 'p1', title: 'Fix <the> "inbox"' }
+  const openable = (id: string) => (id === 'mwasus18611939jk1av' ? card : null)
+  const html = '<p class="x">See mwasus18611939jk1av and mwhidden0000000000000.</p>'
+  assert.equal(
+    linkCardIdsInHtml(html, openable),
+    '<p class="x">See <a href="/projects/p1/mwasus18611939jk1av" title="Fix &lt;the&gt; &quot;inbox&quot;" data-card-id-link>mwasus18611939jk1av</a> and mwhidden0000000000000.</p>'
+  )
+})
+
+test('in rendered HTML, text with no openable id is returned unchanged', () => {
+  const html = '<ul><li>mwhidden0000000000000</li></ul>'
+  assert.equal(linkCardIdsInHtml(html, () => null), html)
 })

@@ -89,7 +89,7 @@ const shownTask = ref<Task | null>(props.task)
 const route = useRoute()
 const openOnBoardTo = computed(() => {
   const task = shownTask.value
-  if (!task || route.path !== '/projects/inbox') return null
+  if (!task?.projectId || route.path !== '/projects/inbox') return null
   const comment = typeof route.params.comment === 'string' ? route.params.comment : null
   return taskLink(task.projectId, task.id, comment)
 })

@@ -4,6 +4,7 @@ import { relativeTime } from '~/composables/useRelativeTime'
 import { dueDayToMs } from '~/utils/dueDate'
 import { agentAuditLink } from '~/composables/useAgentAudit'
 import type { AgentAuditItem } from '~/composables/useAgentAudit'
+import CardIdText from '~/components/CardIdText.vue'
 
 definePageMeta({ layout: 'app' })
 
@@ -408,7 +409,7 @@ async function sendTest() {
                     v-if="item.body"
                     class="mt-0.5 line-clamp-2 text-xs text-muted"
                   >
-                    {{ item.body }}
+                    <CardIdText :text="item.body" />
                   </p>
                   <p class="mt-1 text-xs text-dimmed">
                     {{ item.projectName }}

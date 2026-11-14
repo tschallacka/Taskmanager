@@ -33,6 +33,9 @@ Items are grouped by the day they arrived, newest first. An unread item has a do
    opens scrolled to that comment and highlighted for a moment, so you land on the reply itself.
 4. **Mark all read** in the header clears the whole list at once. It only shows while something is unread.
 
+A card id written in a message, a comment or a task (such as `mwasus18611939jk1av`) is a link to that card, with the card's
+title as its tooltip. An id of a card you cannot open stays plain text.
+
 If the board is no longer available to you, or the task is gone, you get a short message saying so instead of the
 task.
 
