@@ -717,7 +717,7 @@ const menuItems = computed(() => [[
           <!-- Properties, two columns on a wide panel and rows on a phone, in this order: Assignee, Due date,
                Start date, Labels, the custom fields (Priority). Time, Blocked by and GitHub are full-width blocks
                below them (redesign card 5/9). -->
-          <dl class="grid shrink-0 grid-cols-1 gap-x-6 gap-y-1.5 px-5 pb-3 text-xs md:grid-cols-2">
+          <dl class="grid shrink-0 grid-cols-1 gap-x-6 gap-y-1.5 px-5 pb-3 text-xs md:grid-cols-2 [&>div]:max-md:min-h-11">
             <div
               class="grid grid-cols-[6rem_1fr] items-center gap-x-3"
               :class="readonly ? '' : chevronRow"
