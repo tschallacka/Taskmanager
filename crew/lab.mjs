@@ -15,9 +15,13 @@ export function parseSubmit(args) {
   const out = { branch: null, file: null, repeat: null }
   for (let i = 0; i < args.length; i += 1) {
     const a = args[i]
-    if (a === '--file') { out.file = args[i + 1] ?? ''; i += 1 }
-    else if (a === '--repeat') { out.repeat = args[i + 1] ?? ''; i += 1 }
-    else if (a.startsWith('--')) return { error: `unknown flag ${a}` }
+    if (a === '--file') {
+      out.file = args[i + 1] ?? ''
+      i += 1
+    } else if (a === '--repeat') {
+      out.repeat = args[i + 1] ?? ''
+      i += 1
+    } else if (a.startsWith('--')) return { error: `unknown flag ${a}` }
     else if (out.branch === null) out.branch = a
     else return { error: `one branch only; got ${a}` }
   }
@@ -53,7 +57,7 @@ export function main(argv, home = crewHome(), now = new Date()) {
   if (cmd === 'cancel') {
     const branch = args[0]
     if (!branch) return { code: 64, lines: ['usage: crew <who> lab cancel <branch>'] }
-    const out = withQueue(home, queue => {
+    const out = withQueue(home, (queue) => {
       const r = cancel(queue, branch)
       return r.ok ? { result: r, queue: r.queue } : { result: r }
     })

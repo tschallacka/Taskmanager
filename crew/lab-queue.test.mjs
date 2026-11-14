@@ -2,8 +2,7 @@
 // the status lines, the RESULT line, and the file under its lock. Fake data and a temp folder only.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import fs from 'node:fs'
-import { mkdtempSync } from 'node:fs'
+import fs, { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {

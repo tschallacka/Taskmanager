@@ -63,7 +63,7 @@ test('the cards checked are the live copies cards: a reservation, a read-only en
       3101: copy({ task: 'mwa' }),
       3102: copy({ task: 'mwb', pid: 999 }),
       3103: copy({ task: 'mwc', pid: null }),
-      3000: { ...copy({ task: 'mwd' }), readonly: true, label: "Boss's dev copy" },
+      3000: { ...copy({ task: 'mwd' }), readonly: true, label: 'Boss\'s dev copy' },
       3104: copy({ task: 'mwa', pid: 4300 })
     }
   }

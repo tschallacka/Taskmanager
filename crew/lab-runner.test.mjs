@@ -3,8 +3,7 @@
 // (dry mode). Fake slots and fake job runs; the one spawned process is the dry script, which runs no step.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import fs from 'node:fs'
-import { mkdtempSync, writeFileSync, mkdirSync, readdirSync, readFileSync, existsSync } from 'node:fs'
+import fs, { mkdtempSync, writeFileSync, mkdirSync, readdirSync, readFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -24,7 +23,7 @@ const fakeSlot = (granted, holder = null) => {
   const calls = { acquire: [], release: 0 }
   return {
     calls,
-    acquire: purpose => {
+    acquire: (purpose) => {
       calls.acquire.push(purpose)
       return { granted, holder }
     },
@@ -117,7 +116,9 @@ test('a run that throws releases the slot and leaves the job running, so a resta
   const h = home()
   withQueue(h, q => ({ result: null, queue: enqueue(q, { branch: 'wade/a', file: null, repeat: 1 }, { id: 'lab-1', by: 'wade', now: NOW }).queue }))
   const slot = fakeSlot(true)
-  await assert.rejects(runOne(h, { slot, now: () => NOW, runJob: async () => { throw new Error('boom') } }), /boom/)
+  await assert.rejects(runOne(h, { slot, now: () => NOW, runJob: async () => {
+    throw new Error('boom')
+  } }), /boom/)
   assert.equal(slot.calls.release, 1)
   assert.equal(readQueue(queueFile(h)).jobs[0].state, 'running')
   recoverAfterRestart(h, NOW)
@@ -237,7 +238,9 @@ test('fix 4: the grant is refreshed while the run goes on, and not after it ends
   const h = home()
   withQueue(h, q => ({ result: null, queue: enqueue(q, { branch: 'wade/a', file: null, repeat: 1 }, { id: 'lab-1-abcdef', by: 'wade', now: NOW }).queue }))
   let refreshes = 0
-  const slot = { acquire: () => ({ granted: true }), release: () => {}, refresh: () => { refreshes += 1 } }
+  const slot = { acquire: () => ({ granted: true }), release: () => {}, refresh: () => {
+    refreshes += 1
+  } }
   await runOne(h, {
     slot,
     now: () => NOW,

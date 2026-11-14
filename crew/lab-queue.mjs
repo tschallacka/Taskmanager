@@ -3,8 +3,7 @@
 // without a file the whole suite runs. The queue is CREW_HOME/lab/lab-queue.json, written under one lock file. The
 // functions here are pure except the two file helpers at the bottom, so the tests need no process.
 import fs from 'node:fs'
-import { join } from 'node:path'
-import { dirname } from 'node:path'
+import { join, dirname } from 'node:path'
 import { withLock } from './port-registry.mjs'
 
 export const QUEUE_LIMIT = 50
@@ -87,7 +86,7 @@ export function finish(queue, id, result, now) {
 
 /** After a restart: a job that was running is queued again, once. A second crash is a failure, not a loop. */
 export function requeueRunning(queue, now) {
-  const jobs = queue.jobs.map(j => {
+  const jobs = queue.jobs.map((j) => {
     if (j.state !== 'running') return j
     if (j.attempts < MAX_ATTEMPTS) return { ...j, state: 'queued', requeued: now }
     return { ...j, state: 'failed', finished: now, result: { status: 'fail', stage: 'crash', pass: 0, fail: 0 } }
@@ -131,7 +130,7 @@ export function parseResult(text) {
   const line = lines[lines.length - 1]
   if (!line) return { status: 'fail', stage: 'no-result', pass: 0, fail: 0 }
   const status = /^RESULT: pass\b/.test(line) ? 'pass' : 'fail'
-  const field = name => {
+  const field = (name) => {
     const m = new RegExp(`\\b${name}=([^\\s]+)`).exec(line)
     return m ? m[1] : null
   }

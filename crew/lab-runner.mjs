@@ -51,7 +51,7 @@ export function drainRequests(home, { now = new Date().toISOString(), withQueueF
       continue
     }
     const id = String(request.id)
-    const out = withQueueFn(home, queue => {
+    const out = withQueueFn(home, (queue) => {
       const added = enqueue(queue, check.sample, { id, by: String(request.by ?? '?'), now })
       if (!added.ok) return { result: { ok: false, message: added.message } }
       return { result: { ok: true, position: added.position }, queue: added.queue }
@@ -121,14 +121,14 @@ export function jobEnv(home, base = process.env) {
  * cannot start) is a failed run at stage spawn, not a crash of the runner. The child gets jobEnv(), nothing more.
  */
 export function runJobScript(home, job, { script = join(kit, 'lab-run.sh'), timeoutMs = RUN_TIMEOUT_MS, shell = 'sh', base = process.env } = {}) {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     const args = [script, job.id, job.branch]
     if (job.file) args.push(job.file, String(job.repeat ?? 1))
     let stdout = ''
     let timedOut = false
     let finished = false
     let timer = null
-    const done = out => {
+    const done = (out) => {
       if (finished) return
       finished = true
       if (timer) clearTimeout(timer)
@@ -145,9 +145,12 @@ export function runJobScript(home, job, { script = join(kit, 'lab-run.sh'), time
       timedOut = true
       child.kill('SIGTERM')
     }, timeoutMs)
-    child.stdout.on('data', d => { stdout += d })
-    child.stderr.on('data', d => { stdout += d })
-    child.on('error', error => {
+    const collect = (d) => {
+      stdout += d
+    }
+    child.stdout.on('data', collect)
+    child.stderr.on('data', collect)
+    child.on('error', (error) => {
       stdout += `spawn failed: ${error.message}\nRESULT: fail stage=spawn pass=0 fail=0\n`
       done({ stdout, timedOut: false })
     })
@@ -159,7 +162,7 @@ export function runJobScript(home, job, { script = join(kit, 'lab-run.sh'), time
 export async function realSlot(home) {
   const heavy = await import(pathToFileURL(join(kit, 'heavy-slot.mjs')).href)
   return {
-    acquire: purpose => {
+    acquire: (purpose) => {
       const procs = heavy.readProcs()
       const out = heavy.decideSlot({ home, asker: 'lab', purpose: `lab ${purpose}`, procs })
       return { granted: out.granted, holder: out.holder ?? null }
@@ -208,7 +211,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     console.error('lab-runner: CREW_HOME is not set')
     process.exit(2)
   }
-  main(process.argv.slice(2), home).catch(error => {
+  main(process.argv.slice(2), home).catch((error) => {
     console.error(`lab-runner: ${error.message}`)
     process.exit(1)
   })
