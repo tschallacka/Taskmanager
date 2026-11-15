@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { inviteSentence } from '~/utils/inviteSentence'
+
 useSeoMeta({ title: 'Invitation' })
 
 const route = useRoute()
@@ -11,7 +13,7 @@ const { session, isPending: sessionPending } = useAuth()
 type InvitationPreview
   = | { kind: 'customer', customerName: string, organizationName: string }
     | { kind: 'team', organizationName: string, inviterName: string | null, role: string, forYou: boolean | null }
-    | { kind: 'board', projectName: string, inviterName: string | null, role: string, forYou: boolean | null }
+    | { kind: 'board', projectName: string, organizationName: string | null, inviterName: string | null, role: string, forYou: boolean | null }
 
 // Reading the invitation also sets the cookie that lets its recipient create an
 // account where sign-up is otherwise closed, so it has to happen in the browser.
@@ -19,6 +21,23 @@ const { data: invitation, error: loadError, pending } = await useFetch<Invitatio
   () => `/api/invitations/${token.value}`,
   { server: false }
 )
+
+// The words for a team or a board invitation. The page does not learn the address (see above), so the
+// footnote with the email is not shown here, and the invitee's name is not known yet.
+const words = computed(() => {
+  const invite = invitation.value
+  if (!invite || invite.kind === 'customer') return null
+  if (invite.kind === 'team') {
+    return inviteSentence({ kind: 'team', org: invite.organizationName, name: null, email: '' })
+  }
+  return inviteSentence({
+    kind: 'project',
+    org: invite.organizationName ?? invite.inviterName ?? 'Someone',
+    project: invite.projectName,
+    name: null,
+    email: ''
+  })
+})
 
 const loadMessage = computed(() => {
   const status = loadError.value?.statusCode
@@ -68,21 +87,16 @@ async function accept() {
       <div class="text-center space-y-2">
         <AppLogo class="text-2xl mx-auto block" />
         <h1 class="text-xl font-semibold text-white">
-          You're invited
+          {{ words ? words.headline : "You're invited" }}
         </h1>
         <p
           v-if="invitation"
           class="text-sm text-zinc-400"
         >
-          <template v-if="invitation.kind === 'team'">
-            {{ invitation.inviterName ?? 'Someone' }} invited you to join
-            <span class="text-zinc-200 font-medium">{{ invitation.organizationName }}</span>.
+          <template v-if="words">
+            {{ words.sentence }}
           </template>
-          <template v-else-if="invitation.kind === 'board'">
-            {{ invitation.inviterName ?? 'Someone' }} invited you to the board
-            <span class="text-zinc-200 font-medium">{{ invitation.projectName }}</span>.
-          </template>
-          <template v-else>
+          <template v-else-if="invitation.kind === 'customer'">
             {{ invitation.organizationName }} invited you to follow the projects of
             <span class="text-zinc-200 font-medium">{{ invitation.customerName }}</span>.
           </template>
@@ -141,7 +155,7 @@ async function accept() {
             :loading="accepting"
             @click="accept"
           >
-            Accept invitation
+            {{ words ? words.button : 'Accept invitation' }}
           </UButton>
         </template>
         <template v-else-if="invitation.kind === 'customer'">
