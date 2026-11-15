@@ -13,7 +13,7 @@ const script = view.slice(0, view.indexOf('</script>'))
 const fnBody = (name: string) => script.slice(script.indexOf(`function ${name}(`), script.indexOf('\n}\n', script.indexOf(`function ${name}(`)))
 
 test('the view imports the timeline key rule, the tap items and the shared date rule', () => {
-  assert.match(view, /import \{ timelineKeyAction, type TimelineAction \} from '~\/utils\/timelineKeys'/)
+  assert.match(view, /import \{ timelineKeyAction, timelineKeyHoldsArrow, type TimelineAction \} from '~\/utils\/timelineKeys'/)
   assert.match(view, /import \{ nudgePatch \} from '~\/utils\/dateNudge'/)
   assert.match(view, /import \{ TIMELINE_TAP_ITEMS, tapItemAction, type TimelineTapItem \} from '~\/utils\/timelineTap'/)
 })
@@ -23,6 +23,12 @@ test('a focused bar moves with the keys: its keydown runs the key action', () =>
   assert.match(view, /function onBarKey\(task: DatedTask, event: KeyboardEvent\)/)
   assert.match(fnBody('onBarKey'), /const action = timelineKeyAction\(event\.key, \{ shift: event\.shiftKey, alt: event\.altKey \}\)/)
   assert.match(fnBody('onBarKey'), /await applyBarAction\(task, action\)/)
+})
+
+test('a focused bar keeps Left and Right: preventDefault runs before the key action, so Alt+Left and Alt+Right do not reach the browser', () => {
+  const body = fnBody('onBarKey')
+  assert.match(body, /if \(timelineKeyHoldsArrow\(event\.key\)\) event\.preventDefault\(\)/)
+  assert.ok(body.indexOf('timelineKeyHoldsArrow(') < body.indexOf('timelineKeyAction('), 'the hold check comes before the action')
 })
 
 test('a Move-the-bar menu item runs the tap action, through the same save', () => {

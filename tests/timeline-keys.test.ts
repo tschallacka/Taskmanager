@@ -4,8 +4,19 @@
 //   node --import tsx --test tests/timeline-keys.test.ts
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { timelineKeyAction } from '../app/utils/timelineKeys'
+import { timelineKeyAction, timelineKeyHoldsArrow } from '../app/utils/timelineKeys'
 import { nudgePatch } from '../app/utils/dateNudge'
+
+test('Left and Right belong to a focused bar, Alt included: the page stops the browser Back and Forward for them', () => {
+  // Alt+ArrowLeft and Alt+ArrowRight are the browser's Back and Forward; the bar takes them (accepted by Boss, 2026-11-15).
+  assert.equal(timelineKeyHoldsArrow('ArrowLeft'), true)
+  assert.equal(timelineKeyHoldsArrow('ArrowRight'), true)
+  assert.ok(timelineKeyAction('ArrowLeft', { alt: true }))
+  assert.ok(timelineKeyAction('ArrowRight', { alt: true }))
+  assert.equal(timelineKeyHoldsArrow('ArrowUp'), false)
+  assert.equal(timelineKeyHoldsArrow('ArrowDown'), false)
+  assert.equal(timelineKeyHoldsArrow('Enter'), false)
+})
 
 test('a plain arrow moves the whole bar one day', () => {
   assert.deepEqual(timelineKeyAction('ArrowRight', {}), { mode: 'move', delta: 1 })

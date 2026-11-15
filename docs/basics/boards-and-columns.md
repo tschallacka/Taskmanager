@@ -56,7 +56,8 @@ Dragging a card or a bar is the quick way to move it. The same moves are open to
   by a day, Up and Down by a week. On a phone, tap a day to put the picked task there. Undated tasks are listed under
   *No date*, and the same control sets their day.
 - **Timeline.** Focus a bar and press an arrow key: Left and Right move the whole bar a day. Hold Shift with an arrow to
-  change only its due date, or Alt with an arrow to change only its start date. On a phone, or with a mouse, use the
+  change only its due date, or Alt with an arrow to change only its start date. While a bar has focus, Left and Right
+  (Alt included) belong to the bar, so the browser's Back and Forward do not run and the page stays put. On a phone, or with a mouse, use the
   row's **Move the bar** menu: *Move one day earlier*, *Move one day later*, *End one day earlier* and *End one day later*.
   The two *End* items change the due date only. Each item gives the same dates as its key.
 

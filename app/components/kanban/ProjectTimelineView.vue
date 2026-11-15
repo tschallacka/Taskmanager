@@ -2,7 +2,7 @@
 import { addDays, differenceInCalendarDays, format, startOfDay, startOfWeek } from 'date-fns'
 import { dueDayToMs } from '~/utils/dueDate'
 import { errorMessage } from '~/utils/untypedFetch'
-import { timelineKeyAction, type TimelineAction } from '~/utils/timelineKeys'
+import { timelineKeyAction, timelineKeyHoldsArrow, type TimelineAction } from '~/utils/timelineKeys'
 import { nudgePatch } from '~/utils/dateNudge'
 import { TIMELINE_TAP_ITEMS, tapItemAction, type TimelineTapItem } from '~/utils/timelineTap'
 
@@ -162,10 +162,11 @@ async function tapBar(task: DatedTask, id: TimelineTapItem['id']) {
 
 // The keyboard path for a focused bar: a plain arrow moves it a day, Shift changes its end, Alt its start (timelineKeys.ts).
 // The dates come from the same rule the drag uses (dateNudge.ts), so a key move lands where a drag would.
+// Left and Right are the bar's even with Alt, so the browser's Back and Forward do not run while the bar has focus.
 async function onBarKey(task: DatedTask, event: KeyboardEvent) {
+  if (timelineKeyHoldsArrow(event.key)) event.preventDefault()
   const action = timelineKeyAction(event.key, { shift: event.shiftKey, alt: event.altKey })
   if (!action) return
-  event.preventDefault()
   await applyBarAction(task, action)
 }
 
