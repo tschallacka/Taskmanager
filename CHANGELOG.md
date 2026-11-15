@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.36.0 - 2026-11-15
+
+- **The calendar, the timeline and the More pages get keyboard and tap paths.** A task on the calendar moves with the arrow keys or with its Move control and a tap on a day, undated tasks included; a timeline bar moves with the arrow keys (Shift for its end, Alt for its start; Alt+Left and Alt+Right stay on the bar and do not go Back or Forward in the browser) and with its row's Move-the-bar menu; Overview, Messages, Time and Files sit under a More menu in the board's view row (master's row, which also holds Office). The pointer drags are unchanged. `app/components/kanban/ProjectCalendarView.vue`, `app/components/kanban/ProjectTimelineView.vue`, `app/pages/projects/[id].vue`, `app/utils/calendarKeys.ts`, `app/utils/calendarTap.ts`, `app/utils/timelineKeys.ts`, `app/utils/timelineTap.ts`, `app/utils/dateNudge.ts`.
+
 ## 0.35.0 - 2026-11-15
 
 - **Crew up and crew session start take a role file for keys with no worker section.** A session for Nina, Pat or Quincy starts from its own sessions/<key>.role.md; before, crew up reported "no worker role for this key" and `crew session start` needed CREW_ROLE_FILE. Both commands now resolve the role in one order, and CREW_ROLE_FILE, when set, overrides both. The four workers still get their role rebuilt from PROMPTS.md on every start, so a prompt change reaches them. One module, crew/role-file.mjs, holds the role file path and its key check for both commands. Files: crew/role-file.mjs, crew/sessions-up.mjs, crew/session.mjs, crew/kit-files.txt, and their tests.
