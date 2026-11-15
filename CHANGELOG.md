@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.33.0 - 2026-11-15
+
+- **The board's top bar and view row follow the redesign.** The top bar shows the Team › Project crumb, the project's health chip (from Overview) and the board's people as avatars, four and then a count. The view row shows Board, List, Calendar, Timeline and Dashboard as tabs, with Overview, Messages, Time, Files and Office under More, and New task at its right end on the Board view. A search box filters the cards by title, the Filter button holds the labels and Show deleted, and a visit opens the view last chosen on that board. Nothing is removed. Files: `app/pages/projects/[id].vue`, `app/components/kanban/KanbanBoard.vue`, `app/composables/useProjects.ts`, `docs/basics/boards-and-columns.md`, `tests/board-page-crumb.test.ts`.
+
 ## 0.32.1 - 2026-11-15
 
 - **Help: a page on updating a crew that already exists.** `docs/crews/update-a-crew.md` explains the one-line update, `crew update --check`, what an update replaces and keeps, and `crew people add` for roles a crew is missing. It is linked from the help index and from the page on adding a crew. Docs only.

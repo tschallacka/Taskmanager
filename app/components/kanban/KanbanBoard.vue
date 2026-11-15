@@ -2,7 +2,7 @@
 import Sortable from 'sortablejs'
 import type { DropdownMenuItem } from '@nuxt/ui'
 import type { ProjectColumn, ProjectTask } from '~/composables/useProjects'
-import { columnDotAttrs } from '~/utils/tagColors'
+import { columnDotAttrs, isDoneColumnName } from '~/utils/tagColors'
 import { ACCENT_COLORS, colorHex } from '#shared/utils/colors'
 import { relativeTime } from '~/composables/useRelativeTime'
 import { deletionSourceLabel } from '#shared/utils/board'
@@ -20,6 +20,7 @@ const {
   visibleColumnTasks,
   commentCount,
   activeTags,
+  searchText,
   isTrashed,
   createTask,
   moveTask,
@@ -424,6 +425,13 @@ function columnMenu(column: ProjectColumn): DropdownMenuItem[][] {
 // there is nothing trashed in state to draw.
 const liveColumns = computed(() => boardColumns.value.filter(column => !isTrashed(column)))
 
+// The page's New task button (row 2): opens the composer in the first column, the same as that column's Add task.
+function newTask() {
+  const first = liveColumns.value[0]
+  if (first) startCompose(first.id)
+}
+defineExpose({ newTask })
+
 // A live column counts the cards on it, as it always has; the trashed cards
 // sitting in it are not part of the board. A trashed column counts what
 // restoring it would bring back, which is everything still inside it.
@@ -505,7 +513,9 @@ async function submitColumn() {
   if (name) await addColumn(props.projectId, name)
 }
 
-const isFiltering = computed(() => activeTags.value.length > 0)
+const isFiltering = computed(() => activeTags.value.length > 0 || searchText.value.trim() !== '')
+
+// The Done column gets the dashed drop slot when it is empty: finished work lands here.
 
 // Filtered once per render instead of three times per column (header count,
 // list and empty state each asked for the same list).
@@ -852,6 +862,14 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onBoardKeydown))
           class="px-1 py-2 text-xs text-dimmed"
         >
           Nothing matches the filter
+        </p>
+
+        <p
+          v-else-if="!isFiltering && isDoneColumnName(column.name) && tasksOf(column.id).length === 0"
+          class="rounded-lg border border-dashed border-default px-3 py-4 text-center text-sm leading-5 text-muted"
+          data-done-drop-slot
+        >
+          Drag a finished task here, or tick its circle.
         </p>
 
         <!-- Composer sits with the cards, not pinned to the bottom of a tall
