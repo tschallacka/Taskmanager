@@ -25,5 +25,6 @@ const model = defineModel<string>()
     :placeholder="props.placeholder"
     :disabled="props.disabled"
     :size="props.size"
+    :ui="{ base: 'min-h-11 sm:min-h-0' }"
   />
 </template>
