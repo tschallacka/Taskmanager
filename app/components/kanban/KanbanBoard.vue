@@ -6,6 +6,7 @@ import { columnDotAttrs, isDoneColumnName } from '~/utils/tagColors'
 import { ACCENT_COLORS, colorHex } from '#shared/utils/colors'
 import { relativeTime } from '~/composables/useRelativeTime'
 import { deletionSourceLabel } from '#shared/utils/board'
+import { boardPeople } from '~/composables/useProjects'
 
 const props = defineProps<{ projectId: string }>()
 const emit = defineEmits<{ openTask: [taskId: string] }>()
@@ -432,6 +433,93 @@ function newTask() {
 }
 defineExpose({ newTask })
 
+// The phone shows one column at a time (redesign 9/9). The picker sets `phoneColumnId`; until it is set, the first
+// live column shows. Below lg only: on desktop every column stays visible, as it always was.
+const phoneColumnId = ref<string | null>(null)
+// A column that was trashed after it was picked is no longer shown: the first live column takes its place.
+const phoneActiveId = computed(() => (liveColumns.value.some(c => c.id === phoneColumnId.value) ? phoneColumnId.value : liveColumns.value[0]?.id) ?? '')
+const phoneColumns = computed(() => liveColumns.value.map(column => ({
+  id: column.id,
+  name: column.name,
+  count: visibleColumnTasks(column.id).length
+})))
+function phoneHidden(columnId: string) {
+  return columnId !== phoneActiveId.value
+}
+
+// On a phone a horizontal swipe moves to the next or previous column (design page09: "swipe for other columns"). The
+// swipe must be mostly sideways, so an up-and-down scroll of a card list is not taken for one. The desktop is left alone.
+let phoneSwipeStart: { x: number, y: number } | null = null
+function onPhoneTouchStart(event: TouchEvent) {
+  const touch = event.touches[0]
+  phoneSwipeStart = touch ? { x: touch.clientX, y: touch.clientY } : null
+}
+function onPhoneTouchEnd(event: TouchEvent) {
+  const start = phoneSwipeStart
+  phoneSwipeStart = null
+  const touch = event.changedTouches[0]
+  if (!start || !touch || window.matchMedia('(min-width: 1024px)').matches) return
+  const dx = touch.clientX - start.x
+  const dy = touch.clientY - start.y
+  if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return
+  const ids = phoneColumns.value.map(column => column.id)
+  const next = ids[ids.indexOf(phoneActiveId.value) + (dx < 0 ? 1 : -1)]
+  if (next) phoneColumnId.value = next
+}
+
+// The phone's bottom sheet for one card (9/9). The sheet only emits; these handlers call the board's own functions.
+// Assign and due date have no picker yet, and Delete waits for a live-card trash action, so the sheet does not wire them.
+const phoneSheetTaskId = ref<string | null>(null)
+const phoneSheetTask = computed(() => board.value?.tasks.find(t => t.id === phoneSheetTaskId.value) ?? null)
+function onPhoneDone() {
+  if (phoneSheetTaskId.value) onToggleComplete(phoneSheetTaskId.value)
+}
+function onPhoneMove(columnId: string) {
+  if (phoneSheetTaskId.value) void onMoveTask(phoneSheetTaskId.value, columnId)
+}
+// Assignee and due date from the sheet: the board's own calls, with the same error toasts.
+const phonePeople = computed(() => boardPeople().map(person => ({ id: person.id, name: person.name || person.email || '' })))
+function onPhoneAssign(personId: string | null) {
+  if (phoneSheetTaskId.value) void onAssign(phoneSheetTaskId.value, personId)
+}
+async function onPhoneDue(dueOn: string | null) {
+  const id = phoneSheetTaskId.value
+  if (!id) return
+  try {
+    await updateTask(id, { dueOn })
+  } catch {
+    toast.add({ title: 'Could not change the due date', icon: 'i-lucide-alert-triangle', color: 'error' })
+  }
+}
+
+// Delete on the phone sheet: a confirm first, then the same trash the task drawer uses (restorable from the toast).
+// The sheet closes right after its action, which clears phoneSheetTaskId, so the card is kept in its own ref.
+const phoneDeleteOpen = ref(false)
+const phoneDeleteTaskId = ref<string | null>(null)
+function onPhoneDelete() {
+  phoneDeleteTaskId.value = phoneSheetTaskId.value
+  phoneDeleteOpen.value = true
+}
+async function confirmPhoneDelete() {
+  const id = phoneDeleteTaskId.value
+  phoneDeleteOpen.value = false
+  phoneDeleteTaskId.value = null
+  phoneSheetTaskId.value = null
+  if (!id) return
+  try {
+    await deleteTask(id)
+    toast.add({
+      title: 'Task moved to Trash',
+      icon: 'i-lucide-trash-2',
+      duration: 10000,
+      actions: [{ label: 'Undo', onClick: () => void onRestoreTask(id) }]
+    })
+  } catch {
+    // The same words as the desktop's delete (onDeleteTask). The phone adds a confirm and an Undo toast; the card says why.
+    toast.add({ title: 'Could not move the task to the trash', icon: 'i-lucide-alert-triangle', color: 'error' })
+  }
+}
+
 // A live column counts the cards on it, as it always has; the trashed cards
 // sitting in it are not part of the board. A trashed column counts what
 // restoring it would bring back, which is everything still inside it.
@@ -498,12 +586,16 @@ async function confirmPurgeColumn() {
 const addingColumn = ref(false)
 const newColumnName = ref('')
 const newColumnEl = ref<HTMLInputElement | null>(null)
+const phoneNewColumnEl = ref<HTMLInputElement | null>(null)
 
 async function startAddColumn() {
   addingColumn.value = true
   newColumnName.value = ''
   await nextTick()
-  newColumnEl.value?.focus()
+  // Focus the field that is showing: the phone field below the lg breakpoint, the desktop one above it.
+  const phone = window.matchMedia('(max-width: 1023.98px)').matches
+  const field = phone ? phoneNewColumnEl.value : newColumnEl.value
+  field?.focus()
 }
 
 async function submitColumn() {
@@ -691,19 +783,91 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onBoardKeydown))
 </script>
 
 <template>
+  <PhoneColumnPicker
+    v-if="board"
+    :columns="phoneColumns"
+    :active-id="phoneActiveId"
+    :can-add="!isCustomerView"
+    @select="phoneColumnId = $event"
+    @add="startAddColumn"
+  />
+  <p
+    v-if="board"
+    data-testid="phone-swipe-hint"
+    class="px-4 pb-2 text-center text-xs text-dimmed lg:hidden"
+  >
+    ‹ swipe for other columns ›
+  </p>
+  <!-- The phone's Add column name field: the desktop one below is hidden on a phone. -->
+  <div
+    v-if="addingColumn && !isCustomerView"
+    class="px-4 pb-2 lg:hidden"
+  >
+    <input
+      ref="phoneNewColumnEl"
+      v-model="newColumnName"
+      placeholder="Column name"
+      class="w-full rounded-xl border border-primary/60 bg-default px-3 py-2.5 text-sm text-default outline-none placeholder:text-dimmed"
+      @keydown.enter.prevent="submitColumn"
+      @keydown.escape="addingColumn = false"
+      @blur="submitColumn"
+    >
+  </div>
+  <PhoneCardSheet
+    v-if="board"
+    :open="phoneSheetTask !== null"
+    :title="phoneSheetTask?.title ?? ''"
+    :columns="phoneColumns"
+    :current-column-id="phoneSheetTask?.columnId ?? ''"
+    :people="phonePeople"
+    :current-assignee-id="phoneSheetTask?.assigneeId ?? null"
+    :due-on="phoneSheetTask?.dueOn ?? null"
+    @update:open="(open: boolean) => { if (!open) phoneSheetTaskId = null }"
+    @done="onPhoneDone"
+    @move="onPhoneMove"
+    @assign="onPhoneAssign"
+    @due="onPhoneDue"
+    @delete="onPhoneDelete"
+  />
+  <UModal
+    v-if="board"
+    v-model:open="phoneDeleteOpen"
+    title="Delete task?"
+    description="It moves to the board's trash with its updates. Project options > Show trashed can restore it for the next 7 days."
+    :ui="{ footer: 'justify-end' }"
+  >
+    <template #footer>
+      <UButton
+        label="Cancel"
+        color="neutral"
+        variant="ghost"
+        @click="phoneDeleteOpen = false"
+      />
+      <UButton
+        label="Delete task"
+        color="error"
+        @click="confirmPhoneDelete"
+      />
+    </template>
+  </UModal>
   <div
     v-if="board"
     ref="boardEl"
     class="flex h-full min-h-0 items-stretch gap-3 overflow-x-auto px-4 py-4 lg:px-6"
+    @touchstart.passive="onPhoneTouchStart"
+    @touchend.passive="onPhoneTouchEnd"
   >
     <section
       v-for="column in boardColumns"
       :key="column.id"
       :data-column-id="column.id"
       class="kanban-column flex h-full w-[19rem] shrink-0 flex-col rounded-xl"
-      :class="isTrashed(column)
-        ? 'kanban-column-trashed border border-dashed border-default bg-elevated/20 opacity-60 transition-opacity hover:opacity-100'
-        : 'bg-elevated/50'"
+      :class="[
+        phoneHidden(column.id) ? 'max-lg:hidden' : '',
+        isTrashed(column)
+          ? 'kanban-column-trashed border border-dashed border-default bg-elevated/20 opacity-60 transition-opacity hover:opacity-100'
+          : 'bg-elevated/50'
+      ]"
     >
       <!-- A trashed column is a header and its cards, and nothing that edits
            them: the two ways out are restoring it or removing it for good. -->
@@ -840,6 +1004,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onBoardKeydown))
             :customer-board="!!activeProject?.customerId"
             @open="emit('openTask', $event)"
             @toggle-complete="onToggleComplete"
+            @menu="phoneSheetTaskId = $event"
             @assign="onAssign"
             @move="onMoveTask"
             @delete="onDeleteTask"
@@ -901,7 +1066,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onBoardKeydown))
     <!-- Add column -->
     <div
       v-if="!isCustomerView"
-      class="kanban-add-column w-[19rem] shrink-0 self-start"
+      class="kanban-add-column hidden w-[19rem] shrink-0 self-start lg:block"
     >
       <input
         v-if="addingColumn"

@@ -78,10 +78,13 @@ watch(railCollapsed, (value) => {
       </header>
       <!-- The page scrolls here: a page without a scroller of its own (the help pages, Instance settings at a short
            window) reaches its last line. Horizontal overflow stays clipped, as it was. -->
-      <div class="flex min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
+      <div class="flex min-w-0 flex-1 overflow-x-hidden overflow-y-auto pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))] lg:pb-0">
         <slot />
       </div>
     </div>
+
+    <!-- The phone's bottom tab bar (9/9). The page above keeps its bottom clear of it at phone width. -->
+    <BottomTabBar />
 
     <SearchModal />
     <AiChatWidget />

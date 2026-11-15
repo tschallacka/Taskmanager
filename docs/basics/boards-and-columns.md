@@ -68,6 +68,19 @@ Dragging a card or a bar is the quick way to move it. The same moves are open to
   row's **Move the bar** menu: *Move one day earlier*, *Move one day later*, *End one day earlier* and *End one day later*.
   The two *End* items change the due date only. Each item gives the same dates as its key.
 
+## On a phone
+
+On a phone the app has a tab bar at the bottom: **Home**, **Inbox** (with the number of unread items), **My tasks**,
+**Projects** and **Search**. The round **+** above it creates a new project. The drawer menu is still there for the rest.
+
+On a board, the phone shows one column at a time. The **column picker** above the board is a row of chips, one per
+column, each with its number of tasks; tap one to see its cards. A sideways **swipe** on the board moves to the next or
+the previous column (the caption *swipe for other columns* is under the picker). The last chip, **Add column**, creates a
+column: on a phone the name field shows under the picker. Each card has a **⋯** button at its top right. A long-press on a
+card opens the same sheet. The sheet has **Mark done**, **Move to** (the column chips), **Assign to**, **Set due date** and
+**Delete**. Delete moves the task to the trash and shows an **Undo** for a few seconds. A trashed task can be restored from *Show trashed* for 7 days. On a wide screen the
+board shows every column side by side, and the **⋯** button is not there: use the card's menu instead.
+
 ## The List tab
 
 The List tab shows the board's tasks as rows, one section per column (a section collapses when you click its name).
