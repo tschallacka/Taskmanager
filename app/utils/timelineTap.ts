@@ -1,7 +1,7 @@
 // The timeline's tap path (see tests/timeline-tap.test.ts): a menu on a task row lists the four moves. Each item is the action
 // the keyboard path gives for the same keys (timelineKeys.ts), so a tap and a key land the same dates. Pure.
 
-import { timelineKeyAction, type TimelineAction } from './timelineKeys'
+import type { TimelineAction } from './timelineKeys'
 
 export type TimelineTapItem = { id: 'move-earlier' | 'move-later' | 'end-earlier' | 'end-later', label: string }
 
@@ -12,16 +12,16 @@ export const TIMELINE_TAP_ITEMS: readonly TimelineTapItem[] = [
   { id: 'end-later', label: 'End one day later' }
 ]
 
-/** The action a menu item gives. Each item is the keyboard action for the same keys. */
+// The action each item gives: the same as the keyboard action for the same keys (ArrowLeft and ArrowRight, with Shift for the
+// end), written out here so the menu does not depend on the key names.
+const ACTIONS: Record<TimelineTapItem['id'], TimelineAction> = {
+  'move-earlier': { mode: 'move', delta: -1 },
+  'move-later': { mode: 'move', delta: 1 },
+  'end-earlier': { mode: 'end', delta: -1 },
+  'end-later': { mode: 'end', delta: 1 }
+}
+
+/** The action a menu item gives. */
 export function tapItemAction(id: TimelineTapItem['id']): TimelineAction {
-  const keys: Record<TimelineTapItem['id'], { key: string, shift: boolean }> = {
-    'move-earlier': { key: 'ArrowLeft', shift: false },
-    'move-later': { key: 'ArrowRight', shift: false },
-    'end-earlier': { key: 'ArrowLeft', shift: true },
-    'end-later': { key: 'ArrowRight', shift: true }
-  }
-  const { key, shift } = keys[id]
-  const action = timelineKeyAction(key, { shift })
-  if (!action) throw new Error(`no action for ${id}`)
-  return action
+  return ACTIONS[id]
 }

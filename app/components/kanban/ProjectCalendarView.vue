@@ -3,12 +3,15 @@ import {
   addMonths, eachDayOfInterval, endOfMonth, endOfWeek, format, isSameMonth, isToday,
   startOfMonth, startOfWeek
 } from 'date-fns'
-import { calendarKeyDelta, movedDueOn } from '~/utils/calendarKeys'
+import { calendarKeyDelta } from '~/utils/calendarKeys'
 import { dayTapMove, togglePick } from '~/utils/calendarTap'
+import { nudgePatch } from '~/utils/dateNudge'
+import { errorMessage } from '~/utils/untypedFetch'
 
 const emit = defineEmits<{ openTask: [taskId: string] }>()
 
 const { boardColumns, visibleColumnTasks, updateTask, isTrashed } = useProjects()
+const toast = useToast()
 
 const cursor = ref(startOfMonth(new Date()))
 
@@ -35,7 +38,12 @@ const weekdays = computed(() => days.value.slice(0, 7).map(day => format(day, 'E
 
 async function dropOn(day: Date, event: DragEvent) {
   const id = event.dataTransfer?.getData('text/task-id')
-  if (id) await updateTask(id, { dueOn: format(day, 'yyyy-MM-dd') })
+  if (!id) return
+  try {
+    await updateTask(id, { dueOn: format(day, 'yyyy-MM-dd') })
+  } catch (e) {
+    toast.add({ title: errorMessage(e, 'Could not change the day'), icon: 'i-lucide-alert-triangle', color: 'error' })
+  }
 }
 
 function dragStart(taskId: string, event: DragEvent) {
@@ -53,18 +61,27 @@ async function tapDay(day: Date) {
   const move = dayTapMove(pickedId.value, format(day, 'yyyy-MM-dd'), tasks.value)
   if (!move) return
   pickedId.value = null
-  await updateTask(move.id, { dueOn: move.dueOn })
+  try {
+    await updateTask(move.id, { dueOn: move.dueOn })
+  } catch (e) {
+    toast.add({ title: errorMessage(e, 'Could not change the day'), icon: 'i-lucide-alert-triangle', color: 'error' })
+  }
 }
 
 // The keyboard path for a task on a day: the arrow keys move its due day, as a drag of the same days would. Left and right
-// a day, up and down a week (calendarKeys.ts). Any other key is left to the browser.
+// a day, up and down a week (calendarKeys.ts); the day arithmetic is the shared date rule (dateNudge.ts). Any other key is
+// left to the browser.
 async function moveWithKeys(task: { id: string, dueOn?: string | null }, event: KeyboardEvent) {
   const delta = calendarKeyDelta(event.key)
   if (delta === null) return
-  const next = movedDueOn(task.dueOn, delta)
-  if (!next) return
+  const patch = nudgePatch(task, 'move', delta)
+  if (!patch.dueOn) return
   event.preventDefault()
-  await updateTask(task.id, { dueOn: next })
+  try {
+    await updateTask(task.id, { dueOn: patch.dueOn })
+  } catch (e) {
+    toast.add({ title: errorMessage(e, 'Could not change the day'), icon: 'i-lucide-alert-triangle', color: 'error' })
+  }
 }
 
 const undatedOpen = ref(false)
@@ -127,7 +144,7 @@ const undatedOpen = ref(false)
                 type="button"
                 class="shrink-0 rounded-md p-0.5 text-dimmed transition-colors hover:bg-elevated hover:text-default"
                 :class="pickedId === task.id ? 'bg-primary/20 text-default' : ''"
-                aria-label="Move to another day"
+                :aria-label="`Move ${task.title} to another day`"
                 :aria-pressed="pickedId === task.id ? 'true' : 'false'"
                 @click.stop="pick(task.id)"
               >
@@ -181,7 +198,7 @@ const undatedOpen = ref(false)
             :aria-label="`${task.title}, due ${task.dueOn}. Arrow keys move it a day, up and down a week.`"
             @dragstart="dragStart(task.id, $event)"
             @keydown="moveWithKeys(task, $event)"
-            @click="emit('openTask', task.id)"
+            @click.stop="emit('openTask', task.id)"
           >
             {{ task.title }}
           </button>
@@ -189,7 +206,7 @@ const undatedOpen = ref(false)
             type="button"
             class="shrink-0 rounded-md p-0.5 text-dimmed transition-colors hover:bg-elevated hover:text-default"
             :class="pickedId === task.id ? 'bg-primary/20 text-default' : ''"
-            aria-label="Move to another day"
+            :aria-label="`Move ${task.title} to another day`"
             :aria-pressed="pickedId === task.id ? 'true' : 'false'"
             @click.stop="pick(task.id)"
           >

@@ -2,7 +2,7 @@
 import { addDays, differenceInCalendarDays, format, startOfDay, startOfWeek } from 'date-fns'
 import { dueDayToMs } from '~/utils/dueDate'
 import { errorMessage } from '~/utils/untypedFetch'
-import { timelineKeyAction } from '~/utils/timelineKeys'
+import { timelineKeyAction, type TimelineAction } from '~/utils/timelineKeys'
 import { nudgePatch } from '~/utils/dateNudge'
 import { TIMELINE_TAP_ITEMS, tapItemAction, type TimelineTapItem } from '~/utils/timelineTap'
 
@@ -157,13 +157,7 @@ function barMenuItems(task: DatedTask) {
 
 async function tapBar(task: DatedTask, id: TimelineTapItem['id']) {
   const action = tapItemAction(id)
-  const patch = nudgePatch(task, action.mode, action.delta)
-  if (!Object.keys(patch).length) return
-  try {
-    await updateTask(task.id, patch)
-  } catch (e) {
-    toast.add({ title: errorMessage(e, 'Could not change the dates'), icon: 'i-lucide-alert-triangle', color: 'error' })
-  }
+  await applyBarAction(task, action)
 }
 
 // The keyboard path for a focused bar: a plain arrow moves it a day, Shift changes its end, Alt its start (timelineKeys.ts).
@@ -172,6 +166,11 @@ async function onBarKey(task: DatedTask, event: KeyboardEvent) {
   const action = timelineKeyAction(event.key, { shift: event.shiftKey, alt: event.altKey })
   if (!action) return
   event.preventDefault()
+  await applyBarAction(task, action)
+}
+
+// The one save for a key or a tap: the date rule gives the dates, and a failed save says so.
+async function applyBarAction(task: DatedTask, action: TimelineAction) {
   const patch = nudgePatch(task, action.mode, action.delta)
   if (!Object.keys(patch).length) return
   try {
