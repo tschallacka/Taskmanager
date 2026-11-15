@@ -14,7 +14,7 @@ import { join, dirname } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { crewHome } from './home.mjs'
 import { longRunEnv, settingsPath, writeSettingsFile } from './session-settings.mjs'
-import { resolveStartRole } from './role-file.mjs'
+import { resolveStartRole, writeRoleFile } from './role-file.mjs'
 
 export const MODEL = 'claude-haiku-5-5'
 export const NO_REMOTE_SETTINGS = JSON.stringify({ remoteControlAtStartup: false })
@@ -201,7 +201,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       crewText: existsSync(crewPath) ? readFileSync(crewPath, 'utf8') : ''
     })
     if (!resolved.role) out = { ok: false, reason: resolved.reason || `no role for ${key}` }
-    else out = startSession({ home, kit, key, folder: folder ?? process.cwd(), role: resolved.role, bin })
+    else {
+      if (resolved.write) writeRoleFile(home, key, resolved.role)
+      out = startSession({ home, kit, key, folder: folder ?? process.cwd(), role: resolved.role, bin })
+    }
     console.log(out.ok ? `${key}: session ${out.id} ${out.started ? 'started' : out.note}` : out.reason)
     process.exit(out.ok ? 0 : 1)
   }

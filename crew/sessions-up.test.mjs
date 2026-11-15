@@ -2,10 +2,11 @@
 //   node --test crew/sessions-up.test.mjs
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { downSessions, recordedKeys, roleFileText, upSessions, workerRole, writeRoleFile, RESTART_WAKE } from './sessions-up.mjs'
+import { resolveStartRole } from './role-file.mjs'
 
 // The standing rules a person reads on every start: CREW.md. A marker line stands in for the whole file here.
 const CREW_MD = '# The crew: how we work\n\nSTANDING RULE MARKER: post on the card, never by file.\n'
@@ -101,6 +102,16 @@ test('crew up reports a key with no worker role as failed, and does not start it
   assert.equal(started, 0)
   assert.equal(out.lines[0], 'pia: failed: no role for pia: no worker section in PROMPTS.md and no sessions/pia.role.md; not started')
   assert.equal(out.ok, false)
+})
+
+test('resolving a start role does not write the role file: the caller writes a rebuilt worker role', () => {
+  const home = mkdtempSync(join(tmpdir(), 'crew-role-'))
+  mkdirSync(join(home, 'sessions'), { recursive: true })
+  const resolved = resolveStartRole({ home, key: 'wynn', promptsText: PROMPTS, crewText: CREW_MD, env: {} })
+  assert.equal(resolved.source, 'PROMPTS.md')
+  assert.match(resolved.role, /STANDING RULE MARKER/)
+  assert.equal(existsSync(join(home, 'sessions', 'wynn.role.md')), false, 'resolving alone leaves no file behind')
+  assert.equal(resolved.write, true, 'the result says the file is to be written, so the caller writes it')
 })
 
 test('crew up honours CREW_ROLE_FILE for every key, as crew session start does', async () => {

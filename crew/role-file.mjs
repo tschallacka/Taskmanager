@@ -67,22 +67,22 @@ export function writeRoleFile(home, key, text) {
 }
 
 /**
- * The role for `crew session start <key>` (and for `crew up`, through upSessions). Returns { role, source } or { role: '', reason }.
- * Order: CREW_ROLE_FILE (the override); a worker's section, rebuilt and written; the key's own role file; nothing.
+ * The role for `crew session start <key>` (and for `crew up`, through upSessions). Pure: it reads and returns, and writes
+ * nothing. Returns { role, source, write } or { role: '', reason }. `write` is true only for a worker's rebuilt section: the
+ * caller writes it with writeRoleFile before the start, so the file is written where the start is, not inside this call.
+ * Order: CREW_ROLE_FILE (the override); a worker's section, rebuilt; the key's own role file; nothing.
  */
 export function resolveStartRole({ home, key, promptsText, crewText, env = process.env }) {
   if (!validKey(key)) return { role: '', reason: `no such person key: ${key}` }
   if (env.CREW_ROLE_FILE) {
     return existsSync(env.CREW_ROLE_FILE)
-      ? { role: readFileSync(env.CREW_ROLE_FILE, 'utf8'), source: 'CREW_ROLE_FILE' }
+      ? { role: readFileSync(env.CREW_ROLE_FILE, 'utf8'), source: 'CREW_ROLE_FILE', write: false }
       : { role: '', reason: `CREW_ROLE_FILE does not exist: ${env.CREW_ROLE_FILE}` }
   }
   if (workerRole(promptsText, key)) {
-    const role = roleFileText(promptsText, crewText, key)
-    writeRoleFile(home, key, role)
-    return { role, source: 'PROMPTS.md' }
+    return { role: roleFileText(promptsText, crewText, key), source: 'PROMPTS.md', write: true }
   }
   const own = readOwnRoleFile(home, key)
-  if (own !== null) return { role: own, source: 'sessions role file' }
+  if (own !== null) return { role: own, source: 'sessions role file', write: false }
   return { role: '', reason: `no role for ${key}: no worker section in PROMPTS.md and no sessions/${key}.role.md` }
 }

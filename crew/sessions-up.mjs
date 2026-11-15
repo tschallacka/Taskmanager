@@ -57,6 +57,8 @@ export async function upSessions(home, deps) {
       lines.push(`${key}: failed: ${resolved.reason}; not started`)
       continue
     }
+    // A worker's rebuilt role is written before the start, so the start is given exactly what the file holds.
+    if (resolved.write) writeRoleFile(home, key, resolved.role)
     const started = deps.start({ key, folder: record.folder, role: resolved.role })
     if (!started.ok) {
       allUp = false
