@@ -7,29 +7,13 @@
 // CREW.md. The start reads that role file. Only the four workers have a role here; any other key is reported as failed,
 // not started with a guessed role.
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { liveById, listAgents, readRecord, startSession, stopSession, validSessionId, writeRecord } from './session.mjs'
 import { wakeOnce } from './wake.mjs'
+import { roleFileText, workerRole, writeRoleFile, readOwnRoleFile, resolveStartRole, WORKER_NICKS } from './role-file.mjs'
 
-export const WORKER_NICKS = { wren: 'Wren Worker', wick: 'Wick Worker', wynn: 'Wynn Worker', wade: 'Wade Worker' }
-
-/** The worker role for one key, from the PROMPTS.md text: the fenced block under "## Worker", with W and NICK filled in. */
-export function workerRole(promptsText, key) {
-  const nick = WORKER_NICKS[key]
-  if (!nick) return null
-  const lines = String(promptsText ?? '').split('\n')
-  const head = lines.findIndex(line => line.startsWith('## Worker (key'))
-  if (head < 0) return null
-  const open = lines.findIndex((line, i) => i > head && line.startsWith('```'))
-  if (open < 0) return null
-  const close = lines.findIndex((line, i) => i > open && line.startsWith('```'))
-  if (close < 0) return null
-  return lines.slice(open + 1, close).join('\n')
-    .replace(/\bW\b/g, key)
-    .replace(/\bNICK\b/g, nick)
-    .concat('\n')
-}
+export { WORKER_NICKS, workerRole, roleFileText, writeRoleFile, readOwnRoleFile }
 
 /** The keys of the recorded sessions in CREW_HOME/sessions (the mcp configs are not records). */
 export function recordedKeys(home) {
@@ -39,26 +23,6 @@ export function recordedKeys(home) {
     .filter(f => f.endsWith('.json') && !f.endsWith('.mcp.json'))
     .map(f => f.slice(0, -5))
     .sort()
-}
-
-/**
- * The role text of one person's session: the PROMPTS.md worker section, then the CREW.md standing rules (the whole file),
- * in that order. Pure. A missing CREW.md gives the section alone.
- */
-export function roleFileText(promptsText, crewText, key) {
-  const section = workerRole(promptsText, key) ?? ''
-  const rules = String(crewText ?? '').trimEnd()
-  return rules ? `${section.trimEnd()}\n\n${rules}\n` : `${section.trimEnd()}\n`
-}
-
-/** Writes one person's role file, CREW_HOME/sessions/<key>.role.md, mode 600. Returns its path. */
-export function writeRoleFile(home, key, text) {
-  if (!/^[a-z][a-z0-9-]{0,31}$/.test(String(key ?? ''))) throw new Error(`no such person key: ${key}`)
-  const dir = join(home, 'sessions')
-  mkdirSync(dir, { recursive: true })
-  const path = join(dir, `${key}.role.md`)
-  writeFileSync(path, text, { mode: 0o600 })
-  return path
 }
 
 // The wake text typed into a restarted session, once. It is the text, not the role file: the role is read by the start, and
@@ -85,17 +49,17 @@ export async function upSessions(home, deps) {
       lines.push(`${key}: already running (${record.id})`)
       continue
     }
-    const section = workerRole(deps.promptsText, key)
-    if (!section) {
+    // The same role rule as `crew session start` (resolveStartRole): CREW_ROLE_FILE, then a worker's rebuilt section, then the
+    // key's own role file. A key with none of them is reported as failed and not started.
+    const resolved = resolveStartRole({ home, key, promptsText: deps.promptsText, crewText: deps.crewText, env: deps.env })
+    if (resolved.reason) {
       allUp = false
-      lines.push(`${key}: failed: no worker role for this key; not started`)
+      lines.push(`${key}: failed: ${resolved.reason}; not started`)
       continue
     }
-    // The role is one file: the PROMPTS.md section and the CREW.md standing rules. It is written before the start, and the
-    // start is given exactly what the file holds.
-    const role = roleFileText(deps.promptsText, deps.crewText, key)
-    writeRoleFile(home, key, role)
-    const started = deps.start({ key, folder: record.folder, role })
+    // A worker's rebuilt role is written before the start, so the start is given exactly what the file holds.
+    if (resolved.write) writeRoleFile(home, key, resolved.role)
+    const started = deps.start({ key, folder: record.folder, role: resolved.role })
     if (!started.ok) {
       allUp = false
       lines.push(`${key}: failed: ${started.reason}`)
