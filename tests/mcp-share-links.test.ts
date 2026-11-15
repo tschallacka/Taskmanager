@@ -248,6 +248,15 @@ test('every tool that answers with a task, board or update says in its descripti
   }
 })
 
+test('the tools help page says which link an answer carries and that it is the one to share', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { fileURLToPath } = await import('node:url')
+  const page = readFileSync(fileURLToPath(new URL('../docs/agents/tools-overview.md', import.meta.url)), 'utf8')
+  assert.match(page, /## Links to share/, 'the page has a Links to share section')
+  assert.match(page, /`url`/, 'the page names the url field')
+  assert.match(page, /link to share with a person/, 'the page says url is the link to share with a person')
+})
+
 test('get_board answers with the board\'s absolute link', async () => {
   const context = {
     keyId: 'k',
