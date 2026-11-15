@@ -3,10 +3,15 @@ import {
   addMonths, eachDayOfInterval, endOfMonth, endOfWeek, format, isSameMonth, isToday,
   startOfMonth, startOfWeek
 } from 'date-fns'
+import { calendarKeyDelta } from '~/utils/calendarKeys'
+import { dayTapMove, togglePick } from '~/utils/calendarTap'
+import { nudgePatch } from '~/utils/dateNudge'
+import { errorMessage } from '~/utils/untypedFetch'
 
 const emit = defineEmits<{ openTask: [taskId: string] }>()
 
 const { boardColumns, visibleColumnTasks, updateTask, isTrashed } = useProjects()
+const toast = useToast()
 
 const cursor = ref(startOfMonth(new Date()))
 
@@ -33,11 +38,54 @@ const weekdays = computed(() => days.value.slice(0, 7).map(day => format(day, 'E
 
 async function dropOn(day: Date, event: DragEvent) {
   const id = event.dataTransfer?.getData('text/task-id')
-  if (id) await updateTask(id, { dueOn: format(day, 'yyyy-MM-dd') })
+  if (!id) return
+  try {
+    await updateTask(id, { dueOn: format(day, 'yyyy-MM-dd') })
+  } catch (e) {
+    toast.add({ title: errorMessage(e, 'Could not change the day'), icon: 'i-lucide-alert-triangle', color: 'error' })
+  }
 }
 
 function dragStart(taskId: string, event: DragEvent) {
   event.dataTransfer?.setData('text/task-id', taskId)
+}
+
+// The tap path: a task's Move control picks it, and a tap on a day puts the picked task there (calendarTap.ts).
+const pickedId = ref<string | null>(null)
+
+function pick(taskId: string) {
+  pickedId.value = togglePick(pickedId.value, taskId)
+}
+
+async function tapDay(day: Date) {
+  const move = dayTapMove(pickedId.value, format(day, 'yyyy-MM-dd'), tasks.value)
+  if (!move) return
+  pickedId.value = null
+  try {
+    await updateTask(move.id, { dueOn: move.dueOn })
+  } catch (e) {
+    toast.add({ title: errorMessage(e, 'Could not change the day'), icon: 'i-lucide-alert-triangle', color: 'error' })
+  }
+}
+
+// The keyboard path for a task on a day: the arrow keys move its due day, as a drag of the same days would. Left and right
+// a day, up and down a week (calendarKeys.ts); the day arithmetic is the shared date rule (dateNudge.ts). Any other key is
+// left to the browser.
+async function moveWithKeys(task: { id: string, dueOn?: string | null }, event: KeyboardEvent) {
+  const delta = calendarKeyDelta(event.key)
+  if (delta === null) return
+  const patch = nudgePatch(task, 'move', delta)
+  if (!patch.dueOn) return
+  event.preventDefault()
+  try {
+    await updateTask(task.id, { dueOn: patch.dueOn })
+  } catch (e) {
+    toast.add({ title: errorMessage(e, 'Could not change the day'), icon: 'i-lucide-alert-triangle', color: 'error' })
+    return
+  }
+  // The task's button moves to its new day's cell, a new element: focus it there, so the next arrow key still reaches it.
+  await nextTick()
+  document.querySelector<HTMLElement>(`[data-calendar-task="${task.id}"]`)?.focus()
 }
 
 const undatedOpen = ref(false)
@@ -85,17 +133,30 @@ const undatedOpen = ref(false)
         <template #content>
           <div class="max-h-72 w-64 overflow-y-auto p-1.5">
             <p class="px-1.5 pb-1 text-xs text-dimmed">
-              Drag onto a day to schedule.
+              Drag onto a day, or pick a task with its Move control and tap a day.
             </p>
             <div
               v-for="task in undated"
               :key="task.id"
               draggable="true"
-              class="cursor-grab truncate rounded-md px-1.5 py-1 text-xs text-default hover:bg-elevated"
+              class="flex cursor-grab items-center gap-1 rounded-md px-1.5 py-1 text-xs text-default hover:bg-elevated"
               @dragstart="dragStart(task.id, $event)"
               @click="emit('openTask', task.id)"
             >
-              {{ task.title }}
+              <span class="min-w-0 flex-1 truncate">{{ task.title }}</span>
+              <button
+                type="button"
+                class="shrink-0 rounded-md p-0.5 text-dimmed transition-colors hover:bg-elevated hover:text-default"
+                :class="pickedId === task.id ? 'bg-primary/20 text-default' : ''"
+                :aria-label="`Move ${task.title} to another day`"
+                :aria-pressed="pickedId === task.id ? 'true' : 'false'"
+                @click.stop="pick(task.id)"
+              >
+                <UIcon
+                  name="i-lucide-move"
+                  class="size-3.5"
+                />
+              </button>
             </div>
           </div>
         </template>
@@ -120,6 +181,7 @@ const undatedOpen = ref(false)
         :class="isSameMonth(day, cursor) ? '' : 'bg-elevated/30'"
         @dragover.prevent
         @drop.prevent="dropOn(day, $event)"
+        @click="tapDay(day)"
       >
         <span
           class="flex size-6 items-center justify-center self-start rounded-full text-xs tabular-nums"
@@ -128,17 +190,37 @@ const undatedOpen = ref(false)
           {{ format(day, 'd') }}
         </span>
 
-        <button
+        <div
           v-for="task in tasksOn(day).slice(0, 4)"
           :key="task.id"
-          draggable="true"
-          class="truncate rounded-md bg-primary/10 px-1.5 py-1 text-left text-xs text-default transition-colors hover:bg-primary/20"
-          :class="task.completedAt ? 'line-through opacity-60' : ''"
-          @dragstart="dragStart(task.id, $event)"
-          @click="emit('openTask', task.id)"
+          class="flex min-w-0 items-center gap-0.5"
         >
-          {{ task.title }}
-        </button>
+          <button
+            draggable="true"
+            :data-calendar-task="task.id"
+            class="min-w-0 flex-1 truncate rounded-md bg-primary/10 px-1.5 py-1 text-left text-xs text-default transition-colors hover:bg-primary/20"
+            :class="task.completedAt ? 'line-through opacity-60' : ''"
+            :aria-label="`${task.title}, due ${task.dueOn}. Arrow keys move it a day, up and down a week.`"
+            @dragstart="dragStart(task.id, $event)"
+            @keydown="moveWithKeys(task, $event)"
+            @click.stop="emit('openTask', task.id)"
+          >
+            {{ task.title }}
+          </button>
+          <button
+            type="button"
+            class="shrink-0 rounded-md p-0.5 text-dimmed transition-colors hover:bg-elevated hover:text-default"
+            :class="pickedId === task.id ? 'bg-primary/20 text-default' : ''"
+            :aria-label="`Move ${task.title} to another day`"
+            :aria-pressed="pickedId === task.id ? 'true' : 'false'"
+            @click.stop="pick(task.id)"
+          >
+            <UIcon
+              name="i-lucide-move"
+              class="size-3.5"
+            />
+          </button>
+        </div>
         <span
           v-if="tasksOn(day).length > 4"
           class="px-1.5 text-[0.6875rem] text-dimmed"

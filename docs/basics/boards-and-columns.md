@@ -31,16 +31,20 @@ tabs, in this order: **Board**, **List**, **Calendar**, **Timeline** and **Dashb
 
 | View | What it shows |
 |---|---|
+| **Overview** | The board's description, its health status and its status updates. Under **More**. |
 | **Board** | The columns and cards. This is where a board opens. |
 | **List** | The tasks as rows, one section per column, with a cell for each custom field. |
 | **Calendar** | Tasks on the day they are due. Drag a task onto a day to set its due date. |
 | **Timeline** | A bar for each task that has a start or a due date. |
 | **Dashboard** | Counts and charts: completed, incomplete and overdue tasks, and tasks per column. |
-| **Overview** (under More) | The board's description, its health status and its status updates. |
-| **Messages** (under More) | Conversations for the team only. See [Board messages](/help/basics/board-messages). |
-| **Time** (under More) | Time logged on the board's tasks, a week at a time. |
-| **Files** (under More) | Every image pasted into a task description on the board. |
-| **Office** (under More, on a crew's board) | The crew of this board at work. With more than one crew, More lists each one. |
+| **Messages** | Conversations for the team only. See [Board messages](/help/basics/board-messages). Under **More**. |
+| **Time** | Time logged on the board's tasks, a week at a time. Under **More**. |
+| **Files** | Every image pasted into a task description on the board. Under **More**. |
+| **Office** | On a crew's board: the crew of this board at work. With more than one crew, More lists each one. Under **More**. |
+
+**More** is the last tab in the row (its button is labelled *More project views*). It holds **Overview**, **Messages**,
+**Time**, **Files** and, on a crew's board, **Office**. Click it to open the list; on a phone, tap it. With the keyboard, Tab to it and press Enter to
+open the list, then Enter on a view to choose it. Escape closes the list without a choice.
 
 At the right end of the row, on the Board view, there are three things. **Filter** narrows the cards by label; its list shows each label on the board with a count, and **Show deleted** puts the trash on the board. **Search this board** narrows the cards by title, and an empty result says so. **New task** opens the composer in the first column. On a phone the tabs scroll sideways; Filter, search and New task stay in view.
 
@@ -49,6 +53,20 @@ health (**On track**, **At risk** or **Off track**, when it has one, set on **Ov
 as avatars: the first four, then a count. **Share** and the cog are on the right. The cog is **Settings**. The **...**
 menu (*Project options*) next to it holds *Rename project*, *Settings* and, when something has been deleted, *Show
 trashed*.
+
+## Moving tasks without a mouse
+
+Dragging a card or a bar is the quick way to move it. The same moves are open to the keyboard and to a tap:
+
+- **Calendar.** Each task in the calendar has a **Move to another day** control. Press it (Enter with the keyboard, a
+  tap on a phone) to pick the task; the picked task is marked. Then press an arrow key: Left and Right move its due day
+  by a day, Up and Down by a week. On a phone, tap a day to put the picked task there. Undated tasks are listed under
+  *No date*, and the same control sets their day.
+- **Timeline.** Focus a bar and press an arrow key: Left and Right move the whole bar a day. Hold Shift with an arrow to
+  change only its due date, or Alt with an arrow to change only its start date. While a bar has focus, Left and Right
+  (Alt included) belong to the bar, so the browser's Back and Forward do not run and the page stays put. On a phone, or with a mouse, use the
+  row's **Move the bar** menu: *Move one day earlier*, *Move one day later*, *End one day earlier* and *End one day later*.
+  The two *End* items change the due date only. Each item gives the same dates as its key.
 
 ## The List tab
 
