@@ -30,18 +30,35 @@ Under the board's name is a row of tabs. They are different ways of looking at t
 
 | Tab | What it shows |
 |---|---|
-| **Overview** | The board's description, its health status and its status updates. |
+| **Overview** | The board's description, its health status and its status updates. Under **More**. |
 | **Board** | The columns and cards. This is where a board opens. |
 | **List** | The tasks as rows, one section per column, with a cell for each custom field. |
 | **Timeline** | A bar for each task that has a start or a due date. |
 | **Calendar** | Tasks on the day they are due. Drag a task onto a day to set its due date. |
 | **Dashboard** | Counts and charts: completed, incomplete and overdue tasks, and tasks per column. |
-| **Messages** | Conversations for the team only. See [Board messages](/help/basics/board-messages). |
-| **Time** | Time logged on the board's tasks, a week at a time. |
-| **Files** | Every image pasted into a task description on the board. |
+| **Messages** | Conversations for the team only. See [Board messages](/help/basics/board-messages). Under **More**. |
+| **Time** | Time logged on the board's tasks, a week at a time. Under **More**. |
+| **Files** | Every image pasted into a task description on the board. Under **More**. |
+
+**More** is the last tab in the row (its button is labelled *More project views*). It holds **Overview**, **Messages**,
+**Time** and **Files**. Click it to open the list; on a phone, tap it. With the keyboard, Tab to it and press Enter to
+open the list, then Enter on a view to choose it. Escape closes the list without a choice.
 
 **Settings** is the cog at the top right, next to **Share**. The **...** menu (*Project options*) next to it holds
 *Rename project*, *Settings* and, when something has been deleted, *Show trashed*.
+
+## Moving tasks without a mouse
+
+Dragging a card or a bar is the quick way to move it. The same moves are open to the keyboard and to a tap:
+
+- **Calendar.** Each task in the calendar has a **Move to another day** control. Press it (Enter with the keyboard, a
+  tap on a phone) to pick the task; the picked task is marked. Then press an arrow key: Left and Right move its due day
+  by a day, Up and Down by a week. On a phone, tap a day to put the picked task there. Undated tasks are listed under
+  *No date*, and the same control sets their day.
+- **Timeline.** Focus a bar and press an arrow key: Left and Right move the whole bar a day. Hold Shift with an arrow to
+  change only its due date, or Alt with an arrow to change only its start date. On a phone, or with a mouse, use the
+  row's **Move the bar** menu: *Move one day earlier*, *Move one day later*, *End one day earlier* and *End one day later*.
+  The two *End* items change the due date only. Each item gives the same dates as its key.
 
 ## The List tab
 
