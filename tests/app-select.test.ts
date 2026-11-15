@@ -29,6 +29,15 @@ test('the team crews board picker uses AppSelect with its placeholder, and no na
   assert.match(crews, /placeholder="Pick a board"/)
 })
 
+test('the project owner picker uses AppSelect, lists the staff, and hands the owner over on change', () => {
+  const general = read('app/components/kanban/ProjectGeneralSettings.vue')
+  assert.doesNotMatch(general, /<select[\s>]/, 'the owner picker is no longer a native select')
+  assert.match(general, /<AppSelect\s[\s\S]*?data-owner-select/)
+  assert.match(general, /:options="ownerOptions"/)
+  assert.match(general, /@update:model-value="changeOwner"/)
+  assert.match(general, /const ownerOptions = computed\(\(\) => staff\.value\.map\(person => \(\{ label: person\.name \|\| person\.email, value: person\.id \}\)\)\)/)
+})
+
 test('the team invite role select uses AppSelect, and Admin is offered to owners only', () => {
   const invites = read('app/components/TeamInvitesPanel.vue')
   assert.doesNotMatch(invites, /<select[\s>]/, 'the role select is no longer a native select')
