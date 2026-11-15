@@ -63,6 +63,8 @@ export interface ApiKeyContext {
   scopes: ApiKeyScope[]
   /** 'management' for the 10-minute crew token of one board; 'access' for every other key. */
   kind?: 'access' | 'management'
+  /** Set for a crew-scoped token (card mwdd9d2vtgqhfr6izq): the one crew it reaches, for its keys and people routes only. */
+  crewId?: string | null
   /**
    * Set on a Sprocket run's own key (the server's Sprocket, or a person's own Sprocket). Such a run is never given a
    * sensitive tool (mcpToolKit.ts `sensitive`): not in its list, and refused by name.
@@ -139,7 +141,7 @@ function sprocketRunFor(token: string): ApiKeyContext | null {
   return { ...run.context }
 }
 
-async function findKey(token: string) {
+export async function findKey(token: string) {
   const hash = hashApiKey(token)
   const run = runTokens.get(hash)
   if (run) {
@@ -210,6 +212,7 @@ export async function authenticateApiKey(event: H3Event): Promise<ApiKeyContext>
     projectId: key.projectId,
     scopes: key.scopes.filter(isApiKeyScope),
     kind: key.kind,
+    crewId: key.crewId ?? null,
     boardScopes: await loadBoardScopes(key),
     reach: await loadKeyReach(key),
     memberTeamIds: await teamIdsOf(key.userId)
