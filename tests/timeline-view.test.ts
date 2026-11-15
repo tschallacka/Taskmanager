@@ -13,7 +13,7 @@ const script = view.slice(0, view.indexOf('</script>'))
 const fnBody = (name: string) => script.slice(script.indexOf(`function ${name}(`), script.indexOf('\n}\n', script.indexOf(`function ${name}(`)))
 
 test('the view imports the timeline key rule, the tap items and the shared date rule', () => {
-  assert.match(view, /import \{ timelineKeyAction \} from '~\/utils\/timelineKeys'/)
+  assert.match(view, /import \{ timelineKeyAction, type TimelineAction \} from '~\/utils\/timelineKeys'/)
   assert.match(view, /import \{ nudgePatch \} from '~\/utils\/dateNudge'/)
   assert.match(view, /import \{ TIMELINE_TAP_ITEMS, tapItemAction, type TimelineTapItem \} from '~\/utils\/timelineTap'/)
 })
