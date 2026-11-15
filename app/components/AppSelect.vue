@@ -14,17 +14,18 @@ const props = withDefaults(defineProps<{
   size: 'md'
 })
 
-const model = defineModel<string>()
+const model = defineModel<string | null>()
 </script>
 
 <template>
   <USelect
-    v-model="model"
+    :model-value="model ?? undefined"
     :items="props.options"
     value-key="value"
     :placeholder="props.placeholder"
     :disabled="props.disabled"
     :size="props.size"
     :ui="{ base: 'min-h-11 sm:min-h-0' }"
+    @update:model-value="model = $event ?? null"
   />
 </template>

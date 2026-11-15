@@ -22,6 +22,13 @@ test('AppSelect is 44 px tall at phone width (a touch target), and keeps its nor
   assert.match(select, /sm:min-h-0/, 'the 44 px minimum is lifted from the sm breakpoint up')
 })
 
+test('the team crews board picker uses AppSelect with its placeholder, and no native select is left in it', () => {
+  const crews = read('app/components/TeamCrewsPanel.vue')
+  assert.doesNotMatch(crews, /<select[\s>]/, 'the board picker is no longer a native select')
+  assert.match(crews, /<AppSelect\s[\s\S]*?data-team-crew-board/)
+  assert.match(crews, /placeholder="Pick a board"/)
+})
+
 test('the team invite role select uses AppSelect, and Admin is offered to owners only', () => {
   const invites = read('app/components/TeamInvitesPanel.vue')
   assert.doesNotMatch(invites, /<select[\s>]/, 'the role select is no longer a native select')
