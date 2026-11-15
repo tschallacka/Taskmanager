@@ -1,1 +1,0 @@
-- **Phone: swipe between columns.** On a phone the board shows one column at a time; a sideways swipe on the board moves to the next or previous column, and a caption under the column picker says "swipe for other columns". The desktop is unchanged. Files: `app/components/kanban/KanbanBoard.vue`, `tests/phone-swipe.test.ts`.

@@ -2,6 +2,18 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.38.0 - 2026-11-15
+
+- **Phone: a long-press on a card opens its sheet, and the help page describes the column picker and the swipe.** At phone width a long-press on a card opens the same bottom sheet as its ⋯ button, not the desktop popover; the desktop right-click menu is unchanged. The boards help page now covers the column picker, the swipe between columns and the Add column chip. Files: `app/components/kanban/KanbanCard.vue`, `docs/basics/boards-and-columns.md`, `tests/phone-qa-violations.test.ts`.
+
+- **Phone: the card sheet title stops at the close button, and Add column moves into the column picker.** A long card title on the phone sheet now ends in an ellipsis before the X. The board's Add column no longer peeks in at the right edge on a phone: it is the last chip of the column picker, and its name field shows under the picker. The desktop board is unchanged. Files: `app/components/PhoneCardSheet.vue`, `app/components/PhoneColumnPicker.vue`, `app/components/kanban/KanbanBoard.vue`, `tests/phone-add-column.test.ts`.
+
+- **Phone: a tab bar, one column at a time, and a card sheet.** On a phone the app has a bottom tab bar (Home, Inbox with its unread count, My tasks, Projects, Search) and a floating New. A board shows one column at a time with a column picker, and each card's ⋯ opens a sheet with Mark done, Move to, Assign to, Set due date and Delete. The project page's own bottom bar is gone. Files: `app/components/BottomTabBar.vue`, `app/components/PhoneColumnPicker.vue`, `app/components/PhoneCardSheet.vue`, `app/components/kanban/KanbanBoard.vue`, `app/components/kanban/KanbanCard.vue`, `app/components/kanban/TaskDrawer.vue`, `app/components/kanban/TaskComments.vue`, `app/layouts/app.vue`, `app/pages/projects/home.vue`, `app/pages/projects/[id].vue`, `docs/basics/boards-and-columns.md`.
+
+- **Phone: swipe between columns.** On a phone the board shows one column at a time; a sideways swipe on the board moves to the next or previous column, and a caption under the column picker says "swipe for other columns". The desktop is unchanged. Files: `app/components/kanban/KanbanBoard.vue`, `tests/phone-swipe.test.ts`.
+
+- **Phone: the bottom tab bar keeps clear of the home indicator.** The app asks for `viewport-fit=cover`, so the safe-area insets (the notch and the home indicator) reach the page on a phone. Without it every inset read 0 and the tab bar sat under the home indicator. Files: `app/app.vue`, `tests/app-viewport.test.ts`.
+
 ## 0.37.0 - 2026-11-15
 
 - **A comment opened from the Inbox stays in the address.** The card jumps to the reply and the address still names the comment, so a reload or a shared copy of the link scrolls to it again. `app/components/kanban/TaskComments.vue`, `tests/inbox-comment-url.test.ts`.
