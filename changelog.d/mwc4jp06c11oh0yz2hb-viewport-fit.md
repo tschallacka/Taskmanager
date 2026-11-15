@@ -1,0 +1,1 @@
+- **Phone: the bottom tab bar keeps clear of the home indicator.** The app asks for `viewport-fit=cover`, so the safe-area insets (the notch and the home indicator) reach the page on a phone. Without it every inset read 0 and the tab bar sat under the home indicator. Files: `app/app.vue`, `tests/app-viewport.test.ts`.

@@ -303,11 +303,11 @@ function openTask(task: { id: string, projectId: string }) {
                   v-for="task in group.tasks"
                   :key="task.id"
                   data-home-task
-                  class="flex cursor-pointer items-center gap-3 py-2 transition-colors hover:bg-elevated/50"
+                  class="flex min-h-11 cursor-pointer items-center gap-3 py-2 transition-colors hover:bg-elevated/50"
                   @click="openTask(task)"
                 >
                   <button
-                    class="flex size-5 shrink-0 items-center justify-center rounded-full border border-accented text-transparent transition-colors hover:border-success hover:text-success"
+                    class="flex size-[22px] shrink-0 items-center justify-center rounded-full border-[1.5px] border-accented text-transparent transition-colors hover:border-success hover:text-success"
                     aria-label="Mark complete"
                     @click.stop="updateTask(task.id, { completed: true })"
                   >
