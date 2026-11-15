@@ -51,6 +51,13 @@ export function roleFileText(promptsText, crewText, key) {
   return rules ? `${section.trimEnd()}\n\n${rules}\n` : `${section.trimEnd()}\n`
 }
 
+/** The text of a person's own role file, CREW_HOME/sessions/<key>.role.md, or null when there is none. */
+export function readOwnRoleFile(home, key) {
+  if (!/^[a-z][a-z0-9-]{0,31}$/.test(String(key ?? ''))) return null
+  const path = join(home, 'sessions', `${key}.role.md`)
+  return existsSync(path) ? readFileSync(path, 'utf8') : null
+}
+
 /** Writes one person's role file, CREW_HOME/sessions/<key>.role.md, mode 600. Returns its path. */
 export function writeRoleFile(home, key, text) {
   if (!/^[a-z][a-z0-9-]{0,31}$/.test(String(key ?? ''))) throw new Error(`no such person key: ${key}`)
@@ -85,16 +92,22 @@ export async function upSessions(home, deps) {
       lines.push(`${key}: already running (${record.id})`)
       continue
     }
+    // A worker's role is always rebuilt from PROMPTS.md, so a prompt change reaches it. Any other key starts from its own
+    // role file (sessions/<key>.role.md: Nina, Pat, Quincy), and fails only when it has neither.
     const section = workerRole(deps.promptsText, key)
-    if (!section) {
+    const own = section ? null : readOwnRoleFile(home, key)
+    if (!section && own === null) {
       allUp = false
       lines.push(`${key}: failed: no worker role for this key; not started`)
       continue
     }
     // The role is one file: the PROMPTS.md section and the CREW.md standing rules. It is written before the start, and the
     // start is given exactly what the file holds.
-    const role = roleFileText(deps.promptsText, deps.crewText, key)
-    writeRoleFile(home, key, role)
+    let role = own
+    if (section) {
+      role = roleFileText(deps.promptsText, deps.crewText, key)
+      writeRoleFile(home, key, role)
+    }
     const started = deps.start({ key, folder: record.folder, role })
     if (!started.ok) {
       allUp = false

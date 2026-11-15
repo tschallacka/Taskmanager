@@ -188,7 +188,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const kit = dirname(fileURLToPath(import.meta.url))
   const [command, key, folder] = process.argv.slice(2)
   const bin = process.env.CREW_CLAUDE_BIN || 'claude'
-  const roleFile = process.env.CREW_ROLE_FILE
+  // The role: CREW_ROLE_FILE when it is set (an override), else the key's own role file CREW_HOME/sessions/<key>.role.md.
+  const roleFile = process.env.CREW_ROLE_FILE || (key ? join(home, 'sessions', `${key}.role.md`) : '')
   const role = roleFile && existsSync(roleFile) ? readFileSync(roleFile, 'utf8') : ''
   let out
   if (command === 'start') {

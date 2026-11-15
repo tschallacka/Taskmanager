@@ -1,7 +1,8 @@
 // `crew session` with a fake claude (no real session is started). Run: node --test crew/session.test.mjs
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -172,4 +173,20 @@ test('a start that claude refuses is reported with its reason, and nothing is re
   assert.equal(out.ok, false)
   assert.match(out.reason, /refused/)
   assert.equal(readRecord(home, 'wynn'), null)
+})
+
+// `crew session start <key>` with no CREW_ROLE_FILE: the start reads sessions/<key>.role.md, so a person without a worker
+// section in PROMPTS.md (Nina, Pat, Quincy) starts with the file's text.
+test('crew session start reads the role file of the key when CREW_ROLE_FILE is not set', () => {
+  const fake = fakeClaude()
+  const home = mkdtempSync(join(tmpdir(), 'session-cli-home-'))
+  mkdirSync(join(home, 'sessions'), { recursive: true })
+  writeFileSync(join(home, 'sessions', 'nina.role.md'), 'NINA CLI ROLE MARKER\n')
+  const env = { ...process.env, CREW_HOME: home, CREW_CLAUDE_BIN: fake.bin }
+  delete env.CREW_ROLE_FILE
+  const run = spawnSync(process.execPath, [join(HERE, 'session.mjs'), 'start', 'nina', '/tmp'], { encoding: 'utf8', env })
+  assert.equal(run.status, 0, run.stderr || run.stdout)
+  const start = calls(fake).find(args => args.includes('--bg'))
+  assert.ok(start, 'claude --bg was run')
+  assert.match(start[start.indexOf('--append-system-prompt') + 1], /NINA CLI ROLE MARKER/)
 })
