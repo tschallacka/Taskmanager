@@ -296,6 +296,14 @@ test('a guest\'s key gets no staff link on another person\'s board: get_board, l
   await db.delete(taskComments).where(eq(taskComments.id, posted.update.id))
 })
 
+test('the e-mail and push link to a subtask opens its parent\'s panel, as the inbox link does', async () => {
+  const { notificationPath } = await import('../server/utils/notifications')
+  const onSubtask = await notificationPath({ project: { id: board, name: 'Share board', userId: owner, teamId: null, customerId: null }, task: { id: subtask, title: 'Share the subtask', visibility: 'internal' }, actorId: null, type: 'assigned', recipients: [], title: 'x' })
+  assert.equal(onSubtask, `/projects/${board}?task=${task}`)
+  const onTask = await notificationPath({ project: { id: board, name: 'Share board', userId: owner, teamId: null, customerId: null }, task: { id: task, title: 'Share me', visibility: 'internal' }, actorId: null, type: 'assigned', recipients: [], title: 'x' })
+  assert.equal(onTask, `/projects/${board}?task=${task}`)
+})
+
 test('get_board answers with the board\'s absolute link', async () => {
   const context = {
     keyId: 'k',

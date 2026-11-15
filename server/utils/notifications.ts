@@ -4,7 +4,7 @@
 // assigned by hand.
 import { and, eq, inArray } from 'drizzle-orm'
 import { db } from '../db'
-import { notificationPreferences, notifications, pushSubscriptions, user } from '../db/schema'
+import { notificationPreferences, notifications, projectTasks, pushSubscriptions, user } from '../db/schema'
 import type { NotificationType } from '../db/schema'
 import { mailEnabled, sendMail } from '../lib/mailer'
 import { pushEnabled, sendPush } from '../lib/webpush'
@@ -37,9 +37,15 @@ function escapeHtml(text: string): string {
   return text.replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' })[ch]!)
 }
 
-/** Where a mail or a push leads: the task, the conversation, or the board. Matches notificationLink in the app. */
-function pathOf(input: NotifyInput): string {
-  if (input.task) return `/projects/${input.project.id}?task=${input.task.id}`
+/**
+ * Where a mail or a push leads: the task, the conversation, or the board. Matches notificationLink in the app. A subtask
+ * has no panel of its own, so its link is its parent's (the drawer finds only the board's own tasks).
+ */
+export async function notificationPath(input: NotifyInput): Promise<string> {
+  if (input.task) {
+    const [row] = await db.select({ parentTaskId: projectTasks.parentTaskId }).from(projectTasks).where(eq(projectTasks.id, input.task.id)).limit(1)
+    return `/projects/${input.project.id}?task=${row?.parentTaskId ?? input.task.id}`
+  }
   if (input.messageId) return `/projects/${input.project.id}?view=messages&message=${input.messageId}`
   return `/projects/${input.project.id}`
 }
@@ -98,7 +104,7 @@ async function sendCopies(rows: { id: string, userId: string }[], input: NotifyI
         eq(notificationPreferences.email, true)
       ))
 
-    const link = appUrl(pathOf(input))
+    const link = appUrl(await notificationPath(input))
     const body = input.body ?? ''
     for (const person of wanting) {
       const row = rows.find(candidate => candidate.userId === person.userId)!
@@ -122,7 +128,7 @@ async function sendPushes(rows: { id: string, userId: string }[], input: NotifyI
   try {
     const devices = await db.select().from(pushSubscriptions)
       .where(inArray(pushSubscriptions.userId, rows.map(row => row.userId)))
-    const url = pathOf(input)
+    const url = await notificationPath(input)
     await Promise.all(devices.map(async (device) => {
       const row = rows.find(candidate => candidate.userId === device.userId)!
       const result = await sendPush(device, { title: input.title, body: input.body ?? '', url, tag: row.id })
