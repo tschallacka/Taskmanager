@@ -55,7 +55,6 @@ Each archive entry shows "In force from <effective>" and "Replaced on <effective
 
 | Placeholder | What is needed |
 |---|---|
-| `[[HOSTING-LOCATION: ...]]` | country of the Contabo data center the server stands in (provider: Contabo GmbH, Munich, filled in) |
 | `[[EMAIL-SERVICE: ...]]` | name and country of the email service, or "the server's own mail system" |
 
 These documents are written to match what the application does on the day of `effective`. They are not a substitute for legal advice.

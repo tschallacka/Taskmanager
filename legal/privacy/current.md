@@ -133,7 +133,7 @@ To draw some of its icons the application's page may ask the public icon service
 ## 6. Who receives your data
 
 - **Other people in your teams and boards.** Colleagues see what you share with them: your name and profile picture, and your email address only if you allowed that in your settings. Customers and guests see only what is shared with them. The controller can technically access all data stored on the server for operation, support and security; that does not include secrets of project managers, which are stored encrypted.
-- **Hosting.** The server is rented from Contabo GmbH, Munich, Germany, and stands in a data center in [[HOSTING-LOCATION: country of the data center]]. Contabo processes data on my behalf under a data processing agreement (Article 28 GDPR).
+- **Hosting.** The server is rented from Contabo GmbH, Munich, Germany, and stands in a data center in Lauterbourg, France, operated by Contabo France SAS as Contabo's subprocessor. The data stays inside the European Union. Contabo processes data on my behalf under a data processing agreement (Article 28 GDPR) concluded on 15 November 2026.
 - **Email delivery.** If emails are sent, they are handed to [[EMAIL-SERVICE: name and country of the email service, or "the server's own mail system"]] for delivery.
 - **Push services.** If you turn on push notifications, the message goes through the push service of your browser's maker (for example Google, Mozilla or Apple).
 - **Sign-in providers**, when you choose them: Google, GitHub (Microsoft), Discord, or the OpenID Connect provider named on the sign-in page. They learn that you signed in to Taskmanager and when; they do not receive your boards, tasks or comments.
