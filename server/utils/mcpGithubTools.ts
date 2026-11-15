@@ -5,6 +5,7 @@
 // team, as changing the task is.
 import { findTask } from './mcpBoardTools'
 import { audienceOf } from './mcpAccess'
+import { taskShareUrl } from './shareLinks'
 import { createTaskGithubLink, deleteTaskGithubLink, readTaskGithubLinks } from './githubTaskLinks'
 import { McpToolError, optionalBoolean, optionalString, requireString } from './mcpToolKit'
 import type { McpToolDefinition } from './mcpToolKit'
@@ -83,7 +84,14 @@ export const MCP_GITHUB_TOOLS: McpToolDefinition[] = [
     async handler(args, context) {
       const { task, board } = await findTask(requireString(args, 'taskId'), context)
       const { links } = await readTaskGithubLinks({ taskId: task.id, audience: audienceOf(context, board), refresh: optionalBoolean(args, 'refresh') ?? false })
-      return { board: boardOf(board), task: task.id, total: links.length, links }
+      // The task's link to share: staff only, as the other task links are.
+      return {
+        board: boardOf(board),
+        task: task.id,
+        ...(audienceOf(context, board) === 'staff' ? { url: taskShareUrl(board.id, task.id) } : {}),
+        total: links.length,
+        links
+      }
     }
   }
 ]

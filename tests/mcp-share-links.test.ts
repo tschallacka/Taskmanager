@@ -222,6 +222,23 @@ test('delete_task_update answers with the link of the task the update was on', a
   assert.equal(deleted.task.url, `${origin}/projects/${board}?task=${task}`)
 })
 
+test('get_task_github answers with the task\'s absolute link', async () => {
+  const context = {
+    keyId: 'k',
+    keyName: 'k',
+    userId: owner,
+    teamId: null,
+    customerId: null,
+    projectId: null,
+    scopes: ['boards:read'] as ('boards:read' | 'boards:write')[],
+    reach: { allBoards: true, workspaceTeamIds: [], boardIds: [] },
+    memberTeamIds: []
+  }
+  const answer = await MCP_TOOLS.find(t => t.name === 'get_task_github')!.handler({ taskId: task }, context) as { task: string, url?: string }
+  assert.equal(answer.task, task)
+  assert.equal(answer.url, `${origin}/projects/${board}?task=${task}`)
+})
+
 test('get_board answers with the board\'s absolute link', async () => {
   const context = {
     keyId: 'k',
