@@ -2,6 +2,12 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.37.0 - 2026-11-15
+
+- **A comment opened from the Inbox stays in the address.** The card jumps to the reply and the address still names the comment, so a reload or a shared copy of the link scrolls to it again. `app/components/kanban/TaskComments.vue`, `tests/inbox-comment-url.test.ts`.
+
+- **Open on board from the Inbox keeps the comment, and a phone no longer shows it.** The card panel opened from an Inbox comment links to the card at that comment, and on a phone the control is hidden (the back arrow is the way back to the Inbox). `app/components/kanban/TaskDrawer.vue`, `tests/inbox-phone-open.test.ts`, `tests/inbox-comment-link.test.ts`.
+
 ## 0.36.0 - 2026-11-15
 
 - **The calendar, the timeline and the More pages get keyboard and tap paths.** A task on the calendar moves with the arrow keys or with its Move control and a tap on a day, undated tasks included; a timeline bar moves with the arrow keys (Shift for its end, Alt for its start; Alt+Left and Alt+Right stay on the bar and do not go Back or Forward in the browser) and with its row's Move-the-bar menu; Overview, Messages, Time and Files sit under a More menu in the board's view row (master's row, which also holds Office). The pointer drags are unchanged. `app/components/kanban/ProjectCalendarView.vue`, `app/components/kanban/ProjectTimelineView.vue`, `app/pages/projects/[id].vue`, `app/utils/calendarKeys.ts`, `app/utils/calendarTap.ts`, `app/utils/timelineKeys.ts`, `app/utils/timelineTap.ts`, `app/utils/dateNudge.ts`.
