@@ -1,0 +1,1 @@
+- **Pinned boards load once.** The sidebar and the projects list ask for the pins together when a page opens; they now share one request instead of fetching the same list twice (`app/composables/usePins.ts`, `tests/pins-load-once.test.ts`).
