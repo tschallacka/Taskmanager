@@ -14,6 +14,7 @@ import { join, dirname } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { crewHome } from './home.mjs'
 import { longRunEnv, settingsPath, writeSettingsFile } from './session-settings.mjs'
+import { resolveStartRole, writeRoleFile } from './role-file.mjs'
 
 export const MODEL = 'claude-haiku-5-5'
 export const NO_REMOTE_SETTINGS = JSON.stringify({ remoteControlAtStartup: false })
@@ -188,12 +189,22 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const kit = dirname(fileURLToPath(import.meta.url))
   const [command, key, folder] = process.argv.slice(2)
   const bin = process.env.CREW_CLAUDE_BIN || 'claude'
-  const roleFile = process.env.CREW_ROLE_FILE
-  const role = roleFile && existsSync(roleFile) ? readFileSync(roleFile, 'utf8') : ''
   let out
   if (command === 'start') {
-    if (!role) out = { ok: false, reason: 'no role: set CREW_ROLE_FILE to the person section of PROMPTS.md' }
-    else out = startSession({ home, kit, key, folder: folder ?? process.cwd(), role, bin })
+    // The role is resolved here, only for a start: status and list never write a role file (role-file.mjs has the order).
+    const promptsPath = join(home, 'PROMPTS.md')
+    const crewPath = join(home, 'CREW.md')
+    const resolved = resolveStartRole({
+      home,
+      key,
+      promptsText: existsSync(promptsPath) ? readFileSync(promptsPath, 'utf8') : '',
+      crewText: existsSync(crewPath) ? readFileSync(crewPath, 'utf8') : ''
+    })
+    if (!resolved.role) out = { ok: false, reason: resolved.reason || `no role for ${key}` }
+    else {
+      if (resolved.write) writeRoleFile(home, key, resolved.role)
+      out = startSession({ home, kit, key, folder: folder ?? process.cwd(), role: resolved.role, bin })
+    }
     console.log(out.ok ? `${key}: session ${out.id} ${out.started ? 'started' : out.note}` : out.reason)
     process.exit(out.ok ? 0 : 1)
   }

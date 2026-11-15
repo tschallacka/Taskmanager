@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.35.0 - 2026-11-15
+
+- **Crew up and crew session start take a role file for keys with no worker section.** A session for Nina, Pat or Quincy starts from its own sessions/<key>.role.md; before, crew up reported "no worker role for this key" and `crew session start` needed CREW_ROLE_FILE. Both commands now resolve the role in one order, and CREW_ROLE_FILE, when set, overrides both. The four workers still get their role rebuilt from PROMPTS.md on every start, so a prompt change reaches them. One module, crew/role-file.mjs, holds the role file path and its key check for both commands. Files: crew/role-file.mjs, crew/sessions-up.mjs, crew/session.mjs, crew/kit-files.txt, and their tests.
+
 ## 0.34.0 - 2026-11-15
 
 - **The add-a-crew action has a plain name: "Put an AI crew to work on this board".** The board's menu item, the Crews page button, the dialog's title and its button ("Get the prompt") and the help page's title are renamed; the dialog's text names the board and says the token works only on it. The prompt an agent receives now says it puts an AI crew to work on the board in its first line, and uses the plain words "Set up the AI crew for this board" and "Remove the AI crew from this board" for its two actions; the rest of the prompt is unchanged. The help page keeps its address. `app/components/ProjectsListPanel.vue`, `app/components/TeamCrewsPanel.vue`, `app/components/ManagementTokenDialog.vue`, `app/utils/managementPrompt.ts`, `docs/crews/give-a-board-a-crew.md`.
