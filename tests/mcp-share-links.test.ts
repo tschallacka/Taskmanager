@@ -331,6 +331,33 @@ test('a customer-visible task on a shared board carries the board\'s public link
   assert.equal(privateNow.publicUrl, undefined, 'a board that is not shared gives no public link')
 })
 
+test('the public link is on every task answer for a customer-visible task of a shared board: get_board and update_task', async () => {
+  const context = {
+    keyId: keyRow,
+    keyName: 'share test',
+    userId: owner,
+    teamId: null,
+    customerId: null,
+    projectId: null,
+    scopes: ['boards:read', 'boards:write'] as ('boards:read' | 'boards:write')[],
+    reach: { allBoards: true, workspaceTeamIds: [], boardIds: [] },
+    memberTeamIds: []
+  }
+  await db.update(projects).set({ isPublic: true, publicUntil: null }).where(eq(projects.id, board))
+  try {
+    const shown = await MCP_TOOLS.find(t => t.name === 'get_board')!.handler({ board }, context) as { columns: { tasks: { id: string, publicUrl?: string }[] }[] }
+    const card = shown.columns.flatMap(c => c.tasks).find(t => t.id === publicTask)
+    assert.ok(card, 'the customer-visible task is on the board')
+    assert.equal(card.publicUrl, `${origin}/public/project/${board}`, 'get_board gives the card its public link')
+    const internal = shown.columns.flatMap(c => c.tasks).find(t => t.id === task)
+    assert.equal(internal?.publicUrl, undefined, 'an internal card has no public link')
+    const updated = await MCP_TOOLS.find(t => t.name === 'update_task')!.handler({ id: publicTask, title: 'Customer can see this' }, context) as { task: { publicUrl?: string } }
+    assert.equal(updated.task.publicUrl, `${origin}/public/project/${board}`, 'update_task gives the task its public link')
+  } finally {
+    await db.update(projects).set({ isPublic: false }).where(eq(projects.id, board))
+  }
+})
+
 test('get_board answers with the board\'s absolute link', async () => {
   const context = {
     keyId: 'k',

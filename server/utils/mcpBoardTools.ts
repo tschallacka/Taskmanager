@@ -348,15 +348,21 @@ function readDetail(args: Record<string, unknown>): TaskDetail {
  * crew's shadow) and the caller may share it (a project admin or a manager guest). The public page shows the board's
  * cards, not one task, so the link is the board's public page. Staff keys only.
  */
-async function publicUrlFor(task: ProjectTask, board: Project, context: ApiKeyContext): Promise<{ publicUrl?: string }> {
-  if (audienceOf(context, board) !== 'staff' || task.visibility !== 'customer') return {}
-  if (!(await findPublicProject(board.id))) return {}
+async function boardPublicUrl(board: Project, context: ApiKeyContext): Promise<string | undefined> {
+  if (audienceOf(context, board) !== 'staff') return undefined
+  if (!(await findPublicProject(board.id))) return undefined
   try {
     await requireShareAuthority(board, context.userId)
   } catch {
-    return {}
+    return undefined
   }
-  return { publicUrl: publicBoardShareUrl(board.id) }
+  return publicBoardShareUrl(board.id)
+}
+
+async function publicUrlFor(task: ProjectTask, board: Project, context: ApiKeyContext): Promise<{ publicUrl?: string }> {
+  if (task.visibility !== 'customer') return {}
+  const url = await boardPublicUrl(board, context)
+  return url ? { publicUrl: url } : {}
 }
 
 /** The link to a task for a staff caller. A customer's contact gets no staff link: the board's own page is staff's. */
@@ -384,6 +390,8 @@ function taskCard(task: ProjectTask, options: {
   blocked?: BlockedMark
   // The link to share with a person; only staff get one (see staffTaskUrl).
   url?: string
+  // The board's public page, when the board is shared and the caller may share it; a customer-visible card carries it.
+  publicUrl?: string
 } = {}) {
   const detail = options.detail ?? 'summary'
   const terms = options.terms ?? []
@@ -391,6 +399,7 @@ function taskCard(task: ProjectTask, options: {
   return {
     id: task.id,
     ...(options.url ? { url: options.url } : {}),
+    ...(options.publicUrl && task.visibility === 'customer' ? { publicUrl: options.publicUrl } : {}),
     ...(options.board ? { board: options.board } : {}),
     ...(options.column ? { column: options.column } : {}),
     ...(options.parent ? { parent: options.parent } : {}),
@@ -821,6 +830,8 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
       const states = await blockedStatesOn(board.id, grouped.flatMap(group => group.shown).map(task => task.id))
       const marks = new Map([...states].map(([id, state]) => [id, blockedMark(state, audience)] as const))
       const people = await peopleNames(board)
+      // The board's public page, for its customer-visible cards (read once, not per card).
+      const sharedUrl = await boardPublicUrl(board, context)
       // Custom fields are the team's own; a contact's board has none to show.
       const fieldDefs = audienceOf(context, board) === 'staff' ? await listFields(board.id) : []
       const fieldValues = fieldDefs.length ? await loadFieldValues(grouped.flatMap(group => group.shown.map(task => task.id))) : {}
@@ -848,6 +859,7 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
           tasks: shown.map(task => taskCard(task, {
             detail,
             url: staffTaskUrl(task, board, context),
+            publicUrl: sharedUrl,
             updates: counts.get(task.id),
             blocked: marks.get(task.id),
             people,
@@ -947,12 +959,19 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
         return terms.every(term => haystack.includes(term))
       })
 
+      // The public link of each shown task's board, read once per board (only the boards the matches are on).
+      const sharedUrls = new Map<string, string | undefined>()
+      for (const board of new Set(matches.slice(0, limit).map(task => boardsById.get(task.projectId)).filter((b): b is Project => !!b))) {
+        sharedUrls.set(board.id, await boardPublicUrl(board, context))
+      }
+
       return {
         total: matches.length,
         tasks: matches.slice(0, limit).map(task => taskCard(task, {
           detail,
           terms,
           url: boardsById.get(task.projectId) ? staffTaskUrl(task, boardsById.get(task.projectId)!, context) : undefined,
+          publicUrl: sharedUrls.get(task.projectId),
           board: boardsById.get(task.projectId)?.name ?? task.projectId,
           column: columnsById.get(task.columnId)?.name ?? task.columnId
         }))
@@ -1416,7 +1435,7 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
       return {
         created: true,
         board: { id: board.id, name: board.name },
-        task: taskCard(task!, { url: staffTaskUrl(task!, board, context), column: column.name, parent: parent?.task.id, people: await peopleNames(board), fields: describeFieldValues(fieldDefs, storedValues), blocked: await blockedFor(task!.id, audienceOf(context, board)) })
+        task: taskCard(task!, { url: staffTaskUrl(task!, board, context), publicUrl: await boardPublicUrl(board, context), column: column.name, parent: parent?.task.id, people: await peopleNames(board), fields: describeFieldValues(fieldDefs, storedValues), blocked: await blockedFor(task!.id, audienceOf(context, board)) })
       }
     }
   },
@@ -1497,7 +1516,7 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
       return {
         updated: true,
         board: { id: board.id, name: board.name },
-        task: taskCard(updated!, { url: staffTaskUrl(updated!, board, context), column: column.name, people: await peopleNames(board), fields: (await describedFields(board, updated!)).fields, blocked: await blockedFor(updated!.id, audienceOf(context, board)) })
+        task: taskCard(updated!, { url: staffTaskUrl(updated!, board, context), publicUrl: await boardPublicUrl(board, context), column: column.name, people: await peopleNames(board), fields: (await describedFields(board, updated!)).fields, blocked: await blockedFor(updated!.id, audienceOf(context, board)) })
       }
     }
   },
@@ -1558,7 +1577,7 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
         board: { id: board.id, name: board.name },
         from: from.name,
         to: column.name,
-        task: taskCard(updated!, { url: staffTaskUrl(updated!, board, context), column: column.name })
+        task: taskCard(updated!, { url: staffTaskUrl(updated!, board, context), publicUrl: await boardPublicUrl(board, context), column: column.name })
       }
     }
   },
