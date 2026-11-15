@@ -2,6 +2,12 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.34.0 - 2026-11-15
+
+- **The add-a-crew action has a plain name: "Put an AI crew to work on this board".** The board's menu item, the Crews page button, the dialog's title and its button ("Get the prompt") and the help page's title are renamed; the dialog's text names the board and says the token works only on it. The prompt an agent receives now says it puts an AI crew to work on the board in its first line, and uses the plain words "Set up the AI crew for this board" and "Remove the AI crew from this board" for its two actions; the rest of the prompt is unchanged. The help page keeps its address. `app/components/ProjectsListPanel.vue`, `app/components/TeamCrewsPanel.vue`, `app/components/ManagementTokenDialog.vue`, `app/utils/managementPrompt.ts`, `docs/crews/give-a-board-a-crew.md`.
+
+- **Manage an existing crew from its own board: "Manage this crew".** On a crew's own board the board's menu offers **Manage this crew**. It makes a 10-minute token that reaches only that crew: its keys and its people. The window gives two prompts, one to recover the keys (the old keys stop working) and one to add the missing people; each works in the crew's own folder, `~/crew-<slug>`. Only the instance admin, the crew's creator, or an owner or admin of its team can make it; a crew's own accounts cannot. A token made before this change works as before. `server/utils/managementToken.ts`, `server/utils/crewKeyScope.ts`, `server/middleware/crewKeyScope.ts`, `server/db/schema.ts` (an additive, nullable `crew_id` on the key table), `server/api/settings/api-keys/management.post.ts`, `app/components/ManagementTokenDialog.vue`, `app/utils/crewManagePrompt.ts`, `app/components/ProjectsListPanel.vue`.
+
 ## 0.33.0 - 2026-11-15
 
 - **The board's top bar and view row follow the redesign.** The top bar shows the Team › Project crumb, the project's health chip (from Overview) and the board's people as avatars, four and then a count. The view row shows Board, List, Calendar, Timeline and Dashboard as tabs, with Overview, Messages, Time, Files and Office under More, and New task at its right end on the Board view. A search box filters the cards by title, the Filter button holds the labels and Show deleted, and a visit opens the view last chosen on that board. Nothing is removed. Files: `app/pages/projects/[id].vue`, `app/components/kanban/KanbanBoard.vue`, `app/composables/useProjects.ts`, `docs/basics/boards-and-columns.md`, `tests/board-page-crumb.test.ts`.
