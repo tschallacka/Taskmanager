@@ -1567,6 +1567,8 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
         id: task.id,
         title: task.title,
         board: { id: board.id, name: board.name },
+        // A trashed task has no page of its own in the app, so its link is the board, where restore_task brings it back.
+        ...(audienceOf(context, board) === 'staff' ? { url: boardShareUrl(board.id) } : {}),
         restoreWith: 'restore_task'
       }
     }
@@ -1614,6 +1616,7 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
         id: task.id,
         title: task.title,
         board: { id: board.id, name: board.name },
+        ...(audienceOf(context, board) === 'staff' ? { url: taskShareUrl(board.id, task.id) } : {}),
         column: restored?.name ?? columnId
       }
     }

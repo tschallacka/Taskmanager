@@ -9,7 +9,7 @@ import { and, eq } from 'drizzle-orm'
 import { audienceOf } from './mcpAccess'
 import type { Audience } from './auth-helpers'
 import { findTask } from './mcpBoardTools'
-import { updateShareUrl } from './shareLinks'
+import { taskShareUrl, updateShareUrl } from './shareLinks'
 import { McpToolError, asToolErrorAsync, newId, optionalString, requireString } from './mcpToolKit'
 import type { McpToolDefinition } from './mcpToolKit'
 import { notificationExcerpt } from './notifications'
@@ -165,7 +165,12 @@ export const MCP_UPDATE_TOOLS: McpToolDefinition[] = [
         deleted: true,
         byOwner,
         board: { id: board.id, name: board.name },
-        task: { id: task.id, title: task.title },
+        // The update is gone, so its link would open nothing: the task it was on is the link to share.
+        task: {
+          id: task.id,
+          title: task.title,
+          ...(audienceOf(context, board) === 'staff' ? { url: taskShareUrl(board.id, task.id) } : {})
+        },
         update: { id: comment.id, visibility: comment.visibility, length: comment.body.length }
       }
     }

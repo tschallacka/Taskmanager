@@ -185,6 +185,43 @@ test('my_tasks answers each task, and each subtask\'s parent, with its absolute 
   assert.equal(child.parent?.url, `${origin}/projects/${board}?task=${task}`)
 })
 
+test('delete_task answers with the board\'s link (a trashed task has no page of its own); restore_task answers with the task\'s link', async () => {
+  const context = {
+    keyId: keyRow,
+    keyName: 'share test',
+    userId: owner,
+    teamId: null,
+    customerId: null,
+    projectId: null,
+    scopes: ['boards:read', 'boards:write'] as ('boards:read' | 'boards:write')[],
+    reach: { allBoards: true, workspaceTeamIds: [], boardIds: [] },
+    memberTeamIds: []
+  }
+  const created = await MCP_TOOLS.find(t => t.name === 'create_task')!.handler({ board, column: 'To do', title: 'To trash and back' }, context) as { task: { id: string } }
+  const trashed = await MCP_TOOLS.find(t => t.name === 'delete_task')!.handler({ id: created.task.id }, context) as { url?: string }
+  assert.equal(trashed.url, `${origin}/projects/${board}`)
+  const restored = await MCP_TOOLS.find(t => t.name === 'restore_task')!.handler({ id: created.task.id }, context) as { url?: string }
+  assert.equal(restored.url, `${origin}/projects/${board}?task=${created.task.id}`)
+  await db.delete(projectTasks).where(eq(projectTasks.id, created.task.id))
+})
+
+test('delete_task_update answers with the link of the task the update was on', async () => {
+  const context = {
+    keyId: keyRow,
+    keyName: 'share test',
+    userId: owner,
+    teamId: null,
+    customerId: null,
+    projectId: null,
+    scopes: ['boards:read', 'boards:write'] as ('boards:read' | 'boards:write')[],
+    reach: { allBoards: true, workspaceTeamIds: [], boardIds: [] },
+    memberTeamIds: []
+  }
+  const posted = await MCP_TOOLS.find(t => t.name === 'post_task_update')!.handler({ id: task, body: 'Delete me' }, context) as { update: { id: string } }
+  const deleted = await MCP_TOOLS.find(t => t.name === 'delete_task_update')!.handler({ id: task, updateId: posted.update.id }, context) as { task: { url?: string } }
+  assert.equal(deleted.task.url, `${origin}/projects/${board}?task=${task}`)
+})
+
 test('get_board answers with the board\'s absolute link', async () => {
   const context = {
     keyId: 'k',
