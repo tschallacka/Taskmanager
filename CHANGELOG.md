@@ -2,6 +2,14 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.33.0 - 2026-11-15
+
+- **The board's top bar and view row follow the redesign.** The top bar shows the Team › Project crumb, the project's health chip (from Overview) and the board's people as avatars, four and then a count. The view row shows Board, List, Calendar, Timeline and Dashboard as tabs, with Overview, Messages, Time, Files and Office under More, and New task at its right end on the Board view. A search box filters the cards by title, the Filter button holds the labels and Show deleted, and a visit opens the view last chosen on that board. Nothing is removed. Files: `app/pages/projects/[id].vue`, `app/components/kanban/KanbanBoard.vue`, `app/composables/useProjects.ts`, `docs/basics/boards-and-columns.md`, `tests/board-page-crumb.test.ts`.
+
+## 0.32.1 - 2026-11-15
+
+- **Help: a page on updating a crew that already exists.** `docs/crews/update-a-crew.md` explains the one-line update, `crew update --check`, what an update replaces and keeps, and `crew people add` for roles a crew is missing. It is linked from the help index and from the page on adding a crew. Docs only.
+
 ## 0.32.0 - 2026-11-14
 
 - **The task card is one summary (redesign 4/9).** The whole card opens the panel; the hover-only chevron and the empty assignee slot are gone, and an assignee's picture shows only once someone is set. The chips row is in a fixed order: the first two labels then "+N", the select fields, then the state chips (Overdue, Due soon within two days, Waits for N, Team only, Shared with customer), each shown only with a reason, and none on a finished task. Right-click (long press on a touchscreen) opens the menu: Open, Mark done, Assign to..., Move to column..., Set due date..., Copy link, Delete. Space ticks a focused card done. The trash's button reads "Delete now". Deviations from the card: no Undo toast, no hint strip, no compact cards, no drag tilt yet; a waiting card does not name its blockers on hover. `app/components/kanban/KanbanCard.vue`, `app/components/kanban/KanbanBoard.vue`, `app/utils/cardChips.ts`, `app/utils/dueDate.ts`, `app/utils/taskBlockers.ts`, `tests/card-chips.test.ts`, `tests/task-blockers-ui.test.ts`, `docs/basics/tasks.md`.

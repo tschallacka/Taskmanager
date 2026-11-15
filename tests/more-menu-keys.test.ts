@@ -16,10 +16,10 @@ test('the trigger is a native button, reachable with Tab, labelled, and says it 
 })
 
 test('each More item selects its view on activation, the same as a click on a tab', () => {
-  assert.match(page, /onSelect: \(\) => setView\(v\.key\)/)
+  assert.match(page, /onSelect: \(\) => \(v\.key === 'office' \? openOffice\(\) : setView\(v\.key\)\)/)
   assert.doesNotMatch(page, /@click\.prevent="setView\(v\.key\)"/)
 })
 
 test('the menu is a UDropdownMenu, which gives the arrow keys and Escape', () => {
-  assert.match(page, /<UDropdownMenu\s+v-if="moreViewItems\.length"/)
+  assert.match(page, /<UDropdownMenu\s+v-if="moreItems\.length"\s+:items="moreItems"/)
 })

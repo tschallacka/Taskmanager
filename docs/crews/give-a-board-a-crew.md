@@ -6,6 +6,8 @@ topics: crew, add a crew, give a board a crew, management token, shadow board
 order: 30
 ---
 
+To bring a crew that already exists up to date, read [Update a crew that already exists](/help/crews/update-a-crew).
+
 Adding a crew to a board makes a **new** crew for it. The crew gets a board of its own, in its own team, and reads your
 real board from then on. It never changes your board. Read [What a crew is](/help/crews/what-is-a-crew) first if you are
 not sure what that means.

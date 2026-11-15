@@ -26,26 +26,33 @@ way you can rename, add and remove columns at any time.
 
 ## The tabs
 
-Under the board's name is a row of tabs. They are different ways of looking at the same tasks.
+Under the board's name is a row of views. They are different ways of looking at the same tasks. The first five are
+tabs, in this order: **Board**, **List**, **Calendar**, **Timeline** and **Dashboard**. The rest sit under **More**.
 
-| Tab | What it shows |
+| View | What it shows |
 |---|---|
 | **Overview** | The board's description, its health status and its status updates. Under **More**. |
 | **Board** | The columns and cards. This is where a board opens. |
 | **List** | The tasks as rows, one section per column, with a cell for each custom field. |
-| **Timeline** | A bar for each task that has a start or a due date. |
 | **Calendar** | Tasks on the day they are due. Drag a task onto a day to set its due date. |
+| **Timeline** | A bar for each task that has a start or a due date. |
 | **Dashboard** | Counts and charts: completed, incomplete and overdue tasks, and tasks per column. |
 | **Messages** | Conversations for the team only. See [Board messages](/help/basics/board-messages). Under **More**. |
 | **Time** | Time logged on the board's tasks, a week at a time. Under **More**. |
 | **Files** | Every image pasted into a task description on the board. Under **More**. |
+| **Office** | On a crew's board: the crew of this board at work. With more than one crew, More lists each one. Under **More**. |
 
 **More** is the last tab in the row (its button is labelled *More project views*). It holds **Overview**, **Messages**,
-**Time** and **Files**. Click it to open the list; on a phone, tap it. With the keyboard, Tab to it and press Enter to
+**Time**, **Files** and, on a crew's board, **Office**. Click it to open the list; on a phone, tap it. With the keyboard, Tab to it and press Enter to
 open the list, then Enter on a view to choose it. Escape closes the list without a choice.
 
-**Settings** is the cog at the top right, next to **Share**. The **...** menu (*Project options*) next to it holds
-*Rename project*, *Settings* and, when something has been deleted, *Show trashed*.
+At the right end of the row, on the Board view, there are three things. **Filter** narrows the cards by label; its list shows each label on the board with a count, and **Show deleted** puts the trash on the board. **Search this board** narrows the cards by title, and an empty result says so. **New task** opens the composer in the first column. On a phone the tabs scroll sideways; Filter, search and New task stay in view.
+
+The top bar shows the board's team and name (**Team › Project**; click the project name to rename it), the board's
+health (**On track**, **At risk** or **Off track**, when it has one, set on **Overview**), and the people on the board
+as avatars: the first four, then a count. **Share** and the cog are on the right. The cog is **Settings**. The **...**
+menu (*Project options*) next to it holds *Rename project*, *Settings* and, when something has been deleted, *Show
+trashed*.
 
 ## Moving tasks without a mouse
 
