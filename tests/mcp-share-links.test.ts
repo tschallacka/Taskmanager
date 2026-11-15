@@ -11,7 +11,7 @@ Object.assign(globalThis, { createError })
 
 const { db } = await import('../server/db')
 const schema = await import('../server/db/schema')
-const { apiKeys, notifications, projects, projectColumns, projectTasks, taskComments, user } = schema
+const { apiKeys, notifications, projectGuests, projects, projectColumns, projectTasks, taskComments, user } = schema
 const { boardShareUrl, taskShareUrl, updateShareUrl } = await import('../server/utils/shareLinks')
 const { MCP_TOOLS } = await import('../server/utils/mcpRegistry')
 
@@ -26,6 +26,12 @@ const notifyTask = id('notify-task')
 const notifyBoard = id('notify-board')
 // A comment keeps the key it came in on (a foreign key), so the update test needs a real key row.
 const keyRow = id('key')
+// Another person's board, on which the owner is only a guest: the owner's key sees it as a customer's would.
+const other = id('other')
+const otherBoard = id('other-board')
+const otherColumn = id('other-column')
+const otherTask = `tslo${tag}`
+const otherGuest = id('guest')
 const origin = 'https://tasks.example.test'
 const saved = process.env.BETTER_AUTH_URL
 
@@ -40,6 +46,11 @@ before(async () => {
   await db.insert(projectTasks).values({ id: task, projectId: board, columnId: column, title: 'Share me', visibility: 'internal', assigneeId: owner, position: 0, createdAt: now, updatedAt: now })
   // A subtask of the task, assigned to the same owner, so my_tasks shows its parent with a link.
   await db.insert(projectTasks).values({ id: subtask, projectId: board, columnId: column, parentTaskId: task, title: 'Share the subtask', visibility: 'internal', assigneeId: owner, position: 1, createdAt: now, updatedAt: now })
+  await db.insert(user).values({ id: other, name: other, email: `${other}@arnotes.test`, emailVerified: true, createdAt: at, updatedAt: at })
+  await db.insert(projects).values({ id: otherBoard, userId: other, name: 'Someone else board', createdAt: now, updatedAt: now })
+  await db.insert(projectColumns).values({ id: otherColumn, projectId: otherBoard, name: 'To do', position: 0, createdAt: now })
+  await db.insert(projectTasks).values({ id: otherTask, projectId: otherBoard, columnId: otherColumn, title: 'Theirs', visibility: 'customer', position: 0, createdAt: now, updatedAt: now })
+  await db.insert(projectGuests).values({ id: otherGuest, projectId: otherBoard, userId: owner, role: 'editor', addedBy: other, createdAt: now })
   await db.insert(notifications).values([
     { id: notifyTask, userId: owner, type: 'assigned', projectId: board, taskId: task, title: 'Assigned: Share me', createdAt: now },
     { id: notifyBoard, userId: owner, type: 'update', projectId: board, title: 'Board news', createdAt: now }
@@ -51,7 +62,10 @@ after(async () => {
   await db.delete(projectTasks).where(eq(projectTasks.id, task))
   await db.delete(projectColumns).where(eq(projectColumns.id, column))
   await db.delete(projects).where(eq(projects.id, board))
-  await db.delete(user).where(inArray(user.id, [owner]))
+  await db.delete(projectTasks).where(eq(projectTasks.id, otherTask))
+  await db.delete(projectColumns).where(eq(projectColumns.id, otherColumn))
+  await db.delete(projects).where(eq(projects.id, otherBoard))
+  await db.delete(user).where(inArray(user.id, [owner, other]))
   if (saved === undefined) delete process.env.BETTER_AUTH_URL
   else process.env.BETTER_AUTH_URL = saved
   await db.$client.end()
@@ -255,6 +269,30 @@ test('the tools help page says which link an answer carries and that it is the o
   assert.match(page, /## Links to share/, 'the page has a Links to share section')
   assert.match(page, /`url`/, 'the page names the url field')
   assert.match(page, /link to share with a person/, 'the page says url is the link to share with a person')
+})
+
+test('a guest\'s key gets no staff link on another person\'s board: get_board, list_boards and post_task_update', async () => {
+  const context = {
+    keyId: keyRow,
+    keyName: 'share test',
+    userId: owner,
+    teamId: null,
+    customerId: null,
+    projectId: null,
+    scopes: ['boards:read', 'boards:write'] as ('boards:read' | 'boards:write')[],
+    reach: { allBoards: true, workspaceTeamIds: [], boardIds: [] },
+    memberTeamIds: []
+  }
+  const shown = await MCP_TOOLS.find(t => t.name === 'get_board')!.handler({ board: otherBoard }, context) as { id: string, url?: string }
+  assert.equal(shown.id, otherBoard)
+  assert.equal(shown.url, undefined, 'get_board gives a guest no staff board link')
+  const listed = await MCP_TOOLS.find(t => t.name === 'list_boards')!.handler({}, context) as { boards: { id: string, url?: string }[] }
+  const mine = listed.boards.find(b => b.id === otherBoard)
+  assert.ok(mine, 'the other board is listed for the guest')
+  assert.equal(mine.url, undefined, 'list_boards gives a guest no staff board link')
+  const posted = await MCP_TOOLS.find(t => t.name === 'post_task_update')!.handler({ id: otherTask, body: 'Guest note' }, context) as { update: { id: string, url?: string } }
+  assert.equal(posted.update.url, undefined, 'post_task_update gives a guest no staff update link')
+  await db.delete(taskComments).where(eq(taskComments.id, posted.update.id))
 })
 
 test('get_board answers with the board\'s absolute link', async () => {
