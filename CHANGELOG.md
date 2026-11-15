@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.37.1 - 2026-11-15
+
+- **The privacy policy and the Impressum are written, with version numbers and an archive procedure.** `legal/privacy/current.md` (version 1.0.0) says what the service stores, why, on what legal basis, who receives it, how long it is kept and what rights people have, for a European audience; `legal/imprint/current.md` (German, with an English translation) names the person who runs the service. Both carry a version, the date they take effect and the date they were last changed, and `legal/README.md` says how an earlier version is frozen into `archive/` so it stays readable. They are drafts until the placeholders in them are filled and the pages that show them are built (card `mwidrtw6jigffzbe5`).
+
 ## 0.37.0 - 2026-11-15
 
 - **A comment opened from the Inbox stays in the address.** The card jumps to the reply and the address still names the comment, so a reload or a shared copy of the link scrolls to it again. `app/components/kanban/TaskComments.vue`, `tests/inbox-comment-url.test.ts`.
