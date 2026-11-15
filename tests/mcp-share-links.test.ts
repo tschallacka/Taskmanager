@@ -11,7 +11,7 @@ Object.assign(globalThis, { createError })
 
 const { db } = await import('../server/db')
 const schema = await import('../server/db/schema')
-const { apiKeys, notifications, projectGuests, projects, projectColumns, projectTasks, taskComments, user } = schema
+const { apiKeys, customerMembers, customers, notifications, organization, projectGuests, projects, projectColumns, projectTasks, taskComments, user } = schema
 const { boardShareUrl, taskShareUrl, updateShareUrl } = await import('../server/utils/shareLinks')
 const { MCP_TOOLS } = await import('../server/utils/mcpRegistry')
 
@@ -34,6 +34,13 @@ const otherBoard = id('other-board')
 const otherColumn = id('other-column')
 const otherTask = `tslo${tag}`
 const otherGuest = id('guest')
+// A customer's board: its contact is a customer member, not the owner, so the contact's key is a customer's key.
+const team = id('team')
+const customer = id('customer')
+const contact = id('contact')
+const customerBoard = id('customer-board')
+const customerColumn = id('customer-column')
+const customerTask = `tslc${tag}`
 const origin = 'https://tasks.example.test'
 const saved = process.env.BETTER_AUTH_URL
 
@@ -54,6 +61,13 @@ before(async () => {
   await db.insert(projectColumns).values({ id: otherColumn, projectId: otherBoard, name: 'To do', position: 0, createdAt: now })
   await db.insert(projectTasks).values({ id: otherTask, projectId: otherBoard, columnId: otherColumn, title: 'Theirs', visibility: 'customer', position: 0, createdAt: now, updatedAt: now })
   await db.insert(projectGuests).values({ id: otherGuest, projectId: otherBoard, userId: owner, role: 'editor', addedBy: other, createdAt: now })
+  await db.insert(organization).values({ id: team, name: 'Share team', slug: team, createdAt: at })
+  await db.insert(user).values({ id: contact, name: contact, email: `${contact}@arnotes.test`, emailVerified: true, createdAt: at, updatedAt: at })
+  await db.insert(customers).values({ id: customer, organizationId: team, name: 'Share customer', createdAt: now, updatedAt: now })
+  await db.insert(customerMembers).values({ id: id('cm'), customerId: customer, userId: contact, createdAt: now })
+  await db.insert(projects).values({ id: customerBoard, userId: owner, customerId: customer, name: 'Customer board', createdAt: now, updatedAt: now })
+  await db.insert(projectColumns).values({ id: customerColumn, projectId: customerBoard, name: 'To do', position: 0, createdAt: now })
+  await db.insert(projectTasks).values({ id: customerTask, projectId: customerBoard, columnId: customerColumn, title: 'For the customer', visibility: 'customer', position: 0, createdAt: now, updatedAt: now })
   await db.insert(notifications).values([
     { id: notifyTask, userId: owner, type: 'assigned', projectId: board, taskId: task, title: 'Assigned: Share me', createdAt: now },
     { id: notifyBoard, userId: owner, type: 'update', projectId: board, title: 'Board news', createdAt: now }
@@ -69,7 +83,12 @@ after(async () => {
   await db.delete(projectTasks).where(eq(projectTasks.id, otherTask))
   await db.delete(projectColumns).where(eq(projectColumns.id, otherColumn))
   await db.delete(projects).where(eq(projects.id, otherBoard))
-  await db.delete(user).where(inArray(user.id, [owner, other]))
+  await db.delete(projectTasks).where(eq(projectTasks.id, customerTask))
+  await db.delete(projectColumns).where(eq(projectColumns.id, customerColumn))
+  await db.delete(projects).where(eq(projects.id, customerBoard))
+  await db.delete(customers).where(eq(customers.id, customer))
+  await db.delete(organization).where(eq(organization.id, team))
+  await db.delete(user).where(inArray(user.id, [owner, other, contact]))
   if (saved === undefined) delete process.env.BETTER_AUTH_URL
   else process.env.BETTER_AUTH_URL = saved
   await db.$client.end()
@@ -298,6 +317,28 @@ test('a guest\'s key gets no staff link on another person\'s board: get_board, l
   const posted = await MCP_TOOLS.find(t => t.name === 'post_task_update')!.handler({ id: otherTask, body: 'Guest note' }, context) as { update: { id: string, url?: string } }
   assert.equal(posted.update.url, undefined, 'post_task_update gives a guest no staff update link')
   await db.delete(taskComments).where(eq(taskComments.id, posted.update.id))
+})
+
+test('a customer\'s key gets no staff link: get_board and get_task on the customer\'s board, read by the customer\'s contact', async () => {
+  const context = {
+    keyId: keyRow,
+    keyName: 'share test',
+    userId: contact,
+    teamId: null,
+    customerId: customer,
+    projectId: null,
+    scopes: ['boards:read'] as ('boards:read' | 'boards:write')[],
+    reach: { allBoards: true, workspaceTeamIds: [], boardIds: [] },
+    memberTeamIds: []
+  }
+  const shown = await MCP_TOOLS.find(t => t.name === 'get_board')!.handler({ board: customerBoard }, context) as { id: string, url?: string, columns: { tasks: { id: string, url?: string }[] }[] }
+  assert.equal(shown.id, customerBoard)
+  assert.equal(shown.url, undefined, 'get_board gives a customer\'s key no staff board link')
+  const card = shown.columns.flatMap(c => c.tasks).find(t => t.id === customerTask)
+  assert.ok(card, 'the customer-visible task is on the board')
+  assert.equal(card.url, undefined, 'the board\'s cards carry no staff task link for a customer\'s key')
+  const got = await MCP_TOOLS.find(t => t.name === 'get_task')!.handler({ id: customerTask }, context) as { url?: string }
+  assert.equal(got.url, undefined, 'get_task gives a customer\'s key no staff task link')
 })
 
 test('the e-mail and push link to a subtask opens its parent\'s panel, as the inbox link does', async () => {
