@@ -239,6 +239,15 @@ test('get_task_github answers with the task\'s absolute link', async () => {
   assert.equal(answer.url, `${origin}/projects/${board}?task=${task}`)
 })
 
+test('every tool that answers with a task, board or update says in its description that url is the link to share', () => {
+  const linkTools = ['get_task', 'create_task', 'update_task', 'move_task', 'search_tasks', 'my_tasks', 'get_board', 'list_boards', 'post_task_update', 'edit_task_update', 'delete_task_update', 'delete_task', 'restore_task', 'list_notifications', 'get_task_github']
+  for (const name of linkTools) {
+    const tool = MCP_TOOLS.find(t => t.name === name)
+    assert.ok(tool, `${name} is a tool`)
+    assert.match(tool.description, /url is the link to share/, `${name} says url is the link to share`)
+  }
+})
+
 test('get_board answers with the board\'s absolute link', async () => {
   const context = {
     keyId: 'k',

@@ -19,6 +19,15 @@ import { MCP_TIME_TOOLS } from './mcpTimeTools'
 import { MCP_UPDATE_TOOLS } from './mcpUpdateTools'
 import type { McpToolDefinition } from './mcpToolKit'
 
+// The tools whose answer names a task, board or update with its `url`: the link to share with a person. The note says
+// it once, here, so the descriptions cannot disagree about what `url` is.
+const SHARE_LINK_TOOLS: ReadonlySet<string> = new Set([
+  'get_task', 'create_task', 'update_task', 'move_task', 'search_tasks', 'my_tasks', 'get_board', 'list_boards',
+  'post_task_update', 'edit_task_update', 'delete_task_update', 'delete_task', 'restore_task', 'list_notifications',
+  'get_task_github'
+])
+const SHARE_LINK_NOTE = ' In the answer, url is the link to share with a person: it opens the task, board or update in the app. A customer\'s key gets no staff link.'
+
 export const MCP_TOOLS: McpToolDefinition[] = [
   ...MCP_BOARD_TOOLS,
   ...MCP_FIELD_TOOLS,
@@ -32,7 +41,7 @@ export const MCP_TOOLS: McpToolDefinition[] = [
   ...MCP_STATUS_TOOLS,
   ...MCP_TIME_TOOLS,
   ...MCP_UPDATE_TOOLS
-]
+].map(tool => (SHARE_LINK_TOOLS.has(tool.name) ? { ...tool, description: `${tool.description}${SHARE_LINK_NOTE}` } : tool))
 
 export function toolsForScopes(scopes: ApiKeyScope[]): McpToolDefinition[] {
   return MCP_TOOLS.filter(tool => scopes.includes(tool.scope))
