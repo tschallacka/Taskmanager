@@ -53,6 +53,28 @@ const emit = defineEmits<{
 // panel: there is nothing to edit until it is back.
 const trashed = computed(() => props.task.deletedAt != null)
 
+// Below the lg breakpoint (the phone) a long-press opens the card's bottom sheet, the same one as the three-dot menu, and
+// the desktop's popover menu stays off. phoneWidth follows the viewport, so a resize moves the card between the two.
+const phoneWidth = ref(false)
+let phoneQuery: MediaQueryList | null = null
+function syncPhoneWidth() {
+  phoneWidth.value = phoneQuery?.matches ?? false
+}
+onMounted(() => {
+  phoneQuery = window.matchMedia('(max-width: 1023.98px)')
+  syncPhoneWidth()
+  phoneQuery.addEventListener('change', syncPhoneWidth)
+})
+onBeforeUnmount(() => phoneQuery?.removeEventListener('change', syncPhoneWidth))
+
+// The long-press on a touch screen is the browser's contextmenu event. At phone width it opens the sheet instead of the
+// menu, and the native menu is stopped.
+function onPhoneLongPress(event: Event) {
+  if (!phoneWidth.value || trashed.value || props.readonly) return
+  event.preventDefault()
+  emit('menu', props.task.id)
+}
+
 const trashedLabel = computed(() => {
   if (!props.task.deletedAt) return ''
   return `Deleted ${relativeTime(props.task.deletedAt)}${deletionSourceLabel(props.task.deletedVia)}`
@@ -189,7 +211,7 @@ const hasCounts = computed(() =>
 <template>
   <UContextMenu
     :items="menuItems"
-    :disabled="trashed"
+    :disabled="trashed || phoneWidth"
   >
     <div
       :data-id="task.id"
@@ -204,6 +226,7 @@ const hasCounts = computed(() =>
         completed && !trashed ? 'opacity-70' : ''
       ]"
       @click="trashed || $emit('open', task.id)"
+      @contextmenu="onPhoneLongPress"
       @keydown.enter.prevent="trashed || $emit('open', task.id)"
       @keydown.space.prevent="trashed || readonly || $emit('toggleComplete', task.id)"
     >
