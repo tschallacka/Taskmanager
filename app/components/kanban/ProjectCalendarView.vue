@@ -81,7 +81,11 @@ async function moveWithKeys(task: { id: string, dueOn?: string | null }, event: 
     await updateTask(task.id, { dueOn: patch.dueOn })
   } catch (e) {
     toast.add({ title: errorMessage(e, 'Could not change the day'), icon: 'i-lucide-alert-triangle', color: 'error' })
+    return
   }
+  // The task's button moves to its new day's cell, a new element: focus it there, so the next arrow key still reaches it.
+  await nextTick()
+  document.querySelector<HTMLElement>(`[data-calendar-task="${task.id}"]`)?.focus()
 }
 
 const undatedOpen = ref(false)
@@ -193,6 +197,7 @@ const undatedOpen = ref(false)
         >
           <button
             draggable="true"
+            :data-calendar-task="task.id"
             class="min-w-0 flex-1 truncate rounded-md bg-primary/10 px-1.5 py-1 text-left text-xs text-default transition-colors hover:bg-primary/20"
             :class="task.completedAt ? 'line-through opacity-60' : ''"
             :aria-label="`${task.title}, due ${task.dueOn}. Arrow keys move it a day, up and down a week.`"

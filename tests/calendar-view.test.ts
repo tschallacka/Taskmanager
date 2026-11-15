@@ -28,6 +28,17 @@ test('a task on a day moves with the arrow keys: the key handler saves the new d
   assert.match(fnBody('moveWithKeys'), /updateTask\(task\.id, \{ dueOn: patch\.dueOn \}\)/)
 })
 
+test('after an arrow-key move the task keeps keyboard focus: its button is found again in its new day and focused', () => {
+  // A move re-creates the button in the new day's cell, so the focus would drop to the page (measured 2026-11-15 on 3102).
+  assert.match(dayCell, /:data-calendar-task="task\.id"/)
+  const body = fnBody('moveWithKeys')
+  const save = body.indexOf('await updateTask(task.id, { dueOn: patch.dueOn })')
+  assert.ok(save >= 0, 'the key move saves through updateTask')
+  const after = body.slice(save)
+  assert.match(after, /await nextTick\(\)/)
+  assert.match(after, /document\.querySelector<HTMLElement>\(`\[data-calendar-task="\$\{task\.id\}"\]`\)\?\.focus\(\)/)
+})
+
 test('the task button says how to move it, so a keyboard user can find the keys', () => {
   assert.match(dayCell, /:aria-label="`\$\{task\.title\}, due \$\{task\.dueOn\}\. Arrow keys move it a day, up and down a week\.`"/)
 })
