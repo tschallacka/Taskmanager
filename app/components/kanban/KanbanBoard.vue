@@ -438,6 +438,26 @@ function phoneHidden(columnId: string) {
   return columnId !== phoneActiveId.value
 }
 
+// On a phone a horizontal swipe moves to the next or previous column (design page09: "swipe for other columns"). The
+// swipe must be mostly sideways, so an up-and-down scroll of a card list is not taken for one. The desktop is left alone.
+let phoneSwipeStart: { x: number, y: number } | null = null
+function onPhoneTouchStart(event: TouchEvent) {
+  const touch = event.touches[0]
+  phoneSwipeStart = touch ? { x: touch.clientX, y: touch.clientY } : null
+}
+function onPhoneTouchEnd(event: TouchEvent) {
+  const start = phoneSwipeStart
+  phoneSwipeStart = null
+  const touch = event.changedTouches[0]
+  if (!start || !touch || window.matchMedia('(min-width: 1024px)').matches) return
+  const dx = touch.clientX - start.x
+  const dy = touch.clientY - start.y
+  if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return
+  const ids = phoneColumns.value.map(column => column.id)
+  const next = ids[ids.indexOf(phoneActiveId.value) + (dx < 0 ? 1 : -1)]
+  if (next) phoneColumnId.value = next
+}
+
 // The phone's bottom sheet for one card (9/9). The sheet only emits; these handlers call the board's own functions.
 // Assign and due date have no picker yet, and Delete waits for a live-card trash action, so the sheet does not wire them.
 const phoneSheetTaskId = ref<string | null>(null)
@@ -759,6 +779,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onBoardKeydown))
     @select="phoneColumnId = $event"
     @add="startAddColumn"
   />
+  <p
+    v-if="board"
+    data-testid="phone-swipe-hint"
+    class="px-4 pb-2 text-center text-xs text-dimmed lg:hidden"
+  >
+    ‹ swipe for other columns ›
+  </p>
   <!-- The phone's Add column name field: the desktop one below is hidden on a phone. -->
   <div
     v-if="addingColumn && !isCustomerView"
@@ -815,6 +842,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onBoardKeydown))
     v-if="board"
     ref="boardEl"
     class="flex h-full min-h-0 items-stretch gap-3 overflow-x-auto px-4 py-4 lg:px-6"
+    @touchstart.passive="onPhoneTouchStart"
+    @touchend.passive="onPhoneTouchEnd"
   >
     <section
       v-for="column in boardColumns"
