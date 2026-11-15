@@ -428,7 +428,8 @@ const liveColumns = computed(() => boardColumns.value.filter(column => !isTrashe
 // The phone shows one column at a time (redesign 9/9). The picker sets `phoneColumnId`; until it is set, the first
 // live column shows. Below lg only: on desktop every column stays visible, as it always was.
 const phoneColumnId = ref<string | null>(null)
-const phoneActiveId = computed(() => phoneColumnId.value ?? liveColumns.value[0]?.id ?? '')
+// A column that was trashed after it was picked is no longer shown: the first live column takes its place.
+const phoneActiveId = computed(() => (liveColumns.value.some(c => c.id === phoneColumnId.value) ? phoneColumnId.value : liveColumns.value[0]?.id) ?? '')
 const phoneColumns = computed(() => liveColumns.value.map(column => ({
   id: column.id,
   name: column.name,
@@ -466,7 +467,7 @@ function onPhoneDone() {
   if (phoneSheetTaskId.value) onToggleComplete(phoneSheetTaskId.value)
 }
 function onPhoneMove(columnId: string) {
-  if (phoneSheetTaskId.value) moveTask(phoneSheetTaskId.value, columnId, null, null)
+  if (phoneSheetTaskId.value) void onMoveTask(phoneSheetTaskId.value, columnId)
 }
 // Assignee and due date from the sheet: the board's own calls, with the same error toasts.
 const phonePeople = computed(() => boardPeople().map(person => ({ id: person.id, name: person.name || person.email || '' })))
@@ -506,7 +507,8 @@ async function confirmPhoneDelete() {
       actions: [{ label: 'Undo', onClick: () => void onRestoreTask(id) }]
     })
   } catch {
-    toast.add({ title: 'Could not delete the task', icon: 'i-lucide-alert-triangle', color: 'error' })
+    // The same words as the desktop's delete (onDeleteTask). The phone adds a confirm and an Undo toast; the card says why.
+    toast.add({ title: 'Could not move the task to the trash', icon: 'i-lucide-alert-triangle', color: 'error' })
   }
 }
 

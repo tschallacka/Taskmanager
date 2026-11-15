@@ -18,7 +18,7 @@ const emit = defineEmits<{
 <template>
   <div
     data-testid="phone-column-picker"
-    role="tablist"
+    role="group"
     aria-label="Columns"
     class="flex gap-2 overflow-x-auto px-4 pb-2 lg:hidden"
   >
@@ -26,8 +26,7 @@ const emit = defineEmits<{
       v-for="column in props.columns"
       :key="column.id"
       type="button"
-      role="tab"
-      :aria-selected="column.id === props.activeId"
+      :aria-pressed="column.id === props.activeId"
       class="flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-3 text-sm"
       :class="column.id === props.activeId
         ? 'border-primary bg-primary/10 font-semibold text-primary'

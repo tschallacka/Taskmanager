@@ -40,18 +40,24 @@ const actions = [
   { key: 'delete', label: 'Delete', icon: 'i-lucide-trash-2', danger: true }
 ] as const
 
+// Each action is its own case and closes the sheet itself, except assign and due, which open their step.
 function run(key: (typeof actions)[number]['key']) {
-  if (key === 'assign') {
-    step.value = 'assign'
-    return
+  switch (key) {
+    case 'assign':
+      step.value = 'assign'
+      return
+    case 'due':
+      step.value = 'due'
+      return
+    case 'done':
+      emit('done')
+      emit('update:open', false)
+      return
+    case 'delete':
+      emit('delete')
+      emit('update:open', false)
+      return
   }
-  if (key === 'due') {
-    step.value = 'due'
-    return
-  }
-  if (key === 'done') emit('done')
-  if (key === 'delete') emit('delete')
-  emit('update:open', false)
 }
 
 function moveTo(columnId: string) {
