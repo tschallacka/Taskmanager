@@ -22,6 +22,8 @@ const board = id('board')
 const column = id('column')
 const task = `tslt${tag}`
 const subtask = `tsls${tag}`
+// A task the customer can see: on a shared board, it carries the board's public link (publicUrl).
+const publicTask = `tslp${tag}`
 const notifyTask = id('notify-task')
 const notifyBoard = id('notify-board')
 // A comment keeps the key it came in on (a foreign key), so the update test needs a real key row.
@@ -45,6 +47,7 @@ before(async () => {
   await db.insert(projectColumns).values({ id: column, projectId: board, name: 'To do', position: 0, createdAt: now })
   await db.insert(projectTasks).values({ id: task, projectId: board, columnId: column, title: 'Share me', visibility: 'internal', assigneeId: owner, position: 0, createdAt: now, updatedAt: now })
   // A subtask of the task, assigned to the same owner, so my_tasks shows its parent with a link.
+  await db.insert(projectTasks).values({ id: publicTask, projectId: board, columnId: column, title: 'Customer can see this', visibility: 'customer', position: 2, createdAt: now, updatedAt: now })
   await db.insert(projectTasks).values({ id: subtask, projectId: board, columnId: column, parentTaskId: task, title: 'Share the subtask', visibility: 'internal', assigneeId: owner, position: 1, createdAt: now, updatedAt: now })
   await db.insert(user).values({ id: other, name: other, email: `${other}@arnotes.test`, emailVerified: true, createdAt: at, updatedAt: at })
   await db.insert(projects).values({ id: otherBoard, userId: other, name: 'Someone else board', createdAt: now, updatedAt: now })
@@ -60,6 +63,7 @@ before(async () => {
 after(async () => {
   await db.delete(projectTasks).where(eq(projectTasks.id, subtask))
   await db.delete(projectTasks).where(eq(projectTasks.id, task))
+  await db.delete(projectTasks).where(eq(projectTasks.id, publicTask))
   await db.delete(projectColumns).where(eq(projectColumns.id, column))
   await db.delete(projects).where(eq(projects.id, board))
   await db.delete(projectTasks).where(eq(projectTasks.id, otherTask))
@@ -302,6 +306,29 @@ test('the e-mail and push link to a subtask opens its parent\'s panel, as the in
   assert.equal(onSubtask, `/projects/${board}?task=${task}`)
   const onTask = await notificationPath({ project: { id: board, name: 'Share board', userId: owner, teamId: null, customerId: null }, task: { id: task, title: 'Share me', visibility: 'internal' }, actorId: null, type: 'assigned', recipients: [], title: 'x' })
   assert.equal(onTask, `/projects/${board}?task=${task}`)
+})
+
+test('a customer-visible task on a shared board carries the board\'s public link (publicUrl); an internal task and a private board carry none', async () => {
+  const context = {
+    keyId: keyRow,
+    keyName: 'share test',
+    userId: owner,
+    teamId: null,
+    customerId: null,
+    projectId: null,
+    scopes: ['boards:read'] as ('boards:read' | 'boards:write')[],
+    reach: { allBoards: true, workspaceTeamIds: [], boardIds: [] },
+    memberTeamIds: []
+  }
+  const get = MCP_TOOLS.find(t => t.name === 'get_task')!
+  await db.update(projects).set({ isPublic: true, publicUntil: null }).where(eq(projects.id, board))
+  const shown = await get.handler({ id: publicTask }, context) as { publicUrl?: string }
+  assert.equal(shown.publicUrl, `${origin}/public/project/${board}`)
+  const internal = await get.handler({ id: task }, context) as { publicUrl?: string }
+  assert.equal(internal.publicUrl, undefined, 'an internal task has no public link')
+  await db.update(projects).set({ isPublic: false }).where(eq(projects.id, board))
+  const privateNow = await get.handler({ id: publicTask }, context) as { publicUrl?: string }
+  assert.equal(privateNow.publicUrl, undefined, 'a board that is not shared gives no public link')
 })
 
 test('get_board answers with the board\'s absolute link', async () => {

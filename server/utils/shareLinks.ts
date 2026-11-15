@@ -26,6 +26,11 @@ export function openableTaskId(task: { id: string, parentTaskId?: string | null 
   return task.parentTaskId ?? task.id
 }
 
+/** The absolute link to a shared board's public page (/public/project/<id>), the page a customer can open without a sign-in. */
+export function publicBoardShareUrl(boardId: string): string {
+  return `${shareOrigin()}/public/project/${boardId}`
+}
+
 /** The absolute link to a conversation (a message thread on the board's messages view). */
 export function messageShareUrl(boardId: string, messageId: string): string {
   return `${boardShareUrl(boardId)}?view=messages&message=${messageId}`
