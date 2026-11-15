@@ -99,7 +99,46 @@ test('crew up reports a key with no worker role as failed, and does not start it
     return { ok: true }
   }, wake: async () => ({ ok: true }) })
   assert.equal(started, 0)
-  assert.equal(out.lines[0], 'pia: failed: no worker role for this key; not started')
+  assert.equal(out.lines[0], 'pia: failed: no role for pia: no worker section in PROMPTS.md and no sessions/pia.role.md; not started')
+  assert.equal(out.ok, false)
+})
+
+test('crew up honours CREW_ROLE_FILE for every key, as crew session start does', async () => {
+  const home = homeWith({ wynn: { id: DEAD_ID, folder: '/work/wynn' } })
+  const override = join(home, 'override.role.md')
+  writeFileSync(override, 'OVERRIDE ROLE\n', { mode: 0o600 })
+  const started = []
+  const out = await upSessions(home, {
+    promptsText: PROMPTS,
+    crewText: CREW_MD,
+    env: { CREW_ROLE_FILE: override },
+    listAgents: () => [],
+    start: (opts) => {
+      started.push(opts)
+      return { ok: true, id: 'cc000006' }
+    },
+    wake: async () => ({ ok: true })
+  })
+  assert.equal(started[0].role, 'OVERRIDE ROLE\n', 'the override file is the role, not the PROMPTS.md section')
+  assert.deepEqual(out.lines, ['wynn: started (cc000006), woke once'])
+})
+
+test('crew up with CREW_ROLE_FILE set to a missing file fails the key and starts nothing', async () => {
+  const home = homeWith({ wynn: { id: DEAD_ID, folder: '/work/wynn' } })
+  let started = 0
+  const out = await upSessions(home, {
+    promptsText: PROMPTS,
+    crewText: CREW_MD,
+    env: { CREW_ROLE_FILE: join(home, 'nope.role.md') },
+    listAgents: () => [],
+    start: () => {
+      started += 1
+      return { ok: true }
+    },
+    wake: async () => ({ ok: true })
+  })
+  assert.equal(started, 0)
+  assert.match(out.lines[0], /^wynn: failed: CREW_ROLE_FILE does not exist: .*; not started$/)
   assert.equal(out.ok, false)
 })
 
@@ -216,7 +255,7 @@ test('crew up still fails a key that has neither a worker section nor a role fil
     return { ok: true }
   }, wake: async () => ({ ok: true }) })
   assert.equal(started, 0)
-  assert.equal(out.lines[0], 'quincy: failed: no worker role for this key; not started')
+  assert.equal(out.lines[0], 'quincy: failed: no role for quincy: no worker section in PROMPTS.md and no sessions/quincy.role.md; not started')
   assert.equal(out.ok, false)
 })
 

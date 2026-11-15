@@ -7,11 +7,11 @@
 // CREW.md. The start reads that role file. Only the four workers have a role here; any other key is reported as failed,
 // not started with a guessed role.
 import { spawnSync } from 'node:child_process'
-import { existsSync, readdirSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { liveById, listAgents, readRecord, startSession, stopSession, validSessionId, writeRecord } from './session.mjs'
 import { wakeOnce } from './wake.mjs'
-import { roleFileText, workerRole, writeRoleFile, readOwnRoleFile, WORKER_NICKS } from './role-file.mjs'
+import { roleFileText, workerRole, writeRoleFile, readOwnRoleFile, resolveStartRole, WORKER_NICKS } from './role-file.mjs'
 
 export { WORKER_NICKS, workerRole, roleFileText, writeRoleFile, readOwnRoleFile }
 
@@ -24,7 +24,6 @@ export function recordedKeys(home) {
     .map(f => f.slice(0, -5))
     .sort()
 }
-
 
 // The wake text typed into a restarted session, once. It is the text, not the role file: the role is read by the start, and
 // the wake only says that the session is back. The person reads their own card; the kit does not name one.
@@ -50,23 +49,15 @@ export async function upSessions(home, deps) {
       lines.push(`${key}: already running (${record.id})`)
       continue
     }
-    // A worker's role is always rebuilt from PROMPTS.md, so a prompt change reaches it. Any other key starts from its own
-    // role file (sessions/<key>.role.md: Nina, Pat, Quincy), and fails only when it has neither.
-    const section = workerRole(deps.promptsText, key)
-    const own = section ? null : readOwnRoleFile(home, key)
-    if (!section && own === null) {
+    // The same role rule as `crew session start` (resolveStartRole): CREW_ROLE_FILE, then a worker's rebuilt section, then the
+    // key's own role file. A key with none of them is reported as failed and not started.
+    const resolved = resolveStartRole({ home, key, promptsText: deps.promptsText, crewText: deps.crewText, env: deps.env })
+    if (resolved.reason) {
       allUp = false
-      lines.push(`${key}: failed: no worker role for this key; not started`)
+      lines.push(`${key}: failed: ${resolved.reason}; not started`)
       continue
     }
-    // The role is one file: the PROMPTS.md section and the CREW.md standing rules. It is written before the start, and the
-    // start is given exactly what the file holds.
-    let role = own
-    if (section) {
-      role = roleFileText(deps.promptsText, deps.crewText, key)
-      writeRoleFile(home, key, role)
-    }
-    const started = deps.start({ key, folder: record.folder, role })
+    const started = deps.start({ key, folder: record.folder, role: resolved.role })
     if (!started.ok) {
       allUp = false
       lines.push(`${key}: failed: ${started.reason}`)
