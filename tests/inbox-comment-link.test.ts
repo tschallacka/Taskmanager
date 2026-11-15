@@ -37,7 +37,8 @@ test('the task panel offers Open on board from the Inbox, to the card at the com
   const drawer = read('app/components/kanban/TaskDrawer.vue')
   assert.match(drawer, /import \{ taskLink \} from '~\/utils\/taskLink'/)
   assert.match(drawer, /route\.path !== '\/projects\/inbox'/, 'only from the Inbox')
-  assert.match(drawer, /return taskLink\(task\.projectId, task\.id, comment\)/)
+  // The comment comes from the Inbox query too (linkedComment), so the link keeps it.
+  assert.match(drawer, /return taskLink\(task\.projectId, task\.id, linkedComment\.value \|\| null\)/)
   assert.match(drawer, /data-open-on-board/)
 })
 

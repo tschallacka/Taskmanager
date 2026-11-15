@@ -17,7 +17,6 @@ const props = defineProps<{
 }>()
 
 const route = useRoute()
-const router = useRouter()
 const toast = useToast()
 const { session } = useAuth()
 const {
@@ -325,13 +324,9 @@ watch(
     if (!commentId || key === handled) return
     if (!ownComments.value.some(c => c.id === commentId)) return
     handled = key
+    // The comment stays in the address (the Inbox query or the path form), so a reload or a shared copy of the link jumps
+    // to the reply again. The jump itself runs once per task and comment (handled above).
     focusComment(commentId)
-    // The comment in the query is used once: the panel takes it out of the address (replace, not push), so a reload
-    // does not jump again. The path form is left as it is.
-    if (typeof route.query.comment === 'string') {
-      const { comment: _used, ...rest } = route.query
-      router.replace({ query: rest })
-    }
   },
   { immediate: true }
 )
