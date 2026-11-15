@@ -111,7 +111,7 @@ Legal basis: Article 6(1)(b).
 
 Purpose: to keep the service running and safe.
 
-Data: the web server writes access logs (time, IP address, requested address, answer code, size and browser description) for each request; [[LOG-RETENTION: the number of days the web server logs are kept]]. The application keeps short-lived counters per sender and function to limit abuse (rate limits); these are deleted after their time window has passed.
+Data: the web server writes access logs (time, IP address, requested address, answer code, size and browser description) for each request; the web server's access logs are kept for 14 days, and the server's system logs (which include the messages the application writes while it runs) for about four weeks, then they are deleted automatically. The application keeps short-lived counters per sender and function to limit abuse (rate limits); these are deleted after their time window has passed.
 
 Legal basis: Article 6(1)(f): my legitimate interest in the operation and security of the service.
 
@@ -157,8 +157,10 @@ Some of the services above are operated from the United States: OpenRouter and t
 | Key and agent activity records, blocked-call records | 90 days |
 | Stored content of failed GitHub deliveries | 30 days |
 | Rate-limit counters | Minutes to hours, until their window has passed |
-| Web server access logs | [[LOG-RETENTION: days]] |
-| Backups | [[BACKUP-RETENTION: days]]; data deleted from the live service disappears from backups when they are replaced |
+| Web server access logs | 14 days |
+| System logs of the server | About four weeks |
+| Backups | A rolling set: the last 3 copies, then one per day for 7 days, one per week for 4 weeks, one per month for 6 months and one per year for 1 year. Data that you delete from the live service therefore disappears from the backups too, but only as the old copies are replaced: at the latest after about one year. Backups are held only for restoring the service after a failure and are not used for anything else |
+| Trash | A deleted task or column stays in its board's trash for 7 days and is then removed for good, together with its attached files |
 | Emails I receive from you | As long as needed to answer, then deleted unless the law requires me to keep them |
 
 Data that I must keep for legal reasons (for example tax or commercial records, if any ever arise) is kept for the legal period and blocked from other use.
