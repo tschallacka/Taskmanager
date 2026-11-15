@@ -33,7 +33,7 @@ export default defineEventHandler(async (event) => {
     const forYou = session ? (await addressesOfUser(session.user.id)).includes(addressed.email) : null
     return addressed.kind === 'team'
       ? { kind: 'team' as const, organizationName: addressed.organizationName, inviterName: addressed.inviterName, role: addressed.role, forYou }
-      : { kind: 'board' as const, projectName: addressed.projectName, inviterName: addressed.inviterName, role: addressed.role, forYou }
+      : { kind: 'board' as const, projectName: addressed.projectName, organizationName: addressed.organizationName, inviterName: addressed.inviterName, role: addressed.role, forYou }
   }
 
   const [row] = await db
