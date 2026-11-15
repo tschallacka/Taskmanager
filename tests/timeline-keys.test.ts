@@ -25,6 +25,25 @@ test('up, down and every other key do nothing on a bar', () => {
   assert.equal(timelineKeyAction('Enter', {}), null)
 })
 
+test('each key gives the exact start and due dates it should, for a bar from 10 to 12 November', () => {
+  const bar = { startOn: '2026-11-10', dueOn: '2026-11-12' }
+  const dates = (key: string, keys: { shift?: boolean, alt?: boolean }) => {
+    const action = timelineKeyAction(key, keys)
+    assert.ok(action, `${key} should act`)
+    return nudgePatch(bar, action.mode, action.delta)
+  }
+  // Plain arrow: the whole bar moves one day; both dates move.
+  assert.deepEqual(dates('ArrowRight', {}), { startOn: '2026-11-11', dueOn: '2026-11-13' })
+  assert.deepEqual(dates('ArrowLeft', {}), { startOn: '2026-11-09', dueOn: '2026-11-11' })
+  // Shift: only the due date moves; the start stays.
+  assert.deepEqual(dates('ArrowRight', { shift: true }), { dueOn: '2026-11-13' })
+  // Alt: only the start moves; the due date stays.
+  assert.deepEqual(dates('ArrowRight', { alt: true }), { startOn: '2026-11-11' })
+  // An edge stops at the other one: on a one-day bar, Alt+ArrowRight cannot move the start past the due day.
+  const oneDay = nudgePatch({ startOn: '2026-11-12', dueOn: '2026-11-12' }, 'start', 1)
+  assert.deepEqual(oneDay, { startOn: '2026-11-12' })
+})
+
 test('a key move gives the dates a drag of the same days gives', () => {
   const bar = { startOn: '2026-11-10', dueOn: '2026-11-12' }
   const action = timelineKeyAction('ArrowRight', { shift: true })
