@@ -2,6 +2,12 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.36.0 - 2026-11-15
+
+- **A comment opened from the Inbox stays in the address.** The card jumps to the reply and the address still names the comment, so a reload or a shared copy of the link scrolls to it again. `app/components/kanban/TaskComments.vue`, `tests/inbox-comment-url.test.ts`.
+
+- **Open on board from the Inbox keeps the comment, and a phone no longer shows it.** The card panel opened from an Inbox comment links to the card at that comment, and on a phone the control is hidden (the back arrow is the way back to the Inbox). `app/components/kanban/TaskDrawer.vue`, `tests/inbox-phone-open.test.ts`, `tests/inbox-comment-link.test.ts`.
+
 ## 0.35.0 - 2026-11-15
 
 - **Crew up and crew session start take a role file for keys with no worker section.** A session for Nina, Pat or Quincy starts from its own sessions/<key>.role.md; before, crew up reported "no worker role for this key" and `crew session start` needed CREW_ROLE_FILE. Both commands now resolve the role in one order, and CREW_ROLE_FILE, when set, overrides both. The four workers still get their role rebuilt from PROMPTS.md on every start, so a prompt change reaches them. One module, crew/role-file.mjs, holds the role file path and its key check for both commands. Files: crew/role-file.mjs, crew/sessions-up.mjs, crew/session.mjs, crew/kit-files.txt, and their tests.

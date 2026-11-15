@@ -1,1 +1,0 @@
-- **Open on board from the Inbox keeps the comment, and a phone no longer shows it.** The card panel opened from an Inbox comment links to the card at that comment, and on a phone the control is hidden (the back arrow is the way back to the Inbox). `app/components/kanban/TaskDrawer.vue`, `tests/inbox-phone-open.test.ts`, `tests/inbox-comment-link.test.ts`.
