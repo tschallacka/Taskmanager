@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { inviteSentence } from '~/utils/inviteSentence'
 import { inviteLinks } from '~/utils/inviteLinks'
+import { landingFor } from '~/utils/inviteLanding'
 
 useSeoMeta({ title: 'Invitation' })
 
@@ -12,7 +13,7 @@ const { session, isPending: sessionPending } = useAuth()
 // page never learns: whoever was invited has to know it. `forYou` says whether the account signed in now is
 // the invited one, and is null when nobody is signed in.
 type InvitationPreview
-  = | { kind: 'customer', customerName: string, organizationName: string }
+  = | { kind: 'customer', customerName: string, organizationName: string, sharedProjectCount: number }
     | { kind: 'team', organizationName: string, inviterName: string | null, role: string, forYou: boolean | null }
     | { kind: 'board', projectName: string, organizationName: string | null, inviterName: string | null, role: string, forYou: boolean | null }
 
@@ -64,7 +65,7 @@ async function accept() {
   accepting.value = true
   acceptError.value = ''
   try {
-    const answer = await $fetch<{ kind: 'team' | 'board' | 'customer', organizationId?: string, projectId?: string }>(
+    const answer = await $fetch<{ kind: 'team' | 'board' | 'customer', organizationId?: string, projectId?: string, sharedProjectIds?: string[] }>(
       `/api/invitations/${token.value}/accept`,
       { method: 'POST' }
     )
@@ -75,8 +76,14 @@ async function accept() {
     } else if (answer.kind === 'board') {
       await authClient.organization.setActive({ organizationId: null })
     }
+    // Where the invitation says: the team, the board, or the customer's shared project (see utils/inviteLanding).
     // A full load, so the projects store picks up the new boards.
-    await navigateTo(answer.kind === 'board' && answer.projectId ? `/projects/${answer.projectId}` : '/projects', { external: true })
+    const landing = answer.kind === 'board' && answer.projectId
+      ? landingFor({ kind: 'board', projectId: answer.projectId })
+      : answer.kind === 'customer'
+        ? landingFor({ kind: 'customer', sharedProjectIds: answer.sharedProjectIds ?? [] })
+        : landingFor({ kind: 'team' })
+    await navigateTo(landing, { external: true })
   } catch (e: unknown) {
     acceptError.value = (e as { data?: { message?: string } })?.data?.message || 'Could not accept the invitation'
   } finally {
@@ -135,6 +142,12 @@ async function accept() {
             variant="subtle"
             description="This invitation was sent to another address than the one of this account. Sign out and use the invited address, or create an account with it."
           />
+          <p
+            v-if="invitation.kind === 'customer' && invitation.sharedProjectCount === 0"
+            class="text-sm text-zinc-400 text-center"
+          >
+            Nothing is shared with you yet by {{ invitation.organizationName }}. Their projects show here as soon as they share one.
+          </p>
           <UAlert
             v-if="acceptError"
             color="error"
@@ -168,6 +181,12 @@ async function accept() {
             class="text-sm text-zinc-400 text-center"
           >
             Use the email address this invitation was sent to. Anyone else cannot use it.
+          </p>
+          <p
+            v-if="invitation.kind === 'customer' && invitation.sharedProjectCount === 0"
+            class="text-sm text-zinc-400 text-center"
+          >
+            Nothing is shared with you yet by {{ invitation.organizationName }}. Their projects show here as soon as they share one.
           </p>
           <UButton
             block
