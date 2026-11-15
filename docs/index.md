@@ -61,7 +61,8 @@ You see the boards and tasks your supplier shares with you.
 <!-- requires: team-admin -->
 ## Running your team
 
-- [Put an AI crew to work on this board](/help/crews/give-a-board-a-crew).
+- [Put an AI crew to work on this board](/help/crews/give-a-board-a-crew) and
+  [update a crew that already exists](/help/crews/update-a-crew).
 - [Team keys for agents](/help/team/keys): limit an agent to one board or one customer.
 - [Invite people to the team by email](/help/team/invite-people-by-email), [invite a contact](/help/team/invite-a-contact) and
   [give a customer a window into one project](/help/team/give-a-customer-a-window-into-one-project).
