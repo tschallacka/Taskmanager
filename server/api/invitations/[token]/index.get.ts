@@ -1,5 +1,5 @@
 import { db } from '../../../db'
-import { customerInvitations, customers, organization } from '../../../db/schema'
+import { customerInvitations, customers, organization, projects } from '../../../db/schema'
 import { eq } from 'drizzle-orm'
 import { hashInvitationToken, INVITATION_COOKIE } from '../../../utils/customers'
 import { auth } from '../../../lib/auth'
@@ -40,6 +40,7 @@ export default defineEventHandler(async (event) => {
     .select({
       expiresAt: customerInvitations.expiresAt,
       acceptedAt: customerInvitations.acceptedAt,
+      customerId: customers.id,
       customerName: customers.name,
       organizationName: organization.name
     })
@@ -52,6 +53,9 @@ export default defineEventHandler(async (event) => {
   if (row.acceptedAt) throw createError({ statusCode: 410, message: 'This invitation has already been used' })
   if (row.expiresAt <= Date.now()) throw createError({ statusCode: 410, message: 'This invitation has expired' })
 
+  // How many projects are shared with this customer, so the page can say before accepting that there are none yet.
+  const shared = await db.select({ id: projects.id }).from(projects).where(eq(projects.customerId, row.customerId))
+
   rememberToken()
-  return { kind: 'customer' as const, customerName: row.customerName, organizationName: row.organizationName }
+  return { kind: 'customer' as const, customerName: row.customerName, organizationName: row.organizationName, sharedProjectCount: shared.length }
 })

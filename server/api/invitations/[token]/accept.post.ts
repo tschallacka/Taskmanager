@@ -127,6 +127,9 @@ export default defineEventHandler(async (event) => {
     .values({ id: genId(), customerId: claimed.customerId, userId: session.user.id, createdAt: now })
     .onConflictDoNothing()
 
+  // The projects shared with the customer, so the landing can open the one or list the several (see utils/inviteLanding).
+  const shared = await db.select({ id: projects.id }).from(projects).where(eq(projects.customerId, claimed.customerId))
+
   deleteCookie(event, INVITATION_COOKIE, { path: '/' })
-  return { ok: true, kind: 'customer' as const }
+  return { ok: true, kind: 'customer' as const, sharedProjectIds: shared.map(project => project.id) }
 })
