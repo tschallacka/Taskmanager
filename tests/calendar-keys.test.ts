@@ -1,31 +1,36 @@
 // The keyboard path for the calendar (app/utils/calendarKeys.ts): with a task selected, the arrow keys move its due day, as a
-// drag of the same number of days would. Left and right move a day; up and down move a week. Pure: no DOM. Run:
+// drag of the same number of days would. Left and right move a day; up and down move a week. The day arithmetic is the shared
+// date rule (dateNudge.ts), not a copy in this file. Pure: no DOM. Run:
 //   node --import tsx --test tests/calendar-keys.test.ts
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { calendarKeyDelta, movedDueOn } from '../app/utils/calendarKeys'
+import { readFileSync } from 'node:fs'
+import * as calendarKeys from '../app/utils/calendarKeys'
+import { nudgePatch } from '../app/utils/dateNudge'
 
 test('the arrow keys: left and right move one day, up and down move one week', () => {
-  assert.equal(calendarKeyDelta('ArrowLeft'), -1)
-  assert.equal(calendarKeyDelta('ArrowRight'), 1)
-  assert.equal(calendarKeyDelta('ArrowUp'), -7)
-  assert.equal(calendarKeyDelta('ArrowDown'), 7)
+  assert.equal(calendarKeys.calendarKeyDelta('ArrowLeft'), -1)
+  assert.equal(calendarKeys.calendarKeyDelta('ArrowRight'), 1)
+  assert.equal(calendarKeys.calendarKeyDelta('ArrowUp'), -7)
+  assert.equal(calendarKeys.calendarKeyDelta('ArrowDown'), 7)
 })
 
 test('any other key moves nothing', () => {
-  assert.equal(calendarKeyDelta('Enter'), null)
-  assert.equal(calendarKeyDelta('a'), null)
-  assert.equal(calendarKeyDelta(''), null)
+  assert.equal(calendarKeys.calendarKeyDelta('Enter'), null)
+  assert.equal(calendarKeys.calendarKeyDelta('a'), null)
+  assert.equal(calendarKeys.calendarKeyDelta(''), null)
 })
 
-test('a task moves to the day the keys give, the same as a drag of that many days', () => {
-  assert.equal(movedDueOn('2026-11-12', 1), '2026-11-13')
-  assert.equal(movedDueOn('2026-11-12', -7), '2026-11-05')
-  assert.equal(movedDueOn('2026-12-31', 1), '2027-01-01')
-  assert.equal(movedDueOn('2028-02-28', 1), '2028-02-29')
+test('the key rule holds no day arithmetic of its own: the due day comes from the shared date rule', () => {
+  assert.equal('movedDueOn' in calendarKeys, false)
+  const source = readFileSync(new URL('../app/utils/calendarKeys.ts', import.meta.url), 'utf8')
+  assert.doesNotMatch(source, /Date\.UTC/)
 })
 
-test('a task with no due day has nothing to move from, so the keys give no day', () => {
-  assert.equal(movedDueOn(null, 1), null)
-  assert.equal(movedDueOn(undefined, -7), null)
+test('the shared rule moves a due day the way the keys ask, across month, year and leap-day edges', () => {
+  const due = (dueOn: string, delta: number) => nudgePatch({ dueOn }, 'move', delta).dueOn
+  assert.equal(due('2026-11-12', 1), '2026-11-13')
+  assert.equal(due('2026-11-12', -7), '2026-11-05')
+  assert.equal(due('2026-12-31', 1), '2027-01-01')
+  assert.equal(due('2028-02-28', 1), '2028-02-29')
 })
