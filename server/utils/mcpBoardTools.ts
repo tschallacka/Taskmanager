@@ -19,7 +19,7 @@ import { MAX_PROJECT_DESCRIPTION, PROJECT_STATUSES, parseDueOn, parseProjectStat
 import { projectPeople } from './people'
 import { boardTreeFields, hiddenCrewShadows } from './boardTree'
 import { boardRoleFields, crewRealBoardRefusal, isTakenOff, takenOffRefusal, type BoardRoleFields } from './mcpBoardRoles'
-import { taskShareUrl } from './shareLinks'
+import { boardShareUrl, taskShareUrl } from './shareLinks'
 import { readTaskGithubLinks } from './githubTaskLinks'
 import { notifyAssigned, notifyTaskChange } from './notifyEvents'
 import { tellUnblockedAfterBulk, tellUnblockedOnTrash, unfinishedTasksOn } from './unblockedWatch'
@@ -341,6 +341,11 @@ function readDetail(args: Record<string, unknown>): TaskDetail {
   return value
 }
 
+/** The link to a task for a staff caller. A customer's contact gets no staff link: the board's own page is staff's. */
+function staffTaskUrl(task: ProjectTask, board: Project, context: ApiKeyContext): string | undefined {
+  return audienceOf(context, board) === 'staff' ? taskShareUrl(board.id, task.id) : undefined
+}
+
 /**
  * A task as the board draws it: title, labels and a line of the description.
  * The whole description and the thread of updates live behind get_task, so a
@@ -349,11 +354,6 @@ function readDetail(args: Record<string, unknown>): TaskDetail {
  * `column` and `board` are named only where the nesting does not already say so
  * — search results carry them, a board's own columns do not.
  */
-/** The link to a task for a staff caller. A customer's contact gets no staff link: the board's own page is staff's. */
-function staffTaskUrl(task: ProjectTask, board: Project, context: ApiKeyContext): string | undefined {
-  return audienceOf(context, board) === 'staff' ? taskShareUrl(board.id, task.id) : undefined
-}
-
 function taskCard(task: ProjectTask, options: {
   detail?: TaskDetail
   updates?: number
@@ -723,6 +723,8 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
         total: boards.length,
         boards: boards.slice(0, limit).map(board => ({
           ...boardSummary(board, columnCounts.get(board.id) ?? 0, taskCounts.get(board.id) ?? 0),
+          // The board's link to share: staff only, as the task links are (a customer's contact gets none).
+          ...(audienceOf(context, board) === 'staff' ? { url: boardShareUrl(board.id) } : {}),
           ...roleSummary(roles.get(board.id))
         }))
       }

@@ -9,6 +9,7 @@ import { and, eq } from 'drizzle-orm'
 import { audienceOf } from './mcpAccess'
 import type { Audience } from './auth-helpers'
 import { findTask } from './mcpBoardTools'
+import { updateShareUrl } from './shareLinks'
 import { McpToolError, asToolErrorAsync, newId, optionalString, requireString } from './mcpToolKit'
 import type { McpToolDefinition } from './mcpToolKit'
 import { notificationExcerpt } from './notifications'
@@ -216,7 +217,14 @@ export const MCP_UPDATE_TOOLS: McpToolDefinition[] = [
         posted: true,
         // At the top level so the open browsers are told which board changed.
         board: { id: board.id, name: board.name },
-        update: { id: comment!.id, visibility, excerpt: notificationExcerpt(body), replyTo: replyTo ?? null }
+        // The link to share with a person, at this update: staff only, as the task links are.
+        update: {
+          id: comment!.id,
+          ...(audienceOf(context, board) === 'staff' ? { url: updateShareUrl(board.id, task.id, comment!.id) } : {}),
+          visibility,
+          excerpt: notificationExcerpt(body),
+          replyTo: replyTo ?? null
+        }
       }
     }
   }
