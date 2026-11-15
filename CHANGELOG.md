@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.38.1 - 2026-11-15
+
+- Legal documents: the privacy policy and the Impressum 1.0.0 as drafts in legal/, with the version and archive procedure (legal/README.md). The hosting data center (Lauterbourg, France) is filled in from the Contabo data processing agreement.
+
 ## 0.38.0 - 2026-11-15
 
 - **Phone: a long-press on a card opens its sheet, and the help page describes the column picker and the swipe.** At phone width a long-press on a card opens the same bottom sheet as its ⋯ button, not the desktop popover; the desktop right-click menu is unchanged. The boards help page now covers the column picker, the swipe between columns and the Add column chip. Files: `app/components/kanban/KanbanCard.vue`, `docs/basics/boards-and-columns.md`, `tests/phone-qa-violations.test.ts`.
