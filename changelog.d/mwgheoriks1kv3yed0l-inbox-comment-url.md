@@ -1,0 +1,1 @@
+- **A comment opened from the Inbox stays in the address.** The card jumps to the reply and the address still names the comment, so a reload or a shared copy of the link scrolls to it again. `app/components/kanban/TaskComments.vue`, `tests/inbox-comment-url.test.ts`.
