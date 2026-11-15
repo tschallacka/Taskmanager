@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { format } from 'date-fns'
 import { colorHex } from '#shared/utils/colors'
-import { formatContextLength, formatMoney, formatPricePerMillion } from '~/utils/aiSettingsFormat'
+import { formatMoney } from '~/utils/aiSettingsFormat'
 
 definePageMeta({ layout: 'app' })
 
 useSeoMeta({ title: 'Settings' })
 
 const { session, signOut, isInstanceAdmin, refreshSession } = useAuth()
-const { primaryColor, neutralColor, PRIMARY_COLORS, NEUTRAL_COLORS, setPrimaryColor, setNeutralColor, openrouterApiKeyMasked, openrouterModel, POPULAR_OPENROUTER_MODELS, setOpenRouterApiKey, setOpenRouterModel } = useUserSettings()
+const { primaryColor, neutralColor, PRIMARY_COLORS, NEUTRAL_COLORS, setPrimaryColor, setNeutralColor } = useUserSettings()
 
 // The settings section list: each entry jumps to a section on this page (or to a settings page).
 // A jump to a section of this page scrolls the page's own scroll box to it: a plain #hash does not scroll
@@ -28,109 +28,33 @@ const sections = [
   { label: 'AI history', icon: 'i-lucide-history', to: '/settings/ai-history' }
 ]
 
-const toast = useToast()
-
-function errMsg(e: unknown): string | undefined {
-  return (e as { data?: { message?: string } })?.data?.message
-}
-
-// ─── AI settings ─────────────────────────────────────────────
-const apiKeyInput = ref('')
-const showApiKey = ref(false)
-const apiKeySaving = ref(false)
-const apiKeyDirty = computed(() => apiKeyInput.value.trim() !== '')
-
-const modelInput = ref('')
-type ModelCatalog = {
-  models: Array<{ id: string, name: string, contextLength: number | null, modality: string | null, inputPrice: number | null, outputPrice: number | null }>
-}
-const { data: modelCatalog, status: modelCatalogStatus, refresh: refreshModelCatalog } = useFetch<ModelCatalog>('/api/settings/models', { server: false, lazy: true })
-const modelsRefreshing = ref(false)
-
-const { data: aiHistory } = useFetch<{ totals: { prompts: number, cost: number } }>('/api/settings/ai-history', { server: false, lazy: true })
-
-async function forceRefreshModelCatalog() {
-  modelsRefreshing.value = true
-  try {
-    modelCatalog.value = await $fetch<ModelCatalog>('/api/settings/models?refresh=true')
-    toast.add({ title: 'Models and pricing refreshed', icon: 'i-lucide-refresh-cw', duration: 2000 })
-  } catch (e) {
-    toast.add({ title: 'Could not refresh models', description: errMsg(e), icon: 'i-lucide-alert-triangle', color: 'error' })
-  } finally {
-    modelsRefreshing.value = false
-  }
-}
-
-
-const modelOptions = computed(() => {
-  const catalog = modelCatalog.value?.models
-  const options = catalog?.length
-    ? catalog.map(model => ({
-        label: model.name,
-        value: model.id,
-        description: [
-          model.id,
-          formatContextLength(model.contextLength),
-          model.inputPrice !== null ? `Input ${formatPricePerMillion(model.inputPrice)}` : null,
-          model.outputPrice !== null ? `Output ${formatPricePerMillion(model.outputPrice)}` : null
-        ].filter(Boolean).join(' · ')
-      }))
-    : POPULAR_OPENROUTER_MODELS.map(model => ({ label: model, value: model, description: 'Popular model' }))
-
-  if (modelInput.value && !options.some(option => option.value === modelInput.value)) {
-    options.unshift({ label: modelInput.value, value: modelInput.value, description: 'Current model' })
-  }
-  return options
-})
-
-watch(openrouterModel, (v) => {
-  modelInput.value = v
-}, { immediate: true })
-
-async function saveApiKey() {
-  if (!apiKeyInput.value.trim()) return
-  apiKeySaving.value = true
-  try {
-    await setOpenRouterApiKey(apiKeyInput.value)
-    apiKeyInput.value = ''
-    toast.add({ title: 'API key saved', icon: 'i-lucide-check', duration: 2000 })
-  } catch (e) {
-    toast.add({ title: 'Failed to save API key', description: errMsg(e), icon: 'i-lucide-alert-triangle', color: 'error' })
-  } finally {
-    apiKeySaving.value = false
-  }
-}
-
-async function clearApiKey() {
-  apiKeySaving.value = true
-  try {
-    await setOpenRouterApiKey('')
-    apiKeyInput.value = ''
-    toast.add({ title: 'API key removed', icon: 'i-lucide-trash', duration: 2000 })
-  } finally {
-    apiKeySaving.value = false
-  }
-}
-
-async function changeModel(model: string) {
-  try {
-    await setOpenRouterModel(model)
-    toast.add({ title: 'Model updated', icon: 'i-lucide-check', duration: 1500 })
-  } catch (e) {
-    toast.add({ title: 'Failed to update model', description: errMsg(e), icon: 'i-lucide-alert-triangle', color: 'error' })
-  }
-}
-
-const openrouterDocsUrl = 'https://openrouter.ai/keys'
+// ─── AI settings: the state and functions live in useAiSettings ─────────────
+const {
+  apiKeyInput,
+  showApiKey,
+  apiKeySaving,
+  apiKeyDirty,
+  modelInput,
+  modelCatalogStatus,
+  modelsRefreshing,
+  modelOptions,
+  refreshModelCatalog,
+  forceRefreshModelCatalog,
+  saveApiKey,
+  clearApiKey,
+  changeModel,
+  openrouterDocsUrl,
+  openrouterApiKeyMasked,
+  openrouterModel,
+  totalPrompts,
+  totalAiCost
+} = useAiSettings()
 
 const memberSince = computed(() => {
   const date = session.value?.user?.createdAt
   if (!date) return '—'
   return format(new Date(date), 'MMMM yyyy')
 })
-
-const totalPrompts = computed(() => aiHistory.value?.totals.prompts ?? 0)
-const totalAiCost = computed(() => aiHistory.value?.totals.cost ?? 0)
 
 function swatchStyle(color: string, selected: boolean) {
   return {
