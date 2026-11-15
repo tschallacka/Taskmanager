@@ -97,8 +97,8 @@ const shownTask = ref<Task | null>(props.task)
 const openOnBoardTo = computed(() => {
   const task = shownTask.value
   if (!task?.projectId || route.path !== '/projects/inbox') return null
-  const comment = typeof route.params.comment === 'string' ? route.params.comment : null
-  return taskLink(task.projectId, task.id, comment)
+  // The Inbox names the comment in its query (?comment=), so the link keeps it, as the path form does.
+  return taskLink(task.projectId, task.id, linkedComment.value || null)
 })
 // A link to a comment (the path form, or ?comment= from the Inbox) opens the activity. On a phone the thread sits
 // behind the Activity button, so without this the reply has no height and the jump lands on nothing.
@@ -714,6 +714,7 @@ const menuItems = computed(() => [[
           />
           <UButton
             v-if="openOnBoardTo"
+            class="max-md:hidden"
             label="Open on board"
             icon="i-lucide-external-link"
             size="xs"
