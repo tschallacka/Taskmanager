@@ -10,7 +10,7 @@ import { blockedStatesOn } from './taskDependencyService'
 import { blockedMark } from './mcpBlockerLinks'
 import type { BlockedMark } from './mcpBlockerLinks'
 import { audienceOf, readableTasksIn } from './mcpAccess'
-import { notificationShareUrl } from './shareLinks'
+import { notificationShareUrl, taskShareUrl } from './shareLinks'
 import { McpToolError, optionalBoolean, optionalLimit, optionalStringArray } from './mcpToolKit'
 import type { McpToolDefinition } from './mcpToolKit'
 
@@ -80,6 +80,8 @@ export const MCP_ME_TOOLS: McpToolDefinition[] = [
         total: sorted.length,
         tasks: shown.map(row => ({
           id: row.id,
+          // The link to share with a person: staff only, as the other task links are. A subtask's parent is on the same board.
+          ...(audienceOf(context, boards.find(board => board.id === row.boardId)!) === 'staff' ? { url: taskShareUrl(row.boardId, row.id) } : {}),
           title: row.title,
           board: { id: row.boardId, name: row.board },
           ...(row.dueOn ? { dueOn: row.dueOn } : {}),
@@ -87,7 +89,15 @@ export const MCP_ME_TOOLS: McpToolDefinition[] = [
           ...(row.completedAt ? { completed: true } : {}),
           ...(row.labels.length ? { labels: row.labels } : {}),
           ...marks.get(row.id),
-          ...(row.parentTaskId ? { parent: { id: row.parentTaskId, title: parentTitles.get(row.parentTaskId) ?? null } } : {})
+          ...(row.parentTaskId
+            ? {
+                parent: {
+                  id: row.parentTaskId,
+                  title: parentTitles.get(row.parentTaskId) ?? null,
+                  ...(audienceOf(context, boards.find(board => board.id === row.boardId)!) === 'staff' ? { url: taskShareUrl(row.boardId, row.parentTaskId) } : {})
+                }
+              }
+            : {})
         }))
       }
     }

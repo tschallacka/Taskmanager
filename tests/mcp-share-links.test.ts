@@ -21,6 +21,7 @@ const owner = id('owner')
 const board = id('board')
 const column = id('column')
 const task = `tslt${tag}`
+const subtask = `tsls${tag}`
 const notifyTask = id('notify-task')
 const notifyBoard = id('notify-board')
 // A comment keeps the key it came in on (a foreign key), so the update test needs a real key row.
@@ -36,7 +37,9 @@ before(async () => {
   await db.insert(apiKeys).values({ id: keyRow, userId: owner, name: 'share test', keyHash: `${tag}-hash`, keyPrefix: 'tsl', createdAt: now, allBoards: true, boardReachSet: true })
   await db.insert(projects).values({ id: board, userId: owner, name: 'Share board', createdAt: now, updatedAt: now })
   await db.insert(projectColumns).values({ id: column, projectId: board, name: 'To do', position: 0, createdAt: now })
-  await db.insert(projectTasks).values({ id: task, projectId: board, columnId: column, title: 'Share me', visibility: 'internal', position: 0, createdAt: now, updatedAt: now })
+  await db.insert(projectTasks).values({ id: task, projectId: board, columnId: column, title: 'Share me', visibility: 'internal', assigneeId: owner, position: 0, createdAt: now, updatedAt: now })
+  // A subtask of the task, assigned to the same owner, so my_tasks shows its parent with a link.
+  await db.insert(projectTasks).values({ id: subtask, projectId: board, columnId: column, parentTaskId: task, title: 'Share the subtask', visibility: 'internal', assigneeId: owner, position: 1, createdAt: now, updatedAt: now })
   await db.insert(notifications).values([
     { id: notifyTask, userId: owner, type: 'assigned', projectId: board, taskId: task, title: 'Assigned: Share me', createdAt: now },
     { id: notifyBoard, userId: owner, type: 'update', projectId: board, title: 'Board news', createdAt: now }
@@ -44,6 +47,7 @@ before(async () => {
 })
 
 after(async () => {
+  await db.delete(projectTasks).where(eq(projectTasks.id, subtask))
   await db.delete(projectTasks).where(eq(projectTasks.id, task))
   await db.delete(projectColumns).where(eq(projectColumns.id, column))
   await db.delete(projects).where(eq(projects.id, board))
@@ -157,6 +161,28 @@ test('list_notifications answers each notification with the link the Inbox opens
   const onBoard = answer.notifications.find(n => n.id === notifyBoard)
   assert.equal(onTask?.url, `${origin}/projects/${board}?task=${task}`)
   assert.equal(onBoard?.url, `${origin}/projects/${board}`)
+})
+
+test('my_tasks answers each task, and each subtask\'s parent, with its absolute link', async () => {
+  const context = {
+    keyId: 'k',
+    keyName: 'k',
+    userId: owner,
+    teamId: null,
+    customerId: null,
+    projectId: null,
+    scopes: ['boards:read'] as ('boards:read' | 'boards:write')[],
+    reach: { allBoards: true, workspaceTeamIds: [], boardIds: [] },
+    memberTeamIds: []
+  }
+  const answer = await MCP_TOOLS.find(t => t.name === 'my_tasks')!.handler({}, context) as { tasks: { id: string, url?: string, parent?: { id: string, url?: string } }[] }
+  const mine = answer.tasks.find(t => t.id === task)
+  const child = answer.tasks.find(t => t.id === subtask)
+  assert.ok(mine && child, 'the task and its subtask are listed')
+  assert.equal(mine.url, `${origin}/projects/${board}?task=${task}`)
+  assert.equal(child.url, `${origin}/projects/${board}?task=${subtask}`)
+  assert.equal(child.parent?.id, task)
+  assert.equal(child.parent?.url, `${origin}/projects/${board}?task=${task}`)
 })
 
 test('get_board answers with the board\'s absolute link', async () => {
