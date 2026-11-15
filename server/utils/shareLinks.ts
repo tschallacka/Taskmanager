@@ -17,6 +17,21 @@ export function taskShareUrl(boardId: string, taskId: string): string {
   return `${boardShareUrl(boardId)}?task=${taskId}`
 }
 
+/** The absolute link to a conversation (a message thread on the board's messages view). */
+export function messageShareUrl(boardId: string, messageId: string): string {
+  return `${boardShareUrl(boardId)}?view=messages&message=${messageId}`
+}
+
+/**
+ * The link an inbox notification opens: its task, else its message thread, else its board. The same choice the
+ * app's notificationLink makes (notifications.ts builds the e-mail and push link from the same rule).
+ */
+export function notificationShareUrl(boardId: string, target: { taskId?: string | null, messageId?: string | null } = {}): string {
+  if (target.taskId) return taskShareUrl(boardId, target.taskId)
+  if (target.messageId) return messageShareUrl(boardId, target.messageId)
+  return boardShareUrl(boardId)
+}
+
 /** The absolute link to one update of a task: opens the task at that update. */
 export function updateShareUrl(boardId: string, taskId: string, updateId: string): string {
   return `${taskShareUrl(boardId, taskId)}&comment=${updateId}`

@@ -11,7 +11,7 @@ Object.assign(globalThis, { createError })
 
 const { db } = await import('../server/db')
 const schema = await import('../server/db/schema')
-const { apiKeys, projects, projectColumns, projectTasks, taskComments, user } = schema
+const { apiKeys, notifications, projects, projectColumns, projectTasks, taskComments, user } = schema
 const { boardShareUrl, taskShareUrl, updateShareUrl } = await import('../server/utils/shareLinks')
 const { MCP_TOOLS } = await import('../server/utils/mcpRegistry')
 
@@ -21,6 +21,8 @@ const owner = id('owner')
 const board = id('board')
 const column = id('column')
 const task = `tslt${tag}`
+const notifyTask = id('notify-task')
+const notifyBoard = id('notify-board')
 // A comment keeps the key it came in on (a foreign key), so the update test needs a real key row.
 const keyRow = id('key')
 const origin = 'https://tasks.example.test'
@@ -35,6 +37,10 @@ before(async () => {
   await db.insert(projects).values({ id: board, userId: owner, name: 'Share board', createdAt: now, updatedAt: now })
   await db.insert(projectColumns).values({ id: column, projectId: board, name: 'To do', position: 0, createdAt: now })
   await db.insert(projectTasks).values({ id: task, projectId: board, columnId: column, title: 'Share me', visibility: 'internal', position: 0, createdAt: now, updatedAt: now })
+  await db.insert(notifications).values([
+    { id: notifyTask, userId: owner, type: 'assigned', projectId: board, taskId: task, title: 'Assigned: Share me', createdAt: now },
+    { id: notifyBoard, userId: owner, type: 'update', projectId: board, title: 'Board news', createdAt: now }
+  ])
 })
 
 after(async () => {
@@ -132,6 +138,25 @@ test('post_task_update answers with the absolute link of the update, at that upd
   const answer = await MCP_TOOLS.find(t => t.name === 'post_task_update')!.handler({ id: task, body: 'Link check' }, context) as { update: { id: string, url?: string } }
   assert.equal(answer.update.url, `${origin}/projects/${board}?task=${task}&comment=${answer.update.id}`)
   await db.delete(taskComments).where(eq(taskComments.id, answer.update.id))
+})
+
+test('list_notifications answers each notification with the link the Inbox opens: the task, or the board', async () => {
+  const context = {
+    keyId: 'k',
+    keyName: 'k',
+    userId: owner,
+    teamId: null,
+    customerId: null,
+    projectId: null,
+    scopes: ['boards:read'] as ('boards:read' | 'boards:write')[],
+    reach: { allBoards: true, workspaceTeamIds: [], boardIds: [] },
+    memberTeamIds: []
+  }
+  const answer = await MCP_TOOLS.find(t => t.name === 'list_notifications')!.handler({}, context) as { notifications: { id: string, url?: string }[] }
+  const onTask = answer.notifications.find(n => n.id === notifyTask)
+  const onBoard = answer.notifications.find(n => n.id === notifyBoard)
+  assert.equal(onTask?.url, `${origin}/projects/${board}?task=${task}`)
+  assert.equal(onBoard?.url, `${origin}/projects/${board}`)
 })
 
 test('get_board answers with the board\'s absolute link', async () => {

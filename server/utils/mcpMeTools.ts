@@ -10,6 +10,7 @@ import { blockedStatesOn } from './taskDependencyService'
 import { blockedMark } from './mcpBlockerLinks'
 import type { BlockedMark } from './mcpBlockerLinks'
 import { audienceOf, readableTasksIn } from './mcpAccess'
+import { notificationShareUrl } from './shareLinks'
 import { McpToolError, optionalBoolean, optionalLimit, optionalStringArray } from './mcpToolKit'
 import type { McpToolDefinition } from './mcpToolKit'
 
@@ -115,7 +116,11 @@ export const MCP_ME_TOOLS: McpToolDefinition[] = [
           title: notifications.title,
           body: notifications.body,
           board: projects.name,
+          boardId: projects.id,
+          boardOwner: projects.userId,
+          boardTeam: projects.teamId,
           taskId: notifications.taskId,
+          messageId: notifications.messageId,
           createdAt: notifications.createdAt,
           readAt: notifications.readAt,
           actor: user.name
@@ -141,6 +146,10 @@ export const MCP_ME_TOOLS: McpToolDefinition[] = [
           ...(row.body ? { body: row.body } : {}),
           board: row.board,
           ...(row.taskId ? { taskId: row.taskId } : {}),
+          // The link the Inbox opens for this notification: staff only, as the other links are.
+          ...(audienceOf(context, { id: row.boardId, userId: row.boardOwner, teamId: row.boardTeam }) === 'staff'
+            ? { url: notificationShareUrl(row.boardId, { taskId: row.taskId, messageId: row.messageId }) }
+            : {}),
           ...(row.actor ? { from: row.actor } : {}),
           at: new Date(row.createdAt).toISOString(),
           read: row.readAt !== null
