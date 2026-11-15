@@ -66,6 +66,7 @@ const STAFF_ONLY_VIEWS: string[] = ['messages', 'time', 'settings']
 const visibleViews = computed(() => VIEWS.filter(v => (v.key !== 'office' || crewBoard.value || linkedCrews.value.length > 0) && (!STAFF_ONLY_VIEWS.includes(v.key) || !isCustomerView.value)))
 
 const tabViews = computed(() => visibleViews.value.filter(v => v.key !== 'settings'))
+// Overview, Messages, Time and Files sit under the More menu (the owner's design, page06); the rest stay tabs.
 // The office is no panel of this page, so ?view=office falls back to the board instead of showing files.
 // The view a person last chose on a board is the one a visit without ?view= opens (the design: remembered per board).
 // It is kept in this browser only; a link that names a view still wins. A browser that refuses storage remembers nothing.
@@ -735,6 +736,8 @@ useSeoMeta({
           <button
             class="relative flex shrink-0 items-center gap-1.5 px-2.5 py-2 text-sm transition-colors"
             :class="moreViews.some(v => v.key === view) ? 'font-medium text-default' : 'text-muted hover:text-default'"
+            aria-label="More project views"
+            aria-haspopup="menu"
             data-view-more
           >
             More
