@@ -809,6 +809,8 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
       return {
         id: board.id,
         name: board.name,
+        // The board's link to share: staff only, as the task links are.
+        ...(audience === 'staff' ? { url: boardShareUrl(board.id) } : {}),
         ...(board.status ? { status: board.status } : {}),
         ...(board.description ? { description: board.description } : {}),
         ...roleSummary(roles.get(board.id)),

@@ -133,3 +133,38 @@ test('post_task_update answers with the absolute link of the update, at that upd
   assert.equal(answer.update.url, `${origin}/projects/${board}?task=${task}&comment=${answer.update.id}`)
   await db.delete(taskComments).where(eq(taskComments.id, answer.update.id))
 })
+
+test('get_board answers with the board\'s absolute link', async () => {
+  const context = {
+    keyId: 'k',
+    keyName: 'k',
+    userId: owner,
+    teamId: null,
+    customerId: null,
+    projectId: null,
+    scopes: ['boards:read'] as ('boards:read' | 'boards:write')[],
+    reach: { allBoards: true, workspaceTeamIds: [], boardIds: [] },
+    memberTeamIds: []
+  }
+  const answer = await MCP_TOOLS.find(t => t.name === 'get_board')!.handler({ board }, context) as { id: string, url?: string }
+  assert.equal(answer.id, board)
+  assert.equal(answer.url, `${origin}/projects/${board}`)
+})
+
+test('edit_task_update answers with the absolute link of the edited update', async () => {
+  const context = {
+    keyId: keyRow,
+    keyName: 'share test',
+    userId: owner,
+    teamId: null,
+    customerId: null,
+    projectId: null,
+    scopes: ['boards:read', 'boards:write'] as ('boards:read' | 'boards:write')[],
+    reach: { allBoards: true, workspaceTeamIds: [], boardIds: [] },
+    memberTeamIds: []
+  }
+  const posted = await MCP_TOOLS.find(t => t.name === 'post_task_update')!.handler({ id: task, body: 'Before the edit' }, context) as { update: { id: string } }
+  const edited = await MCP_TOOLS.find(t => t.name === 'edit_task_update')!.handler({ id: task, updateId: posted.update.id, body: 'After the edit' }, context) as { update: { id: string, url?: string } }
+  assert.equal(edited.update.url, `${origin}/projects/${board}?task=${task}&comment=${posted.update.id}`)
+  await db.delete(taskComments).where(eq(taskComments.id, posted.update.id))
+})

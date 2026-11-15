@@ -123,6 +123,8 @@ export const MCP_UPDATE_TOOLS: McpToolDefinition[] = [
         task: { id: task.id, title: task.title },
         update: {
           id: updated!.id,
+          // The link to share with a person, at this update: staff only, as post_task_update's is.
+          ...(audienceOf(context, board) === 'staff' ? { url: updateShareUrl(board.id, task.id, updated!.id) } : {}),
           visibility: updated!.visibility,
           length: body.length,
           editedAt: updated!.editedAt,
