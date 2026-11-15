@@ -15,12 +15,18 @@ test('Open on board keeps the comment: it reads the comment from the Inbox query
 })
 
 test('on a phone the Inbox panel has no Open on board control (the back arrow is the phone way back)', () => {
-  const button = drawer.slice(drawer.indexOf('data-open-on-board') - 400, drawer.indexOf('data-open-on-board') + 40)
+  const at = drawer.indexOf('data-open-on-board')
+  assert.ok(at >= 0, 'the Open on board control carries data-open-on-board')
+  const button = drawer.slice(at - 400, at + 40)
   assert.match(button, /class="[^"]*\bmax-md:hidden\b[^"]*"|class="hidden md:inline-flex[^"]*"|class="[^"]*\bhidden\b md:[^"]*"/)
 })
 
 test('a comment notification opens the card in place: the Inbox does not navigate for it', () => {
-  const commentBranch = inbox.slice(inbox.indexOf('if (item.taskId) {'), inbox.indexOf('} else if (item.type === \'message\''))
+  const start = inbox.indexOf('if (item.taskId) {')
+  const end = inbox.indexOf('} else if (item.type === \'message\'')
+  assert.ok(start >= 0, 'the Inbox has the comment branch (if (item.taskId) {)')
+  assert.ok(end > start, 'the comment branch ends before the message branch')
+  const commentBranch = inbox.slice(start, end)
   assert.doesNotMatch(commentBranch, /navigateTo/)
   assert.match(commentBranch, /router\.replace\(\{ query: \{ \.\.\.route\.query, task: item\.taskId, comment: item\.commentId \} \}\)/)
 })
