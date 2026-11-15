@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { inviteSentence } from '~/utils/inviteSentence'
+import { inviteLinks } from '~/utils/inviteLinks'
 
 useSeoMeta({ title: 'Invitation' })
 
@@ -38,6 +39,9 @@ const words = computed(() => {
     email: ''
   })
 })
+
+// The registration form is the default for every kind; the plain link under the button signs in instead.
+const links = computed(() => inviteLinks(token.value))
 
 const loadMessage = computed(() => {
   const status = loadError.value?.statusCode
@@ -158,37 +162,28 @@ async function accept() {
             {{ words ? words.button : 'Accept invitation' }}
           </UButton>
         </template>
-        <template v-else-if="invitation.kind === 'customer'">
-          <UButton
-            block
-            size="lg"
-            color="primary"
-            :to="`/login?invite=${encodeURIComponent(token)}`"
-          >
-            Sign in or create an account
-          </UButton>
-        </template>
         <template v-else>
-          <p class="text-sm text-zinc-400 text-center">
+          <p
+            v-if="invitation.kind !== 'customer'"
+            class="text-sm text-zinc-400 text-center"
+          >
             Use the email address this invitation was sent to. Anyone else cannot use it.
           </p>
           <UButton
             block
             size="lg"
             color="primary"
-            :to="`/login?invite=${encodeURIComponent(token)}`"
+            :to="links.primary"
           >
-            I have an account: sign in
+            {{ words ? words.button : 'Create an account' }}
           </UButton>
-          <UButton
-            block
-            size="lg"
-            color="neutral"
-            variant="outline"
-            :to="`/login?invite=${encodeURIComponent(token)}&signup=1`"
-          >
-            Create an account
-          </UButton>
+          <p class="text-sm text-zinc-400 text-center">
+            Already have an account?
+            <NuxtLink
+              :to="links.signIn"
+              class="text-primary underline"
+            >Sign in</NuxtLink>
+          </p>
         </template>
       </template>
     </div>
