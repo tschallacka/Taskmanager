@@ -43,6 +43,17 @@ Under the board's name is a row of tabs. They are different ways of looking at t
 **Settings** is the cog at the top right, next to **Share**. The **...** menu (*Project options*) next to it holds
 *Rename project*, *Settings* and, when something has been deleted, *Show trashed*.
 
+## On a phone
+
+On a phone the app has a tab bar at the bottom: **Home**, **Inbox** (with the number of unread items), **My tasks**,
+**Projects** and **Search**. The round **+** above it creates a new project. The drawer menu is still there for the rest.
+
+On a board, the phone shows one column at a time. The chips above the board are the columns, each with its number of
+tasks; tap one to see its cards. Each card has a **⋯** button at its top right. It opens a sheet with **Mark done**,
+**Move to** (the column chips), **Assign to**, **Set due date** and **Delete**. Delete moves the task to the trash and
+shows an **Undo** for a few seconds. A trashed task can be restored from *Show trashed* for 7 days. On a wide screen the
+board shows every column side by side, and the **⋯** button is not there: use the card's menu instead.
+
 ## The List tab
 
 The List tab shows the board's tasks as rows, one section per column (a section collapses when you click its name).
