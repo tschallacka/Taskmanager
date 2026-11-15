@@ -19,7 +19,7 @@ import { MAX_PROJECT_DESCRIPTION, PROJECT_STATUSES, parseDueOn, parseProjectStat
 import { projectPeople } from './people'
 import { boardTreeFields, hiddenCrewShadows } from './boardTree'
 import { boardRoleFields, crewRealBoardRefusal, isTakenOff, takenOffRefusal, type BoardRoleFields } from './mcpBoardRoles'
-import { boardShareUrl, taskShareUrl } from './shareLinks'
+import { boardShareUrl, openableTaskId, taskShareUrl } from './shareLinks'
 import { readTaskGithubLinks } from './githubTaskLinks'
 import { notifyAssigned, notifyTaskChange } from './notifyEvents'
 import { tellUnblockedAfterBulk, tellUnblockedOnTrash, unfinishedTasksOn } from './unblockedWatch'
@@ -343,7 +343,7 @@ function readDetail(args: Record<string, unknown>): TaskDetail {
 
 /** The link to a task for a staff caller. A customer's contact gets no staff link: the board's own page is staff's. */
 function staffTaskUrl(task: ProjectTask, board: Project, context: ApiKeyContext): string | undefined {
-  return audienceOf(context, board) === 'staff' ? taskShareUrl(board.id, task.id) : undefined
+  return audienceOf(context, board) === 'staff' ? taskShareUrl(board.id, openableTaskId(task)) : undefined
 }
 
 /**
@@ -444,7 +444,7 @@ async function taskDetail(task: ProjectTask, board: Project, context: ApiKeyCont
   return {
     id: task.id,
     // The link to share with a person: it opens this task on its board (shareLinks.ts). Staff only.
-    ...(audience === 'staff' ? { url: taskShareUrl(board.id, task.id) } : {}),
+    ...(audience === 'staff' ? { url: taskShareUrl(board.id, openableTaskId(task)) } : {}),
     board: { id: board.id, name: board.name },
     column: column?.name ?? task.columnId,
     title: task.title,
@@ -1616,7 +1616,7 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
         id: task.id,
         title: task.title,
         board: { id: board.id, name: board.name },
-        ...(audienceOf(context, board) === 'staff' ? { url: taskShareUrl(board.id, task.id) } : {}),
+        ...(audienceOf(context, board) === 'staff' ? { url: taskShareUrl(board.id, openableTaskId(task)) } : {}),
         column: restored?.name ?? columnId
       }
     }

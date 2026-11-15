@@ -194,7 +194,8 @@ test('my_tasks answers each task, and each subtask\'s parent, with its absolute 
   const child = answer.tasks.find(t => t.id === subtask)
   assert.ok(mine && child, 'the task and its subtask are listed')
   assert.equal(mine.url, `${origin}/projects/${board}?task=${task}`)
-  assert.equal(child.url, `${origin}/projects/${board}?task=${subtask}`)
+  // A subtask has no panel of its own in the app (the drawer finds only the board's own tasks), so its link is its parent's.
+  assert.equal(child.url, `${origin}/projects/${board}?task=${task}`)
   assert.equal(child.parent?.id, task)
   assert.equal(child.parent?.url, `${origin}/projects/${board}?task=${task}`)
 })

@@ -5,7 +5,7 @@
 // team, as changing the task is.
 import { findTask } from './mcpBoardTools'
 import { audienceOf } from './mcpAccess'
-import { taskShareUrl } from './shareLinks'
+import { openableTaskId, taskShareUrl } from './shareLinks'
 import { createTaskGithubLink, deleteTaskGithubLink, readTaskGithubLinks } from './githubTaskLinks'
 import { McpToolError, optionalBoolean, optionalString, requireString } from './mcpToolKit'
 import type { McpToolDefinition } from './mcpToolKit'
@@ -88,7 +88,7 @@ export const MCP_GITHUB_TOOLS: McpToolDefinition[] = [
       return {
         board: boardOf(board),
         task: task.id,
-        ...(audienceOf(context, board) === 'staff' ? { url: taskShareUrl(board.id, task.id) } : {}),
+        ...(audienceOf(context, board) === 'staff' ? { url: taskShareUrl(board.id, openableTaskId(task)) } : {}),
         total: links.length,
         links
       }

@@ -3,6 +3,7 @@
 // audience rule applies: a contact's agent is not shown tasks the contact cannot
 // see.
 import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm'
+import { alias } from 'drizzle-orm/pg-core'
 import { db } from '../db'
 import { notifications, projectTasks, projects, user } from '../db/schema'
 import { accessibleBoards } from './mcpBoardTools'
@@ -10,7 +11,7 @@ import { blockedStatesOn } from './taskDependencyService'
 import { blockedMark } from './mcpBlockerLinks'
 import type { BlockedMark } from './mcpBlockerLinks'
 import { audienceOf, readableTasksIn } from './mcpAccess'
-import { notificationShareUrl, taskShareUrl } from './shareLinks'
+import { notificationShareUrl, openableTaskId, taskShareUrl } from './shareLinks'
 import { McpToolError, optionalBoolean, optionalLimit, optionalStringArray } from './mcpToolKit'
 import type { McpToolDefinition } from './mcpToolKit'
 
@@ -81,7 +82,7 @@ export const MCP_ME_TOOLS: McpToolDefinition[] = [
         tasks: shown.map(row => ({
           id: row.id,
           // The link to share with a person: staff only, as the other task links are. A subtask's parent is on the same board.
-          ...(audienceOf(context, boards.find(board => board.id === row.boardId)!) === 'staff' ? { url: taskShareUrl(row.boardId, row.id) } : {}),
+          ...(audienceOf(context, boards.find(board => board.id === row.boardId)!) === 'staff' ? { url: taskShareUrl(row.boardId, openableTaskId(row)) } : {}),
           title: row.title,
           board: { id: row.boardId, name: row.board },
           ...(row.dueOn ? { dueOn: row.dueOn } : {}),
@@ -118,6 +119,8 @@ export const MCP_ME_TOOLS: McpToolDefinition[] = [
     async handler(args, context) {
       const unreadOnly = optionalBoolean(args, 'unreadOnly') ?? false
       const limit = optionalLimit(args, 'limit', 20, 100)
+      // The notification's task, read for its parent: a subtask's link is its parent's (see openableTaskId).
+      const notifyTask = alias(projectTasks, 'notify_task')
 
       const rows = await db
         .select({
@@ -130,6 +133,8 @@ export const MCP_ME_TOOLS: McpToolDefinition[] = [
           boardOwner: projects.userId,
           boardTeam: projects.teamId,
           taskId: notifications.taskId,
+          // A subtask's notification opens its parent's panel, the only panel the app has for it.
+          taskParentId: notifyTask.parentTaskId,
           messageId: notifications.messageId,
           createdAt: notifications.createdAt,
           readAt: notifications.readAt,
@@ -138,6 +143,7 @@ export const MCP_ME_TOOLS: McpToolDefinition[] = [
         .from(notifications)
         .innerJoin(projects, eq(projects.id, notifications.projectId))
         .leftJoin(user, eq(user.id, notifications.actorId))
+        .leftJoin(notifyTask, eq(notifyTask.id, notifications.taskId))
         .where(and(eq(notifications.userId, context.userId), unreadOnly ? isNull(notifications.readAt) : undefined))
         .orderBy(desc(notifications.createdAt))
         .limit(limit)
@@ -158,7 +164,7 @@ export const MCP_ME_TOOLS: McpToolDefinition[] = [
           ...(row.taskId ? { taskId: row.taskId } : {}),
           // The link the Inbox opens for this notification: staff only, as the other links are.
           ...(audienceOf(context, { id: row.boardId, userId: row.boardOwner, teamId: row.boardTeam }) === 'staff'
-            ? { url: notificationShareUrl(row.boardId, { taskId: row.taskId, messageId: row.messageId }) }
+            ? { url: notificationShareUrl(row.boardId, { taskId: row.taskParentId ?? row.taskId, messageId: row.messageId }) }
             : {}),
           ...(row.actor ? { from: row.actor } : {}),
           at: new Date(row.createdAt).toISOString(),

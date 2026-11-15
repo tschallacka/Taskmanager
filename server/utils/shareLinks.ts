@@ -17,6 +17,15 @@ export function taskShareUrl(boardId: string, taskId: string): string {
   return `${boardShareUrl(boardId)}?task=${taskId}`
 }
 
+/**
+ * The id of the task a link opens. A subtask has no panel of its own: the app's drawer finds only the board's own
+ * tasks, so a link to a subtask would open nothing. The subtask is listed in its parent's panel, so its link is its
+ * parent's.
+ */
+export function openableTaskId(task: { id: string, parentTaskId?: string | null }): string {
+  return task.parentTaskId ?? task.id
+}
+
 /** The absolute link to a conversation (a message thread on the board's messages view). */
 export function messageShareUrl(boardId: string, messageId: string): string {
   return `${boardShareUrl(boardId)}?view=messages&message=${messageId}`
