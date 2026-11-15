@@ -1,13 +1,19 @@
 <script setup lang="ts">
 import { countdownText, managementPrompt, refusalLink } from '~/utils/managementPrompt'
+import { crewManagePrompt } from '~/utils/crewManagePrompt'
 
 // "Put an AI crew to work on this board": makes the 10-minute token for one board and shows it once, with the copy-paste prompt
-// for the agent. The token lives only in this component: it is cleared when the dialog closes or the time runs out.
+// for the agent. On a crew's own board ("Manage this crew", card mwdd9d2vtgqhfr6izq) the token reaches only that crew, with two
+// prompts: recover the keys, add the missing people. The token lives only in this component: it is cleared when the dialog
+// closes or the time runs out.
 
 const props = defineProps<{
   open: boolean
-  board: { id: string, name: string } | null
+  board: { id: string, name: string, crewSlug?: string | null } | null
 }>()
+
+// A crew's own board is the one with a crew slug.
+const isCrewBoard = computed(() => Boolean(props.board?.crewSlug))
 
 const emit = defineEmits<{
   'update:open': [open: boolean]
@@ -106,7 +112,9 @@ async function make() {
     issued.value = {
       token: made.token,
       expiresAt,
-      prompt: managementPrompt({ origin, boardId: made.board.id, boardName: made.board.name, token: made.token, expiresAt })
+      prompt: board.crewSlug
+        ? ['recover', 'people'].map(job => crewManagePrompt({ origin, slug: board.crewSlug as string, boardName: made.board.name, token: made.token, expiresAt, job: job as 'recover' | 'people' })).join('\n\n----------\n\n')
+        : managementPrompt({ origin, boardId: made.board.id, boardName: made.board.name, token: made.token, expiresAt })
     }
     phase.value = 'issued'
     now.value = Date.now()
@@ -163,8 +171,10 @@ function close() {
 <template>
   <UModal
     :open="open"
-    :title="`Put an AI crew to work on ${board?.name ?? 'this board'}`"
-    description="This makes a token for 10 minutes. Paste the prompt below into a new Claude Code session: it sets up a crew (a PM, workers and testers) that works on this board and keeps its own keys."
+    :title="isCrewBoard ? 'Manage this crew' : `Put an AI crew to work on ${board?.name ?? 'this board'}`"
+    :description="isCrewBoard
+      ? 'This makes a token for 10 minutes that reaches only this crew. Paste the prompt below into a Claude Code session: it recovers the keys or adds the missing people for this crew. Recovering the keys makes new keys and the old keys stop working; the prompt asks for a confirm before it does anything.'
+      : 'This makes a token for 10 minutes. Paste the prompt below into a new Claude Code session: it sets up a crew (a PM, workers and testers) that works on this board and keeps its own keys.'"
     :ui="{ footer: 'justify-end' }"
     @update:open="(value: boolean) => emit('update:open', value)"
   >
