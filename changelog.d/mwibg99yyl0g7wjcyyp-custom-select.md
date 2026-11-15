@@ -1,0 +1,1 @@
+- **Custom select.** The team invite role select (Member / Admin) is a theme-aware select, so the Admin option reads in dark mode; the shared `AppSelect` component wraps Nuxt UI's select (`app/components/AppSelect.vue`, `TeamInvitesPanel.vue`). The other native selects are still to change, one card each.
