@@ -74,7 +74,7 @@ function saveDue(value: string | null) {
   <UModal
     :open="props.open"
     :title="props.title"
-    :ui="{ title: 'min-w-0 truncate pe-10' }"
+    :ui="{ header: 'min-w-0', wrapper: 'min-w-0 flex-1', title: 'min-w-0 truncate pe-10' }"
     @update:open="(v: boolean) => emit('update:open', v)"
   >
     <template #body>

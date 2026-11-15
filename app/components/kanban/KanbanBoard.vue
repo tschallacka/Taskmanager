@@ -556,12 +556,16 @@ async function confirmPurgeColumn() {
 const addingColumn = ref(false)
 const newColumnName = ref('')
 const newColumnEl = ref<HTMLInputElement | null>(null)
+const phoneNewColumnEl = ref<HTMLInputElement | null>(null)
 
 async function startAddColumn() {
   addingColumn.value = true
   newColumnName.value = ''
   await nextTick()
-  newColumnEl.value?.focus()
+  // Focus the field that is showing: the phone field below the lg breakpoint, the desktop one above it.
+  const phone = window.matchMedia('(max-width: 1023.98px)').matches
+  const field = phone ? phoneNewColumnEl.value : newColumnEl.value
+  field?.focus()
 }
 
 async function submitColumn() {
@@ -751,8 +755,25 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onBoardKeydown))
     v-if="board"
     :columns="phoneColumns"
     :active-id="phoneActiveId"
+    :can-add="!isCustomerView"
     @select="phoneColumnId = $event"
+    @add="startAddColumn"
   />
+  <!-- The phone's Add column name field: the desktop one below is hidden on a phone. -->
+  <div
+    v-if="addingColumn && !isCustomerView"
+    class="px-4 pb-2 lg:hidden"
+  >
+    <input
+      ref="phoneNewColumnEl"
+      v-model="newColumnName"
+      placeholder="Column name"
+      class="w-full rounded-xl border border-primary/60 bg-default px-3 py-2.5 text-sm text-default outline-none placeholder:text-dimmed"
+      @keydown.enter.prevent="submitColumn"
+      @keydown.escape="addingColumn = false"
+      @blur="submitColumn"
+    >
+  </div>
   <PhoneCardSheet
     v-if="board"
     :open="phoneSheetTask !== null"
@@ -996,7 +1017,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onBoardKeydown))
     <!-- Add column -->
     <div
       v-if="!isCustomerView"
-      class="kanban-add-column w-[19rem] shrink-0 self-start"
+      class="kanban-add-column hidden w-[19rem] shrink-0 self-start lg:block"
     >
       <input
         v-if="addingColumn"
