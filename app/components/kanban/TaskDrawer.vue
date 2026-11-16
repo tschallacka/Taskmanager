@@ -7,6 +7,7 @@ import { dueDayToMs, isOverdueDay } from '~/utils/dueDate'
 import { absoluteUrl, copyTaskLink } from '~/utils/copyTaskLink'
 import { activityStartsOpen, taskPanelPath } from '~/utils/taskPanelUrl'
 import { taskLink } from '~/utils/taskLink'
+import { stripPendingPlaceholders } from '~/utils/editor/imagePlaceholders'
 
 interface Task {
   id: string
@@ -219,7 +220,8 @@ function flushDescription(taskId = props.task?.id) {
   }
   if (!descDirty) return
   descDirty = false
-  if (taskId) updateTask(taskId, { description: editorContent.value })
+  // An image still uploading is not content yet: it is left out of what is saved, and comes in when it finishes.
+  if (taskId) updateTask(taskId, { description: stripPendingPlaceholders(editorContent.value) })
 }
 
 watch(editorContent, () => {
@@ -260,7 +262,8 @@ watch(() => props.task?.title, (title) => {
 
 watch(() => props.task?.description, (description) => {
   if (description === undefined || descDirty || descTimer) return
-  if (description === editorContent.value) return
+  // The server's copy has no pending placeholder in it, so compare without them: an echo must not wipe an upload in progress.
+  if (description === stripPendingPlaceholders(editorContent.value)) return
   suppressSave = true
   editorContent.value = description
   nextTick(() => {
