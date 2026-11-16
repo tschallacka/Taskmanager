@@ -55,6 +55,14 @@ test('the draft task board picker uses AppSelect with the boards as options', ()
   assert.match(draft, /const boardOptions = computed\(\(\) => props\.boards\.map\(board => \(\{ label: board\.name, value: board\.id \}\)\)\)/)
 })
 
+test('the new custom field type picker uses AppSelect with the four field types', () => {
+  const settings = read('app/components/kanban/ProjectSettingsView.vue')
+  assert.doesNotMatch(settings, /<select[\s>]/, 'the field type picker is no longer a native select')
+  assert.match(settings, /<AppSelect\s[\s\S]*?data-new-field-type/)
+  assert.match(settings, /:options="fieldTypeOptions"/)
+  assert.match(settings, /const fieldTypeOptions = Object\.entries\(FIELD_TYPE_LABELS\)\.map\(\(\[value, label\]\) => \(\{ label, value \}\)\)/)
+})
+
 test('the team invite role select uses AppSelect, and Admin is offered to owners only', () => {
   const invites = read('app/components/TeamInvitesPanel.vue')
   assert.doesNotMatch(invites, /<select[\s>]/, 'the role select is no longer a native select')
