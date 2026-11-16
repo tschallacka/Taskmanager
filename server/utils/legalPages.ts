@@ -7,6 +7,22 @@ import type { LegalDoc } from '../../shared/utils/legalDocs'
 export type LegalPage = { status: 200, doc: LegalDoc } | { status: 404 }
 
 /**
+ * The archived versions of one document: the files under `archive/` with their key's file name. A key is
+ * `legal:<document>:archive:<file>.md`. The file name is returned as it is; the dates come from the front matter.
+ */
+export async function archivedLegalSources(storage: { getKeys: () => Promise<string[]>, getItem: (key: string) => Promise<unknown> }, document: string): Promise<Map<string, string>> {
+  const files = new Map<string, string>()
+  for (const key of await storage.getKeys()) {
+    const parts = key.split(':')
+    // An archived version is named `<version>_<date>.md` (legal/README.md); anything else in the folder is not one.
+    if (parts.length < 4 || parts.at(-2) !== 'archive' || parts.at(-3) !== document || !/^\d+\.\d+\.\d+_.+\.md$/.test(parts.at(-1) ?? '')) continue
+    const source = await storage.getItem(key)
+    if (typeof source === 'string') files.set(parts.at(-1)!, source)
+  }
+  return files
+}
+
+/**
  * The current version of each document, from the bundled assets. A key is `legal:<document>:current.md` (the
  * archive keys have `archive` in the document's place and are left out here).
  */
