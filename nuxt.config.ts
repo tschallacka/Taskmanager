@@ -50,7 +50,11 @@ export default defineNuxtConfig({
     preset: 'bun',
     // The help pages in docs/ ship inside the server build, so a deployed instance has the same
     // pages the repository has. server/utils/helpStore.ts reads them as `assets:docs`.
-    serverAssets: [{ baseName: 'docs', dir: fileURLToPath(new URL('./docs', import.meta.url)) }],
+    serverAssets: [
+      { baseName: 'docs', dir: fileURLToPath(new URL('./docs', import.meta.url)) },
+      // The privacy policy and the legal notice (legal/README.md). Served only when published (server/utils/legalPages.ts).
+      { baseName: 'legal', dir: fileURLToPath(new URL('./legal', import.meta.url)) }
+    ],
     // In dev, a server error is printed as plain text with its stack and answered
     // as JSON. The default renderer (youch) reads source maps through a
     // WebAssembly parser that traps ("unreachable") on this project's bundles,
