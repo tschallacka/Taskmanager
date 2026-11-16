@@ -1,0 +1,1 @@
+- **Account data list.** The server now classifies every table by whether it holds a person's own rows, their memberships, secrets, other people's rows or infrastructure (`server/utils/accountTables.ts`). The account download and the account deletion read this one list, and a test fails when a table is added without a class. No change to what people see yet.
