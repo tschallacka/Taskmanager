@@ -4,6 +4,7 @@ import { customerInvitations, customers, projects } from '../../../db/schema'
 import { genId, requireProject } from '../../../utils/projects'
 import { INVITATION_TTL_MS, newInvitationToken, requireCustomer, requireOrgStaff } from '../../../utils/customers'
 import { customerChoiceError } from '#shared/utils/inviteEmail'
+import { takenMessage } from '#shared/utils/projectFiling'
 
 // The project's Share dialog path to a customer: the project is filed under the customer and an invitation to the
 // email is made, in one step. The customer is picked from the team's list, or a new one is made under the team with
@@ -39,6 +40,14 @@ export default defineEventHandler(async (event) => {
   }
   if (customer.organizationId !== project.teamId) {
     throw createError({ statusCode: 400, message: 'Choose a customer of this project\'s team.' })
+  }
+  // A project already under another customer is refused, not moved (shared/utils/projectFiling).
+  if (project.customerId && project.customerId !== customer.id) {
+    const [current] = await db.select({ name: customers.name }).from(customers).where(eq(customers.id, project.customerId))
+    throw createError({
+      statusCode: 400,
+      message: takenMessage({ id: project.id, name: project.name, customerId: project.customerId, customerName: current?.name ?? null })
+    })
   }
 
   const { token, tokenHash } = newInvitationToken()
