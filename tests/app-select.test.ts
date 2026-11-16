@@ -63,6 +63,17 @@ test('the new custom field type picker uses AppSelect with the four field types'
   assert.match(settings, /const fieldTypeOptions = Object\.entries\(FIELD_TYPE_LABELS\)\.map\(\(\[value, label\]\) => \(\{ label, value \}\)\)/)
 })
 
+test('the list view group and sort pickers use AppSelect with their options', () => {
+  const list = read('app/components/kanban/ProjectListView.vue')
+  assert.doesNotMatch(list, /<select[\s>]/, 'the group and sort pickers are no longer native selects')
+  assert.match(list, /<AppSelect\s[\s\S]*?data-list-group/)
+  assert.match(list, /<AppSelect\s[\s\S]*?data-list-sort/)
+  assert.match(list, /:options="groupOptions"/)
+  assert.match(list, /:options="sortOptions"/)
+  assert.match(list, /@update:model-value="setGroupBy"/)
+  assert.match(list, /@update:model-value="setSortBy"/)
+})
+
 test('the team invite role select uses AppSelect, and Admin is offered to owners only', () => {
   const invites = read('app/components/TeamInvitesPanel.vue')
   assert.doesNotMatch(invites, /<select[\s>]/, 'the role select is no longer a native select')
