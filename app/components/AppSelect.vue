@@ -4,11 +4,15 @@
 interface SelectOption { label: string, value: string, disabled?: boolean }
 
 const props = withDefaults(defineProps<{
-  options: SelectOption[]
+  options?: SelectOption[]
+  // Options under headings, one heading per group (as the native optgroup was). Give either options or groups.
+  groups?: { label: string, options: SelectOption[] }[]
   placeholder?: string
   disabled?: boolean
   size?: 'sm' | 'md'
 }>(), {
+  options: () => [],
+  groups: undefined,
   placeholder: undefined,
   disabled: false,
   size: 'md'
@@ -16,7 +20,14 @@ const props = withDefaults(defineProps<{
 
 const model = defineModel<string | null>()
 // A disabled option stays in the list, greyed out, as it did in the native select.
-const items = computed(() => props.options.map(option => ({ label: option.label, value: option.value, disabled: option.disabled })))
+function toItem(option: SelectOption) {
+  return { label: option.label, value: option.value, disabled: option.disabled }
+}
+// Nuxt UI draws an array of arrays as groups, and a label item as the heading of its group.
+interface PickerItem { label: string, value?: string, type?: 'label', disabled?: boolean }
+const items = computed<PickerItem[] | PickerItem[][]>(() => props.groups
+  ? props.groups.map((group): PickerItem[] => [{ label: group.label, type: 'label' }, ...group.options.map(toItem)])
+  : props.options.map(toItem))
 </script>
 
 <template>

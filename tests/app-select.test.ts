@@ -10,7 +10,7 @@ test('AppSelect renders through USelect with the options, placeholder and disabl
   const select = read('app/components/AppSelect.vue')
   assert.match(select, /<USelect/)
   assert.match(select, /:items="items"/)
-  assert.match(select, /const items = computed\(\(\) => props\.options\.map/)
+  assert.match(select, /const items = computed<[\s\S]*?>\(\(\) => props\.groups/)
   assert.match(select, /value-key="value"/)
   assert.match(select, /:placeholder="props\.placeholder"/)
   assert.match(select, /:disabled="props\.disabled"/)
@@ -137,6 +137,21 @@ test('the custom field select cell uses AppSelect, keeps its clicks from the row
   assert.match(field, /<span[^>]*@click\.stop[^>]*>\s*<AppSelect/, 'the picker sits in a wrapper that stops the click from reaching the row')
   assert.match(field, /const NONE = '__none__'/, 'the empty choice uses a sentinel, since an item cannot have an empty value')
   assert.match(field, /emit\('change', raw === '' \? null : raw\)/, 'an empty choice still reports null')
+})
+
+test('AppSelect can list options under group headings (a label per group)', () => {
+  const select = read('app/components/AppSelect.vue')
+  assert.match(select, /groups\?: \{ label: string, options: SelectOption\[\] \}\[\]/, 'an optional list of groups')
+  assert.match(select, /type: 'label'/, 'each group is headed by a label item')
+})
+
+test('the timesheet task picker uses AppSelect, grouped by project, with no native select', () => {
+  const page = read('app/pages/projects/timesheet.vue')
+  assert.doesNotMatch(page, /<select[\s>]/, 'the task picker is no longer a native select')
+  assert.doesNotMatch(page, /<optgroup/, 'no native option groups')
+  assert.match(page, /<AppSelect\s[\s\S]*?data-ts-task/)
+  assert.match(page, /:groups="taskPickerGroups"/)
+  assert.match(page, /@update:model-value="\(value\) => taskId = value \?\? ''"/)
 })
 
 test('the team invite role select uses AppSelect, and Admin is offered to owners only', () => {

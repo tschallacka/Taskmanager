@@ -63,6 +63,11 @@ const taskGroups = computed(() => {
   }
   return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name))
 })
+// The task picker's groups: one heading per project, with its open tasks under it.
+const taskPickerGroups = computed(() => taskGroups.value.map(group => ({
+  label: group.name,
+  options: group.tasks.map(task => ({ label: task.title, value: task.id }))
+})))
 
 const taskId = ref('')
 const duration = ref('')
@@ -172,28 +177,14 @@ async function removeEntry(id: string) {
         data-ts-form
         @submit.prevent="add"
       >
-        <select
-          v-model="taskId"
-          class="min-w-48 flex-1 rounded-md border border-default bg-transparent px-2 py-1.5 text-sm text-default outline-none focus:border-primary"
+        <AppSelect
+          :model-value="taskId || null"
+          :groups="taskPickerGroups"
+          placeholder="Pick a task…"
+          class="min-w-48 flex-1"
           data-ts-task
-        >
-          <option value="">
-            Pick a task…
-          </option>
-          <optgroup
-            v-for="group in taskGroups"
-            :key="group.name"
-            :label="group.name"
-          >
-            <option
-              v-for="task in group.tasks"
-              :key="task.id"
-              :value="task.id"
-            >
-              {{ task.title }}
-            </option>
-          </optgroup>
-        </select>
+          @update:model-value="(value) => taskId = value ?? ''"
+        />
         <input
           v-model="duration"
           type="text"
