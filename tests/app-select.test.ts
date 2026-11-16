@@ -84,6 +84,17 @@ test('the secret access pickers (add and edit) use AppSelect with the two access
   assert.match(secrets, /@update:model-value="setEditAccess"/)
 })
 
+test('the project members pickers (team, row role, add user, add role) use AppSelect and no native select is left', () => {
+  const members = read('app/components/kanban/ProjectMembersSettings.vue')
+  assert.doesNotMatch(members, /<select[\s>]/, 'the members pickers are no longer native selects')
+  assert.match(members, /<AppSelect\s[\s\S]*?data-members-team-pick/)
+  assert.match(members, /<AppSelect\s[\s\S]*?data-member-role-change/)
+  assert.match(members, /<AppSelect\s[\s\S]*?data-member-add-user/)
+  assert.match(members, /<AppSelect\s[\s\S]*?data-member-add-role/)
+  assert.match(members, /@update:model-value="\(value\) => changeRole\(person, value\)"/)
+  assert.match(members, /:options="roleOptions"/)
+})
+
 test('the team invite role select uses AppSelect, and Admin is offered to owners only', () => {
   const invites = read('app/components/TeamInvitesPanel.vue')
   assert.doesNotMatch(invites, /<select[\s>]/, 'the role select is no longer a native select')
