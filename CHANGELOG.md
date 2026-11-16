@@ -2,6 +2,14 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.39.0 - 2026-11-16
+
+- **Agents get the public link of a customer-visible task.** When a board is shared (its public link is on and not expired), get_task answers a customer-visible task with `publicUrl`: the board's public page, for a key whose owner may share the board (a project admin or a manager guest). The public page shows the board's cards, not one task, so the link opens the board. Staff keys only. Files: `server/utils/mcpBoardTools.ts`, `server/utils/shareLinks.ts`, `tests/mcp-share-links.test.ts`.
+
+- **Agents get a link to share.** The MCP tools that answer with a task, board or update now return `url`: the link that opens it in the app, on this instance (staff keys only; a customer's key gets none). Covers get_task, create_task, update_task, move_task, search_tasks, my_tasks, get_board, list_boards, the update tools, list_notifications, delete_task, restore_task and get_task_github. The tool descriptions and the Tools help page say so. A subtask's link, and the e-mail and push about a subtask, now open its parent's panel, as its Inbox link does (a subtask has no panel of its own). Files: `server/utils/shareLinks.ts`, `server/utils/notifications.ts`, `server/utils/mcpBoardTools.ts`, `server/utils/mcpUpdateTools.ts`, `server/utils/mcpMeTools.ts`, `server/utils/mcpGithubTools.ts`, `server/utils/mcpRegistry.ts`, `docs/agents/tools-overview.md`.
+
+- **An invited person lands where the invitation says.** A customer contact with one board shared lands on that board, with several or none on **Shared with you** (which lists the boards, or says nothing is shared yet). A team member who signs in again in a new browser opens their team, and a customer contact with no team goes to the shared list rather than the first-project form. The invite page's registration form is the default, with a plain **Already have an account? Sign in** link. Files: app/pages/invite/[token].vue, app/pages/projects/index.vue, app/pages/shared-with-me.vue, app/components/AppSidebar.vue, app/utils/inviteLanding.ts, app/utils/projectsEntry.ts, app/utils/teamEntry.ts, app/utils/loginMode.ts, app/utils/inviteLinks.ts, shared/utils/sharedGroups.ts, server/api/shared-with-me.get.ts, server/api/invitations/[token]/accept.post.ts, server/api/invitations/[token]/index.get.ts, server/utils/protectedApi.ts, server/utils/sharedProjectIds.ts, server/middleware/requireAuth.ts, docs/team/invite-a-contact.md, changelog.d/mwidpx1zhcb8izzzqw-invite-landing.md.
+
 ## 0.38.1 - 2026-11-15
 
 - Legal documents: the privacy policy and the Impressum 1.0.0 as drafts in legal/, with the version and archive procedure (legal/README.md). The hosting data center (Lauterbourg, France) is filled in from the Contabo data processing agreement.
