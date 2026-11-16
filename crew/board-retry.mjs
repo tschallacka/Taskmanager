@@ -29,7 +29,7 @@ export function statusWait(status, attempt) {
 // The status file, read after a failure. Any answer that is not a JSON object (404, HTML, a dead server) is "no file".
 async function readStatus(url, fetchImpl) {
   try {
-    const res = await fetchImpl(`${new URL(url).origin}${STATUS_PATH}`, { headers: { accept: 'application/json' } })
+    const res = await fetchImpl(`${new URL(url).origin}${STATUS_PATH}`, { headers: { accept: 'application/json' }, signal: AbortSignal.timeout(5_000) })
     if (!res.ok) return null
     const parsed = JSON.parse(await res.text())
     return parsed && typeof parsed === 'object' ? parsed : null
@@ -46,13 +46,16 @@ export async function boardRequest(req, deps = {}) {
   const fetchImpl = deps.fetchImpl ?? fetch
   const sleep = deps.sleep ?? (ms => new Promise(resolve => setTimeout(resolve, ms)))
   const log = deps.log ?? (line => process.stderr.write(`${line}\n`))
+  // A socket that connects and never answers is an outage after this long (30 s: a list call answers in seconds, and a
+  // slow deploy gets room before the listener starts waiting).
+  const timeoutMs = deps.timeoutMs ?? 30_000
   let attempt = 0
   let reported = false
   for (;;) {
     let outage
     let res
     try {
-      res = await fetchImpl(req.url, req.init)
+      res = await fetchImpl(req.url, { ...req.init, signal: AbortSignal.timeout(timeoutMs) })
     } catch (error) {
       outage = `connection error: ${error?.message ?? error}`
     }
