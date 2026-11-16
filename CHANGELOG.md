@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.39.2 - 2026-11-16
+
+- **Invite follow-ups: System by default, and no "Personal Workspace" while the team loads.** A visitor with no stored choice gets System, not a fixed dark theme; a stored choice is kept. The workspace switcher shows "Loading workspace" while the active team loads, so a team member who lands in the team sees a label that agrees with the team's boards. The invitation page uses the theme colours, so a new visitor on a light system sees it light. Files: `nuxt.config.ts`, `app/components/TeamSwitcher.vue`, `app/utils/workspaceLabel.ts`, `app/pages/invite/[token].vue`, `tests/color-mode-default.test.ts`, `tests/team-switcher-label.test.ts`, `tests/invite-page-theme.test.ts`.
+
 ## 0.39.1 - 2026-11-16
 
 - Invited people land on their shared work: a customer whose board was shared to their email now opens that board (or the shared list) after accepting the customer invitation, the sidebar lists each shared project once, and a person who cannot create projects no longer sees "No projects yet. Create one" or a New project button.
