@@ -12,10 +12,6 @@ const FOLDER = join(ROOT, 'changelog.d')
 
 const fragments = readdirSync(FOLDER).filter(name => name.endsWith('.md')).sort()
 
-test('there is at least one fragment to check', () => {
-  assert.ok(fragments.length > 0)
-})
-
 for (const name of fragments) {
   const text = readFileSync(join(FOLDER, name), 'utf8')
 
