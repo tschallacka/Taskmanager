@@ -9,7 +9,8 @@ const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.ur
 test('AppSelect renders through USelect with the options, placeholder and disabled state it is given', () => {
   const select = read('app/components/AppSelect.vue')
   assert.match(select, /<USelect/)
-  assert.match(select, /:items="props\.options"/)
+  assert.match(select, /:items="items"/)
+  assert.match(select, /const items = computed\(\(\) => props\.options\.map/)
   assert.match(select, /value-key="value"/)
   assert.match(select, /:placeholder="props\.placeholder"/)
   assert.match(select, /:disabled="props\.disabled"/)
@@ -112,6 +113,21 @@ test('the GitHub settings pickers (link visibility, sync column and visibility, 
   }
   assert.match(gh, /:options="columnOptions\(row\)"/, 'the column picker lists the board columns, plus the draft value when it is not on the board')
   assert.match(gh, /@update:model-value="\(value\) => changeVisibility\(row, value\)"/)
+})
+
+test('AppSelect passes a disabled option through to its list', () => {
+  const select = read('app/components/AppSelect.vue')
+  assert.match(select, /disabled\?: boolean/, 'an option may be disabled')
+  assert.match(select, /disabled: option\.disabled/, 'the disabled flag reaches the list item')
+})
+
+test('the rule step pickers (kind, column, person, visibility, yes or no) use AppSelect and no native select is left', () => {
+  const step = read('app/components/kanban/ProjectRuleStep.vue')
+  assert.doesNotMatch(step, /<select[\s>]/, 'the rule step pickers are no longer native selects')
+  assert.match(step, /<AppSelect\s[\s\S]*?data-step-kind/)
+  const valuePickers = step.match(/<AppSelect[^>]*\bdata-step-value\b/g) ?? []
+  assert.equal(valuePickers.length, 4, 'column, person (three kinds), visibility and yes or no use AppSelect')
+  assert.match(step, /const NONE = '__none__'/, 'an empty choice (nobody, anyone) uses a sentinel, since an item cannot have an empty value')
 })
 
 test('the team invite role select uses AppSelect, and Admin is offered to owners only', () => {

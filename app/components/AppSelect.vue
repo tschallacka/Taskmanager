@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // A select whose open list follows the app's theme. The native select draws its open list in the browser's own
 // colours, so an option could be unreadable in dark mode. This one renders through Nuxt UI, like the other selects.
-interface SelectOption { label: string, value: string }
+interface SelectOption { label: string, value: string, disabled?: boolean }
 
 const props = withDefaults(defineProps<{
   options: SelectOption[]
@@ -15,12 +15,14 @@ const props = withDefaults(defineProps<{
 })
 
 const model = defineModel<string | null>()
+// A disabled option stays in the list, greyed out, as it did in the native select.
+const items = computed(() => props.options.map(option => ({ label: option.label, value: option.value, disabled: option.disabled })))
 </script>
 
 <template>
   <USelect
     :model-value="model ?? undefined"
-    :items="props.options"
+    :items="items"
     value-key="value"
     :placeholder="props.placeholder"
     :disabled="props.disabled"
