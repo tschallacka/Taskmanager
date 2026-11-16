@@ -25,6 +25,16 @@ Why a daemon: a round is almost all script. The check compares the board with th
 and posted the markers. A Claude session spent model usage on every round, sat idle between rounds, stopped at the account's
 limit, and looped when its credentials were missing. The daemon does none of those things.
 
+## Dispatch switches
+
+Three switches in crew.json turn the dispatch live. All three are off by default. Each one is read as a strict `true`
+under `susy.dispatch`, and each one works the same way: a dry-run logs what it would do to `.listen/susy-daemon-dryrun.log`,
+and nothing is mailed. Boss turns a switch on only after reading that log for a round.
+
+- `susy.dispatch.gateWakes`: a card that enters Verify PM, UX, CQ or QA wakes that gate's owner with one mail.
+- `susy.dispatch.nextCard`: an idle worker is offered the next card of the queue. The marker goes on the card first, then the mail.
+- `susy.dispatch.reviewNeeds`: the one status line of the cards waiting for Boss and the owner is mailed to Boss, when it changes.
+
 ## Running it
 
 - `{{node_kit}}/susy-daemon.mjs once` runs one tick; `loop [sec]` ticks every 60 seconds (or sec).
