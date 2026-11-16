@@ -4,7 +4,7 @@ import type { Project } from '~/composables/useProjects'
 import type { PinnedBoard } from '~/composables/usePins'
 import { crewUpdatePrompt } from '~/utils/crewUpdatePrompt'
 import { taskCountLabel } from '#shared/utils/board'
-import { crewTreeRows, rowGutter } from '~/utils/crewTreeRows'
+import { crewChildLabel, crewTreeRows, rowGutter } from '~/utils/crewTreeRows'
 import { mayCreateProjects, panelListsProject } from '~/utils/sidebarAccess'
 import { countOpenTasks, healthTint, kindIcon, projectKind } from '~/utils/projectKind'
 
@@ -68,12 +68,9 @@ function toggleTree(id: string) {
 // The arrow and the nested rows come from the same computation (app/utils/crewTreeRows.ts).
 const treeRows = computed(() => crewTreeRows(listedProjects.value, openTrees.value))
 
-// A shadow board nested under its real board reads "Real board › crew: Crew name"; the crew's home board is named as is.
-function boardLabel(project: Project) {
-  if (project.role === 'shadow' && project.realBoard && project.crew) {
-    return `${project.realBoard.name} › crew: ${project.crew.name}`
-  }
-  return project.name
+// A shadow board reads "crew: Crew name" under its project and "Real board › crew: Crew name" on its own (see crewChildLabel).
+function boardLabel(project: Project, depth: 0 | 1 = 0) {
+  return crewChildLabel(project, depth)
 }
 
 // A real board a crew's member sees beside the crew's shadow is a label: it opens nothing and shows no tasks here.
@@ -466,7 +463,7 @@ function menuItems(project: Project) {
             class="truncate leading-snug"
             :class="depth ? 'text-xs font-normal text-muted' : 'text-sm font-medium text-default'"
           >
-            {{ boardLabel(project) }}
+            {{ boardLabel(project, depth) }}
           </p>
           <p
             class="truncate text-xs text-muted"

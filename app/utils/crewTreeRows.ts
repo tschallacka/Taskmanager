@@ -48,3 +48,18 @@ export function rowGutter(row: Pick<TreeRow<TreeProject>, 'depth' | 'shadowCount
   if (row.depth === 1) return 'none'
   return row.shadowCount > 0 ? 'toggle' : 'spacer'
 }
+
+/**
+ * The label of a row in the list. A crew row nested under its project reads "crew: <name>": the project is the line
+ * above it, and repeating it cut "crew:" off on a narrow sidebar. A crew row listed on its own keeps the project in
+ * front of it; a board or a crew home is named as it is.
+ */
+export function crewChildLabel(
+  project: { name: string, role?: string, realBoard?: { name: string } | null, crew?: { name: string } | null },
+  depth: 0 | 1
+): string {
+  if (project.role === 'shadow' && project.realBoard && project.crew) {
+    return depth === 1 ? `crew: ${project.crew.name}` : `${project.realBoard.name} › crew: ${project.crew.name}`
+  }
+  return project.name
+}
