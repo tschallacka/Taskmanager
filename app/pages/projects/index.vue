@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { entryFor, mayShowFirstProjectForm } from '~/utils/projectsEntry'
+import { entryFor, mayShowFirstProjectForm, redirectPending, sharedDecided } from '~/utils/projectsEntry'
 import { selectTeamOrStay, teamToOpenFor } from '~/utils/teamEntry'
 
 definePageMeta({ layout: 'app' })
@@ -9,7 +9,7 @@ const { teams, activeTeamId, setActiveTeam, isPending: teamsPending } = useTeams
 const route = useRoute()
 
 // A customer contact or guest with no team and no board goes to the shared list, not to the first-project form.
-const { data: sharedData } = useFetch<{ contact: boolean }>('/api/shared-with-me', { server: false, lazy: true })
+const { data: sharedData, status: sharedStatus } = useFetch<{ contact: boolean }>('/api/shared-with-me', { server: false, lazy: true })
 const contactOnlyEntry = computed(() => !teamsPending.value && ready.value && sharedData.value
   ? entryFor({ asksNew: route.query.new === '1', hasProjects: projects.value.length > 0, teamCount: teams.value.length, contact: sharedData.value.contact })
   : null)
@@ -26,11 +26,16 @@ const teamEntry = computed(() => !teamsPending.value && ready.value
       teamIds: teams.value.map(team => team.id)
     })
   : null)
+// Set when selecting the team failed: the person then stays in the personal workspace, and the form may show.
+const teamSelectFailed = ref(false)
 watch(teamEntry, async (teamId) => {
   if (!teamId) return
   // If the team cannot be selected, the person stays in the personal workspace; nothing is thrown.
   const selected = await selectTeamOrStay(setActiveTeam, teamId)
-  if (!selected) return
+  if (!selected) {
+    teamSelectFailed.value = true
+    return
+  }
   // A full load, so the projects store picks up the team's boards.
   await navigateTo('/projects', { replace: true, external: true })
 }, { immediate: true })
@@ -51,8 +56,8 @@ watch([ready, wantsNew], ([isReady]) => {
 const showEmptyState = computed(() => mayShowFirstProjectForm({
   ready: ready.value,
   teamsPending: teamsPending.value,
-  sharedLoaded: sharedData.value !== undefined && sharedData.value !== null,
-  redirecting: contactOnlyEntry.value !== null || teamEntry.value !== null
+  sharedLoaded: sharedDecided(sharedStatus.value),
+  redirecting: redirectPending(contactOnlyEntry.value, false) || redirectPending(teamEntry.value, teamSelectFailed.value)
 }) && (projects.value.length === 0 || wantsNew.value))
 
 const name = ref('')

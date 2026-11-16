@@ -24,3 +24,13 @@ export interface FormGateInput {
 export function mayShowFirstProjectForm(input: FormGateInput): boolean {
   return input.ready && !input.teamsPending && input.sharedLoaded && !input.redirecting
 }
+
+/** A redirect is pending while it has a target and its move has not failed (a failed team selection stays put). */
+export function redirectPending(target: string | null, failed: boolean): boolean {
+  return target !== null && !failed
+}
+
+/** The shared list counts as decided once its fetch has finished, even when the fetch failed. */
+export function sharedDecided(status: 'idle' | 'pending' | 'success' | 'error'): boolean {
+  return status === 'success' || status === 'error'
+}

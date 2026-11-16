@@ -5,7 +5,20 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { entryFor, mayShowFirstProjectForm } from '../app/utils/projectsEntry'
+import { entryFor, mayShowFirstProjectForm, redirectPending, sharedDecided } from '../app/utils/projectsEntry'
+
+test('a redirect is pending only while its target is set and its selection has not failed', () => {
+  assert.equal(redirectPending('/shared-with-me', false), true)
+  assert.equal(redirectPending(null, false), false)
+  assert.equal(redirectPending('t1', true), false, 'a team selection that failed is no longer a pending redirect')
+})
+
+test('the shared list counts as decided once its fetch has finished, even when it failed', () => {
+  assert.equal(sharedDecided('pending'), false)
+  assert.equal(sharedDecided('idle'), false)
+  assert.equal(sharedDecided('success'), true)
+  assert.equal(sharedDecided('error'), true)
+})
 
 test('the first-project form does not paint until the page has decided to stay', () => {
   // Not decided yet: the teams or the shared list are still loading.
