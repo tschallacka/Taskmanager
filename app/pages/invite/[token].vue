@@ -270,6 +270,7 @@ watch([session, invitation], () => {
           </p>
         </template>
       </template>
+      <LegalLinks />
     </div>
   </div>
 </template>

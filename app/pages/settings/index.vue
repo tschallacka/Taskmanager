@@ -19,5 +19,8 @@ onMounted(() => {
 <template>
   <SettingsShell>
     <SettingsStats />
+    <div class="pb-6">
+      <LegalLinks />
+    </div>
   </SettingsShell>
 </template>
