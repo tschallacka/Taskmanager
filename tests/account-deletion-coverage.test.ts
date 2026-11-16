@@ -7,7 +7,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { getTableConfig } from 'drizzle-orm/pg-core'
 import * as schema from '../server/db/schema'
-import { ACCOUNT_RULES, NAMED_PERSON_COLUMNS } from '../server/utils/accountRules'
+import { ACCOUNT_RULES, EXPORT_RULES, EXPORT_SECRET_COLUMN, NAMED_PERSON_COLUMNS } from '../server/utils/accountRules'
 
 interface Found { key: string, notNull: boolean }
 
@@ -69,5 +69,42 @@ test('a NOT NULL person column keeps its row: delete or tombstone, never null', 
   for (const column of personForeignKeys().filter(column => column.notNull)) {
     assert.notEqual(ACCOUNT_RULES[column.key as keyof typeof ACCOUNT_RULES], undefined, column.key)
     assert.notEqual(ACCOUNT_RULES[column.key as keyof typeof ACCOUNT_RULES], 'null', column.key)
+  }
+})
+
+// The download (Art. 20, card mwjfpr8phz5gi4bdjqa) reads the same walk: every table that holds a person's id has a decision
+// in EXPORT_RULES, either exported (an allow-list of fields, for the rows whose `by` column is the person) or not, with a reason.
+const personTables = (): string[] => [...new Set(ALL_PERSON_COLUMNS().map(column => column.key.split('.')[0]!))]
+
+test('every table that holds a person id has a download decision: exported, or not, with the reason', () => {
+  const missing = personTables().filter(table => !(table in EXPORT_RULES))
+  assert.deepEqual(missing, [], `no download decision for: ${missing.join(', ')}`)
+})
+
+test('a download decision names a table that holds a person id (no stale entry)', () => {
+  const stale = Object.keys(EXPORT_RULES).filter(table => !personTables().includes(table))
+  assert.deepEqual(stale, [], `not a person table: ${stale.join(', ')}`)
+})
+
+test('an exported table names real columns: the owner column and every field', () => {
+  const columns = new Map(tables().map(config => [config.name, new Set(config.columns.map(column => column.name))]))
+  for (const [table, rule] of Object.entries(EXPORT_RULES)) {
+    if (rule.kind !== 'export') continue
+    const real = columns.get(table)
+    assert.ok(real?.has(rule.by), `${table}.${rule.by} is not a column (the owner column)`)
+    for (const field of rule.fields) assert.ok(real?.has(field), `${table}.${field} is not a column`)
+  }
+})
+
+test('no exported field looks like a secret: hash, token, secret, password, passkey, key, prefix, salt, otp, code, session', () => {
+  for (const [table, rule] of Object.entries(EXPORT_RULES)) {
+    if (rule.kind !== 'export') continue
+    for (const field of rule.fields) assert.doesNotMatch(field, EXPORT_SECRET_COLUMN, `${table}.${field} looks like a secret`)
+  }
+})
+
+test('every exclusion and every export says why, in words', () => {
+  for (const [table, rule] of Object.entries(EXPORT_RULES)) {
+    assert.ok(rule.why.trim().length >= 10, `${table}: say why`)
   }
 })
