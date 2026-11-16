@@ -8,7 +8,10 @@ definePageMeta({ layout: 'app' })
 useSeoMeta({ title: 'Profile' })
 
 const { session } = useAuth()
-const { ready, projects, allTasks } = useProjects()
+const { ready, projects, allTasks, ensureTasks } = useProjects()
+onMounted(() => {
+  ensureTasks().catch(() => {})
+})
 
 const me = computed(() => session.value?.user)
 
