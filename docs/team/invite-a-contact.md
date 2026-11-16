@@ -36,13 +36,16 @@ The link looks like `https://your-instance/invite/` followed by a long code. It 
 
 They open the link. The page says "You're invited" and who invited them to follow which customer's projects.
 
-1. If they are not signed in, they click **Sign in or create an account**. After signing in or signing up they are
+1. If they are not signed in, they click **Create an account**. The link opens the sign-up form; a person who already
+   has an account clicks **Already have an account? Sign in** under it. After signing in or signing up they are
    brought back to the same page.
 2. They click **Accept invitation**.
-3. They land on the most recently updated board in their personal workspace, and all of the customer's boards are
-   listed in the sidebar.
+3. Where they land depends on what you have shared with the customer's contacts. If exactly one board is shared with
+   them, that board opens. If several are shared, they land on **Shared with you**, which lists them. If none is
+   shared yet, **Shared with you** says that nothing is shared yet. A later sign-in goes to the same place.
 
-The customer's boards appear in their **personal workspace**. A contact does not become a member of your team.
+The boards shared with them appear under the name of your organisation in the sidebar. A contact does not become a
+member of your team.
 
 If the link is no longer usable they see one of these instead:
 

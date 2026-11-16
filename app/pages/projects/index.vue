@@ -1,8 +1,44 @@
 <script setup lang="ts">
+import { entryFor, mayShowFirstProjectForm, redirectPending, sharedDecided } from '~/utils/projectsEntry'
+import { selectTeamOrStay, teamToOpenFor } from '~/utils/teamEntry'
+
 definePageMeta({ layout: 'app' })
 
 const { ready, projects, createProject } = useProjects()
+const { teams, activeTeamId, setActiveTeam, isPending: teamsPending } = useTeams()
 const route = useRoute()
+
+// A customer contact or guest with no team and no board goes to the shared list, not to the first-project form.
+const { data: sharedData, status: sharedStatus } = useFetch<{ contact: boolean }>('/api/shared-with-me', { key: 'shared-with-me', server: false, lazy: true })
+const contactOnlyEntry = computed(() => !teamsPending.value && ready.value && sharedData.value
+  ? entryFor({ asksNew: route.query.new === '1', hasProjects: projects.value.length > 0, teamCount: teams.value.length, contact: sharedData.value.contact })
+  : null)
+watch(contactOnlyEntry, (path) => {
+  if (path) navigateTo(path, { replace: true })
+}, { immediate: true })
+
+// A team member who signs in again in a new browser starts in the personal workspace, which is empty: open their team.
+const teamEntry = computed(() => !teamsPending.value && ready.value
+  ? teamToOpenFor({
+      asksNew: route.query.new === '1',
+      hasProjects: projects.value.length > 0,
+      activeTeamId: activeTeamId.value,
+      teamIds: teams.value.map(team => team.id)
+    })
+  : null)
+// Set when selecting the team failed: the person then stays in the personal workspace, and the form may show.
+const teamSelectFailed = ref(false)
+watch(teamEntry, async (teamId) => {
+  if (!teamId) return
+  // If the team cannot be selected, the person stays in the personal workspace; nothing is thrown.
+  const selected = await selectTeamOrStay(setActiveTeam, teamId)
+  if (!selected) {
+    teamSelectFailed.value = true
+    return
+  }
+  // A full load, so the projects store picks up the team's boards.
+  await navigateTo('/projects', { replace: true, external: true })
+}, { immediate: true })
 
 // Land on the most recently updated board.
 // ?new=1 (the sidebar's new-project button) keeps you here to name one.
@@ -16,7 +52,13 @@ watch([ready, wantsNew], ([isReady]) => {
 
 // A frame of this page while a redirect is pending reads as a flash of "no
 // projects", so nothing paints until we know there is nothing to open.
-const showEmptyState = computed(() => ready.value && (projects.value.length === 0 || wantsNew.value))
+// The form waits until the page has decided it stays here (see mayShowFirstProjectForm), so it never flashes first.
+const showEmptyState = computed(() => mayShowFirstProjectForm({
+  ready: ready.value,
+  teamsPending: teamsPending.value,
+  sharedLoaded: sharedDecided(sharedStatus.value),
+  redirecting: redirectPending(contactOnlyEntry.value, false) || redirectPending(teamEntry.value, teamSelectFailed.value)
+}) && (projects.value.length === 0 || wantsNew.value))
 
 const name = ref('')
 const creating = ref(false)
