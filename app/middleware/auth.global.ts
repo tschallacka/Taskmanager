@@ -1,4 +1,5 @@
 import { authClient, forgetSession, readSession } from '~/composables/useAuth'
+import { isPublicPagePath } from '#shared/utils/publicPaths'
 
 export default defineNuxtRouteMiddleware(async (to) => {
   // A sign-in starts on the login page: the next read of the session must ask the server.
@@ -6,11 +7,9 @@ export default defineNuxtRouteMiddleware(async (to) => {
     forgetSession()
     return
   }
-  if (to.path.startsWith('/public/')) return
-  // Read before its recipient has an account; the page itself asks them to sign in.
-  if (to.path.startsWith('/invite/')) return
-  // Opened from a mail, maybe in a browser that is not signed in; the page asks for sign-in itself.
-  if (to.path.startsWith('/confirm-email/')) return
+  // The pages a signed-out visitor may open: the public project pages, invitations, the mail confirmation, and the
+  // legal pages (privacy, imprint and their archives). The list is shared/utils/publicPaths.ts.
+  if (isPublicPagePath(to.path)) return
 
   // The reactive session can still be empty right after signing in, so an
   // absent session is confirmed against the server before bouncing to /login.
