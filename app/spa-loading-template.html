@@ -1,10 +1,18 @@
 <!-- Shown by the browser from the first paint, before the app's JavaScript has run (the app is client-rendered). Inline only. -->
+<script>
+  // The colour choice the person made in the app (stored by Nuxt as nuxt-color-mode); "system" follows the OS.
+  try {
+    var mode = localStorage.getItem('nuxt-color-mode')
+    if (mode === 'dark' || (mode !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      document.documentElement.classList.add('spa-dark')
+    }
+  } catch (e) {}
+</script>
 <style>
+  html { --spa-bg: #fff; --spa-fg: #5f6368; }
+  html.spa-dark { --spa-bg: #18181b; --spa-fg: #a1a1aa; color-scheme: dark; }
   html, body { margin: 0; height: 100%; }
-  body { background: #fff; color: #5f6368; font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
-  @media (prefers-color-scheme: dark) {
-    body { background: #18181b; color: #a1a1aa; }
-  }
+  body { background: var(--spa-bg); color: var(--spa-fg); font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
   .spa-loading { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
   .spinner { width: 20px; height: 20px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; opacity: 0.6; }
   @keyframes spin { to { transform: rotate(360deg); } }

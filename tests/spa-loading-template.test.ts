@@ -24,5 +24,12 @@ test('the change has its own changelog fragment (one change, one file)', () => {
 
 test('the template has no external resources', () => {
   const html = readFileSync(TEMPLATE, 'utf8')
-  assert.doesNotMatch(html, /<link\s|<script\s|src=|@import/, 'inline only')
+  assert.doesNotMatch(html, /<link\s|<script\s+[^>]*src=|src=|@import/, 'inline only')
+})
+
+test('the template follows the colour choice the person made in the app, not only the OS setting', () => {
+  const html = readFileSync(TEMPLATE, 'utf8')
+  assert.match(html, /nuxt-color-mode/, 'reads the stored choice the app saves')
+  assert.match(html, /classList\.add\('spa-dark'\)/, 'applies a dark class for a dark choice')
+  assert.match(html, /\.spa-dark\s*\{/, 'the dark class sets the dark colours')
 })
