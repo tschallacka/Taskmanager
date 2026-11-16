@@ -3,6 +3,10 @@
 // gave up. Now an outage is waited out: 60 s, doubling, capped at 5 min, forever, reported once on stderr. A 4xx is a
 // fault and is thrown at once. The status file the platform may publish (STATUS_PATH) only adds a reason and a
 // retry_after; it is never trusted beyond waiting, and its absence means plain backoff.
+//
+// Two limits to keep in mind. The helper is generic: a write sent through it can run twice after a 502 or a reset, so
+// use it for reads, or make the write idempotent first (the listener only reads today). And a 5xx is retried forever by
+// design: a 500 caused by one bad request loops silently after its one line.
 
 export const STATUS_PATH = '/.well-known/blaze-status.json'
 const FIRST_WAIT_MS = 60_000
