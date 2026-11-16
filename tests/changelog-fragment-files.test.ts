@@ -10,7 +10,8 @@ import { join } from 'node:path'
 const ROOT = process.cwd()
 const FOLDER = join(ROOT, 'changelog.d')
 
-const fragments = readdirSync(FOLDER).filter(name => name.endsWith('.md')).sort()
+// The folder is absent when no fragment is pending (a release folds them away): then there is nothing to check.
+const fragments = existsSync(FOLDER) ? readdirSync(FOLDER).filter(name => name.endsWith('.md')).sort() : []
 
 for (const name of fragments) {
   const text = readFileSync(join(FOLDER, name), 'utf8')
