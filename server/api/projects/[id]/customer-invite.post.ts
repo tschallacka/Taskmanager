@@ -41,8 +41,6 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'Choose a customer of this project\'s team.' })
   }
 
-  await db.update(projects).set({ customerId: customer.id }).where(eq(projects.id, project.id))
-
   const { token, tokenHash } = newInvitationToken()
   const now = Date.now()
   const [invitation] = await db.insert(customerInvitations).values({
@@ -55,6 +53,9 @@ export default defineEventHandler(async (event) => {
     createdAt: now,
     expiresAt: now + INVITATION_TTL_MS
   }).returning()
+
+  // Filed only after the invitation is written, so a failed invitation leaves the project where it was (Nina's S1).
+  await db.update(projects).set({ customerId: customer.id }).where(eq(projects.id, project.id))
 
   const origin = process.env.BETTER_AUTH_URL || getRequestURL(event).origin
   return {

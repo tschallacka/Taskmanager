@@ -106,23 +106,23 @@ async function accept() {
 </script>
 
 <template>
-  <div class="flex items-center justify-center min-h-screen bg-zinc-950">
-    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 w-full max-w-sm space-y-6 shadow-xl">
+  <div class="flex items-center justify-center min-h-screen bg-default px-4">
+    <div class="bg-elevated border border-default rounded-2xl p-8 w-full max-w-sm space-y-6 shadow-xl">
       <div class="text-center space-y-2">
         <AppLogo class="text-2xl mx-auto block" />
-        <h1 class="text-xl font-semibold text-white">
+        <h1 class="text-xl font-semibold text-default">
           {{ words ? words.headline : "You're invited" }}
         </h1>
         <p
           v-if="invitation"
-          class="text-sm text-zinc-400"
+          class="text-sm text-muted"
         >
           <template v-if="words">
             {{ words.sentence }}
           </template>
           <template v-else-if="invitation.kind === 'customer'">
             {{ invitation.organizationName }} invited you to follow the projects of
-            <span class="text-zinc-200 font-medium">{{ invitation.customerName }}</span>.
+            <span class="text-default font-medium">{{ invitation.customerName }}</span>.
           </template>
         </p>
       </div>
@@ -133,7 +133,7 @@ async function accept() {
       >
         <UIcon
           name="i-lucide-loader-2"
-          class="size-5 animate-spin text-zinc-500"
+          class="size-5 animate-spin text-dimmed"
         />
       </div>
 
@@ -147,13 +147,13 @@ async function accept() {
       <template v-else-if="invitation">
         <p
           v-if="shareText"
-          class="text-sm text-zinc-400 text-center"
+          class="text-sm text-muted text-center"
         >
           {{ shareText }}
         </p>
         <template v-if="session">
-          <p class="text-sm text-zinc-400 text-center">
-            Signed in as <span class="text-zinc-200">{{ session.user.email }}</span>.
+          <p class="text-sm text-muted text-center">
+            Signed in as <span class="text-default">{{ session.user.email }}</span>.
           </p>
           <UAlert
             v-if="invitation.kind !== 'customer' && invitation.forYou === false"
@@ -191,15 +191,15 @@ async function accept() {
         <template v-else>
           <p
             v-if="invitation.kind !== 'customer'"
-            class="text-sm text-zinc-400 text-center"
+            class="text-sm text-muted text-center"
           >
             Use the email address this invitation was sent to. Anyone else cannot use it.
           </p>
           <p
             v-if="invitation.email"
-            class="text-sm text-zinc-400 text-center"
+            class="text-sm text-muted text-center"
           >
-            This invitation is for <span class="text-zinc-200">{{ invitation.email }}</span>.
+            This invitation is for <span class="text-default">{{ invitation.email }}</span>.
           </p>
           <UButton
             block
@@ -209,7 +209,7 @@ async function accept() {
           >
             {{ words ? words.button : 'Create an account' }}
           </UButton>
-          <p class="text-sm text-zinc-400 text-center">
+          <p class="text-sm text-muted text-center">
             Already have an account?
             <NuxtLink
               :to="links.signIn"

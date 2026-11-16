@@ -28,8 +28,8 @@ export default defineNuxtConfig({
 
   css: ['~/assets/css/main.css'],
 
-  // Dark is the default; someone who chose light or system keeps that choice in their browser.
-  colorMode: { preference: 'dark' },
+  // System is the default, so a new visitor follows their device; someone who chose dark or light keeps that choice in their browser.
+  colorMode: { preference: 'system' },
   runtimeConfig: {
     public: {
       discordEnabled: false,

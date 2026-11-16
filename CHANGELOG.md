@@ -2,6 +2,14 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.39.2 - 2026-11-16
+
+- **Invite follow-ups: System by default, and no "Personal Workspace" while the team loads.** A visitor with no stored choice gets System, not a fixed dark theme; a stored choice is kept. The workspace switcher shows "Loading workspace" while the active team loads, so a team member who lands in the team sees a label that agrees with the team's boards. The invitation page uses the theme colours, so a new visitor on a light system sees it light. Files: `nuxt.config.ts`, `app/components/TeamSwitcher.vue`, `app/utils/workspaceLabel.ts`, `app/pages/invite/[token].vue`, `tests/color-mode-default.test.ts`, `tests/team-switcher-label.test.ts`, `tests/invite-page-theme.test.ts`.
+
+## 0.39.1 - 2026-11-16
+
+- Invited people land on their shared work: a customer whose board was shared to their email now opens that board (or the shared list) after accepting the customer invitation, the sidebar lists each shared project once, and a person who cannot create projects no longer sees "No projects yet. Create one" or a New project button.
+
 ## 0.39.0 - 2026-11-16
 
 - **Agents get the public link of a customer-visible task.** When a board is shared (its public link is on and not expired), get_task answers a customer-visible task with `publicUrl`: the board's public page, for a key whose owner may share the board (a project admin or a manager guest). The public page shows the board's cards, not one task, so the link opens the board. Staff keys only. Files: `server/utils/mcpBoardTools.ts`, `server/utils/shareLinks.ts`, `tests/mcp-share-links.test.ts`.
