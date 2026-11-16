@@ -4,6 +4,21 @@ import { member, projectGuestInvitations, projectGuests, projects } from '../db/
 import { genId } from './projects'
 import { invitesToClaim } from './pendingInviteRules'
 
+/** How many open board invitations to these addresses could be claimed now (read only: the invite page counts them). */
+export async function pendingBoardCountFor(addresses: string[], now: number): Promise<number> {
+  if (!addresses.length) return 0
+  const lowered = addresses.map(address => address.toLowerCase())
+  const rows = await db
+    .select({ id: projectGuestInvitations.id })
+    .from(projectGuestInvitations)
+    .where(and(
+      eq(projectGuestInvitations.status, 'open'),
+      gt(projectGuestInvitations.expiresAt, now),
+      inArray(sql`lower(${projectGuestInvitations.email})`, lowered)
+    ))
+  return rows.length
+}
+
 // The owner's rule: one email can be invited to several boards, and a follow-up invitation to an account that already
 // exists is accepted by itself. So every open board invitation sent to one of the account's addresses is claimed here,
 // when the account accepts a customer invitation or signs in as an invited person.
