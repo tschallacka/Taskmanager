@@ -61,6 +61,21 @@ test('a team owner is refused, and the team is named; nothing is removed', async
   assert.ok(still, 'the account is still there')
 })
 
+test('a refused deletion removes nothing of the person: their personal board and comment stay', async () => {
+  // The owner has a personal board and a team board, and a membership: a refused deletion leaves all of them.
+  const personal = id('owner-personal-board')
+  await db.insert(schema.projects).values({ id: personal, userId: ownerOfTeam, teamId: null, name: 'Refused personal', createdAt: Date.now(), updatedAt: Date.now() })
+  try {
+    await assert.rejects(deleteAccount(ownerOfTeam))
+    const [board] = await db.select().from(schema.projects).where(eq(schema.projects.id, personal))
+    assert.equal(board?.userId, ownerOfTeam, 'the personal board is still the person\'s')
+    const [membership] = await db.select().from(member).where(eq(member.userId, ownerOfTeam))
+    assert.ok(membership, 'the membership stays')
+  } finally {
+    await db.delete(schema.projects).where(eq(schema.projects.id, personal))
+  }
+})
+
 test('an admin of a team, but not its owner, is not refused by the owner rule', async () => {
   assert.equal(await accountRefusal(handedOver), null)
   // A person who was an owner and was handed the team over: after the hand-over there is nothing to refuse.
