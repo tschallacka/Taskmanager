@@ -36,6 +36,13 @@ The core of it. Most agents need nothing else.
   card, for the team only.
 <!-- /requires -->
 
+## Links to share
+
+A board, a task and an update come back with a `url` field: the link to share with a person. It opens the board, the
+task or the update in the app, on this instance. A link to a trashed task opens its board instead, where
+`restore_task` brings it back. The staff's links are given to staff keys only; a customer's key gets none. The
+descriptions of these tools say the same.
+
 ## Task updates
 
 A task has a thread of short updates.

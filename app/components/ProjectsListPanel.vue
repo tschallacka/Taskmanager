@@ -5,13 +5,22 @@ import type { PinnedBoard } from '~/composables/usePins'
 import { crewUpdatePrompt } from '~/utils/crewUpdatePrompt'
 import { taskCountLabel } from '#shared/utils/board'
 import { crewTreeRows } from '~/utils/crewTreeRows'
+import { mayCreateProjects, panelListsProject } from '~/utils/sidebarAccess'
 import { countOpenTasks, healthTint, kindIcon, projectKind } from '~/utils/projectKind'
 
 const { ready, projects, allTasks, deleteProject, renameProject } = useProjects()
 const route = useRoute()
 const { unread: inboxUnread } = useNotifications()
 const { pins, pinsLoaded, loadPins, isPinned, pinBoard, unpinBoard } = usePins()
-const { activeTeamId } = useTeams()
+const { activeTeamId, teams, isPending: teamsPending } = useTeams()
+
+// A customer contact or guest sees the projects shared with them in their own group (AppSidebar), so the PROJECTS list
+// leaves them out for a person with no team: each shared project is listed once. Like the sidebar, nothing is hidden
+// while the teams load.
+const { data: sharedData } = useFetch<{ groups: { projects: { id: string }[] }[], contact: boolean }>('/api/shared-with-me', { key: 'shared-with-me', server: false, lazy: true })
+const sharedIds = computed(() => new Set((sharedData.value?.groups ?? []).flatMap(group => group.projects.map(project => project.id))))
+const listedProjects = computed(() => projects.value.filter(project => panelListsProject({ teamCount: teams.value.length, sharedIds: sharedIds.value, teamsPending: teamsPending.value }, project.id)))
+const mayCreate = computed(() => mayCreateProjects({ teamCount: teams.value.length, contact: sharedData.value?.contact ?? false, teamsPending: teamsPending.value }))
 const { switchWorkspace } = useWorkspace()
 const toast = useToast()
 
@@ -57,7 +66,7 @@ function toggleTree(id: string) {
 
 // A shadow board nests under its real board when that board is in the list; otherwise it stays a top-level row.
 // The arrow and the nested rows come from the same computation (app/utils/crewTreeRows.ts).
-const treeRows = computed(() => crewTreeRows(projects.value, openTrees.value))
+const treeRows = computed(() => crewTreeRows(listedProjects.value, openTrees.value))
 
 // A shadow board nested under its real board reads "Real board › crew: Crew name"; the crew's home board is named as is.
 function boardLabel(project: Project) {
@@ -376,6 +385,7 @@ function menuItems(project: Project) {
     <div class="flex items-center justify-between px-2 pb-1">
       <span class="text-xs font-semibold uppercase tracking-wider text-dimmed">Projects</span>
       <UButton
+        v-if="mayCreate"
         icon="i-lucide-plus"
         size="xs"
         color="neutral"
@@ -386,7 +396,7 @@ function menuItems(project: Project) {
     </div>
 
     <p
-      v-if="ready && projects.length === 0"
+      v-if="ready && projects.length === 0 && mayCreate"
       class="px-2 py-3 text-xs text-dimmed"
     >
       No projects yet.

@@ -1,11 +1,23 @@
 <script setup lang="ts">
 import { healthTint, kindIcon } from '~/utils/projectKind'
+import { sidebarAccess } from '~/utils/sidebarAccess'
 
 const props = withDefaults(defineProps<{ collapsed?: boolean }>(), { collapsed: false })
 const emit = defineEmits<{ 'close': [], 'toggle-rail': [] }>()
 const searchOpen = useSearchModal()
 const { session, signOut, isInstanceAdmin } = useAuth()
 const colorMode = useColorMode()
+const { teams, isPending: teamsPending } = useTeams()
+
+// The projects shared with a customer contact, by organisation. Team items show only for a team member.
+type SharedGroup = { label: string, projects: { id: string, name: string }[] }
+const { data: sharedData } = useFetch<{ groups: SharedGroup[] }>('/api/shared-with-me', { key: 'shared-with-me', server: false, lazy: true })
+const access = computed(() => sidebarAccess({
+  teamCount: teams.value.length,
+  sharedGroups: (sharedData.value?.groups ?? []).map(group => ({ organizationName: group.label, projects: group.projects }))
+}))
+// While the teams load, the team items stay, so a member does not see them vanish and come back.
+const showTeamItems = computed(() => teamsPending.value || access.value.teamItems)
 
 // The three-way Appearance row: System, Dark, Light. The current choice shows a tick.
 const APPEARANCE = [
@@ -258,7 +270,28 @@ watch(() => route.path, () => emit('close'))
           />
         </section>
 
+        <!-- Keyed by position and name: two groups can share a name (a customer and a guest team), never a key. -->
         <section
+          v-for="(group, index) in access.groups"
+          :key="`${index}:${group.label}`"
+          class="mt-3 space-y-0.5"
+          :aria-label="group.label"
+        >
+          <h2 class="px-2 pb-1 text-xs font-medium uppercase tracking-wide text-muted">
+            {{ group.label }}
+          </h2>
+          <NuxtLink
+            v-for="project in group.projects"
+            :key="project.id"
+            :to="`/projects/${project.id}`"
+            class="block truncate rounded-md px-2 py-1.5 text-sm text-default hover:bg-elevated"
+          >
+            {{ project.name }}
+          </NuxtLink>
+        </section>
+
+        <section
+          v-if="showTeamItems"
           class="mt-3 space-y-0.5"
           aria-label="Team"
         >
@@ -280,7 +313,7 @@ watch(() => route.path, () => emit('close'))
       </div>
 
       <div class="shrink-0 space-y-1.5 border-t border-default p-2">
-        <TeamSwitcher />
+        <TeamSwitcher v-if="showTeamItems" />
         <UDropdownMenu
           :items="accountItems"
           :content="{ align: 'start', collisionPadding: 12 }"
