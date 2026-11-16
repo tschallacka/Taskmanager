@@ -6,6 +6,7 @@ import { crewUpdatePrompt } from '~/utils/crewUpdatePrompt'
 import { taskCountLabel } from '#shared/utils/board'
 import { crewTreeRows } from '~/utils/crewTreeRows'
 import { mayCreateProjects, panelListsProject } from '~/utils/sidebarAccess'
+import { teamToOpenFor } from '~/utils/teamEntry'
 import { countOpenTasks, healthTint, kindIcon, projectKind } from '~/utils/projectKind'
 
 const { ready, projects, allTasks, deleteProject, renameProject } = useProjects()
@@ -21,6 +22,9 @@ const { data: sharedData } = useFetch<{ groups: { projects: { id: string }[] }[]
 const sharedIds = computed(() => new Set((sharedData.value?.groups ?? []).flatMap(group => group.projects.map(project => project.id))))
 const listedProjects = computed(() => projects.value.filter(project => panelListsProject({ teamCount: teams.value.length, sharedIds: sharedIds.value, teamsPending: teamsPending.value }, project.id)))
 const mayCreate = computed(() => mayCreateProjects({ teamCount: teams.value.length, contact: sharedData.value?.contact ?? false, teamsPending: teamsPending.value }))
+// A person who signs in again in a new browser starts in the personal workspace; the projects page then opens their team (and reloads).
+// Until that happens the list is empty for them, so the empty line waits.
+const openingTeam = computed(() => teamToOpenFor({ asksNew: false, hasProjects: projects.value.length > 0, activeTeamId: activeTeamId.value, teamIds: teams.value.map(team => team.id) }) !== null)
 const { switchWorkspace } = useWorkspace()
 const toast = useToast()
 
@@ -396,7 +400,7 @@ function menuItems(project: Project) {
     </div>
 
     <p
-      v-if="ready && projects.length === 0 && mayCreate && !teamsPending"
+      v-if="ready && projects.length === 0 && mayCreate && !teamsPending && !openingTeam"
       class="px-2 py-3 text-xs text-dimmed"
     >
       No projects yet.
