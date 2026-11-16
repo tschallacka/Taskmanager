@@ -29,6 +29,7 @@ export default defineEventHandler(async (event) => {
         .select({
           id: customerInvitations.id,
           label: customerInvitations.label,
+          email: customerInvitations.email,
           createdAt: customerInvitations.createdAt,
           expiresAt: customerInvitations.expiresAt
         })
