@@ -6,7 +6,8 @@ import { CHART_TEMPLATE, MERMAID_TEMPLATE } from '~/utils/chart'
 import { transformActions } from '~/composables/useAi'
 import { useEditorAi } from '~/composables/useEditorAi'
 import { createContentExtensions } from '~/utils/editor/extensions'
-import { SmartClipboard, imageFiles, insertImages } from '~/utils/editor/clipboard'
+import { SmartClipboard, imageFiles, insertImages, type ImageUploader } from '~/utils/editor/clipboard'
+import { ImagePlaceholderMark } from '~/utils/editor/imagePlaceholderMark'
 import { BlockShortcuts } from '~/utils/editor/blocks'
 import { AiPendingDecoration, BlurredSelection, HashtagHighlight } from '~/utils/editor/decorations'
 import {
@@ -42,7 +43,7 @@ import EditorAiPrompt from '~/components/editor/EditorAiPrompt.vue'
 const props = defineProps<{
   modelValue: string
   placeholder?: string
-  uploadImage?: (file: File) => Promise<string | null>
+  uploadImage?: ImageUploader
   toolbarOnFocus?: boolean
 }>()
 
@@ -165,6 +166,7 @@ const SlashTablePickerKeys = Extension.create({
 
 const extensions = [
   ...createContentExtensions({ editable: true }),
+  ImagePlaceholderMark,
   SmartClipboard.configure({ getUploader: () => props.uploadImage }),
   BlockShortcuts.configure({ onLink: editLink }),
   HashtagHighlight,

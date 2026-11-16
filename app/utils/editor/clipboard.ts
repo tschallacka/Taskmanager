@@ -3,6 +3,7 @@ import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { DOMParser as ProseMirrorDOMParser, DOMSerializer, Slice, type Fragment } from '@tiptap/pm/model'
 import type { EditorView } from '@tiptap/pm/view'
 import { convertTaskLists, htmlToMarkdown, markdownToHtml } from '~/utils/markdown'
+import { insertPlaceholders, settleWithError, settleWithImage, updatePlaceholder } from './imagePlaceholderMark'
 
 // Everything that crosses the clipboard. Going in, the editor takes whatever it
 // is handed and makes the best document of it: formatted HTML stays formatted,
@@ -11,7 +12,8 @@ import { convertTaskLists, htmlToMarkdown, markdownToHtml } from '~/utils/markdo
 // plain-text side of a copy is Markdown, so a description pastes cleanly into
 // a terminal, a commit message or another Markdown tool.
 
-export type ImageUploader = (file: File) => Promise<string | null>
+// The uploader reports progress (null when the stack gives only start and finish), and fails by rejecting with the reason.
+export type ImageUploader = (file: File, onProgress?: (progress: number | null) => void) => Promise<string | null>
 
 export interface SmartClipboardOptions {
   // A getter, because the uploader is a component prop and may change.
@@ -133,13 +135,31 @@ function pasteCodeBlock(editor: Editor, text: string, language: string) {
   }).run()
 }
 
+// Each image gets its placeholder at once, at the cursor (or where it was dropped), so a slow upload is never a silent wait.
+// The upload reports its progress into the placeholder; a finished one becomes the image, a failed one a visible line with the reason.
 export async function insertImages(editor: Editor, files: File[], upload: ImageUploader, position?: number) {
-  const urls = await Promise.all(files.map(file => upload(file)))
-  if (editor.isDestroyed) return
-  const images = urls.filter((url): url is string => !!url).map(src => ({ type: 'image', attrs: { src } }))
-  if (!images.length) return
   const at = Math.min(position ?? editor.state.selection.from, editor.state.doc.content.size)
-  editor.chain().focus().insertContentAt(at, images).run()
+  const ids = files.map(() => newPlaceholderId())
+  insertPlaceholders(editor, at, ids)
+  await Promise.all(files.map(async (file, i) => {
+    const id = ids[i]!
+    try {
+      const url = await upload(file, progress => updatePlaceholder(editor, { id, state: 'pending', progress }))
+      if (!url) throw new Error('The upload did not return an address')
+      settleWithImage(editor, id, url)
+    } catch (e) {
+      settleWithError(editor, id, reasonOf(e))
+    }
+  }))
+}
+
+function newPlaceholderId(): string {
+  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
+}
+
+function reasonOf(error: unknown): string {
+  const message = (error as { data?: { message?: string }, message?: string })?.data?.message ?? (error as Error)?.message
+  return message || 'unknown error'
 }
 
 export function imageFiles(data: DataTransfer | null | undefined): File[] {
