@@ -10,5 +10,6 @@ test('a failed first load does not mark the project list ready with an empty lis
   const plugin = read('app/plugins/init-projects.client.ts')
   const catchBlock = plugin.slice(plugin.indexOf('} catch {'), plugin.indexOf('} catch {') + 600)
   assert.doesNotMatch(catchBlock, /initProjectsStore\(\[\], \[\]/, 'the catch must not set the store ready with no projects')
-  assert.match(catchBlock, /await useProjects\(\)\.load\(\)\.catch/, 'the catch tries the list once more through the store, and leaves it not ready if that fails too')
+  assert.match(plugin, /loadInitialProjects\(/, 'the plugin loads through loadInitialProjects, which retries once and initialises the store with the full answer')
+  assert.doesNotMatch(catchBlock, /useProjects\(\)\.load\(\)/, 'the catch no longer calls load(), which left the search index unset')
 })
