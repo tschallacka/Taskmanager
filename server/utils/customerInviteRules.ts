@@ -9,8 +9,12 @@ export interface TiedCustomerInvite {
 }
 
 export function customerInvitesToClaim(rows: TiedCustomerInvite[], addresses: string[], now: number): string[] {
+  return rows.filter(row => tiedInviteIsAcceptable(row, addresses, now)).map(row => row.id)
+}
+
+/** One link, for the accept by id: open, unexpired, tied to one of the account's addresses. */
+export function tiedInviteIsAcceptable(row: TiedCustomerInvite, addresses: string[], now: number): boolean {
+  if (row.email === null || row.acceptedAt !== null || row.expiresAt <= now) return false
   const mine = new Set(addresses.map(address => address.toLowerCase()))
-  return rows
-    .filter(row => row.email !== null && row.acceptedAt === null && row.expiresAt > now && mine.has(row.email.toLowerCase()))
-    .map(row => row.id)
+  return mine.has(row.email.toLowerCase())
 }

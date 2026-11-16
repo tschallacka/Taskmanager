@@ -5,7 +5,16 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { customerInvitesToClaim } from '../server/utils/customerInviteRules'
+import { customerInvitesToClaim, tiedInviteIsAcceptable } from '../server/utils/customerInviteRules'
+
+test('the later-sign-in accept takes only an open, unexpired link tied to one of the account addresses', () => {
+  const row = { id: 'c1', email: 'ada@example.com', acceptedAt: null, expiresAt: later }
+  assert.equal(tiedInviteIsAcceptable(row, ['ada@example.com'], now), true)
+  assert.equal(tiedInviteIsAcceptable(row, ['other@example.com'], now), false)
+  assert.equal(tiedInviteIsAcceptable({ ...row, acceptedAt: now - 1 }, ['ada@example.com'], now), false)
+  assert.equal(tiedInviteIsAcceptable({ ...row, expiresAt: earlier }, ['ada@example.com'], now), false)
+  assert.equal(tiedInviteIsAcceptable({ ...row, email: null }, ['ada@example.com'], now), false)
+})
 
 const now = Date.parse('2026-11-16T10:00:00Z')
 const later = now + 60_000
