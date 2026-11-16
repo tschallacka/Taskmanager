@@ -21,6 +21,7 @@ import { collectActivity, listenerRunning, newActivityLines, readLoad } from './
 import { projectsRoot, readWorkerRows, workerStates } from './susy-workers.mjs'
 import { markMailed, sessionErrorReport } from './session-errors.mjs'
 import { planGateRound, settleGateMail } from './susy-gate-wakes.mjs'
+import { offerRound } from './susy-next-card.mjs'
 
 export const TICK_SECONDS = 60
 
@@ -169,6 +170,16 @@ export async function runOnce(home, now = Date.now(), { live = false } = {}) {
     result.state.owed = gate.owed
     lines.push(...gate.lines)
   }
+  // Phase 3, the next card by mail (card mwf201blsqvx3jczev): an idle worker is offered the next card of the queue. The kill
+  // switch is crew.json susy.dispatch.nextCard. The dry-run line is logged once, not on every tick it holds.
+  const offer = result.ok
+    ? offerRound({ cards: result.cards, keyOf: keyOfName(crew?.people), live, enabled: crew?.susy?.dispatch?.nextCard === true })
+    : null
+  if (offer) {
+    const seen = new Set(result.state.offerLines ?? [])
+    lines.push(...offer.lines.filter(line => !seen.has(line)))
+    result.state.offerLines = offer.lines
+  }
   if (live) {
     for (const item of errors.pending) {
       try {
@@ -191,6 +202,23 @@ export async function runOnce(home, now = Date.now(), { live = false } = {}) {
         lines.push(`mailed ${mail.to}: gate wake for ${mail.cardId}`)
       } catch (error) {
         lines.push(`could not mail ${mail.to} about ${mail.cardId}, tried again next tick: ${error.message}`)
+      }
+    }
+    // Next card by mail: the marker goes on the card first; the mail follows only when the marker is posted. A card whose
+    // marker was posted is not offered again, so a failed mail after it is logged, not retried.
+    for (const o of offer?.offers ?? []) {
+      try {
+        await call('post_task_update', { id: o.cardId, body: o.marker, visibility: 'internal' })
+      } catch (error) {
+        lines.push(`could not write the offer marker on ${o.cardId}, no mail to ${o.to}: ${error.message}`)
+        continue
+      }
+      try {
+        const { sendMail } = await import('./mail-client.mjs')
+        await sendMail({ base: creds.base, slug: creds.crew?.slug, key, to: o.to, text: o.text, mailboxDir: `${home}/mailbox`, makeId: () => crypto.randomUUID().replaceAll('-', '') })
+        lines.push(`offered ${o.to}: card ${o.cardId}`)
+      } catch (error) {
+        lines.push(`marked ${o.cardId} for ${o.to}, but the mail failed (not retried): ${error.message}`)
       }
     }
     if (result.mailBoss && key && creds.crew?.slug) {
