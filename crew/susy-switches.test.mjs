@@ -4,7 +4,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
-const read = (path) => readFileSync(new URL(`./${path}`, import.meta.url), 'utf8')
+const read = path => readFileSync(new URL(`./${path}`, import.meta.url), 'utf8')
 const SWITCHES = ['gateWakes', 'nextCard', 'reviewNeeds']
 
 test('the charter names each dispatch switch, as susy.dispatch.<name>', () => {
