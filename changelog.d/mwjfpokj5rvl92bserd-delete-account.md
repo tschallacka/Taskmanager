@@ -1,0 +1,1 @@
+- **Delete my account: the rules for every column that holds a person's user id.** Each such column is decided in one rule table (delete, keep as "Deleted user", or clear), and a test fails when a new user column has no rule. The deletion itself and the settings button come in later commits. Files: `server/utils/accountRules.ts`, `tests/account-deletion-coverage.test.ts`.
