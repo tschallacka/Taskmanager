@@ -93,7 +93,7 @@ async function accept() {
 </script>
 
 <template>
-  <div class="flex items-center justify-center min-h-screen bg-default">
+  <div class="flex items-center justify-center min-h-screen bg-default px-4">
     <div class="bg-elevated border border-default rounded-2xl p-8 w-full max-w-sm space-y-6 shadow-xl">
       <div class="text-center space-y-2">
         <AppLogo class="text-2xl mx-auto block" />

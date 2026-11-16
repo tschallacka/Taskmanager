@@ -15,6 +15,10 @@ test('the invitation page template has no fixed dark palette classes', () => {
   assert.doesNotMatch(template, /\bbg-black\b/)
 })
 
+test('the page keeps a side gutter at phone width', () => {
+  assert.match(template, /class="[^"]*\bbg-default\b[^"]*\bpx-4\b[^"]*"/)
+})
+
 test('the page background and card use the theme tokens', () => {
   assert.match(template, /class="[^"]*\bbg-default\b[^"]*"/)
   assert.match(template, /class="[^"]*\bbg-elevated\b[^"]*\bborder-default\b[^"]*"/)
