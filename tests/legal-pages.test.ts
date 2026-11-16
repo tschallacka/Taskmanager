@@ -23,6 +23,16 @@ test('the documents are bundled into the server build, like the help pages', () 
   assert.match(config, /\.\/legal/)
 })
 
+test('the archive is served by its own API routes, and the archive pages exist for both documents', () => {
+  assert.match(read('server/api/legal/[doc]/archive.get.ts'), /archiveList\(/)
+  assert.match(read('server/api/legal/[doc]/archive/[version].get.ts'), /archivedVersion\(/)
+  for (const doc of ['privacy', 'imprint']) {
+    assert.match(read(`app/pages/${doc}/archive/index.vue`), /LegalArchivePage/)
+    assert.match(read(`app/pages/${doc}/archive/[version].vue`), /LegalDocumentPage/)
+  }
+  assert.match(read('app/components/LegalArchivePage.vue'), /\/archive/)
+})
+
 // One component draws either document; each page names its document.
 test('the shared legal page reads its document from the API and shows the version and dates at the top', () => {
   const vue = read('app/components/LegalDocumentPage.vue')
@@ -35,7 +45,7 @@ test('the shared legal page reads its document from the API and shows the versio
 
 for (const [page, document] of [['privacy', 'privacy'], ['imprint', 'imprint']] as const) {
   test(`/${page} is the ${document} document, with no sign-in needed`, () => {
-    const vue = read(`app/pages/${page}.vue`)
+    const vue = read(`app/pages/${page}/index.vue`)
     assert.match(vue, new RegExp(`name="${document}"`))
     assert.match(vue, /LegalDocumentPage/)
     assert.match(vue, /middleware: \[\]/)
