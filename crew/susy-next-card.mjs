@@ -63,3 +63,16 @@ export function nextCardOffers({ cards, keyOf, at = new Date().toISOString(), wo
   }
   return { offers }
 }
+
+/**
+ * What one round does with the offers. Dry-run logs each offer and offers nothing. Live with the switch on
+ * (susy.dispatch.nextCard is true) returns the offers: the daemon writes each marker first and mails only after the
+ * marker is posted. Live with the switch off logs that and offers nothing. No cards (the board was not read): nothing.
+ */
+export function offerRound({ cards, keyOf, live = false, enabled = false, at }) {
+  if (!cards) return { offers: [], lines: [] }
+  const { offers } = nextCardOffers({ cards, keyOf, at })
+  if (!live) return { offers: [], lines: offers.map(o => `would offer ${o.to}: card ${o.cardId} "${o.title}"`) }
+  if (!enabled) return { offers: [], lines: offers.map(o => `next card off (susy.dispatch.nextCard is not true): would offer ${o.to} card ${o.cardId}`) }
+  return { offers, lines: [] }
+}

@@ -2,7 +2,7 @@
 // Fake boards only: no network, no mail, no board writes. Run: node --test crew/susy-next-card.test.mjs
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { nextCardOffers, offerMarkerOf, offerText } from './susy-next-card.mjs'
+import { nextCardOffers, offerMarkerOf, offerText, offerRound } from './susy-next-card.mjs'
 
 const KEYS = { 'Wade Worker': 'wade', 'Wick Worker': 'wick', 'Wren Worker': 'wren', 'Wynn Worker': 'wynn' }
 const keyOf = name => KEYS[name] ?? null
@@ -73,4 +73,29 @@ test('the marker and the mail carry the card and the one thing to do', () => {
   assert.equal(offerMarkerOf({ author: 'crew susy (agent)', body: offer.marker }), offer.to)
   assert.equal(offerMarkerOf({ author: 'crew wade (agent)', body: 'offered to wade' }), null)
   assert.match(offerText(card('c', 'To do', { title: 'T', description: 'First sentence. Second.' }), 'wade'), /First sentence\./)
+})
+
+// ---- the round: dry-run logs, live offers (the marker is written first by the daemon), kill switch ----
+
+test('dry-run logs each offer and offers nothing live', () => {
+  const out = offerRound({ cards: [card('a', 'To do')], keyOf, live: false, enabled: true })
+  assert.deepEqual(out.offers, [])
+  assert.match(out.lines[0], /^would offer wren: card a/)
+})
+
+test('live with the switch on: the offers are returned for the daemon to write and mail', () => {
+  const out = offerRound({ cards: [card('a', 'To do')], keyOf, live: true, enabled: true })
+  assert.equal(out.offers.length, 1)
+  assert.equal(out.offers[0].to, 'wren')
+  assert.match(out.offers[0].marker, /^Susy: offered to wren \| at /)
+})
+
+test('live with the switch off: nothing is offered, and a line says the switch is off', () => {
+  const out = offerRound({ cards: [card('a', 'To do')], keyOf, live: true, enabled: false })
+  assert.deepEqual(out.offers, [])
+  assert.match(out.lines[0], /next card off \(susy\.dispatch\.nextCard is not true\)/)
+})
+
+test('no board read (no cards): nothing happens', () => {
+  assert.deepEqual(offerRound({ cards: undefined, keyOf, live: true, enabled: true }), { offers: [], lines: [] })
 })
