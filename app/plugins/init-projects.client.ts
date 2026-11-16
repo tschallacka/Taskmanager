@@ -40,6 +40,8 @@ export default defineNuxtPlugin(async () => {
     ])
     initProjectsStore(projects, tasks, boardSearch)
   } catch {
-    initProjectsStore([], [], boardSearch)
+    // A failed first read must not look like an empty account ("No projects yet"). Try the list once more through the
+    // store; if that fails too, the store stays not ready and the page keeps its loading line.
+    await useProjects().load().catch(() => {})
   }
 })
