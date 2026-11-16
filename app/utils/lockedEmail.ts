@@ -9,6 +9,14 @@ export function inviteFormLink(token: string, mode: 'signin' | 'signup', email: 
   return email ? `${base}&email=${encodeURIComponent(email)}` : base
 }
 
+/** The sign-in and sign-up links of an invitation, with the address when it is tied to one (team, board or customer). */
+export function formLinksFor(token: string, email: string | null): { primary: string, signIn: string } {
+  return {
+    primary: inviteFormLink(token, 'signup', email),
+    signIn: inviteFormLink(token, 'signin', email)
+  }
+}
+
 /** The address from the query, trimmed, or '' when it is missing, repeated or malformed. */
 export function lockedEmailFromQuery(value: unknown): string {
   if (typeof value !== 'string') return ''

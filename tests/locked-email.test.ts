@@ -4,7 +4,18 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { lockedEmailFromQuery, inviteFormLink } from '../app/utils/lockedEmail'
+import { lockedEmailFromQuery, inviteFormLink, formLinksFor } from '../app/utils/lockedEmail'
+
+test('a team or board invitation tied to an address gets prefilled form links too', () => {
+  assert.deepEqual(formLinksFor('abc', 'ada@example.com'), {
+    primary: '/login?invite=abc&signup=1&email=ada%40example.com',
+    signIn: '/login?invite=abc&signin=1&email=ada%40example.com'
+  })
+})
+
+test('an anonymous link gets the plain form links', () => {
+  assert.deepEqual(formLinksFor('abc', null), { primary: '/login?invite=abc&signup=1', signIn: '/login?invite=abc&signin=1' })
+})
 
 test('the form link carries the token and, when the invitation has one, the address', () => {
   assert.equal(inviteFormLink('abc', 'signup', 'ada@example.com'), '/login?invite=abc&signup=1&email=ada%40example.com')

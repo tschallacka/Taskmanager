@@ -35,8 +35,9 @@ export default defineEventHandler(async (event) => {
     const session = await auth.api.getSession({ headers: event.headers }).catch(() => null)
     const forYou = session ? (await addressesOfUser(session.user.id)).includes(addressed.email) : null
     return addressed.kind === 'team'
-      ? { kind: 'team' as const, organizationName: addressed.organizationName, inviterName: addressed.inviterName, role: addressed.role, forYou }
-      : { kind: 'board' as const, projectName: addressed.projectName, organizationName: addressed.organizationName, inviterName: addressed.inviterName, role: addressed.role, forYou }
+      // The address is shown in full to whoever holds the link (approved by Boss), so the forms can prefill and lock it.
+      ? { kind: 'team' as const, organizationName: addressed.organizationName, inviterName: addressed.inviterName, role: addressed.role, forYou, email: addressed.email }
+      : { kind: 'board' as const, projectName: addressed.projectName, organizationName: addressed.organizationName, inviterName: addressed.inviterName, role: addressed.role, forYou, email: addressed.email }
   }
 
   const [row] = await db
