@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { realtimeHeaders } from '~/composables/useRealtime'
 import { errorMessage, untypedFetch } from '~/utils/untypedFetch'
+import { customerInviteInputError } from '#shared/utils/inviteEmail'
 
 // The Share control in a board's header: an avatar stack and a Share button that opens the dialog
 // where people are let onto the board. A project admin invites guests (editor or manager guest, and
@@ -75,6 +76,43 @@ async function loadListing() {
     staff.value = (await untypedFetch<{ people: StaffPerson[] }>(`${base.value}/members`).catch(() => ({ people: [] as StaffPerson[] }))).people
   }
 }
+
+// ─── Invite as a customer contact ──────────────────────────
+// The project is filed under a customer and an email invitation is made in one step (see
+// server/api/projects/[id]/customer-invite.post.ts). The input rule is tested in tests/project-customer-invite.test.ts.
+const { customers, refresh: refreshCustomers } = useCustomers()
+const customerChoice = ref('')
+const customerEmail = ref('')
+const customerError = ref('')
+const customerLink = ref('')
+const customerSending = ref(false)
+const customerItems = computed(() => (customers.value ?? []).map(customer => ({ label: customer.name, value: customer.id })))
+
+async function inviteCustomer() {
+  const problem = customerInviteInputError({ customerId: customerChoice.value, email: customerEmail.value })
+  if (problem) {
+    customerError.value = problem
+    return
+  }
+  customerSending.value = true
+  customerError.value = ''
+  try {
+    const answer = await untypedFetch<{ url: string }>(`${base.value}/customer-invite`, {
+      method: 'POST',
+      headers: realtimeHeaders(),
+      body: { customerId: customerChoice.value, email: customerEmail.value.trim() }
+    })
+    customerLink.value = answer.url
+    customerEmail.value = ''
+    await refreshCustomers()
+  } catch (e) {
+    customerError.value = errorMessage(e, 'Could not invite that person')
+  } finally {
+    customerSending.value = false
+  }
+}
+
+refreshCustomers().catch(() => {})
 
 // ─── Invite ────────────────────────────────────────────────
 
@@ -338,6 +376,55 @@ watch(open, (isOpen) => {
           class="space-y-6"
           data-share-dialog
         >
+          <section
+            class="space-y-2"
+            data-share-customer
+          >
+            <h3 class="text-sm font-semibold text-default">
+              Invite as a customer contact
+            </h3>
+            <p class="text-xs text-muted">
+              The project is filed under the customer, and the invitation is tied to the email. Nothing is sent: copy the link.
+            </p>
+            <form
+              class="space-y-2"
+              @submit.prevent="inviteCustomer"
+            >
+              <USelect
+                v-model="customerChoice"
+                :items="customerItems"
+                placeholder="Choose the customer"
+                class="w-full"
+              />
+              <UInput
+                v-model="customerEmail"
+                type="email"
+                placeholder="Email address of the person"
+                class="w-full"
+              />
+              <p
+                v-if="customerError"
+                class="text-xs text-error"
+              >
+                {{ customerError }}
+              </p>
+              <div
+                v-if="customerLink"
+                class="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 p-2"
+              >
+                <code class="min-w-0 flex-1 truncate text-[11px]">{{ customerLink }}</code>
+              </div>
+              <UButton
+                type="submit"
+                size="sm"
+                variant="soft"
+                :loading="customerSending"
+              >
+                File and create link
+              </UButton>
+            </form>
+          </section>
+
           <section class="space-y-2">
             <h3 class="flex items-center gap-1.5 text-sm font-semibold text-default">
               Invite with email
