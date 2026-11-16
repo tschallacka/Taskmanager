@@ -353,8 +353,10 @@ async function boardPublicUrl(board: Project, context: ApiKeyContext): Promise<s
   if (!(await findPublicProject(board.id))) return undefined
   try {
     await requireShareAuthority(board, context.userId)
-  } catch {
-    return undefined
+  } catch (error) {
+    // A caller who may not share gets no link (403). Anything else is a real failure, and it must show.
+    if ((error as { statusCode?: number }).statusCode === 403) return undefined
+    throw error
   }
   return publicBoardShareUrl(board.id)
 }

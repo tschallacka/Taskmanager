@@ -1,20 +1,31 @@
 // The links an agent hands to a person: the same paths the app's routes use (notifications.ts builds the task link the
 // Inbox shows, taskComments.ts the update link). One helper builds them for the MCP, the notifications and the REST
-// answers, so the three cannot drift apart. The origin is the instance's own, from BETTER_AUTH_URL.
+// answers, so the three cannot drift apart. The origin is the instance's own, from BETTER_AUTH_URL. Every absolute link
+// is the origin plus one of the path builders below; nothing else writes an app path.
 
 /** The origin of this instance, without a trailing slash. */
 export function shareOrigin(): string {
   return (process.env.BETTER_AUTH_URL || 'http://localhost:3000').replace(/\/$/, '')
 }
 
-/** The absolute link to a board. */
-export function boardShareUrl(boardId: string): string {
-  return `${shareOrigin()}/projects/${boardId}`
+/** The path of a board. */
+export function boardPath(boardId: string): string {
+  return `/projects/${boardId}`
 }
 
-/** The absolute link to a task: opens the task's panel on its board. */
-export function taskShareUrl(boardId: string, taskId: string): string {
-  return `${boardShareUrl(boardId)}?task=${taskId}`
+/** The path of a task: opens the task's panel on its board. */
+export function taskPath(boardId: string, taskId: string): string {
+  return `${boardPath(boardId)}?task=${taskId}`
+}
+
+/** The path of a conversation (a message thread on the board's messages view). */
+export function messagePath(boardId: string, messageId: string): string {
+  return `${boardPath(boardId)}?view=messages&message=${messageId}`
+}
+
+/** The path of one update of a task: opens the task at that update. */
+export function updatePath(boardId: string, taskId: string, updateId: string): string {
+  return `${taskPath(boardId, taskId)}&comment=${updateId}`
 }
 
 /**
@@ -26,6 +37,16 @@ export function openableTaskId(task: { id: string, parentTaskId?: string | null 
   return task.parentTaskId ?? task.id
 }
 
+/** The absolute link to a board. */
+export function boardShareUrl(boardId: string): string {
+  return `${shareOrigin()}${boardPath(boardId)}`
+}
+
+/** The absolute link to a task: opens the task's panel on its board. */
+export function taskShareUrl(boardId: string, taskId: string): string {
+  return `${shareOrigin()}${taskPath(boardId, taskId)}`
+}
+
 /** The absolute link to a shared board's public page (/public/project/<id>), the page a customer can open without a sign-in. */
 export function publicBoardShareUrl(boardId: string): string {
   return `${shareOrigin()}/public/project/${boardId}`
@@ -33,7 +54,7 @@ export function publicBoardShareUrl(boardId: string): string {
 
 /** The absolute link to a conversation (a message thread on the board's messages view). */
 export function messageShareUrl(boardId: string, messageId: string): string {
-  return `${boardShareUrl(boardId)}?view=messages&message=${messageId}`
+  return `${shareOrigin()}${messagePath(boardId, messageId)}`
 }
 
 /**
@@ -48,5 +69,5 @@ export function notificationShareUrl(boardId: string, target: { taskId?: string 
 
 /** The absolute link to one update of a task: opens the task at that update. */
 export function updateShareUrl(boardId: string, taskId: string, updateId: string): string {
-  return `${taskShareUrl(boardId, taskId)}&comment=${updateId}`
+  return `${shareOrigin()}${updatePath(boardId, taskId, updateId)}`
 }

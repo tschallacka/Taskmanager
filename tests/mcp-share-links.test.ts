@@ -13,7 +13,7 @@ const { db } = await import('../server/db')
 const schema = await import('../server/db/schema')
 const { apiKeys, customerMembers, customers, notifications, organization, projectGuests, projects, projectColumns, projectTasks, taskComments, user } = schema
 const { boardShareUrl, taskShareUrl, updateShareUrl } = await import('../server/utils/shareLinks')
-const { MCP_TOOLS } = await import('../server/utils/mcpRegistry')
+const { MCP_TOOLS, SHARE_LINK_TOOLS } = await import('../server/utils/mcpRegistry')
 
 const tag = randomBytes(4).toString('hex')
 const id = (name: string) => `tsl-${tag}-${name}`
@@ -43,6 +43,23 @@ const customerColumn = id('customer-column')
 const customerTask = `tslc${tag}`
 const origin = 'https://tasks.example.test'
 const saved = process.env.BETTER_AUTH_URL
+
+type Scope = 'boards:read' | 'boards:write'
+
+/** The context of an agent's key, as the MCP hands it to a tool: a staff key of the owner unless told otherwise. */
+function agentContext({ userId = owner, customerId = null, scopes = ['boards:read'] }: { userId?: string, customerId?: string | null, scopes?: Scope[] } = {}) {
+  return {
+    keyId: keyRow,
+    keyName: 'share test',
+    userId,
+    teamId: null,
+    customerId,
+    projectId: null,
+    scopes,
+    reach: { allBoards: true, workspaceTeamIds: [], boardIds: [] },
+    memberTeamIds: []
+  }
+}
 
 before(async () => {
   process.env.BETTER_AUTH_URL = origin
@@ -109,34 +126,13 @@ test('the origin has no trailing slash, and falls back to localhost without the 
 })
 
 test('get_task answers with the task\'s link to share', async () => {
-  const context = {
-    keyId: 'k',
-    keyName: 'k',
-    userId: owner,
-    teamId: null,
-    customerId: null,
-    projectId: null,
-    scopes: ['boards:read'] as ('boards:read' | 'boards:write')[],
-    reach: { allBoards: true, workspaceTeamIds: [], boardIds: [] },
-    memberTeamIds: []
-  }
   const tool = MCP_TOOLS.find(t => t.name === 'get_task')!
-  const answer = await tool.handler({ id: task }, context) as { url?: string }
+  const answer = await tool.handler({ id: task }, agentContext()) as { url?: string }
   assert.equal(answer.url, `${origin}/projects/${board}?task=${task}`)
 })
 
 test('create_task, update_task and move_task answer with the absolute link of the task they touched', async () => {
-  const context = {
-    keyId: 'k',
-    keyName: 'k',
-    userId: owner,
-    teamId: null,
-    customerId: null,
-    projectId: null,
-    scopes: ['boards:read', 'boards:write'] as ('boards:read' | 'boards:write')[],
-    reach: { allBoards: true, workspaceTeamIds: [], boardIds: [] },
-    memberTeamIds: []
-  }
+  const context = agentContext({ scopes: ['boards:read', 'boards:write'] })
   const created = await MCP_TOOLS.find(t => t.name === 'create_task')!.handler({ board, column: 'To do', title: 'Made by agent' }, context) as { task: { id: string, url?: string } }
   assert.equal(created.task.url, `${origin}/projects/${board}?task=${created.task.id}`)
   const updated = await MCP_TOOLS.find(t => t.name === 'update_task')!.handler({ id: created.task.id, title: 'Renamed' }, context) as { task: { url?: string } }
@@ -147,53 +143,21 @@ test('create_task, update_task and move_task answer with the absolute link of th
 })
 
 test('list_boards answers each board with its absolute link', async () => {
-  const context = {
-    keyId: 'k',
-    keyName: 'k',
-    userId: owner,
-    teamId: null,
-    customerId: null,
-    projectId: null,
-    scopes: ['boards:read'] as ('boards:read' | 'boards:write')[],
-    reach: { allBoards: true, workspaceTeamIds: [], boardIds: [] },
-    memberTeamIds: []
-  }
-  const answer = await MCP_TOOLS.find(t => t.name === 'list_boards')!.handler({}, context) as { boards: { id: string, url?: string }[] }
+  const answer = await MCP_TOOLS.find(t => t.name === 'list_boards')!.handler({}, agentContext()) as { boards: { id: string, url?: string }[] }
   const mine = answer.boards.find(b => b.id === board)
   assert.ok(mine, 'the test board is listed')
   assert.equal(mine.url, `${origin}/projects/${board}`)
 })
 
 test('post_task_update answers with the absolute link of the update, at that update', async () => {
-  const context = {
-    keyId: keyRow,
-    keyName: 'share test',
-    userId: owner,
-    teamId: null,
-    customerId: null,
-    projectId: null,
-    scopes: ['boards:read', 'boards:write'] as ('boards:read' | 'boards:write')[],
-    reach: { allBoards: true, workspaceTeamIds: [], boardIds: [] },
-    memberTeamIds: []
-  }
+  const context = agentContext({ scopes: ['boards:read', 'boards:write'] })
   const answer = await MCP_TOOLS.find(t => t.name === 'post_task_update')!.handler({ id: task, body: 'Link check' }, context) as { update: { id: string, url?: string } }
   assert.equal(answer.update.url, `${origin}/projects/${board}?task=${task}&comment=${answer.update.id}`)
   await db.delete(taskComments).where(eq(taskComments.id, answer.update.id))
 })
 
 test('list_notifications answers each notification with the link the Inbox opens: the task, or the board', async () => {
-  const context = {
-    keyId: 'k',
-    keyName: 'k',
-    userId: owner,
-    teamId: null,
-    customerId: null,
-    projectId: null,
-    scopes: ['boards:read'] as ('boards:read' | 'boards:write')[],
-    reach: { allBoards: true, workspaceTeamIds: [], boardIds: [] },
-    memberTeamIds: []
-  }
-  const answer = await MCP_TOOLS.find(t => t.name === 'list_notifications')!.handler({}, context) as { notifications: { id: string, url?: string }[] }
+  const answer = await MCP_TOOLS.find(t => t.name === 'list_notifications')!.handler({}, agentContext()) as { notifications: { id: string, url?: string }[] }
   const onTask = answer.notifications.find(n => n.id === notifyTask)
   const onBoard = answer.notifications.find(n => n.id === notifyBoard)
   assert.equal(onTask?.url, `${origin}/projects/${board}?task=${task}`)
@@ -201,18 +165,7 @@ test('list_notifications answers each notification with the link the Inbox opens
 })
 
 test('my_tasks answers each task, and each subtask\'s parent, with its absolute link', async () => {
-  const context = {
-    keyId: 'k',
-    keyName: 'k',
-    userId: owner,
-    teamId: null,
-    customerId: null,
-    projectId: null,
-    scopes: ['boards:read'] as ('boards:read' | 'boards:write')[],
-    reach: { allBoards: true, workspaceTeamIds: [], boardIds: [] },
-    memberTeamIds: []
-  }
-  const answer = await MCP_TOOLS.find(t => t.name === 'my_tasks')!.handler({}, context) as { tasks: { id: string, url?: string, parent?: { id: string, url?: string } }[] }
+  const answer = await MCP_TOOLS.find(t => t.name === 'my_tasks')!.handler({}, agentContext()) as { tasks: { id: string, url?: string, parent?: { id: string, url?: string } }[] }
   const mine = answer.tasks.find(t => t.id === task)
   const child = answer.tasks.find(t => t.id === subtask)
   assert.ok(mine && child, 'the task and its subtask are listed')
@@ -224,17 +177,7 @@ test('my_tasks answers each task, and each subtask\'s parent, with its absolute 
 })
 
 test('delete_task answers with the board\'s link (a trashed task has no page of its own); restore_task answers with the task\'s link', async () => {
-  const context = {
-    keyId: keyRow,
-    keyName: 'share test',
-    userId: owner,
-    teamId: null,
-    customerId: null,
-    projectId: null,
-    scopes: ['boards:read', 'boards:write'] as ('boards:read' | 'boards:write')[],
-    reach: { allBoards: true, workspaceTeamIds: [], boardIds: [] },
-    memberTeamIds: []
-  }
+  const context = agentContext({ scopes: ['boards:read', 'boards:write'] })
   const created = await MCP_TOOLS.find(t => t.name === 'create_task')!.handler({ board, column: 'To do', title: 'To trash and back' }, context) as { task: { id: string } }
   const trashed = await MCP_TOOLS.find(t => t.name === 'delete_task')!.handler({ id: created.task.id }, context) as { url?: string }
   assert.equal(trashed.url, `${origin}/projects/${board}`)
@@ -244,41 +187,21 @@ test('delete_task answers with the board\'s link (a trashed task has no page of 
 })
 
 test('delete_task_update answers with the link of the task the update was on', async () => {
-  const context = {
-    keyId: keyRow,
-    keyName: 'share test',
-    userId: owner,
-    teamId: null,
-    customerId: null,
-    projectId: null,
-    scopes: ['boards:read', 'boards:write'] as ('boards:read' | 'boards:write')[],
-    reach: { allBoards: true, workspaceTeamIds: [], boardIds: [] },
-    memberTeamIds: []
-  }
+  const context = agentContext({ scopes: ['boards:read', 'boards:write'] })
   const posted = await MCP_TOOLS.find(t => t.name === 'post_task_update')!.handler({ id: task, body: 'Delete me' }, context) as { update: { id: string } }
   const deleted = await MCP_TOOLS.find(t => t.name === 'delete_task_update')!.handler({ id: task, updateId: posted.update.id }, context) as { task: { url?: string } }
   assert.equal(deleted.task.url, `${origin}/projects/${board}?task=${task}`)
 })
 
 test('get_task_github answers with the task\'s absolute link', async () => {
-  const context = {
-    keyId: 'k',
-    keyName: 'k',
-    userId: owner,
-    teamId: null,
-    customerId: null,
-    projectId: null,
-    scopes: ['boards:read'] as ('boards:read' | 'boards:write')[],
-    reach: { allBoards: true, workspaceTeamIds: [], boardIds: [] },
-    memberTeamIds: []
-  }
-  const answer = await MCP_TOOLS.find(t => t.name === 'get_task_github')!.handler({ taskId: task }, context) as { task: string, url?: string }
+  const answer = await MCP_TOOLS.find(t => t.name === 'get_task_github')!.handler({ taskId: task }, agentContext()) as { task: string, url?: string }
   assert.equal(answer.task, task)
   assert.equal(answer.url, `${origin}/projects/${board}?task=${task}`)
 })
 
 test('every tool that answers with a task, board or update says in its description that url is the link to share', () => {
-  const linkTools = ['get_task', 'create_task', 'update_task', 'move_task', 'search_tasks', 'my_tasks', 'get_board', 'list_boards', 'post_task_update', 'edit_task_update', 'delete_task_update', 'delete_task', 'restore_task', 'list_notifications', 'get_task_github']
+  const linkTools = [...SHARE_LINK_TOOLS]
+  assert.equal(linkTools.length, 15, 'the registry lists the fifteen link tools')
   for (const name of linkTools) {
     const tool = MCP_TOOLS.find(t => t.name === name)
     assert.ok(tool, `${name} is a tool`)
@@ -296,17 +219,7 @@ test('the tools help page says which link an answer carries and that it is the o
 })
 
 test('a guest\'s key gets no staff link on another person\'s board: get_board, list_boards and post_task_update', async () => {
-  const context = {
-    keyId: keyRow,
-    keyName: 'share test',
-    userId: owner,
-    teamId: null,
-    customerId: null,
-    projectId: null,
-    scopes: ['boards:read', 'boards:write'] as ('boards:read' | 'boards:write')[],
-    reach: { allBoards: true, workspaceTeamIds: [], boardIds: [] },
-    memberTeamIds: []
-  }
+  const context = agentContext({ scopes: ['boards:read', 'boards:write'] })
   const shown = await MCP_TOOLS.find(t => t.name === 'get_board')!.handler({ board: otherBoard }, context) as { id: string, url?: string }
   assert.equal(shown.id, otherBoard)
   assert.equal(shown.url, undefined, 'get_board gives a guest no staff board link')
@@ -320,17 +233,7 @@ test('a guest\'s key gets no staff link on another person\'s board: get_board, l
 })
 
 test('a customer\'s key gets no staff link: get_board and get_task on the customer\'s board, read by the customer\'s contact', async () => {
-  const context = {
-    keyId: keyRow,
-    keyName: 'share test',
-    userId: contact,
-    teamId: null,
-    customerId: customer,
-    projectId: null,
-    scopes: ['boards:read'] as ('boards:read' | 'boards:write')[],
-    reach: { allBoards: true, workspaceTeamIds: [], boardIds: [] },
-    memberTeamIds: []
-  }
+  const context = agentContext({ userId: contact, customerId: customer })
   const shown = await MCP_TOOLS.find(t => t.name === 'get_board')!.handler({ board: customerBoard }, context) as { id: string, url?: string, columns: { tasks: { id: string, url?: string }[] }[] }
   assert.equal(shown.id, customerBoard)
   assert.equal(shown.url, undefined, 'get_board gives a customer\'s key no staff board link')
@@ -350,17 +253,7 @@ test('the e-mail and push link to a subtask opens its parent\'s panel, as the in
 })
 
 test('a customer-visible task on a shared board carries the board\'s public link (publicUrl); an internal task and a private board carry none', async () => {
-  const context = {
-    keyId: keyRow,
-    keyName: 'share test',
-    userId: owner,
-    teamId: null,
-    customerId: null,
-    projectId: null,
-    scopes: ['boards:read'] as ('boards:read' | 'boards:write')[],
-    reach: { allBoards: true, workspaceTeamIds: [], boardIds: [] },
-    memberTeamIds: []
-  }
+  const context = agentContext()
   const get = MCP_TOOLS.find(t => t.name === 'get_task')!
   await db.update(projects).set({ isPublic: true, publicUntil: null }).where(eq(projects.id, board))
   const shown = await get.handler({ id: publicTask }, context) as { publicUrl?: string }
@@ -373,17 +266,7 @@ test('a customer-visible task on a shared board carries the board\'s public link
 })
 
 test('the public link is on every task answer for a customer-visible task of a shared board: get_board and update_task', async () => {
-  const context = {
-    keyId: keyRow,
-    keyName: 'share test',
-    userId: owner,
-    teamId: null,
-    customerId: null,
-    projectId: null,
-    scopes: ['boards:read', 'boards:write'] as ('boards:read' | 'boards:write')[],
-    reach: { allBoards: true, workspaceTeamIds: [], boardIds: [] },
-    memberTeamIds: []
-  }
+  const context = agentContext({ scopes: ['boards:read', 'boards:write'] })
   await db.update(projects).set({ isPublic: true, publicUntil: null }).where(eq(projects.id, board))
   try {
     const shown = await MCP_TOOLS.find(t => t.name === 'get_board')!.handler({ board }, context) as { columns: { tasks: { id: string, publicUrl?: string }[] }[] }
@@ -400,34 +283,13 @@ test('the public link is on every task answer for a customer-visible task of a s
 })
 
 test('get_board answers with the board\'s absolute link', async () => {
-  const context = {
-    keyId: 'k',
-    keyName: 'k',
-    userId: owner,
-    teamId: null,
-    customerId: null,
-    projectId: null,
-    scopes: ['boards:read'] as ('boards:read' | 'boards:write')[],
-    reach: { allBoards: true, workspaceTeamIds: [], boardIds: [] },
-    memberTeamIds: []
-  }
-  const answer = await MCP_TOOLS.find(t => t.name === 'get_board')!.handler({ board }, context) as { id: string, url?: string }
+  const answer = await MCP_TOOLS.find(t => t.name === 'get_board')!.handler({ board }, agentContext()) as { id: string, url?: string }
   assert.equal(answer.id, board)
   assert.equal(answer.url, `${origin}/projects/${board}`)
 })
 
 test('edit_task_update answers with the absolute link of the edited update', async () => {
-  const context = {
-    keyId: keyRow,
-    keyName: 'share test',
-    userId: owner,
-    teamId: null,
-    customerId: null,
-    projectId: null,
-    scopes: ['boards:read', 'boards:write'] as ('boards:read' | 'boards:write')[],
-    reach: { allBoards: true, workspaceTeamIds: [], boardIds: [] },
-    memberTeamIds: []
-  }
+  const context = agentContext({ scopes: ['boards:read', 'boards:write'] })
   const posted = await MCP_TOOLS.find(t => t.name === 'post_task_update')!.handler({ id: task, body: 'Before the edit' }, context) as { update: { id: string } }
   const edited = await MCP_TOOLS.find(t => t.name === 'edit_task_update')!.handler({ id: task, updateId: posted.update.id, body: 'After the edit' }, context) as { update: { id: string, url?: string } }
   assert.equal(edited.update.url, `${origin}/projects/${board}?task=${task}&comment=${posted.update.id}`)

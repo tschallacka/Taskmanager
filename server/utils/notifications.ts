@@ -10,6 +10,7 @@ import { mailEnabled, sendMail } from '../lib/mailer'
 import { pushEnabled, sendPush } from '../lib/webpush'
 import { projectPeople } from './people'
 import { publishToUser } from './realtime'
+import { boardPath, messagePath, shareOrigin, taskPath } from './shareLinks'
 
 const MAX_EXCERPT = 160
 
@@ -44,14 +45,10 @@ function escapeHtml(text: string): string {
 export async function notificationPath(input: NotifyInput): Promise<string> {
   if (input.task) {
     const [row] = await db.select({ parentTaskId: projectTasks.parentTaskId }).from(projectTasks).where(eq(projectTasks.id, input.task.id)).limit(1)
-    return `/projects/${input.project.id}?task=${row?.parentTaskId ?? input.task.id}`
+    return taskPath(input.project.id, row?.parentTaskId ?? input.task.id)
   }
-  if (input.messageId) return `/projects/${input.project.id}?view=messages&message=${input.messageId}`
-  return `/projects/${input.project.id}`
-}
-
-function appUrl(path: string): string {
-  return `${(process.env.BETTER_AUTH_URL ?? 'http://localhost:3000').replace(/\/$/, '')}${path}`
+  if (input.messageId) return messagePath(input.project.id, input.messageId)
+  return boardPath(input.project.id)
 }
 
 /**
@@ -104,7 +101,7 @@ async function sendCopies(rows: { id: string, userId: string }[], input: NotifyI
         eq(notificationPreferences.email, true)
       ))
 
-    const link = appUrl(await notificationPath(input))
+    const link = `${shareOrigin()}${await notificationPath(input)}`
     const body = input.body ?? ''
     for (const person of wanting) {
       const row = rows.find(candidate => candidate.userId === person.userId)!

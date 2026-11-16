@@ -21,7 +21,7 @@ import type { McpToolDefinition } from './mcpToolKit'
 
 // The tools whose answer names a task, board or update with its `url`: the link to share with a person. The note says
 // it once, here, so the descriptions cannot disagree about what `url` is.
-const SHARE_LINK_TOOLS: ReadonlySet<string> = new Set([
+export const SHARE_LINK_TOOLS: ReadonlySet<string> = new Set([
   'get_task', 'create_task', 'update_task', 'move_task', 'search_tasks', 'my_tasks', 'get_board', 'list_boards',
   'post_task_update', 'edit_task_update', 'delete_task_update', 'delete_task', 'restore_task', 'list_notifications',
   'get_task_github'
