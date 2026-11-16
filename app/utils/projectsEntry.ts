@@ -13,6 +13,11 @@ export function entryFor(input: EntryInput): string | null {
   return input.contact ? '/shared-with-me' : null
 }
 
+/** One redirect at a time: a pending invitation comes before the shared list (the invitation has to be finished first). */
+export function firstRedirect(contactTarget: string | null, inviteTarget: string | null): string | null {
+  return inviteTarget ?? contactTarget
+}
+
 export interface FormGateInput {
   ready: boolean
   teamsPending: boolean
