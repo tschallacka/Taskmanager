@@ -9,6 +9,12 @@ export function inviteEmailError(value: string, required: boolean): string | nul
   return EMAIL.test(address) ? null : 'Enter a valid email address.'
 }
 
+/** The project's Share path to a customer: a customer is picked and an email is given (both needed). */
+export function customerInviteInputError(input: { customerId: string, email: string }): string | null {
+  if (!input.customerId.trim()) return 'Choose the customer this person belongs to.'
+  return inviteEmailError(input.email, true)
+}
+
 export function emptyCustomerWarning(input: { customerProjectCount: number, tickedCount: number }): string | null {
   if (input.customerProjectCount > 0 || input.tickedCount > 0) return null
   return 'This customer has no projects yet: they will see nothing.'
