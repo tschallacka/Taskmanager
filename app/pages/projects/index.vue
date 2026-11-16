@@ -2,7 +2,7 @@
 import { entryFor, firstRedirect, mayShowFirstProjectForm, redirectPending, sharedDecided } from '~/utils/projectsEntry'
 import { selectTeamOrStay, teamRedirectAllowed, teamToOpenFor } from '~/utils/teamEntry'
 import { pendingInviteEntry } from '~/utils/pendingInviteEntry'
-import { pendingInvitationEntry } from '~/utils/pendingInvitationEntry'
+import { autoClaimDue, pendingInvitationEntry } from '~/utils/pendingInvitationEntry'
 
 definePageMeta({ layout: 'app' })
 
@@ -22,7 +22,29 @@ const inviteEntry = computed(() => !teamsPending.value && ready.value && sharedD
 
 // Invitations sent to this account's address that it has not accepted: a later sign-in shows them, with Accept invitation.
 const { data: pendingData } = useFetch<{ invitations: unknown[] }>('/api/pending-invitations', { key: 'pending-invitations', server: false, lazy: true })
-const pendingEntry = computed(() => !teamsPending.value && ready.value && pendingData.value
+// The owner's rule: an invitation tied to the signed-in verified address is accepted by itself, once, here. Until that is
+// done, nothing is sent to the pending page, so the Accept button does not show for a tied invitation.
+const autoClaiming = ref(false)
+const autoClaimed = ref(false)
+watch(() => autoClaimDue({
+  ready: ready.value,
+  teamsPending: teamsPending.value,
+  pendingCount: pendingData.value?.invitations.length ?? 0,
+  done: autoClaimed.value || autoClaiming.value
+}), async (due) => {
+  if (!due) return
+  autoClaiming.value = true
+  try {
+    await $fetch('/api/pending-invitations/claim', { method: 'POST' })
+  } catch {
+    // Nothing to show here: whatever is left stays on the pending page.
+  }
+  autoClaimed.value = true
+  autoClaiming.value = false
+  await Promise.all([refreshNuxtData('pending-invitations'), refreshNuxtData('shared-with-me')])
+}, { immediate: true })
+
+const pendingEntry = computed(() => autoClaimed.value && !teamsPending.value && ready.value && pendingData.value
   ? pendingInvitationEntry({ asksNew: route.query.new === '1', hasProjects: projects.value.length > 0, teamCount: teams.value.length, pendingCount: pendingData.value.invitations.length })
   : null)
 

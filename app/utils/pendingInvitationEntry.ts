@@ -6,3 +6,8 @@ export function pendingInvitationEntry(input: { asksNew: boolean, hasProjects: b
   // Not under /invite: that path is the token route, and 'pending' would be read as a token.
   return '/pending-invitations'
 }
+
+/** The invitations tied to the signed-in verified address are accepted by themselves, once, on the projects page. */
+export function autoClaimDue(input: { ready: boolean, teamsPending: boolean, pendingCount: number, done: boolean }): boolean {
+  return input.ready && !input.teamsPending && input.pendingCount > 0 && !input.done
+}
