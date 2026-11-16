@@ -1,0 +1,1 @@
+- **The first paint says what is loading.** Before the app's code has run, the browser shows a spinner with "Opening your projects…" (app/spa-loading-template.html), so a person who signs in and waits does not see a blank page.
