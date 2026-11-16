@@ -13,6 +13,11 @@ export function teamToOpenFor(input: TeamEntryInput): string | null {
   return input.teamIds[0] ?? null
 }
 
+/** The team redirect waits while a shared-list or invitation redirect is pending: one decision at a time. */
+export function teamRedirectAllowed(input: { contactTarget: string | null, inviteTarget: string | null }): boolean {
+  return input.contactTarget === null && input.inviteTarget === null
+}
+
 /**
  * Selects the team. True when it worked (the caller reloads into it); false when it failed, in which case the person
  * stays in the personal workspace and nothing is thrown.

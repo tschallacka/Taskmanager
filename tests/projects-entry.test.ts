@@ -5,7 +5,14 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { entryFor, mayShowFirstProjectForm, redirectPending, sharedDecided } from '../app/utils/projectsEntry'
+import { entryFor, firstRedirect, mayShowFirstProjectForm, redirectPending, sharedDecided } from '../app/utils/projectsEntry'
+
+test('one redirect at a time: a pending invitation wins over the shared list', () => {
+  assert.equal(firstRedirect('/shared-with-me', '/invite/abc'), '/invite/abc')
+  assert.equal(firstRedirect('/shared-with-me', null), '/shared-with-me')
+  assert.equal(firstRedirect(null, '/invite/abc'), '/invite/abc')
+  assert.equal(firstRedirect(null, null), null)
+})
 
 test('a redirect is pending only while its target is set and its selection has not failed', () => {
   assert.equal(redirectPending('/shared-with-me', false), true)

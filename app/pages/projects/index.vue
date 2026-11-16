@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { entryFor, mayShowFirstProjectForm, redirectPending, sharedDecided } from '~/utils/projectsEntry'
-import { selectTeamOrStay, teamToOpenFor } from '~/utils/teamEntry'
+import { entryFor, firstRedirect, mayShowFirstProjectForm, redirectPending, sharedDecided } from '~/utils/projectsEntry'
+import { selectTeamOrStay, teamRedirectAllowed, teamToOpenFor } from '~/utils/teamEntry'
+import { pendingInviteEntry } from '~/utils/pendingInviteEntry'
 
 definePageMeta({ layout: 'app' })
 
@@ -9,16 +10,25 @@ const { teams, activeTeamId, setActiveTeam, isPending: teamsPending } = useTeams
 const route = useRoute()
 
 // A customer contact or guest with no team and no board goes to the shared list, not to the first-project form.
-const { data: sharedData, status: sharedStatus } = useFetch<{ contact: boolean }>('/api/shared-with-me', { key: 'shared-with-me', server: false, lazy: true })
+const { data: sharedData, status: sharedStatus } = useFetch<{ contact: boolean, inviteToken: string | null }>('/api/shared-with-me', { key: 'shared-with-me', server: false, lazy: true })
 const contactOnlyEntry = computed(() => !teamsPending.value && ready.value && sharedData.value
   ? entryFor({ asksNew: route.query.new === '1', hasProjects: projects.value.length > 0, teamCount: teams.value.length, contact: sharedData.value.contact })
   : null)
-watch(contactOnlyEntry, (path) => {
+// Someone who signed up from an invitation link and never pressed Accept goes back to that invitation.
+const inviteEntry = computed(() => !teamsPending.value && ready.value && sharedData.value
+  ? pendingInviteEntry({ asksNew: route.query.new === '1', hasProjects: projects.value.length > 0, teamCount: teams.value.length, inviteToken: sharedData.value.inviteToken })
+  : null)
+
+// One navigation for the two (see firstRedirect): the invitation first, then the shared list.
+watch(() => firstRedirect(contactOnlyEntry.value, inviteEntry.value), (path) => {
   if (path) navigateTo(path, { replace: true })
 }, { immediate: true })
 
 // A team member who signs in again in a new browser starts in the personal workspace, which is empty: open their team.
-const teamEntry = computed(() => !teamsPending.value && ready.value
+const teamEntry = computed(() => !teamsPending.value && ready.value && teamRedirectAllowed({
+  contactTarget: contactOnlyEntry.value,
+  inviteTarget: inviteEntry.value
+})
   ? teamToOpenFor({
       asksNew: route.query.new === '1',
       hasProjects: projects.value.length > 0,
@@ -57,7 +67,7 @@ const showEmptyState = computed(() => mayShowFirstProjectForm({
   ready: ready.value,
   teamsPending: teamsPending.value,
   sharedLoaded: sharedDecided(sharedStatus.value),
-  redirecting: redirectPending(contactOnlyEntry.value, false) || redirectPending(teamEntry.value, teamSelectFailed.value)
+  redirecting: redirectPending(contactOnlyEntry.value, false) || redirectPending(inviteEntry.value, false) || redirectPending(teamEntry.value, teamSelectFailed.value)
 }) && (projects.value.length === 0 || wantsNew.value))
 
 const name = ref('')

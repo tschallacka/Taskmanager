@@ -2,6 +2,7 @@
 import { inviteSentence } from '~/utils/inviteSentence'
 import { inviteLinks } from '~/utils/inviteLinks'
 import { landingFor } from '~/utils/inviteLanding'
+import { shareLine } from '~/utils/inviteShareLine'
 
 useSeoMeta({ title: 'Invitation' })
 
@@ -43,6 +44,13 @@ const words = computed(() => {
 
 // The registration form is the default for every kind; the plain link under the button signs in instead.
 const links = computed(() => inviteLinks(token.value))
+
+// What is shared, said only when the page knows it (see utils/inviteShareLine). A customer invitation only.
+const shareText = computed(() => {
+  const invite = invitation.value
+  if (!invite || invite.kind !== 'customer') return null
+  return shareLine({ count: invite.sharedProjectCount, signedIn: !!session.value, organizationName: invite.organizationName })
+})
 
 const loadMessage = computed(() => {
   const status = loadError.value?.statusCode
@@ -133,10 +141,10 @@ async function accept() {
 
       <template v-else-if="invitation">
         <p
-          v-if="invitation.kind === 'customer' && invitation.sharedProjectCount === 0"
+          v-if="shareText"
           class="text-sm text-zinc-400 text-center"
         >
-          Nothing is shared with you yet by {{ invitation.organizationName }}. Their projects show here as soon as they share one.
+          {{ shareText }}
         </p>
         <template v-if="session">
           <p class="text-sm text-zinc-400 text-center">
