@@ -111,12 +111,15 @@ function cancel() {
 
     <div
       v-if="!showEmptyState"
-      class="flex min-h-0 flex-1 items-center justify-center"
+      class="flex min-h-0 flex-1 flex-col items-center justify-center gap-3"
     >
       <UIcon
         name="i-lucide-loader-circle"
         class="size-5 animate-spin text-muted"
       />
+      <p class="text-sm text-muted">
+        Opening your projects…
+      </p>
     </div>
 
     <div
