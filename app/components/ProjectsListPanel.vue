@@ -90,12 +90,17 @@ async function openRow(project: Project) {
   openProject(project.id)
 }
 
-// The line under a board's name: the customer, the time, and the task count (the small words say whose board it is).
+// The line under a board's name, in two parts. `start` (the customer, the time) may truncate. `end` (the read-only
+// marker and the task count) never does: a cut-off count tells the reader nothing, so the long part gives way first.
 function rowNote(project: Project) {
   const customer = project.customerName ? `${project.customerName} · ` : ''
-  if (isLabelRow(project)) return `${customer}crew's real board · read-only`
-  const kind = project.role === 'crew_home' ? 'crew home · ' : project.readOnly ? 'read-only · ' : ''
-  return `${kind}${customer}${relativeTime(project.updatedAt)} · ${countLabel(project)} ${countsFor(project).total === 1 ? 'task' : 'tasks'}`
+  if (isLabelRow(project)) return { start: `${customer}crew's real board`, end: 'read-only' }
+  const kind = project.role === 'crew_home' ? 'crew home · ' : ''
+  const marker = project.readOnly ? 'read-only · ' : ''
+  return {
+    start: `${kind}${customer}${relativeTime(project.updatedAt)}`,
+    end: `${marker}${countLabel(project)} ${countsFor(project).total === 1 ? 'task' : 'tasks'}`
+  }
 }
 
 // Opening a shadow board from the URL, or from the board header's link, opens the tree it sits in. It runs again
@@ -466,10 +471,14 @@ function menuItems(project: Project) {
             {{ boardLabel(project, depth) }}
           </p>
           <p
-            class="truncate text-xs text-muted"
+            class="flex min-w-0 text-xs text-muted"
             :title="countTitle(project)"
           >
-            {{ rowNote(project) }}
+            <span class="min-w-0 truncate">{{ rowNote(project).start }}</span>
+            <span
+              v-if="rowNote(project).end"
+              class="shrink-0 whitespace-nowrap"
+            >&nbsp;· {{ rowNote(project).end }}</span>
           </p>
         </div>
         <!-- The open count, in the board's health tint: the design's number at the row's right edge. -->
