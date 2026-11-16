@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { CustomerContact, CustomerInvitation } from '~/composables/useCustomers'
 import { emptyCustomerWarning, inviteEmailError } from '#shared/utils/inviteEmail'
+import { pendingInvitedEmails, showNobodyLine } from '~/utils/contactsPanel'
 
 const open = defineModel<boolean>('open', { default: false })
 
@@ -365,10 +366,17 @@ function confirmRevoke(customerId: string, invitation: CustomerInvitation) {
                       Contacts
                     </p>
                     <p
-                      v-if="contacts.length === 0"
+                      v-if="showNobodyLine(contacts.length, pendingInvitedEmails(invitations).length)"
                       class="text-xs text-muted"
                     >
                       Nobody logs in for {{ c.name }} yet.
+                    </p>
+                    <p
+                      v-for="email in pendingInvitedEmails(invitations)"
+                      :key="`pending-${email}`"
+                      class="text-xs text-muted"
+                    >
+                      Invited, not accepted yet: {{ email }}
                     </p>
                     <div
                       v-for="contact in contacts"
