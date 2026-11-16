@@ -1,1 +1,0 @@
-- **Sidebar: the task count and the read-only marker stay whole.** On a narrow sidebar the line under a project name was cut off, so "read-only" and the task count were lost. The customer and the time now give way first; the crew name still truncates first, and the count and the marker never truncate. Files: `app/components/ProjectsListPanel.vue`.
