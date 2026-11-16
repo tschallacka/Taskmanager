@@ -6,7 +6,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { boardRequest, backoffMs, statusWait, STATUS_PATH } from './board-retry.mjs'
+import { boardRequest, listenerCall, backoffMs, statusWait, STATUS_PATH } from './board-retry.mjs'
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
 const html = (status = 502) => new Response('<html><body>502 Bad Gateway</body></html>', { status, headers: { 'content-type': 'text/html' } })
@@ -103,4 +103,36 @@ test('listen.mjs makes its board call through the retry helper', () => {
   const listen = readFileSync(join(import.meta.dirname, 'listen.mjs'), 'utf8')
   assert.match(listen, /from '\.\/board-retry\.mjs'/)
   assert.doesNotMatch(listen, /await res\.json\(\)/, 'the listener no longer parses the answer itself')
+})
+
+// M1 (review card, Nina): a bad key (4xx) must not end the listener. The listener's call is listenerCall: a 4xx is
+// logged once and answered as null, as the listener did before the retry helper; an outage still waits.
+test('a 401 through the listener call is null and one stderr line, not an exception: the listener goes on', async () => {
+  const logs = []
+  const result = await listenerCall({ url: 'https://board.example/api/mcp', init: { method: 'POST' } }, {
+    fetchImpl: async () => json({ error: 'unauthorized' }, 401),
+    sleep: async () => {},
+    log: line => logs.push(line)
+  })
+  assert.equal(result, null)
+  assert.equal(logs.length, 1)
+  assert.match(logs[0], /401/)
+})
+
+test('a 502 HTML, then JSON, through the listener call: the JSON comes back, and the wait is 60 s', async () => {
+  const answers = [html(502), json({ ok: true })]
+  const waits = []
+  const result = await listenerCall({ url: 'https://board.example/api/mcp', init: { method: 'POST' } }, {
+    fetchImpl: async url => (url.endsWith(STATUS_PATH) ? new Response('', { status: 404 }) : answers.shift()),
+    sleep: async (ms) => { waits.push(ms) },
+    log: () => {}
+  })
+  assert.deepEqual(result, { ok: true })
+  assert.deepEqual(waits, [60000])
+})
+
+test('the listener calls the board through listenerCall, not the bare helper', () => {
+  const listen = readFileSync(join(import.meta.dirname, 'listen.mjs'), 'utf8')
+  assert.match(listen, /listenerCall\(/)
+  assert.doesNotMatch(listen, /boardRequest\(/)
 })
