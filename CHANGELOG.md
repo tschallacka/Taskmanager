@@ -2,6 +2,12 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.39.5 - 2026-11-16
+
+- **Sidebar: the task count and the read-only marker stay whole.** On a narrow sidebar the line under a project name was cut off, so "read-only" and the task count were lost. The customer and the time now give way first; the crew name still truncates first, and the count and the marker never truncate. Files: `app/components/ProjectsListPanel.vue`.
+
+- **Sidebar: the arrow keeps every project name in line, and a crew reads as the child of its project.** Every project row reserves the arrow's width, so a project with a crew is no longer indented. A crew under its project is indented with a left rule, a smaller muted name and the label "crew: <name>". Files: `app/components/ProjectsListPanel.vue`, `app/utils/crewTreeRows.ts`, `tests/sidebar-crew-label.test.ts`.
+
 ## 0.39.4 - 2026-11-16
 
 - **The Customers popup's confirmation opens on top.** "Remove customer?" (and remove contact, revoke link) opened behind the Customers popup, so a customer could not be deleted. The confirmation now uses the app's modal layer like every other modal and is declared after the popup. Files: `app/components/CustomersModal.vue`, `tests/customers-confirm-layer.test.ts`.
