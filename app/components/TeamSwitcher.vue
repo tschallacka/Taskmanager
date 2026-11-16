@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
+import { workspaceLabel } from '~/utils/workspaceLabel'
 
-const { teams, activeTeam, setActiveTeam } = useTeams()
+const { teams, activeTeam, setActiveTeam, isPending } = useTeams()
 const { isInstanceAdmin, canCreateOrganizations } = useAuth()
 const { refresh: refreshProjects } = useProjects()
 const { refresh: refreshCustomers } = useCustomers()
@@ -133,7 +134,7 @@ const dropdownItems = computed<DropdownMenuItem[]>(() => {
           />
         </div>
         <span class="min-w-0 flex-1 truncate text-left font-medium">
-          {{ activeTeam ? activeTeam.name : 'Personal Workspace' }}
+          {{ workspaceLabel({ teamName: activeTeam?.name ?? null, pending: isPending }) }}
         </span>
         <UBadge
           v-if="activeTeam"

@@ -1,4 +1,9 @@
 <script setup lang="ts">
+import { inviteSentence } from '~/utils/inviteSentence'
+import { inviteLinks } from '~/utils/inviteLinks'
+import { landingFor } from '~/utils/inviteLanding'
+import { shareLine } from '~/utils/inviteShareLine'
+
 useSeoMeta({ title: 'Invitation' })
 
 const route = useRoute()
@@ -9,9 +14,9 @@ const { session, isPending: sessionPending } = useAuth()
 // page never learns: whoever was invited has to know it. `forYou` says whether the account signed in now is
 // the invited one, and is null when nobody is signed in.
 type InvitationPreview
-  = | { kind: 'customer', customerName: string, organizationName: string }
+  = | { kind: 'customer', customerName: string, organizationName: string, sharedProjectCount: number }
     | { kind: 'team', organizationName: string, inviterName: string | null, role: string, forYou: boolean | null }
-    | { kind: 'board', projectName: string, inviterName: string | null, role: string, forYou: boolean | null }
+    | { kind: 'board', projectName: string, organizationName: string | null, inviterName: string | null, role: string, forYou: boolean | null }
 
 // Reading the invitation also sets the cookie that lets its recipient create an
 // account where sign-up is otherwise closed, so it has to happen in the browser.
@@ -19,6 +24,33 @@ const { data: invitation, error: loadError, pending } = await useFetch<Invitatio
   () => `/api/invitations/${token.value}`,
   { server: false }
 )
+
+// The words for a team or a board invitation. The page does not learn the address (see above), so the
+// footnote with the email is not shown here, and the invitee's name is not known yet.
+const words = computed(() => {
+  const invite = invitation.value
+  if (!invite || invite.kind === 'customer') return null
+  if (invite.kind === 'team') {
+    return inviteSentence({ kind: 'team', org: invite.organizationName, name: null, email: '' })
+  }
+  return inviteSentence({
+    kind: 'project',
+    org: invite.organizationName ?? invite.inviterName ?? 'Someone',
+    project: invite.projectName,
+    name: null,
+    email: ''
+  })
+})
+
+// The registration form is the default for every kind; the plain link under the button signs in instead.
+const links = computed(() => inviteLinks(token.value))
+
+// What is shared, said only when the page knows it (see utils/inviteShareLine). A customer invitation only.
+const shareText = computed(() => {
+  const invite = invitation.value
+  if (!invite || invite.kind !== 'customer') return null
+  return shareLine({ count: invite.sharedProjectCount, signedIn: !!session.value, organizationName: invite.organizationName })
+})
 
 const loadMessage = computed(() => {
   const status = loadError.value?.statusCode
@@ -41,7 +73,7 @@ async function accept() {
   accepting.value = true
   acceptError.value = ''
   try {
-    const answer = await $fetch<{ kind: 'team' | 'board' | 'customer', organizationId?: string, projectId?: string }>(
+    const answer = await $fetch<{ kind: 'team' | 'board' | 'customer', organizationId?: string, projectId?: string, sharedProjectIds?: string[] }>(
       `/api/invitations/${token.value}/accept`,
       { method: 'POST' }
     )
@@ -52,8 +84,14 @@ async function accept() {
     } else if (answer.kind === 'board') {
       await authClient.organization.setActive({ organizationId: null })
     }
+    // Where the invitation says: the team, the board, or the customer's shared project (see utils/inviteLanding).
     // A full load, so the projects store picks up the new boards.
-    await navigateTo(answer.kind === 'board' && answer.projectId ? `/projects/${answer.projectId}` : '/projects', { external: true })
+    const landing = answer.kind === 'board' && answer.projectId
+      ? landingFor({ kind: 'board', projectId: answer.projectId })
+      : answer.kind === 'customer'
+        ? landingFor({ kind: 'customer', sharedProjectIds: answer.sharedProjectIds ?? [] })
+        : landingFor({ kind: 'team' })
+    await navigateTo(landing, { external: true })
   } catch (e: unknown) {
     acceptError.value = (e as { data?: { message?: string } })?.data?.message || 'Could not accept the invitation'
   } finally {
@@ -63,28 +101,23 @@ async function accept() {
 </script>
 
 <template>
-  <div class="flex items-center justify-center min-h-screen bg-zinc-950">
-    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 w-full max-w-sm space-y-6 shadow-xl">
+  <div class="flex items-center justify-center min-h-screen bg-default px-4">
+    <div class="bg-elevated border border-default rounded-2xl p-8 w-full max-w-sm space-y-6 shadow-xl">
       <div class="text-center space-y-2">
         <AppLogo class="text-2xl mx-auto block" />
-        <h1 class="text-xl font-semibold text-white">
-          You're invited
+        <h1 class="text-xl font-semibold text-default">
+          {{ words ? words.headline : "You're invited" }}
         </h1>
         <p
           v-if="invitation"
-          class="text-sm text-zinc-400"
+          class="text-sm text-muted"
         >
-          <template v-if="invitation.kind === 'team'">
-            {{ invitation.inviterName ?? 'Someone' }} invited you to join
-            <span class="text-zinc-200 font-medium">{{ invitation.organizationName }}</span>.
+          <template v-if="words">
+            {{ words.sentence }}
           </template>
-          <template v-else-if="invitation.kind === 'board'">
-            {{ invitation.inviterName ?? 'Someone' }} invited you to the board
-            <span class="text-zinc-200 font-medium">{{ invitation.projectName }}</span>.
-          </template>
-          <template v-else>
+          <template v-else-if="invitation.kind === 'customer'">
             {{ invitation.organizationName }} invited you to follow the projects of
-            <span class="text-zinc-200 font-medium">{{ invitation.customerName }}</span>.
+            <span class="text-default font-medium">{{ invitation.customerName }}</span>.
           </template>
         </p>
       </div>
@@ -95,7 +128,7 @@ async function accept() {
       >
         <UIcon
           name="i-lucide-loader-2"
-          class="size-5 animate-spin text-zinc-500"
+          class="size-5 animate-spin text-dimmed"
         />
       </div>
 
@@ -107,9 +140,15 @@ async function accept() {
       />
 
       <template v-else-if="invitation">
+        <p
+          v-if="shareText"
+          class="text-sm text-muted text-center"
+        >
+          {{ shareText }}
+        </p>
         <template v-if="session">
-          <p class="text-sm text-zinc-400 text-center">
-            Signed in as <span class="text-zinc-200">{{ session.user.email }}</span>.
+          <p class="text-sm text-muted text-center">
+            Signed in as <span class="text-default">{{ session.user.email }}</span>.
           </p>
           <UAlert
             v-if="invitation.kind !== 'customer' && invitation.forYou === false"
@@ -141,40 +180,31 @@ async function accept() {
             :loading="accepting"
             @click="accept"
           >
-            Accept invitation
-          </UButton>
-        </template>
-        <template v-else-if="invitation.kind === 'customer'">
-          <UButton
-            block
-            size="lg"
-            color="primary"
-            :to="`/login?invite=${encodeURIComponent(token)}`"
-          >
-            Sign in or create an account
+            {{ words ? words.button : 'Accept invitation' }}
           </UButton>
         </template>
         <template v-else>
-          <p class="text-sm text-zinc-400 text-center">
+          <p
+            v-if="invitation.kind !== 'customer'"
+            class="text-sm text-muted text-center"
+          >
             Use the email address this invitation was sent to. Anyone else cannot use it.
           </p>
           <UButton
             block
             size="lg"
             color="primary"
-            :to="`/login?invite=${encodeURIComponent(token)}`"
+            :to="links.primary"
           >
-            I have an account: sign in
+            {{ words ? words.button : 'Create an account' }}
           </UButton>
-          <UButton
-            block
-            size="lg"
-            color="neutral"
-            variant="outline"
-            :to="`/login?invite=${encodeURIComponent(token)}&signup=1`"
-          >
-            Create an account
-          </UButton>
+          <p class="text-sm text-muted text-center">
+            Already have an account?
+            <NuxtLink
+              :to="links.signIn"
+              class="text-primary underline"
+            >Sign in</NuxtLink>
+          </p>
         </template>
       </template>
     </div>

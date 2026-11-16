@@ -2,6 +2,54 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.39.4 - 2026-11-16
+
+- **The Customers popup's confirmation opens on top.** "Remove customer?" (and remove contact, revoke link) opened behind the Customers popup, so a customer could not be deleted. The confirmation now uses the app's modal layer like every other modal and is declared after the popup. Files: `app/components/CustomersModal.vue`, `tests/customers-confirm-layer.test.ts`.
+
+## 0.39.3 - 2026-11-16
+
+- **The first paint says what is loading.** Before the app's code has run, the browser shows a spinner with "Opening your projects…" (app/spa-loading-template.html), so a person who signs in and waits does not see a blank page.
+
+- **Projects load with a visible wait.** On /projects a line reads "Opening your projects…" while the list loads, a failed first load retries instead of showing "No projects yet", and the sidebar's "No projects yet" waits while a person's team is being opened (a person who signs in again in a new browser no longer sees an empty list flash). Files: app/pages/projects/index.vue, app/plugins/init-projects.client.ts, app/components/ProjectsListPanel.vue.
+
+## 0.39.2 - 2026-11-16
+
+- **Invite follow-ups: System by default, and no "Personal Workspace" while the team loads.** A visitor with no stored choice gets System, not a fixed dark theme; a stored choice is kept. The workspace switcher shows "Loading workspace" while the active team loads, so a team member who lands in the team sees a label that agrees with the team's boards. The invitation page uses the theme colours, so a new visitor on a light system sees it light. Files: `nuxt.config.ts`, `app/components/TeamSwitcher.vue`, `app/utils/workspaceLabel.ts`, `app/pages/invite/[token].vue`, `tests/color-mode-default.test.ts`, `tests/team-switcher-label.test.ts`, `tests/invite-page-theme.test.ts`.
+
+## 0.39.1 - 2026-11-16
+
+- Invited people land on their shared work: a customer whose board was shared to their email now opens that board (or the shared list) after accepting the customer invitation, the sidebar lists each shared project once, and a person who cannot create projects no longer sees "No projects yet. Create one" or a New project button.
+
+## 0.39.0 - 2026-11-16
+
+- **Agents get the public link of a customer-visible task.** When a board is shared (its public link is on and not expired), get_task answers a customer-visible task with `publicUrl`: the board's public page, for a key whose owner may share the board (a project admin or a manager guest). The public page shows the board's cards, not one task, so the link opens the board. Staff keys only. Files: `server/utils/mcpBoardTools.ts`, `server/utils/shareLinks.ts`, `tests/mcp-share-links.test.ts`.
+
+- **Agents get a link to share.** The MCP tools that answer with a task, board or update now return `url`: the link that opens it in the app, on this instance (staff keys only; a customer's key gets none). Covers get_task, create_task, update_task, move_task, search_tasks, my_tasks, get_board, list_boards, the update tools, list_notifications, delete_task, restore_task and get_task_github. The tool descriptions and the Tools help page say so. A subtask's link, and the e-mail and push about a subtask, now open its parent's panel, as its Inbox link does (a subtask has no panel of its own). Files: `server/utils/shareLinks.ts`, `server/utils/notifications.ts`, `server/utils/mcpBoardTools.ts`, `server/utils/mcpUpdateTools.ts`, `server/utils/mcpMeTools.ts`, `server/utils/mcpGithubTools.ts`, `server/utils/mcpRegistry.ts`, `docs/agents/tools-overview.md`.
+
+- **An invited person lands where the invitation says.** A customer contact with one board shared lands on that board, with several or none on **Shared with you** (which lists the boards, or says nothing is shared yet). A team member who signs in again in a new browser opens their team, and a customer contact with no team goes to the shared list rather than the first-project form. The invite page's registration form is the default, with a plain **Already have an account? Sign in** link. Files: app/pages/invite/[token].vue, app/pages/projects/index.vue, app/pages/shared-with-me.vue, app/components/AppSidebar.vue, app/utils/inviteLanding.ts, app/utils/projectsEntry.ts, app/utils/teamEntry.ts, app/utils/loginMode.ts, app/utils/inviteLinks.ts, shared/utils/sharedGroups.ts, server/api/shared-with-me.get.ts, server/api/invitations/[token]/accept.post.ts, server/api/invitations/[token]/index.get.ts, server/utils/protectedApi.ts, server/utils/sharedProjectIds.ts, server/middleware/requireAuth.ts, docs/team/invite-a-contact.md, changelog.d/mwidpx1zhcb8izzzqw-invite-landing.md.
+
+## 0.38.1 - 2026-11-15
+
+- Legal documents: the privacy policy and the Impressum 1.0.0 as drafts in legal/, with the version and archive procedure (legal/README.md). The hosting data center (Lauterbourg, France) is filled in from the Contabo data processing agreement.
+
+## 0.38.0 - 2026-11-15
+
+- **Phone: a long-press on a card opens its sheet, and the help page describes the column picker and the swipe.** At phone width a long-press on a card opens the same bottom sheet as its ⋯ button, not the desktop popover; the desktop right-click menu is unchanged. The boards help page now covers the column picker, the swipe between columns and the Add column chip. Files: `app/components/kanban/KanbanCard.vue`, `docs/basics/boards-and-columns.md`, `tests/phone-qa-violations.test.ts`.
+
+- **Phone: the card sheet title stops at the close button, and Add column moves into the column picker.** A long card title on the phone sheet now ends in an ellipsis before the X. The board's Add column no longer peeks in at the right edge on a phone: it is the last chip of the column picker, and its name field shows under the picker. The desktop board is unchanged. Files: `app/components/PhoneCardSheet.vue`, `app/components/PhoneColumnPicker.vue`, `app/components/kanban/KanbanBoard.vue`, `tests/phone-add-column.test.ts`.
+
+- **Phone: a tab bar, one column at a time, and a card sheet.** On a phone the app has a bottom tab bar (Home, Inbox with its unread count, My tasks, Projects, Search) and a floating New. A board shows one column at a time with a column picker, and each card's ⋯ opens a sheet with Mark done, Move to, Assign to, Set due date and Delete. The project page's own bottom bar is gone. Files: `app/components/BottomTabBar.vue`, `app/components/PhoneColumnPicker.vue`, `app/components/PhoneCardSheet.vue`, `app/components/kanban/KanbanBoard.vue`, `app/components/kanban/KanbanCard.vue`, `app/components/kanban/TaskDrawer.vue`, `app/components/kanban/TaskComments.vue`, `app/layouts/app.vue`, `app/pages/projects/home.vue`, `app/pages/projects/[id].vue`, `docs/basics/boards-and-columns.md`.
+
+- **Phone: swipe between columns.** On a phone the board shows one column at a time; a sideways swipe on the board moves to the next or previous column, and a caption under the column picker says "swipe for other columns". The desktop is unchanged. Files: `app/components/kanban/KanbanBoard.vue`, `tests/phone-swipe.test.ts`.
+
+- **Phone: the bottom tab bar keeps clear of the home indicator.** The app asks for `viewport-fit=cover`, so the safe-area insets (the notch and the home indicator) reach the page on a phone. Without it every inset read 0 and the tab bar sat under the home indicator. Files: `app/app.vue`, `tests/app-viewport.test.ts`.
+
+## 0.37.0 - 2026-11-15
+
+- **A comment opened from the Inbox stays in the address.** The card jumps to the reply and the address still names the comment, so a reload or a shared copy of the link scrolls to it again. `app/components/kanban/TaskComments.vue`, `tests/inbox-comment-url.test.ts`.
+
+- **Open on board from the Inbox keeps the comment, and a phone no longer shows it.** The card panel opened from an Inbox comment links to the card at that comment, and on a phone the control is hidden (the back arrow is the way back to the Inbox). `app/components/kanban/TaskDrawer.vue`, `tests/inbox-phone-open.test.ts`, `tests/inbox-comment-link.test.ts`.
+
 ## 0.36.0 - 2026-11-15
 
 - **The calendar, the timeline and the More pages get keyboard and tap paths.** A task on the calendar moves with the arrow keys or with its Move control and a tap on a day, undated tasks included; a timeline bar moves with the arrow keys (Shift for its end, Alt for its start; Alt+Left and Alt+Right stay on the bar and do not go Back or Forward in the browser) and with its row's Move-the-bar menu; Overview, Messages, Time and Files sit under a More menu in the board's view row (master's row, which also holds Office). The pointer drags are unchanged. `app/components/kanban/ProjectCalendarView.vue`, `app/components/kanban/ProjectTimelineView.vue`, `app/pages/projects/[id].vue`, `app/utils/calendarKeys.ts`, `app/utils/calendarTap.ts`, `app/utils/timelineKeys.ts`, `app/utils/timelineTap.ts`, `app/utils/dateNudge.ts`.

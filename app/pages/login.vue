@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { loginMode } from '~/utils/loginMode'
+
 definePageMeta({ middleware: [] }) // skip auth middleware on this page
 
 useSeoMeta({ title: 'Sign in' })
@@ -27,8 +29,12 @@ const hasAlternatives = computed(() => isDiscordEnabled.value || isGitHubEnabled
 
 // `credentials` is the password form; the other two replace it in the same card.
 const step = ref<'credentials' | 'email-code' | 'two-factor'>('credentials')
-// An invitation page sends someone without an account straight to sign-up (`signup=1`).
-const mode = ref<'sign-in' | 'sign-up'>(inviteToken.value && route.query.signup === '1' ? 'sign-up' : 'sign-in')
+// An invitation opens in sign-up unless the address says `signin=1` (see utils/loginMode).
+const mode = ref<'sign-in' | 'sign-up'>(loginMode({
+  invite: inviteToken.value,
+  signup: typeof route.query.signup === 'string' ? route.query.signup : undefined,
+  signin: typeof route.query.signin === 'string' ? route.query.signin : undefined
+}))
 const name = ref('')
 const email = ref('')
 const password = ref('')
