@@ -131,6 +131,46 @@ test('a 502 HTML, then JSON, through the listener call: the JSON comes back, and
   assert.deepEqual(waits, [60000])
 })
 
+// S1 (review card, Nina): a socket that connects and never answers must not stall the listener. The board call has a
+// timeout (30 s by default, passed in deps here as 50 ms); a timeout is an outage and is retried.
+test('a board call that never answers is aborted by its timeout, counted as an outage, and retried', async () => {
+  let calls = 0
+  const seenSignals = []
+  const fetchImpl = (url, init) => {
+    if (url.endsWith(STATUS_PATH)) return Promise.resolve(new Response('', { status: 404 }))
+    calls++
+    seenSignals.push(init?.signal)
+    if (calls === 1) {
+      return new Promise((_resolve, reject) => {
+        // AbortSignal.timeout's timer does not keep the process alive: a ref'd timer does, until the abort.
+        const keepAlive = setTimeout(() => {}, 10_000)
+        init.signal.addEventListener('abort', () => {
+          clearTimeout(keepAlive)
+          reject(new DOMException('timed out', 'TimeoutError'))
+        })
+      })
+    }
+    return Promise.resolve(json({ ok: true }))
+  }
+  const logs = []
+  const result = await boardRequest({ url: 'https://board.example/api/mcp', init: { method: 'POST' } }, {
+    fetchImpl,
+    timeoutMs: 50,
+    sleep: async () => {},
+    log: line => logs.push(line)
+  })
+  assert.deepEqual(result, { ok: true })
+  assert.equal(calls, 2)
+  assert.ok(seenSignals.every(signal => signal instanceof AbortSignal), 'every board call carries an abort signal')
+  assert.match(logs[0] ?? '', /connection error/)
+})
+
+test('the board call and the status probe carry a timeout in the helper (30 s and 5 s)', () => {
+  const helper = readFileSync(join(import.meta.dirname, 'board-retry.mjs'), 'utf8')
+  assert.match(helper, /timeoutMs \?\? 30_?000/)
+  assert.match(helper, /AbortSignal\.timeout\(5_?000\)/)
+})
+
 test('the listener calls the board through listenerCall, not the bare helper', () => {
   const listen = readFileSync(join(import.meta.dirname, 'listen.mjs'), 'utf8')
   assert.match(listen, /listenerCall\(/)
