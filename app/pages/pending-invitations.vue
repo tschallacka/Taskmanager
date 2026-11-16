@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { landingFor } from '~/utils/inviteLanding'
+
 definePageMeta({ layout: 'app' })
 
 useSeoMeta({ title: 'Invitations' })
@@ -15,8 +17,9 @@ async function accept(id: string) {
   accepting.value = id
   error.value = ''
   try {
-    await $fetch('/api/pending-invitations', { method: 'POST', body: { id } })
-    await navigateTo('/shared-with-me', { external: true })
+    const answer = await $fetch<{ ok: boolean, sharedProjectIds: string[] }>('/api/pending-invitations', { method: 'POST', body: { id } })
+    // Lands like a customer link: the one project, or the shared list (see utils/inviteLanding).
+    await navigateTo(landingFor({ kind: 'customer', sharedProjectIds: answer.sharedProjectIds }), { external: true })
   } catch (e) {
     error.value = (e as { data?: { message?: string } })?.data?.message || 'Could not accept the invitation'
     await refresh()
