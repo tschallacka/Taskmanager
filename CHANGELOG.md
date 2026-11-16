@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.40.0 - 2026-11-16
+
+- **Delete my account: the rules for every column that holds a person's user id.** Each such column is decided in one rule table (delete, keep as "Deleted user", or clear), and a test fails when a new user column has no rule. The deletion itself removes a personal board with no other member, with its tasks and attachment files, keeps a team's work under "Deleted user", and clears the columns the person filled in. It refuses while the person owns a team (the teams are named), for the last instance admin, and for a crew account. Settings > Account has "Delete my account": it lists what happens, and deletes only after the person types their own address. Files: `server/api/account/delete.post.ts`, `server/utils/accountRules.ts`, `server/utils/accountDeletion.ts`, `app/components/DeleteAccountPanel.vue`, `app/pages/settings/index.vue`, `shared/utils/deleteAccountText.ts`, `tests/delete-account-ui.test.ts`, `tests/account-deletion-coverage.test.ts`, `tests/account-deletion.test.ts`, `tests/changelog-fragment-files.test.ts`.
+
 ## 0.39.5 - 2026-11-16
 
 - **Sidebar: the task count and the read-only marker stay whole.** On a narrow sidebar the line under a project name was cut off, so "read-only" and the task count were lost. The customer and the time now give way first; the crew name still truncates first, and the count and the marker never truncate. Files: `app/components/ProjectsListPanel.vue`.
