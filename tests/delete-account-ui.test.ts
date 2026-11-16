@@ -46,10 +46,23 @@ test('the route deletes the signed-in person only, after the typed confirmation'
   assert.doesNotMatch(route, /readBody[\s\S]*deleteAccount\(body/, 'the id comes from the session, never from the body')
 })
 
-test('the settings account section shows the panel', () => {
+test('the settings account section shows the button, and the button opens a confirm dialog', () => {
   assert.match(read('app/pages/settings/index.vue'), /<DeleteAccountPanel \/>/)
-  const panel = read('app/components/account/DeleteAccountPanel.vue')
+  // At the top of app/components, so the tag is <DeleteAccountPanel> (a folder would prefix the name).
+  const panel = read('app/components/DeleteAccountPanel.vue')
   assert.match(panel, /deletionLines\(\)/)
   assert.match(panel, /\/api\/account\/delete/)
   assert.match(panel, /confirmMatches\(/)
+  // The confirmation is a dialog: the button opens it, and nothing is deleted until it is confirmed inside.
+  assert.match(panel, /<UModal/)
+  assert.match(panel, /v-model:open="open"/)
+  assert.match(panel, /label="Delete my account"/)
+  assert.match(panel, /@click="remove"/)
+})
+
+test('the dialog shows the consequences, the typed confirmation, and the team refusal with the way to the team page', () => {
+  const panel = read('app/components/DeleteAccountPanel.vue')
+  assert.match(panel, /refusal\.teams/)
+  assert.match(panel, /to="\/team"/)
+  assert.match(panel, /v-for="line in lines"/)
 })
