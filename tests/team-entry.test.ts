@@ -6,7 +6,13 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { selectTeamOrStay, teamToOpenFor } from '../app/utils/teamEntry'
+import { selectTeamOrStay, teamRedirectAllowed, teamToOpenFor } from '../app/utils/teamEntry'
+
+test('the team redirect waits while a shared-list or invitation redirect is pending (one decision at a time)', () => {
+  assert.equal(teamRedirectAllowed({ contactTarget: null, inviteTarget: null }), true)
+  assert.equal(teamRedirectAllowed({ contactTarget: '/shared-with-me', inviteTarget: null }), false)
+  assert.equal(teamRedirectAllowed({ contactTarget: null, inviteTarget: '/invite/abc' }), false)
+})
 
 test('when selecting the team works, the page reloads into it (true)', async () => {
   let selected: string | null = null

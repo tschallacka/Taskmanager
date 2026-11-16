@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { entryFor, mayShowFirstProjectForm, redirectPending, sharedDecided } from '~/utils/projectsEntry'
-import { selectTeamOrStay, teamToOpenFor } from '~/utils/teamEntry'
+import { selectTeamOrStay, teamRedirectAllowed, teamToOpenFor } from '~/utils/teamEntry'
 import { pendingInviteEntry } from '~/utils/pendingInviteEntry'
 
 definePageMeta({ layout: 'app' })
@@ -27,7 +27,10 @@ watch(inviteEntry, (path) => {
 }, { immediate: true })
 
 // A team member who signs in again in a new browser starts in the personal workspace, which is empty: open their team.
-const teamEntry = computed(() => !teamsPending.value && ready.value
+const teamEntry = computed(() => !teamsPending.value && ready.value && teamRedirectAllowed({
+  contactTarget: contactOnlyEntry.value,
+  inviteTarget: inviteEntry.value
+})
   ? teamToOpenFor({
       asksNew: route.query.new === '1',
       hasProjects: projects.value.length > 0,

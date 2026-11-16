@@ -7,7 +7,7 @@ import { lookupAddressedInvitation } from '../../../utils/invitations'
 import { addressesOfUser } from '../../../utils/extraEmails'
 import { guestProjectIdsOf } from '../../../utils/guests'
 import { sharedProjectIds } from '../../../utils/sharedProjectIds'
-import { pendingBoardCountFor } from '../../../utils/pendingInvites'
+import { pendingBoardProjectIdsFor } from '../../../utils/pendingInvites'
 
 // What an invitation link is for, readable before signing in: the invite page
 // has to say whose portal, team or board it opens. Opening it also drops the token in a cookie,
@@ -62,13 +62,13 @@ export default defineEventHandler(async (event) => {
   const session = await auth.api.getSession({ headers: event.headers }).catch(() => null)
   const guestShared = session ? await guestProjectIdsOf(session.user.id) : []
   // Board invitations already sent to this account's address count too: accepting claims them (see utils/pendingInvites).
-  const pending = session ? await pendingBoardCountFor(await addressesOfUser(session.user.id), Date.now()) : 0
+  const pendingIds = session ? await pendingBoardProjectIdsFor(await addressesOfUser(session.user.id), Date.now()) : []
 
   rememberToken()
   return {
     kind: 'customer' as const,
     customerName: row.customerName,
     organizationName: row.organizationName,
-    sharedProjectCount: sharedProjectIds(customerShared.map(project => project.id), guestShared).length + pending
+    sharedProjectCount: sharedProjectIds(customerShared.map(project => project.id), [...guestShared, ...pendingIds]).length
   }
 })
