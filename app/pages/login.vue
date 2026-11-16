@@ -236,6 +236,15 @@ onMounted(async () => {
         >
           {{ mode === 'sign-in' ? 'Sign in' : 'Create account' }}
         </UButton>
+        <p
+          v-if="mode === 'sign-up'"
+          class="text-center text-xs text-zinc-400"
+        >
+          By continuing you accept the <NuxtLink
+            to="/privacy"
+            class="text-primary underline"
+          >Privacy Policy</NuxtLink>.
+        </p>
       </form>
 
       <!-- Email code -->
@@ -481,6 +490,7 @@ onMounted(async () => {
           </div>
         </template>
       </template>
+      <LegalLinks />
     </div>
   </div>
 </template>
