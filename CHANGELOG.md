@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.39.4 - 2026-11-16
+
+- **The Customers popup's confirmation opens on top.** "Remove customer?" (and remove contact, revoke link) opened behind the Customers popup, so a customer could not be deleted. The confirmation now uses the app's modal layer like every other modal and is declared after the popup. Files: `app/components/CustomersModal.vue`, `tests/customers-confirm-layer.test.ts`.
+
 ## 0.39.3 - 2026-11-16
 
 - **The first paint says what is loading.** Before the app's code has run, the browser shows a spinner with "Opening your projects…" (app/spa-loading-template.html), so a person who signs in and waits does not see a blank page.
