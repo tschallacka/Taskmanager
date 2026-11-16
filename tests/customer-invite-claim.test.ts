@@ -39,6 +39,16 @@ test('a used, expired, or other-address link is left alone', () => {
   assert.deepEqual(customerInvitesToClaim(rows, ['ada@example.com'], now), [])
 })
 
+test('one address invited to two customers: both links are claimed, each on its own', () => {
+  const rows = [
+    { id: 'alpha', email: 'ada@example.com', acceptedAt: null, expiresAt: later },
+    { id: 'beta', email: 'ada@example.com', acceptedAt: null, expiresAt: later }
+  ]
+  assert.deepEqual(customerInvitesToClaim(rows, ['ada@example.com'], now), ['alpha', 'beta'])
+  // Accepting one does not spend the other.
+  assert.deepEqual(customerInvitesToClaim([rows[1]!], ['ada@example.com'], now), ['beta'])
+})
+
 test('the address match ignores case', () => {
   const rows = [{ id: 'c1', email: 'Ada@Example.com', acceptedAt: null, expiresAt: later }]
   assert.deepEqual(customerInvitesToClaim(rows, ['ada@example.com'], now), ['c1'])
