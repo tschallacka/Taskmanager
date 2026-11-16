@@ -95,6 +95,15 @@ test('the project members pickers (team, row role, add user, add role) use AppSe
   assert.match(members, /:options="roleOptions"/)
 })
 
+test('the board share guest role pickers (invite form and each guest row) use AppSelect', () => {
+  const share = read('app/components/BoardShare.vue')
+  assert.doesNotMatch(share, /<select[\s>]/, 'the guest role pickers are no longer native selects')
+  assert.match(share, /<AppSelect\s[\s\S]*?data-share-role/)
+  assert.match(share, /<AppSelect\s[\s\S]*?:aria-label="`Role of \$\{guest\.name\}`"/)
+  assert.match(share, /:options="guestRoleOptions"/)
+  assert.match(share, /@update:model-value="\(value\) => changeGuestRole\(guest, asGuestRole\(value\)\)"/)
+})
+
 test('the team invite role select uses AppSelect, and Admin is offered to owners only', () => {
   const invites = read('app/components/TeamInvitesPanel.vue')
   assert.doesNotMatch(invites, /<select[\s>]/, 'the role select is no longer a native select')
