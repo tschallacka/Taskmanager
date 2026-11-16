@@ -130,6 +130,15 @@ test('the rule step pickers (kind, column, person, visibility, yes or no) use Ap
   assert.match(step, /const NONE = '__none__'/, 'an empty choice (nobody, anyone) uses a sentinel, since an item cannot have an empty value')
 })
 
+test('the custom field select cell uses AppSelect, keeps its clicks from the row, and reports a cleared value as null', () => {
+  const field = read('app/components/kanban/FieldInput.vue')
+  assert.doesNotMatch(field, /<select[\s>]/, 'the field select is no longer a native select')
+  assert.match(field, /<AppSelect\s[\s\S]*?:data-field-input="field\.name"/)
+  assert.match(field, /<span[^>]*@click\.stop[^>]*>\s*<AppSelect/, 'the picker sits in a wrapper that stops the click from reaching the row')
+  assert.match(field, /const NONE = '__none__'/, 'the empty choice uses a sentinel, since an item cannot have an empty value')
+  assert.match(field, /emit\('change', raw === '' \? null : raw\)/, 'an empty choice still reports null')
+})
+
 test('the team invite role select uses AppSelect, and Admin is offered to owners only', () => {
   const invites = read('app/components/TeamInvitesPanel.vue')
   assert.doesNotMatch(invites, /<select[\s>]/, 'the role select is no longer a native select')
