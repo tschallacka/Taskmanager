@@ -12,14 +12,15 @@ const { ready, projects, allTasks, deleteProject, renameProject } = useProjects(
 const route = useRoute()
 const { unread: inboxUnread } = useNotifications()
 const { pins, pinsLoaded, loadPins, isPinned, pinBoard, unpinBoard } = usePins()
-const { activeTeamId, teams } = useTeams()
+const { activeTeamId, teams, isPending: teamsPending } = useTeams()
 
 // A customer contact or guest sees the projects shared with them in their own group (AppSidebar), so the PROJECTS list
-// leaves them out for a person with no team: each shared project is listed once.
-const { data: sharedData } = useFetch<{ groups: { projects: { id: string }[] }[], contact: boolean }>('/api/shared-with-me', { server: false, lazy: true })
+// leaves them out for a person with no team: each shared project is listed once. Like the sidebar, nothing is hidden
+// while the teams load.
+const { data: sharedData } = useFetch<{ groups: { projects: { id: string }[] }[], contact: boolean }>('/api/shared-with-me', { key: 'shared-with-me', server: false, lazy: true })
 const sharedIds = computed(() => new Set((sharedData.value?.groups ?? []).flatMap(group => group.projects.map(project => project.id))))
-const listedProjects = computed(() => projects.value.filter(project => panelListsProject({ teamCount: teams.value.length, sharedIds: sharedIds.value }, project.id)))
-const mayCreate = computed(() => mayCreateProjects({ teamCount: teams.value.length, contact: sharedData.value?.contact ?? false }))
+const listedProjects = computed(() => projects.value.filter(project => panelListsProject({ teamCount: teams.value.length, sharedIds: sharedIds.value, teamsPending: teamsPending.value }, project.id)))
+const mayCreate = computed(() => mayCreateProjects({ teamCount: teams.value.length, contact: sharedData.value?.contact ?? false, teamsPending: teamsPending.value }))
 const { switchWorkspace } = useWorkspace()
 const toast = useToast()
 
@@ -384,6 +385,7 @@ function menuItems(project: Project) {
     <div class="flex items-center justify-between px-2 pb-1">
       <span class="text-xs font-semibold uppercase tracking-wider text-dimmed">Projects</span>
       <UButton
+        v-if="mayCreate"
         icon="i-lucide-plus"
         size="xs"
         color="neutral"

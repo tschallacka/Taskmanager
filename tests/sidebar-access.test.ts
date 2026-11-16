@@ -21,6 +21,11 @@ test('a shared project is listed in its group only, not again under PROJECTS, fo
   assert.equal(panelListsProject({ teamCount: 0, sharedIds: new Set(['p1']) }, 'own'), true, 'their own board stays listed')
 })
 
+test('while the teams are still loading, nothing is hidden and nothing is offered', () => {
+  assert.equal(panelListsProject({ teamCount: 0, sharedIds: new Set(['p1']), teamsPending: true }, 'p1'), true)
+  assert.equal(mayCreateProjects({ teamCount: 0, contact: true, teamsPending: true }), false)
+})
+
 test('a team member keeps every project in PROJECTS, shared or not', () => {
   assert.equal(panelListsProject({ teamCount: 1, sharedIds: new Set(['p1']) }, 'p1'), true)
 })

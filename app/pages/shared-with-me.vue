@@ -7,7 +7,7 @@ useSeoMeta({ title: 'Shared with you' })
 
 // The projects a customer contact can open, by customer. Nothing here can be created: this is what was shared.
 type SharedGroup = { key: string, label: string, projects: { id: string, name: string }[] }
-const { data, status } = await useFetch<{ groups: SharedGroup[] }>('/api/shared-with-me', { server: false, lazy: true })
+const { data, status } = await useFetch<{ groups: SharedGroup[] }>('/api/shared-with-me', { key: 'shared-with-me', server: false, lazy: true })
 const groups = computed(() => data.value?.groups ?? [])
 </script>
 

@@ -19,11 +19,17 @@ export function sidebarAccess(input: { teamCount: number, sharedGroups: SharedGr
 }
 
 /** A person with no team and nothing of their own to see is not offered Create one (a contact only follows boards). */
-export function mayCreateProjects(input: { teamCount: number, contact: boolean }): boolean {
+export function mayCreateProjects(input: { teamCount: number, contact: boolean, teamsPending?: boolean }): boolean {
+  // While the teams load, nothing is offered: the answer is not known yet.
+  if (input.teamsPending) return false
   return !(input.teamCount === 0 && input.contact)
 }
 
-/** Whether the PROJECTS list shows a project: a person with no team sees their shared projects in their group only. */
-export function panelListsProject(input: { teamCount: number, sharedIds: Set<string> }, projectId: string): boolean {
+/**
+ * Whether the PROJECTS list shows a project: a person with no team sees their shared projects in their group only.
+ * While the teams load, every project stays listed (as the sidebar keeps its team items while loading).
+ */
+export function panelListsProject(input: { teamCount: number, sharedIds: Set<string>, teamsPending?: boolean }, projectId: string): boolean {
+  if (input.teamsPending) return true
   return !(input.teamCount === 0 && input.sharedIds.has(projectId))
 }

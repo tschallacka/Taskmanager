@@ -9,7 +9,7 @@ const { teams, activeTeamId, setActiveTeam, isPending: teamsPending } = useTeams
 const route = useRoute()
 
 // A customer contact or guest with no team and no board goes to the shared list, not to the first-project form.
-const { data: sharedData, status: sharedStatus } = useFetch<{ contact: boolean }>('/api/shared-with-me', { server: false, lazy: true })
+const { data: sharedData, status: sharedStatus } = useFetch<{ contact: boolean }>('/api/shared-with-me', { key: 'shared-with-me', server: false, lazy: true })
 const contactOnlyEntry = computed(() => !teamsPending.value && ready.value && sharedData.value
   ? entryFor({ asksNew: route.query.new === '1', hasProjects: projects.value.length > 0, teamCount: teams.value.length, contact: sharedData.value.contact })
   : null)

@@ -11,7 +11,7 @@ const { teams, isPending: teamsPending } = useTeams()
 
 // The projects shared with a customer contact, by organisation. Team items show only for a team member.
 type SharedGroup = { label: string, projects: { id: string, name: string }[] }
-const { data: sharedData } = useFetch<{ groups: SharedGroup[] }>('/api/shared-with-me', { server: false, lazy: true })
+const { data: sharedData } = useFetch<{ groups: SharedGroup[] }>('/api/shared-with-me', { key: 'shared-with-me', server: false, lazy: true })
 const access = computed(() => sidebarAccess({
   teamCount: teams.value.length,
   sharedGroups: (sharedData.value?.groups ?? []).map(group => ({ organizationName: group.label, projects: group.projects }))
