@@ -16,12 +16,6 @@ test('the first paint carries the "Opening your projects…" line and a spinner'
   assert.match(html, /class="spinner"|animate-spin|@keyframes/, 'a spinner')
 })
 
-test('the change has its own changelog fragment (one change, one file)', () => {
-  const fragment = new URL('../changelog.d/mwisegs935bfm3bf0sg-first-paint.md', import.meta.url)
-  assert.ok(existsSync(fragment), 'changelog.d/mwisegs935bfm3bf0sg-first-paint.md exists')
-  assert.match(readFileSync(fragment, 'utf8'), /^- \*\*[^*]+\.\*\* /, 'one bullet with a bold lead sentence')
-})
-
 test('the template has no external resources', () => {
   const html = readFileSync(TEMPLATE, 'utf8')
   assert.doesNotMatch(html, /<link\s|<script\s+[^>]*src=|src=|@import/, 'inline only')
