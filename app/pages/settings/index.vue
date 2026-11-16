@@ -556,6 +556,9 @@ function swatchStyle(color: string, selected: boolean) {
             </div>
           </div>
         </UContainer>
+        <div class="pb-6">
+          <LegalLinks />
+        </div>
       </div>
     </div>
   </div>

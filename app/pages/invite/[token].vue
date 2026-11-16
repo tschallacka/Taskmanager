@@ -207,6 +207,7 @@ async function accept() {
           </p>
         </template>
       </template>
+      <LegalLinks />
     </div>
   </div>
 </template>
