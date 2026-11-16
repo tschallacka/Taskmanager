@@ -1,11 +1,12 @@
 import { and, eq, isNull } from 'drizzle-orm'
 import { db } from '../db'
-import { customerInvitations, customerMembers, customers, projects } from '../db/schema'
+import { customerInvitations, customerMembers, customers } from '../db/schema'
 import { addressesOfUser } from '../utils/extraEmails'
 import { genId } from '../utils/projects'
 import { tiedInviteIsAcceptable } from '../utils/customerInviteRules'
 import { guestProjectIdsOf } from '../utils/guests'
 import { sharedProjectIds } from '../utils/sharedProjectIds'
+import { projectsSharedWith } from '../utils/customerProjects'
 
 // Accepts one pending invitation from the pending-invitations page: it must be tied to one of the signed-in account's
 // addresses, open and unexpired. The account becomes a contact of that customer.
@@ -35,7 +36,7 @@ export default defineEventHandler(async (event) => {
   await db.insert(customerMembers).values({ id: genId(), customerId: claimed.customerId, userId: event.context.session.user.id, createdAt: now }).onConflictDoNothing()
   const [customer] = await db.select({ name: customers.name }).from(customers).where(eq(customers.id, claimed.customerId))
   // Where it lands (see utils/inviteLanding): the one project, or the shared list.
-  const customerShared = await db.select({ id: projects.id }).from(projects).where(eq(projects.customerId, claimed.customerId))
+  const customerShared = await projectsSharedWith(claimed.customerId)
   const guestShared = await guestProjectIdsOf(event.context.session.user.id)
   return {
     ok: true,

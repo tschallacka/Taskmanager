@@ -1,5 +1,5 @@
 import { db } from '../../../db'
-import { customerInvitations, customers, organization, projects } from '../../../db/schema'
+import { customerInvitations, customers, organization } from '../../../db/schema'
 import { eq } from 'drizzle-orm'
 import { hashInvitationToken, INVITATION_COOKIE } from '../../../utils/customers'
 import { auth } from '../../../lib/auth'
@@ -8,6 +8,7 @@ import { addressesOfUser } from '../../../utils/extraEmails'
 import { guestProjectIdsOf } from '../../../utils/guests'
 import { sharedProjectIds } from '../../../utils/sharedProjectIds'
 import { pendingBoardProjectIdsFor } from '../../../utils/pendingInvites'
+import { projectsSharedWith } from '../../../utils/customerProjects'
 
 // What an invitation link is for, readable before signing in: the invite page
 // has to say whose portal, team or board it opens. Opening it also drops the token in a cookie,
@@ -60,7 +61,7 @@ export default defineEventHandler(async (event) => {
 
   // How many projects are shared with this person as a customer contact: the customer's projects, and the boards
   // they hold as a guest when they are signed in. The page says before accepting that there are none yet.
-  const customerShared = await db.select({ id: projects.id }).from(projects).where(eq(projects.customerId, row.customerId))
+  const customerShared = await projectsSharedWith(row.customerId)
   const session = await auth.api.getSession({ headers: event.headers }).catch(() => null)
   const guestShared = session ? await guestProjectIdsOf(session.user.id) : []
   // Board invitations already sent to this account's address count too: accepting claims them (see utils/pendingInvites).

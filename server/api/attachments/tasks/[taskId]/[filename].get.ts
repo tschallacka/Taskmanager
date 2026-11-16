@@ -8,7 +8,16 @@ import { isTeamMember } from '#server/utils/auth-helpers'
 import { isStaffOfShadowedBoard } from '#server/utils/crewBoardAccess'
 import { hiddenCrewShadows, isCrewShadow } from '#server/utils/boardTree'
 import { guestRowOf } from '#server/utils/guests'
+import { sharedCustomerIdsOf } from '#server/utils/customerProjects'
 import { ATTACHMENT_MIME, SAFE_FILENAME, SAFE_ID, taskAttachmentDir } from '#server/utils/attachments'
+
+// A contact of any customer the project is shared with (a project can be shared with several customers).
+async function isContactOfSharingCustomer(userId: string, projectId: string): Promise<boolean> {
+  for (const customerId of await sharedCustomerIdsOf(projectId)) {
+    if (await isCustomerContact(userId, customerId)) return true
+  }
+  return false
+}
 
 // Serves an image uploaded into a task description. Readable by whoever can
 // read the task: its board's owner or team, a contact of the board's customer
@@ -27,7 +36,6 @@ export default defineEventHandler(async (event) => {
       projectId: projects.id,
       userId: projects.userId,
       teamId: projects.teamId,
-      customerId: projects.customerId,
       isPublic: projects.isPublic,
       publicUntil: projects.publicUntil,
       visibility: projectTasks.visibility
@@ -52,7 +60,7 @@ export default defineEventHandler(async (event) => {
     const allowed = userId !== undefined && (
       userId === row.userId
       || (row.teamId ? await isTeamMember(userId, row.teamId) : false)
-      || (sharedWithCustomers && row.customerId ? await isCustomerContact(userId, row.customerId) : false)
+      || (sharedWithCustomers ? await isContactOfSharingCustomer(userId, row.projectId) : false)
       // A guest of the board reads what is not marked private, like a customer's contact.
       || (sharedWithCustomers && Boolean(await guestRowOf(row.projectId, userId)))
       // The staff of a real board read the shadow board its crew keeps in another team.
