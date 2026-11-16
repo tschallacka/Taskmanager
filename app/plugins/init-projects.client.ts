@@ -1,7 +1,7 @@
 import MiniSearch from 'minisearch'
 import { initProjectsStore } from '~/composables/useProjects'
 import { loadInitialProjects } from '~/utils/projectsInitialLoad'
-import type { Project, TaskSearchRow } from '~/composables/useProjects'
+import type { Project } from '~/composables/useProjects'
 import { authClient } from '~/composables/useAuth'
 
 type BoardSearchDoc = { id: string, type: 'project' | 'task', name: string, title: string, descriptionText: string }
@@ -35,10 +35,10 @@ export default defineNuxtPlugin(async () => {
   })
 
   // A failed first read is retried once, and the store is initialised only with the full answer, so the search index is set. If the
-  // retry fails too, the store stays not ready and the page keeps its loading line (not "No projects yet").
+  // retry fails too, the store stays not ready and the page keeps its loading line (not "No projects yet"). The task list is loaded
+  // on first use (ensureTasks), not here.
   await loadInitialProjects(
     () => $fetch<Project[]>('/api/projects'),
-    () => $fetch<TaskSearchRow[]>('/api/tasks'),
-    (projects, tasks) => initProjectsStore(projects, tasks, boardSearch)
+    projects => initProjectsStore(projects, boardSearch)
   )
 })
