@@ -46,6 +46,16 @@ case "$EVENT" in
   stop)
     has_listener && exit 0
     case "$INPUT" in *'"stop_hook_active":true'*|*'"stop_hook_active": true'*) exit 0 ;; esac
+    # A board that does not answer JSON is an outage: the listener retries by itself (board-retry.mjs), so starting one
+    # now would only meet the same outage. Say so, and let her stop; a healthy board with no listener still blocks.
+    health=$(node "$KIT/board-health.mjs" "$CREW" 2>/dev/null)
+    case "$health" in
+      down*)
+        reason=$(printf '%s' "${health#down: }" | sed 's/\\/\\\\/g; s/"/\\"/g')
+        printf '{"systemMessage":"Your board listener is not running, but the board is unreachable (%s). The kit retries by itself; start the listener once the board answers, and you may stop now."}\n' "$reason"
+        exit 0
+        ;;
+    esac
     printf '{"decision":"block","reason":"Your own board listener is not running. Start it now with your Bash tool, run_in_background: true (never nohup): %s . Then you may stop."}\n' "$JSON_START"
     ;;
   sessionstart)
