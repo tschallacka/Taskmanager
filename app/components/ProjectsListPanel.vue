@@ -23,7 +23,8 @@ const sharedIds = computed(() => new Set((sharedData.value?.groups ?? []).flatMa
 const listedProjects = computed(() => projects.value.filter(project => panelListsProject({ teamCount: teams.value.length, sharedIds: sharedIds.value, teamsPending: teamsPending.value }, project.id)))
 const mayCreate = computed(() => mayCreateProjects({ teamCount: teams.value.length, contact: sharedData.value?.contact ?? false, teamsPending: teamsPending.value }))
 // A person who signs in again in a new browser starts in the personal workspace; the projects page then opens their team (and reloads).
-// Until that happens the list is empty for them, so the empty line waits.
+// Until that happens the list is empty for them, so the empty line waits. asksNew is false here on purpose: the sidebar's own "new project"
+// link (?new=1) is not a reason to keep the team unopened, so only the projects page reads it.
 const openingTeam = computed(() => teamToOpenFor({ asksNew: false, hasProjects: projects.value.length > 0, activeTeamId: activeTeamId.value, teamIds: teams.value.map(team => team.id) }) !== null)
 const { switchWorkspace } = useWorkspace()
 const toast = useToast()
