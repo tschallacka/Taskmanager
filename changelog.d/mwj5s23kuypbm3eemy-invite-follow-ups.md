@@ -1,0 +1,1 @@
+- **New visitors follow the system colour mode.** A visitor with no stored choice gets System, not a fixed dark theme; a stored choice is kept. Files: `nuxt.config.ts`, `tests/color-mode-default.test.ts`.
