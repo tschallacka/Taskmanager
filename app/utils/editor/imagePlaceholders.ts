@@ -66,6 +66,12 @@ export function saveText(text: string, placeholders: Placeholder[]): string {
   })
 }
 
+/** The text a placeholder shows in the editor: "Uploading image…" while pending, the failure line with its reason once failed. */
+export function placeholderLabel(item: Placeholder): string {
+  if (item.state === 'failed') return `Image failed to upload: ${item.error ?? 'unknown error'}`
+  return 'Uploading image…'
+}
+
 /** The saved HTML without the pending placeholders: an unfinished image is never saved as content. Failed lines stay. */
 export function stripPendingPlaceholders(html: string): string {
   return html.replace(/<span[^>]*data-image-placeholder="[^"]*"[^>]*data-state="pending"[^>]*>[\s\S]*?<\/span>/g, '')
