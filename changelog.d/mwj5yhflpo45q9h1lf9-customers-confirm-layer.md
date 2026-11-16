@@ -1,0 +1,1 @@
+- **The Customers popup's confirmation opens on top.** "Remove customer?" (and remove contact, revoke link) opened behind the Customers popup, so a customer could not be deleted. The confirmation now uses the app's modal layer like every other modal and is declared after the popup. Files: `app/components/CustomersModal.vue`, `tests/customers-confirm-layer.test.ts`.
