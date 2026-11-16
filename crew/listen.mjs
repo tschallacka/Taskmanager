@@ -15,6 +15,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { config, here, loadCreds } from './config.mjs'
 import { parseListenState } from './listen-state.mjs'
+import { boardRequest } from './board-retry.mjs'
 import { writePidFile } from './pidfile.mjs'
 
 const creds = loadCreds()
@@ -50,13 +51,17 @@ function chat(args) {
   }
 }
 
+// A board outage (a deploy answers HTML or a 502) is waited out inside the call (board-retry.mjs), so the listener
+// keeps listening and never ends for it; only a 4xx, a fault, is thrown.
 async function mcp(name, args) {
-  const res = await fetch(`${creds.base}/api/mcp`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'accept': 'application/json, text/event-stream', 'authorization': `Bearer ${me.apiKey}` },
-    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } })
+  const body = await boardRequest({
+    url: `${creds.base}/api/mcp`,
+    init: {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'accept': 'application/json, text/event-stream', 'authorization': `Bearer ${me.apiKey}` },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } })
+    }
   })
-  const body = await res.json()
   try {
     return JSON.parse(body.result?.content?.[0]?.text ?? 'null')
   } catch {
