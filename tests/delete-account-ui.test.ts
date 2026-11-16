@@ -66,3 +66,17 @@ test('the dialog shows the consequences, the typed confirmation, and the team re
   assert.match(panel, /to="\/team"/)
   assert.match(panel, /v-for="line in lines"/)
 })
+
+test('the dialog footer stacks its two buttons at phone width, and end-aligns them from sm up', () => {
+  // Quincy, 390 px: "Keep my account" was clipped off the left edge while the footer only justified to the end. The
+  // footer is a column under sm and a row from sm up, so both buttons stay inside the dialog at 390 px.
+  const panel = read('app/components/DeleteAccountPanel.vue')
+  const footer = /<template #footer>\s*<div class="([^"]+)"/.exec(panel)
+  assert.ok(footer, 'the footer has a div with classes')
+  const classes = footer[1]!.split(/\s+/)
+  assert.ok(classes.includes('flex'), 'the footer is a flex container')
+  assert.ok(classes.includes('flex-col'), 'the buttons stack on a phone')
+  assert.ok(classes.includes('sm:flex-row'), 'the buttons sit in a row from sm up')
+  assert.ok(classes.includes('sm:justify-end'), 'the row is end-aligned from sm up')
+  assert.ok(!classes.includes('justify-end'), 'justify-end at phone width is what clipped the button')
+})

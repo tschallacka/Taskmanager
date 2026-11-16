@@ -115,7 +115,7 @@ async function remove() {
         </div>
       </template>
       <template #footer>
-        <div class="flex w-full justify-end gap-2">
+        <div class="flex w-full flex-col gap-2 sm:flex-row sm:justify-end">
           <UButton
             label="Keep my account"
             color="neutral"
