@@ -34,3 +34,17 @@ export function reviewLine({ boss, owner }) {
   if (owner.length) parts.push(part('Owner', owner))
   return parts.length ? `Waiting for a human. ${parts.join('. ')}.` : ''
 }
+
+/**
+ * One round of the line. The line is logged (dry-run) or mailed to Boss (live, switch on) only when it changes from the
+ * previous round. Live with the switch off logs that. A board that was not read keeps the previous line. The caller
+ * stores `line` as the previous line only after a mail went out, so a failed mail is tried again on the next round.
+ */
+export function reviewRound({ cards, now, previous = '', live = false, enabled = false }) {
+  if (!cards) return { line: previous, mail: null, lines: [] }
+  const line = reviewLine(reviewNeeds(cards, now))
+  if (line === previous || line === '') return { line, mail: null, lines: [] }
+  if (!live) return { line, mail: null, lines: [line] }
+  if (!enabled) return { line, mail: null, lines: [`review needs off (susy.dispatch.reviewNeeds is not true): ${line}`] }
+  return { line, mail: line, lines: [] }
+}
