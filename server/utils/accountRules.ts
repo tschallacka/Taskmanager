@@ -8,7 +8,8 @@
 
 export const DELETED_USER_ID = 'deleted-user'
 
-export type AccountRule = 'delete' | 'tombstone' | 'null' | 'by-scope'
+// 'delete-by-key': the column holds a crew person's key, not a user id: the rows whose key is the person's go.
+export type AccountRule = 'delete' | 'tombstone' | 'null' | 'by-scope' | 'delete-by-key'
 
 export const ACCOUNT_RULES = {
   // Sign-in material and the person's own settings: deleted.
@@ -75,7 +76,10 @@ export const ACCOUNT_RULES = {
   'task_dependencies.created_by': 'null',
   'pairing_device_requests.approved_by': 'null',
   'api_key_secrets.actor_id': 'null',
-  'github_delivery_failures.handled_by': 'null'
+  'github_delivery_failures.handled_by': 'null',
+  // A crew account's correspondence: its rows go with the person (see deleteCrewMailFor).
+  'crew_mail.from_key': 'delete-by-key',
+  'crew_mail.to_key': 'delete-by-key'
 } as const satisfies Record<string, AccountRule>
 
 // Columns that hold a person's name with no foreign key to the user table. They are part of the same coverage.

@@ -3,14 +3,14 @@
 // and its avatar folder; a team board, or a personal one someone else is on, stays with the 'Deleted user' name.
 import { existsSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
-import { and, eq, isNull, like, ne, or } from 'drizzle-orm'
+import { and, eq, inArray, isNull, like, ne, or } from 'drizzle-orm'
 import { getTableConfig } from 'drizzle-orm/pg-core'
 import { db } from '../db'
 import * as schema from '../db/schema'
 import { ACCOUNT_RULES, DELETED_USER_ID } from './accountRules'
 import type { AccountRule } from './accountRules'
 import { removeTaskAttachments } from './attachments'
-import { isCrewAddress } from './crewAccounts'
+import { isCrewAddress, personKeyOf } from './crewAccounts'
 
 const DELETED_EMAIL = 'deleted-user@deleted.invalid'
 
@@ -53,6 +53,30 @@ async function applyColumnRule(tx: typeof db, tableName: string, columnName: str
   } else {
     await tx.update(table).set({ [key]: null } as never).where(eq(column, userId))
   }
+}
+
+/**
+ * The crew key of a crew account, and its crew: the key its crew mail is sent and received under. A person who is not a
+ * crew account has none, and so no crew mail (crew mail is only between crew accounts).
+ */
+export async function crewMailKeyOf(tx: Pick<typeof db, 'select'>, userId: string): Promise<{ crewId: string, key: string } | null> {
+  const [person] = await tx.select().from(schema.user).where(eq(schema.user.id, userId))
+  if (!person || !person.crewId || !isCrewAddress(person.email)) return null
+  const [crew] = await tx.select().from(schema.crews).where(eq(schema.crews.id, person.crewId))
+  if (!crew) return null
+  return { crewId: crew.id, key: personKeyOf(crew.slug, person.email) }
+}
+
+/**
+ * Deletes the crew mail where a key is the sender or the recipient, within one crew. Returns the number of rows removed.
+ * An empty key list removes nothing.
+ */
+export async function deleteCrewMailFor(tx: Pick<typeof db, 'delete'>, crewId: string, keys: string[]): Promise<number> {
+  if (keys.length === 0) return 0
+  const gone = await tx.delete(schema.crewMail)
+    .where(and(eq(schema.crewMail.crewId, crewId), or(inArray(schema.crewMail.fromKey, keys), inArray(schema.crewMail.toKey, keys))))
+    .returning({ id: schema.crewMail.id })
+  return gone.length
 }
 
 /** The tombstone row: the name shown for the person's kept work. Created once; it cannot sign in. */
@@ -145,9 +169,13 @@ export async function deleteAccount(userId: string): Promise<DeletionResult> {
     await tx.delete(schema.portfolios).where(and(eq(schema.portfolios.userId, userId), isNull(schema.portfolios.teamId)))
     await tx.update(schema.portfolios).set({ userId: DELETED_USER_ID }).where(eq(schema.portfolios.userId, userId))
 
+    // Crew mail: the rows of the person's crew key, when the person is a crew account (see crewMailKeyOf).
+    const mail = await crewMailKeyOf(tx, userId)
+    if (mail) await deleteCrewMailFor(tx, mail.crewId, [mail.key])
+
     // Every other column, by its rule.
     for (const [key, rule] of Object.entries(ACCOUNT_RULES)) {
-      if (rule === 'by-scope') continue
+      if (rule === 'by-scope' || rule === 'delete-by-key') continue
       const [tableName, columnName] = key.split('.') as [string, string]
       await applyColumnRule(tx, tableName, columnName, rule, userId)
     }
