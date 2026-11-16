@@ -1,0 +1,1 @@
+- **Crew kit: Susy's role text names the absent line.** SUSY.md says that Susy checks absence for the four workers only, and that she sends Pia one line for someone who is not running. CREW.md names that line in "How the PM starts a worker or reviewer". Files: `crew/SUSY.md.tmpl`, `crew/CREW.md.tmpl`.
