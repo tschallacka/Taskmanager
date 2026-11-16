@@ -4,9 +4,13 @@ import type { LegalDoc } from '#shared/utils/legalDocs'
 
 // One legal document, public: its version and dates at the top, then the text. The page is in the look of the sign-in
 // page. A document that is not published answers 404 from the API, and the page is then a 404 too.
-const props = defineProps<{ name: 'privacy' | 'imprint' }>()
+// With a version, it is that archived version as it was in force (the archive page); without one, the current document.
+const props = defineProps<{ name: 'privacy' | 'imprint', version?: string }>()
 
-const { data: doc, error } = await useFetch<LegalDoc>(() => `/api/legal/${props.name}`, { server: false })
+const { data: doc, error } = await useFetch<LegalDoc>(
+  () => (props.version ? `/api/legal/${props.name}/archive/${props.version}` : `/api/legal/${props.name}`),
+  { server: false }
+)
 if (error.value) throw createError({ statusCode: 404, statusMessage: 'Not found' })
 
 const dateLabel = (day: string) => new Date(`${day}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
