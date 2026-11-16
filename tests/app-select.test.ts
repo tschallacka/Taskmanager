@@ -47,6 +47,14 @@ test('the team rule mode picker uses AppSelect with its two modes, and switches 
   assert.match(builder, /@update:model-value="setModeFromPicker"/)
 })
 
+test('the draft task board picker uses AppSelect with the boards as options', () => {
+  const draft = read('app/components/DraftTaskModal.vue')
+  assert.doesNotMatch(draft, /<select[\s>]/, 'the board picker is no longer a native select')
+  assert.match(draft, /<AppSelect\s[\s\S]*?data-draft-project/)
+  assert.match(draft, /:options="boardOptions"/)
+  assert.match(draft, /const boardOptions = computed\(\(\) => props\.boards\.map\(board => \(\{ label: board\.name, value: board\.id \}\)\)\)/)
+})
+
 test('the team invite role select uses AppSelect, and Admin is offered to owners only', () => {
   const invites = read('app/components/TeamInvitesPanel.vue')
   assert.doesNotMatch(invites, /<select[\s>]/, 'the role select is no longer a native select')
