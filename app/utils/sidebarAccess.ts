@@ -17,3 +17,13 @@ export function sidebarAccess(input: { teamCount: number, sharedGroups: SharedGr
     groups: input.sharedGroups.map(group => ({ label: group.organizationName, projects: group.projects }))
   }
 }
+
+/** A person with no team and nothing of their own to see is not offered Create one (a contact only follows boards). */
+export function mayCreateProjects(input: { teamCount: number, contact: boolean }): boolean {
+  return !(input.teamCount === 0 && input.contact)
+}
+
+/** Whether the PROJECTS list shows a project: a person with no team sees their shared projects in their group only. */
+export function panelListsProject(input: { teamCount: number, sharedIds: Set<string> }, projectId: string): boolean {
+  return !(input.teamCount === 0 && input.sharedIds.has(projectId))
+}

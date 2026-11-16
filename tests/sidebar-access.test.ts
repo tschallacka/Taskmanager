@@ -5,7 +5,25 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { sidebarAccess } from '../app/utils/sidebarAccess'
+import { mayCreateProjects, panelListsProject, sidebarAccess } from '../app/utils/sidebarAccess'
+
+test('a customer contact with no team and nothing shared is not offered Create one', () => {
+  assert.equal(mayCreateProjects({ teamCount: 0, contact: true }), false)
+})
+
+test('a team member, or a person who is not a contact, may still create', () => {
+  assert.equal(mayCreateProjects({ teamCount: 1, contact: true }), true)
+  assert.equal(mayCreateProjects({ teamCount: 0, contact: false }), true)
+})
+
+test('a shared project is listed in its group only, not again under PROJECTS, for a person with no team', () => {
+  assert.equal(panelListsProject({ teamCount: 0, sharedIds: new Set(['p1']) }, 'p1'), false)
+  assert.equal(panelListsProject({ teamCount: 0, sharedIds: new Set(['p1']) }, 'own'), true, 'their own board stays listed')
+})
+
+test('a team member keeps every project in PROJECTS, shared or not', () => {
+  assert.equal(panelListsProject({ teamCount: 1, sharedIds: new Set(['p1']) }, 'p1'), true)
+})
 
 const shared = [
   { organizationName: 'Tschallacka\'s Organisation', projects: [{ id: 'p1', name: 'Garden plan' }] }
