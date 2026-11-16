@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { entryFor, mayShowFirstProjectForm, redirectPending, sharedDecided } from '~/utils/projectsEntry'
+import { entryFor, firstRedirect, mayShowFirstProjectForm, redirectPending, sharedDecided } from '~/utils/projectsEntry'
 import { selectTeamOrStay, teamRedirectAllowed, teamToOpenFor } from '~/utils/teamEntry'
 import { pendingInviteEntry } from '~/utils/pendingInviteEntry'
 
@@ -14,15 +14,13 @@ const { data: sharedData, status: sharedStatus } = useFetch<{ contact: boolean, 
 const contactOnlyEntry = computed(() => !teamsPending.value && ready.value && sharedData.value
   ? entryFor({ asksNew: route.query.new === '1', hasProjects: projects.value.length > 0, teamCount: teams.value.length, contact: sharedData.value.contact })
   : null)
-watch(contactOnlyEntry, (path) => {
-  if (path) navigateTo(path, { replace: true })
-}, { immediate: true })
-
 // Someone who signed up from an invitation link and never pressed Accept goes back to that invitation.
 const inviteEntry = computed(() => !teamsPending.value && ready.value && sharedData.value
   ? pendingInviteEntry({ asksNew: route.query.new === '1', hasProjects: projects.value.length > 0, teamCount: teams.value.length, inviteToken: sharedData.value.inviteToken })
   : null)
-watch(inviteEntry, (path) => {
+
+// One navigation for the two (see firstRedirect): the invitation first, then the shared list.
+watch(() => firstRedirect(contactOnlyEntry.value, inviteEntry.value), (path) => {
   if (path) navigateTo(path, { replace: true })
 }, { immediate: true })
 
