@@ -28,3 +28,11 @@ test('the confirmation is declared after the customers popup, so at equal layer 
   const confirm = source.indexOf('v-model:open="isConfirmOpen"')
   assert.ok(popup > 0 && confirm > popup, 'the confirmation UModal comes after the popup UModal in the template')
 })
+
+test('a long confirmation title wraps and keeps clear of the close button (390 px)', () => {
+  const source = read('app/components/CustomersModal.vue')
+  const confirm = source.slice(source.lastIndexOf('<UModal', source.indexOf('v-model:open="isConfirmOpen"')))
+  const ui = confirm.slice(0, confirm.indexOf('>'))
+  assert.match(ui, /title: '[^']*break-words/, 'the title may break long words')
+  assert.match(ui, /title: '[^']*pe-10/, 'the title leaves room for the close button')
+})

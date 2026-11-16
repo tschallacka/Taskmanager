@@ -465,6 +465,7 @@ function confirmRevoke(customerId: string, invitation: CustomerInvitation) {
       v-model:open="isConfirmOpen"
       :title="confirmRequest?.title"
       :description="confirmRequest?.description"
+      :ui="{ title: 'min-w-0 break-words pe-10' }"
     >
       <template #body>
         <div class="flex justify-end gap-2">
