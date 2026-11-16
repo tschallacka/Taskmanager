@@ -72,6 +72,16 @@ export function placeholderLabel(item: Placeholder): string {
   return 'Uploading image…'
 }
 
+/**
+ * The inline style of a placeholder's bar: a pending one fills to its progress (a fixed partial bar when the length is unknown),
+ * the others have none.
+ */
+export function placeholderBarStyle(state: PlaceholderState, progress: number | null): string {
+  if (state !== 'pending') return ''
+  const value = progress ?? 0.3
+  return `--progress: ${value}; background: linear-gradient(to right, rgba(127, 127, 127, 0.3) calc(var(--progress) * 100%), transparent 0); border-radius: 0.25rem;`
+}
+
 /** The saved HTML without the pending placeholders: an unfinished image is never saved as content. Failed lines stay. */
 export function stripPendingPlaceholders(html: string): string {
   return html.replace(/<span[^>]*data-image-placeholder="[^"]*"[^>]*data-state="pending"[^>]*>[\s\S]*?<\/span>/g, '')

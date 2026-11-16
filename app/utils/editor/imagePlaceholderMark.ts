@@ -2,7 +2,7 @@
 // types around it. The mark renders as a span the saved HTML can recognise (see stripPendingPlaceholders); a pending one shows its
 // progress as a bar through --progress.
 import { Mark, mergeAttributes, type Editor } from '@tiptap/core'
-import { placeholderLabel, type Placeholder } from './imagePlaceholders'
+import { placeholderBarStyle, placeholderLabel, type Placeholder, type PlaceholderState } from './imagePlaceholders'
 
 export const ImagePlaceholderMark = Mark.create({
   name: 'imagePlaceholder',
@@ -19,13 +19,13 @@ export const ImagePlaceholderMark = Mark.create({
     return [{ tag: 'span[data-image-placeholder]' }]
   },
   renderHTML({ HTMLAttributes, mark }) {
-    const state = String(mark.attrs.state)
-    const progress = typeof mark.attrs.progress === 'number' ? `--progress: ${mark.attrs.progress}` : undefined
+    const state = String(mark.attrs.state) as PlaceholderState
+    const progress = typeof mark.attrs.progress === 'number' ? mark.attrs.progress : null
     return ['span', mergeAttributes(HTMLAttributes, {
       'class': 'image-placeholder',
       'data-image-placeholder': mark.attrs.id,
       'data-state': state,
-      'style': state === 'pending' ? progress : undefined
+      'style': placeholderBarStyle(state, progress) || undefined
     }), 0]
   }
 })
@@ -56,7 +56,8 @@ export function insertPlaceholders(editor: Editor, at: number, ids: string[]) {
     ...(i > 0 ? [editor.schema.text(' ')] : []),
     ...pendingNodes(editor, { id, state: 'pending', progress: null })
   ])
-  if (nodes.length) editor.chain().focus().insertContentAt(at, nodes).run()
+  // The nodes are ProseMirror nodes, so they go in as a transaction; insertContentAt would read them as JSON.
+  if (nodes.length) editor.view.dispatch(editor.state.tr.insert(at, nodes).scrollIntoView())
 }
 
 /** Updates a pending placeholder's progress. A placeholder the person has removed is left alone. */
