@@ -6,7 +6,7 @@
 import { after, before, test } from 'node:test'
 import assert from 'node:assert/strict'
 import { randomBytes } from 'node:crypto'
-import { existsSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { createError } from 'h3'
 import { eq, inArray } from 'drizzle-orm'
@@ -18,6 +18,7 @@ const schema = await import('../server/db/schema')
 const { DELETED_USER_ID } = await import('../server/utils/accountRules')
 const { deleteAccount } = await import('../server/utils/accountDeletion')
 const { taskAttachmentDir } = await import('../server/utils/attachments')
+const { avatarDir } = await import('../server/utils/avatarStore')
 const { user, session, organization, member, projects, projectColumns, projectTasks, taskComments, timeEntries, goals, projectMembers } = schema
 
 const tag = randomBytes(4).toString('hex')
@@ -77,6 +78,9 @@ before(async () => {
   const dir = taskAttachmentDir(attachmentTask)
   mkdirSync(dir, { recursive: true })
   writeFileSync(join(dir, 'abc123.png'), 'x')
+  // The profile picture folder: one folder per person, from avatarDir, removed with the account.
+  mkdirSync(avatarDir(leaver), { recursive: true })
+  writeFileSync(join(avatarDir(leaver), `${'a'.repeat(24)}.png`), 'x')
 })
 
 after(async () => {
@@ -84,6 +88,7 @@ after(async () => {
   await db.delete(organization).where(eq(organization.id, team))
   await db.delete(user).where(inArray(user.id, [other, DELETED_USER_ID]))
   rmSync(taskAttachmentDir(attachmentTask), { recursive: true, force: true })
+  rmSync(avatarDir(leaver), { recursive: true, force: true })
   await db.$client.end()
 })
 
@@ -98,6 +103,7 @@ test('deleting an account follows the rules for each kind of data', async () => 
   const [goneTask] = await db.select().from(projectTasks).where(eq(projectTasks.id, taskOnPersonal))
   assert.equal(goneTask, undefined)
   assert.equal(existsSync(taskAttachmentDir(attachmentTask)), false, 'the attachment file is gone from disk')
+  assert.equal(existsSync(avatarDir(leaver)), false, 'the profile picture folder is gone from disk')
   const [goneSession] = await db.select().from(session).where(eq(session.id, sessionId))
   assert.equal(goneSession, undefined)
   const [goneMember] = await db.select().from(member).where(eq(member.userId, leaver))
@@ -144,6 +150,13 @@ test('another person is not touched by the deletion', async () => {
   assert.ok(otherMembership, 'the other owner keeps the team')
   const [otherTaskRow] = await db.select().from(projectTasks).where(eq(projectTasks.id, otherTask))
   assert.equal(otherTaskRow?.createdBy, other)
+})
+
+test('the deletion finds the profile picture folder through avatarStore, not its own path', () => {
+  // A second copy of the path would go stale when avatarStore moves, and a deleted account would keep its picture on disk.
+  const source = readFileSync(join(process.cwd(), 'server', 'utils', 'accountDeletion.ts'), 'utf8')
+  assert.match(source, /avatarDir\(userId\)/)
+  assert.doesNotMatch(source, /'avatars'/)
 })
 
 test('deleting again is a no-op: the person no longer exists', async () => {

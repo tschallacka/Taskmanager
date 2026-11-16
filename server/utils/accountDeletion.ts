@@ -2,7 +2,6 @@
 // carries them out in one transaction. A personal board with no other member goes with its tasks, its attachment files
 // and its avatar folder; a team board, or a personal one someone else is on, stays with the 'Deleted user' name.
 import { existsSync, rmSync } from 'node:fs'
-import { join } from 'node:path'
 import { and, eq, inArray, isNull, like, ne, or } from 'drizzle-orm'
 import { getTableConfig } from 'drizzle-orm/pg-core'
 import { db } from '../db'
@@ -11,6 +10,7 @@ import { ACCOUNT_RULES, DELETED_USER_ID } from './accountRules'
 import type { AccountRule } from './accountRules'
 import { removeTaskAttachments } from './attachments'
 import { isCrewAddress, personKeyOf } from './crewAccounts'
+import { avatarDir } from './avatarStore'
 
 const DELETED_EMAIL = 'deleted-user@deleted.invalid'
 
@@ -138,7 +138,7 @@ export async function deleteAccount(userId: string): Promise<DeletionResult> {
     throw createError({ statusCode: 409, statusMessage: 'Conflict', message: refusal.message, data: { teams: refusal.teams ?? [] } })
   }
   const result: DeletionResult = { deletedBoards: [], tombstonedBoards: [], deletedTasks: [] }
-  const avatarFolder = join(process.cwd(), 'data', 'avatars', userId)
+  const avatarFolder = avatarDir(userId)
 
   await db.transaction(async (tx) => {
     await ensureTombstone(tx)
