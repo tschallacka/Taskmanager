@@ -22,6 +22,7 @@ import { projectsRoot, readWorkerRows, workerStates } from './susy-workers.mjs'
 import { markMailed, sessionErrorReport } from './session-errors.mjs'
 import { planGateRound, settleGateMail } from './susy-gate-wakes.mjs'
 import { offerRound } from './susy-next-card.mjs'
+import { reviewRound } from './susy-review-needs.mjs'
 
 export const TICK_SECONDS = 60
 
@@ -180,6 +181,16 @@ export async function runOnce(home, now = Date.now(), { live = false } = {}) {
     lines.push(...offer.lines.filter(line => !seen.has(line)))
     result.state.offerLines = offer.lines
   }
+  // Phase 4, the review-needs line (card mwf201blsqvx3jczev): the cards that wait for Boss or the owner, as one line. It is
+  // logged, or mailed to Boss in live mode with crew.json susy.dispatch.reviewNeeds true, only when it changes. A mail that
+  // fails keeps the previous line, so it is tried again on the next tick.
+  const review = result.ok
+    ? reviewRound({ cards: result.cards, now, previous: result.state.reviewLine ?? '', live, enabled: crew?.susy?.dispatch?.reviewNeeds === true })
+    : null
+  if (review) {
+    lines.push(...review.lines)
+    if (!review.mail) result.state.reviewLine = review.line
+  }
   if (live) {
     for (const item of errors.pending) {
       try {
@@ -202,6 +213,17 @@ export async function runOnce(home, now = Date.now(), { live = false } = {}) {
         lines.push(`mailed ${mail.to}: gate wake for ${mail.cardId}`)
       } catch (error) {
         lines.push(`could not mail ${mail.to} about ${mail.cardId}, tried again next tick: ${error.message}`)
+      }
+    }
+    // The review-needs line goes to Boss; the stored line is updated only when the mail went out.
+    if (review?.mail) {
+      try {
+        const { sendMail } = await import('./mail-client.mjs')
+        await sendMail({ base: creds.base, slug: creds.crew?.slug, key, to: 'boss', text: review.mail, mailboxDir: `${home}/mailbox`, makeId: () => crypto.randomUUID().replaceAll('-', '') })
+        result.state.reviewLine = review.line
+        lines.push('mailed boss: review needs')
+      } catch (error) {
+        lines.push(`could not mail boss the review line, tried again next tick: ${error.message}`)
       }
     }
     // Next card by mail: the marker goes on the card first; the mail follows only when the marker is posted. A card whose
