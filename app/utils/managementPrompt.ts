@@ -32,7 +32,7 @@ Step 1: get the kit. Keep it in ~/crew-kit-<host>, where <host> is the host name
   Otherwise: mkdir -p ~/crew-kit-<host> && tar -xzf ~/crew-kit.tar.gz -C ~/crew-kit-<host> && cd ~/crew-kit-<host> && npm install
 
 Step 2: make the crew. In the kit folder, run the setup with the token in the environment variable only:
-  cd ~/crew-kit-<host> && TASKMANAGER_MANAGEMENT_TOKEN=<token> node setup.mjs --origin ${origin} --board ${boardId} --repo <repository path>
+  cd ~/crew-kit-<host> && TASKMANAGER_MANAGEMENT_TOKEN=<token> node setup.mjs --origin ${origin} --board ${boardId} --repo <repository path> --worktree-base <folder the repository is in>
   The crew is always new. If the command says the slug is taken, run it again with --slug <another slug>. Never rotate a crew.
   The crew gets its own home, ~/crew-<slug> (the slug the command makes, or the one you passed with --slug). Do not set CREW_HOME, and do not use any other folder. If that folder already holds creds.json, the command stops and changes nothing: use another --slug.
 

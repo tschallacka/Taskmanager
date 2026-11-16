@@ -1,10 +1,13 @@
 import { db } from '../../../db'
-import { customerInvitations, customers, organization } from '../../../db/schema'
+import { customerInvitations, customers, organization, projects } from '../../../db/schema'
 import { eq } from 'drizzle-orm'
 import { hashInvitationToken, INVITATION_COOKIE } from '../../../utils/customers'
 import { auth } from '../../../lib/auth'
 import { lookupAddressedInvitation } from '../../../utils/invitations'
 import { addressesOfUser } from '../../../utils/extraEmails'
+import { guestProjectIdsOf } from '../../../utils/guests'
+import { sharedProjectIds } from '../../../utils/sharedProjectIds'
+import { pendingBoardProjectIdsFor } from '../../../utils/pendingInvites'
 
 // What an invitation link is for, readable before signing in: the invite page
 // has to say whose portal, team or board it opens. Opening it also drops the token in a cookie,
@@ -33,13 +36,14 @@ export default defineEventHandler(async (event) => {
     const forYou = session ? (await addressesOfUser(session.user.id)).includes(addressed.email) : null
     return addressed.kind === 'team'
       ? { kind: 'team' as const, organizationName: addressed.organizationName, inviterName: addressed.inviterName, role: addressed.role, forYou }
-      : { kind: 'board' as const, projectName: addressed.projectName, inviterName: addressed.inviterName, role: addressed.role, forYou }
+      : { kind: 'board' as const, projectName: addressed.projectName, organizationName: addressed.organizationName, inviterName: addressed.inviterName, role: addressed.role, forYou }
   }
 
   const [row] = await db
     .select({
       expiresAt: customerInvitations.expiresAt,
       acceptedAt: customerInvitations.acceptedAt,
+      customerId: customers.id,
       customerName: customers.name,
       organizationName: organization.name
     })
@@ -52,6 +56,19 @@ export default defineEventHandler(async (event) => {
   if (row.acceptedAt) throw createError({ statusCode: 410, message: 'This invitation has already been used' })
   if (row.expiresAt <= Date.now()) throw createError({ statusCode: 410, message: 'This invitation has expired' })
 
+  // How many projects are shared with this person as a customer contact: the customer's projects, and the boards
+  // they hold as a guest when they are signed in. The page says before accepting that there are none yet.
+  const customerShared = await db.select({ id: projects.id }).from(projects).where(eq(projects.customerId, row.customerId))
+  const session = await auth.api.getSession({ headers: event.headers }).catch(() => null)
+  const guestShared = session ? await guestProjectIdsOf(session.user.id) : []
+  // Board invitations already sent to this account's address count too: accepting claims them (see utils/pendingInvites).
+  const pendingIds = session ? await pendingBoardProjectIdsFor(await addressesOfUser(session.user.id), Date.now()) : []
+
   rememberToken()
-  return { kind: 'customer' as const, customerName: row.customerName, organizationName: row.organizationName }
+  return {
+    kind: 'customer' as const,
+    customerName: row.customerName,
+    organizationName: row.organizationName,
+    sharedProjectCount: sharedProjectIds(customerShared.map(project => project.id), [...guestShared, ...pendingIds]).length
+  }
 })

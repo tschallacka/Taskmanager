@@ -271,10 +271,12 @@ onBeforeUnmount(destroySortable)
             @keydown.tab.prevent="onRowTab(sub, $event)"
             @blur="onRowBlur(sub, $event)"
           >
-          <UAvatar
+          <UserAvatar
             v-if="personById(sub.assigneeId)"
-            :src="personById(sub.assigneeId)?.image ?? undefined"
-            :alt="personById(sub.assigneeId)?.name"
+            :user-id="personById(sub.assigneeId)!.id"
+            :name="personById(sub.assigneeId)!.name"
+            :email="personById(sub.assigneeId)!.email"
+            :image="personById(sub.assigneeId)!.image"
             size="3xs"
           />
           <UDropdownMenu

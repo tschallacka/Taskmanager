@@ -1,30 +1,6 @@
 import { auth } from '../lib/auth'
 import { crewAccountLive, isCrewAddress } from '../utils/crewAccounts'
-
-// Everything under these needs a session. `/api/invitations` is deliberately not
-// here: an invite link has to be readable before its recipient has an account.
-const PROTECTED_PREFIXES = [
-  '/api/account',
-  '/api/settings',
-  '/api/ai',
-  '/api/chat',
-  '/api/teams',
-  '/api/projects',
-  '/api/tasks',
-  '/api/columns',
-  '/api/notifications',
-  '/api/pins',
-  '/api/agent-audit',
-  '/api/goals',
-  '/api/portfolios',
-  '/api/time',
-  '/api/timer',
-  '/api/customers',
-  '/api/admin',
-  '/api/github',
-  '/api/help',
-  '/api/people'
-]
+import { isProtectedApiPath } from '../utils/protectedApi'
 
 // The routes that take an API key as well as a session: POST /api/projects/:id/import, POST /api/projects/import
 // and GET /api/projects/:id/backup. Each one authenticates the key and applies its own permission rule.
@@ -39,7 +15,9 @@ export default defineEventHandler(async (event) => {
   if (WEBHOOK_PATHS.includes(path)) return
   // A board import may come with an API key: the route authenticates the key and applies the admin rule itself.
   if (BOARD_IMPORT_PATH.test(path.split('?')[0]!) && /^Bearer\s/i.test(event.headers.get('authorization') ?? '')) return
-  if (!PROTECTED_PREFIXES.some(prefix => path.startsWith(prefix))) return
+  // Everything on the protected list needs a session (see utils/protectedApi). `/api/invitations` is not on it:
+  // an invite link has to be readable before its recipient has an account.
+  if (!isProtectedApiPath(path)) return
 
   const session = await auth.api.getSession({ headers: event.headers })
   if (!session) throw createError({ statusCode: 401, message: 'Unauthorized' })

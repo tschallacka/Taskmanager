@@ -4,7 +4,7 @@
 // Without --from the kit is the one the board serves (/crew/kit.tar.gz). A kit folder that already matches
 // it changes nothing. Otherwise the kit files that differ are backed up into CREW_HOME/backups/update-<time>/kit,
 // the files the new kit no longer ships are removed, and the new kit finishes the job: the owner's files
-// (PROJECT-RULES.md, BRIEF.md) are merged from the template they came from (kept in CREW_HOME/kit-base),
+// (PROJECT-RULES.md, BRIEF.md, JANET.md) follow the marker line: the kit text above it is replaced, the project's text below it is kept,
 // the skill copies are refreshed only where they still match the old kit, init renders the documents, and the
 // server-side changes in CHANGELOG.md are listed, never made. CREW_HOME's own files (creds.json, crew.json,
 // forks, profiles, logs) are never touched. A copy that fails puts the kit folder back from the backup.
@@ -19,6 +19,7 @@ import { chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync,
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { kitDir } from './home.mjs'
+import { updateOwnerFile } from './owner-file.mjs'
 
 const NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
 // What a kit never ships: tests, dotfiles, logins, runs, the kit's own records, and the archive itself.
@@ -259,56 +260,25 @@ async function finish(planFile) {
   const values = templateValues()
   const lines = []
   let problems = 0
-  const mergeDir = join(plan.backupDir, 'merge')
-  mkdirSync(mergeDir, { recursive: true, mode: 0o700 })
-  const saveBase = (out, text) => {
-    mkdirSync(join(here, 'kit-base'), { recursive: true, mode: 0o700 })
-    writeFileSync(join(here, 'kit-base', out), text, { mode: 0o600 })
-  }
+  // The kit text above the marker line is replaced with the new template's; the project's text below it is kept byte for
+  // byte (crew/owner-file.mjs). No merge, so no conflict. A file with no marker is migrated once.
   for (const out of OWNER_FILES) {
     const theirs = renderTemplate(readFileSync(join(kitDir, `${out}.tmpl`), 'utf8'), values)
     const ours = readText(join(here, out))
-    const base = readText(join(here, 'kit-base', out))
     if (ours === null) {
       lines.push(`${out}: not there; init writes it from the new template`)
-    } else if (ours === theirs) {
-      saveBase(out, theirs)
-      lines.push(`${out}: already matches the new template`)
-    } else if (base === null) {
-      // No record of the template this file came from. The new template becomes the base now, so the next
-      // update merges from here; the template changes made before now are not pulled in.
-      const newFile = join(plan.backupDir, `${out}.new`)
-      writeFileSync(newFile, theirs)
-      saveBase(out, theirs)
-      lines.push(`WARN ${out}: no template was recorded for this file, so the new template cannot be merged into it now. Kept as it is. The new template is in ${newFile} and is now recorded as the base, so a later update merges any template change from there on. Template changes made before this one are not brought in: compare with that file by hand.`)
-    } else if (base === theirs) {
-      lines.push(`${out}: the template did not change; kept`)
-    } else if (ours === base) {
-      copyFileSync(join(here, out), join(plan.backupDir, out))
-      writeFileSync(join(here, out), theirs)
-      saveBase(out, theirs)
-      lines.push(`${out}: updated from the new template (no edits of yours were in it)`)
-    } else {
-      const oursPath = join(mergeDir, `${out}.ours`)
-      const basePath = join(mergeDir, `${out}.base`)
-      const theirsPath = join(mergeDir, `${out}.theirs`)
-      writeFileSync(oursPath, ours)
-      writeFileSync(basePath, base)
-      writeFileSync(theirsPath, theirs)
-      const merge = spawnSync('git', ['merge-file', '-p', oursPath, basePath, theirsPath], { encoding: 'utf8' })
-      if (merge.status === 0) {
-        copyFileSync(join(here, out), join(plan.backupDir, out))
-        writeFileSync(join(here, out), merge.stdout)
-        saveBase(out, theirs)
-        lines.push(`${out}: your edits and the new template merged cleanly (your file before: ${join(plan.backupDir, out)})`)
-      } else {
-        const conflicted = join(plan.backupDir, `${out}.merged`)
-        writeFileSync(conflicted, merge.stdout ?? '')
-        problems++
-        const why = merge.status > 0 ? `${merge.status} conflict(s)` : 'git merge-file is not available'
-        lines.push(`CONFLICT ${out}: ${why}. Kept as it is. The merged text with conflict markers is in ${conflicted}; resolve it by hand and copy it over ${join(here, out)}.`)
-      }
+      continue
     }
+    const result = updateOwnerFile(ours, theirs)
+    if (result.status === 'unchanged') {
+      lines.push(`${out}: already matches the new kit text`)
+      continue
+    }
+    copyFileSync(join(here, out), join(plan.backupDir, out))
+    writeFileSync(join(here, out), result.text)
+    lines.push(result.status === 'migrated'
+      ? `${out}: migrated once: the new kit text is above the marker line and your file is kept below it; delete the kit text in it by hand (your file before: ${join(plan.backupDir, out)})`
+      : `${out}: the kit text above the marker line is replaced; your text below it is kept (your file before: ${join(plan.backupDir, out)})`)
   }
   // The skill copies in the Claude skills folder are refreshed only while they still match the old kit.
   const claudeHome = process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude')
@@ -423,8 +393,21 @@ function updateAll() {
 async function main() {
   if (ARGS[0] === '--apply') return apply(ARGS[1])
   if (ARGS[0] === '--finish') return finish(ARGS[1])
+  await noteClaudeVersion()
   if (ARGS.includes('--all')) return updateAll()
   return front()
+}
+
+// The Claude Code limits in claude-long-run.json were checked against one version (claude.mjs). Say
+// which version is installed, and warn when it is older.
+async function noteClaudeVersion() {
+  const { spawnSync } = await import('node:child_process')
+  const { versionWarning } = await import('./claude.mjs')
+  const v = spawnSync('claude', ['--version'], { encoding: 'utf8' })
+  const text = (v.stdout || '').trim()
+  console.log(`Claude Code: ${text || 'not found on this machine'}`)
+  const warn = versionWarning(text)
+  if (warn) console.log(`warning: ${warn}. The long-run limits may differ; see README "Claude Code limits".`)
 }
 
 main().then((code) => {

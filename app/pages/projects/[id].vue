@@ -1,14 +1,17 @@
 <script setup lang="ts">
 import type { ProjectTask } from '~/composables/useProjects'
 import { taskCountLabel, terminalColumnIds } from '#shared/utils/board'
+import { boardLoadMessage, isBoardId } from '~/utils/boardLoad'
 import { queryForView } from '~/utils/projectViewQuery'
-import { queryWithoutTask, taskPanelPath } from '~/utils/taskPanelUrl'
+import { initialsOf } from '~/utils/avatarInitials'
+import { tagChipAttrs } from '~/utils/tagColors'
+import { boardLabelColor } from '~/composables/useProjects'
+import { queryWithoutTask, taskPanelPath, taskQueryAsPanelAddress } from '~/utils/taskPanelUrl'
 
 // One page for the board and for its task panel addresses: the same key keeps the board mounted while the panel opens.
 definePageMeta({ layout: 'app', key: route => `projects/${route.params.id}` })
 
 const route = useRoute()
-const searchOpen = useSearchModal()
 // The instance admin may load a backup into a crew's board, which everyone else only reads (owner, 2026-11-12).
 const { isInstanceAdmin } = useAuth()
 const importOpen = ref(false)
@@ -25,6 +28,8 @@ const {
   updateProjectSharing,
   unarchiveProject,
   activeTags,
+  searchText,
+  setSearchText,
   boardTagCounts,
   toggleTagFilter,
   clearTagFilter,
@@ -37,6 +42,8 @@ const {
 } = useProjects()
 
 const projectId = computed(() => route.params.id as string)
+// The board's own component, for the New task button in the view row (its newTask opens the first column's composer).
+const boardRef = ref<{ newTask: () => void } | null>(null)
 
 const VIEWS = [
   { key: 'overview', label: 'Overview', icon: 'i-lucide-layout-dashboard' },
@@ -58,10 +65,35 @@ const STAFF_ONLY_VIEWS: string[] = ['messages', 'time', 'settings']
 const visibleViews = computed(() => VIEWS.filter(v => (v.key !== 'office' || crewBoard.value || linkedCrews.value.length > 0) && (!STAFF_ONLY_VIEWS.includes(v.key) || !isCustomerView.value)))
 
 const tabViews = computed(() => visibleViews.value.filter(v => v.key !== 'settings'))
+// Overview, Messages, Time and Files sit under the More menu (the owner's design, page06); the rest stay tabs.
 // The office is no panel of this page, so ?view=office falls back to the board instead of showing files.
-const view = computed(() => visibleViews.value.filter(v => v.key !== 'office').find(v => v.key === route.query.view)?.key ?? 'board')
+// The view a person last chose on a board is the one a visit without ?view= opens (the design: remembered per board).
+// It is kept in this browser only; a link that names a view still wins. A browser that refuses storage remembers nothing.
+const lastViewKey = (id: string) => `tm-last-view:${id}`
+function rememberedView(id: string): string | null {
+  try {
+    return localStorage.getItem(lastViewKey(id))
+  } catch {
+    return null
+  }
+}
+function rememberView(id: string, key: string) {
+  try {
+    localStorage.setItem(lastViewKey(id), key)
+  } catch {
+    // Storage refused: the choice is only for this visit.
+  }
+}
+const view = computed(() => {
+  const available = visibleViews.value.filter(v => v.key !== 'office')
+  const fromLink = available.find(v => v.key === route.query.view)?.key
+  if (fromLink) return fromLink
+  const remembered = projectId.value ? rememberedView(projectId.value) : null
+  return available.find(v => v.key === remembered)?.key ?? 'board'
+})
 
 function setView(key: string) {
+  if (projectId.value) rememberView(projectId.value, key)
   navigateTo({ path: route.path, query: queryForView(route.query, key) }, { replace: true })
 }
 
@@ -75,6 +107,21 @@ const officeCrewItems = computed(() => linkedCrews.value.map(crew => ({
   icon: 'i-lucide-building-2',
   onSelect: () => openOffice(crew.id)
 })))
+
+// The view switcher's row: the five main views as tabs, in the design's order (page 01); every other view sits under More.
+const PRIMARY_VIEWS = ['board', 'list', 'calendar', 'timeline', 'dashboard']
+const primaryViews = computed(() => PRIMARY_VIEWS
+  .map(key => tabViews.value.find(v => v.key === key))
+  .filter((v): v is NonNullable<typeof v> => Boolean(v)))
+const moreViews = computed(() => tabViews.value.filter(v => !PRIMARY_VIEWS.includes(v.key)))
+const moreItems = computed(() => moreViews.value.flatMap((v) => {
+  if (v.key === 'office' && linkedCrews.value.length > 1) return officeCrewItems.value
+  return [{
+    label: v.label,
+    icon: v.icon,
+    onSelect: () => (v.key === 'office' ? openOffice() : setView(v.key))
+  }]
+}))
 
 // The tab row scrolls sideways on a phone. Its edges fade where tabs are cut off,
 // so it is clear that the row goes on.
@@ -102,24 +149,37 @@ onMounted(() => {
 onBeforeUnmount(() => window.removeEventListener('resize', updateTabCues))
 
 const loadFailed = ref(false)
+// Why the board did not load, for the sentence the page shows (boardLoad.ts): a bad id, or the HTTP status of the failure.
+const loadInvalidId = ref(false)
+const loadFailStatus = ref<number | null>(null)
 // The team a board that will not open here belongs to, when the caller is in that team.
 const teamHint = ref<{ teamId: string, teamName: string } | null>(null)
 
 async function openBoard(id: string) {
   loadFailed.value = false
+  loadInvalidId.value = false
+  loadFailStatus.value = null
   teamHint.value = null
   try {
     await loadBoard(id)
-  } catch {
-    // Deleted in another tab, or a board from a workspace this session no longer
-    // has: an endless spinner is the one thing that must not happen.
+  } catch (error) {
+    // Deleted in another tab, a board from a workspace this session no longer has, or a request that timed out:
+    // the spinner must never stay. The sentence says which (boardLoadMessage).
+    const failure = error as { statusCode?: number, status?: number } | null
+    loadFailStatus.value = failure?.statusCode ?? failure?.status ?? null
     loadFailed.value = true
     teamHint.value = await $fetch<{ teamId: string, teamName: string }>(`/api/projects/${id}/team-hint`).catch(() => null)
   }
 }
 
 watch(projectId, (id) => {
-  if (!id || !/^[a-z0-9]+$/i.test(id)) return
+  if (!id) return
+  // A bad id (for example a hyphen) is not a board: the page says so instead of spinning.
+  if (!isBoardId(id)) {
+    loadFailed.value = true
+    loadInvalidId.value = true
+    return
+  }
   openBoard(id)
 }, { immediate: true })
 
@@ -141,18 +201,20 @@ const drawerTaskId = computed<string | null>(() => {
   return typeof id === 'string' && id ? id : null
 })
 
-function openDrawerTask(taskId: string) {
-  navigateTo({ path: taskPanelPath(String(route.params.id), taskId), query: queryWithoutTask(route.query) })
+// Opens a card's panel. A comment, when given, stays in the path (/projects/<id>/<task>/<comment>), so the panel jumps to it.
+function openDrawerTask(taskId: string, commentId?: string | null) {
+  navigateTo({ path: taskPanelPath(String(route.params.id), taskId, commentId), query: queryWithoutTask(route.query) })
 }
 
 function closeDrawer() {
   navigateTo({ path: taskPanelPath(String(route.params.id)), query: queryWithoutTask(route.query) }, { replace: true })
 }
 
-// The old deep link ?task=<id> (global search and the home list) is rewritten to the path form.
-watch(() => route.query.task, (taskId) => {
-  if (typeof taskId !== 'string' || !taskId) return
-  navigateTo({ path: taskPanelPath(String(route.params.id), taskId), query: queryWithoutTask(route.query) }, { replace: true })
+// The old deep link ?task=<id>[&comment=<id>] (outside links, saved bookmarks) is rewritten to the path form, once. The
+// comment stays in the query, so the panel can jump to it; the panel removes it after the jump.
+watch(() => route.query.task, () => {
+  const address = taskQueryAsPanelAddress(String(route.params.id), route.query)
+  if (address) navigateTo({ path: address.path, query: address.query }, { replace: true })
 }, { immediate: true })
 
 const drawerTask = computed<ProjectTask | null>(() =>
@@ -243,7 +305,38 @@ const taskCountTitle = computed(() => {
 
 // Only an organisation's boards can belong to a customer; a personal board has
 // nobody to share with.
-const { activeTeamId, setActiveTeam } = useTeams()
+const { activeTeamId, setActiveTeam, teams } = useTeams()
+// The team a board belongs to, for the top-bar crumb "Team › Project". Empty for a board with no team.
+const teamName = computed(() => {
+  const id = activeProject.value?.teamId
+  return id ? (teams.value.find(team => team.id === id)?.name ?? null) : null
+})
+// The project's health, as set on Overview, shown as a chip in the top bar. Nothing is shown when no status is set.
+const HEALTH = {
+  on_track: { label: 'On track', tone: 'tm-tone-ok', dot: 'tm-dot-ok' },
+  at_risk: { label: 'At risk', tone: 'tm-tone-warn', dot: 'tm-dot-warn' },
+  off_track: { label: 'Off track', tone: 'tm-tone-danger', dot: 'tm-dot-danger' }
+} as const
+const healthChip = computed(() => {
+  const status = activeProject.value?.status
+  return status ? HEALTH[status] : null
+})
+// Who is on the board, for the avatars in the top bar: the members list, four shown and a count after. A customer, or
+// anyone the list refuses, sees none.
+const boardPeople = ref<{ id: string, name: string, image?: string | null }[]>([])
+async function loadBoardPeople(id: string) {
+  try {
+    const res = await $fetch<{ people: { id: string, name: string, image?: string | null }[] }>(`/api/projects/${id}/members`)
+    // A reply for a board the page has left is dropped, so a quick switch cannot show one board's people on another.
+    if (projectId.value === id) boardPeople.value = res.people ?? []
+  } catch {
+    if (projectId.value === id) boardPeople.value = []
+  }
+}
+watch(projectId, (id) => {
+  if (id && !isCustomerView.value) loadBoardPeople(id)
+  else boardPeople.value = []
+}, { immediate: true })
 const { switchWorkspace } = useWorkspace()
 const { refresh: refreshProjects } = useProjects()
 const { customers, ensureLoaded: ensureCustomers } = useCustomers()
@@ -378,6 +471,17 @@ useSeoMeta({
       <span aria-hidden="true">›</span>
       <span class="px-1">(shadow)</span>
     </nav>
+    <!-- Team › Project: the crumb above the board header. A shadow board has its own crumb (above), so it is left out here. -->
+    <nav
+      v-if="activeProject && !activeProject.realBoard && teamName"
+      class="flex min-w-0 shrink-0 flex-wrap items-center gap-x-1 px-4 pt-2 text-xs text-muted lg:px-6"
+      aria-label="Breadcrumb"
+      data-team-crumb
+    >
+      <span class="truncate">{{ teamName }}</span>
+      <span aria-hidden="true">›</span>
+      <span class="truncate text-default">{{ activeProject.name }}</span>
+    </nav>
     <!-- Board header: the name, the crew and customer badges and the task count go into the shared top bar's title;
          the label filter, settings, share and options go into its actions. -->
     <Teleport
@@ -421,6 +525,19 @@ useSeoMeta({
           </UButton>
         </UDropdownMenu>
 
+        <span
+          v-if="healthChip"
+          class="tm-chip shrink-0"
+          :class="healthChip.tone"
+          data-health-chip
+        >
+          <span
+            class="tm-dot"
+            :class="healthChip.dot"
+          />
+          {{ healthChip.label }}
+        </span>
+
         <UDropdownMenu
           v-if="canPickCustomer"
           :items="customerMenu"
@@ -453,6 +570,29 @@ useSeoMeta({
         >
           {{ taskCountText }} {{ taskCount === 1 ? 'task' : 'tasks' }}
         </span>
+
+        <!-- Who is on the board: the first four as avatars, then a count. -->
+        <span
+          v-if="boardPeople.length"
+          class="flex shrink-0 items-center pl-1"
+          data-board-avatars
+        >
+          <UAvatar
+            v-for="person in boardPeople.slice(0, 4)"
+            :key="person.id"
+            :src="person.image || undefined"
+            :alt="person.name"
+            :text="initialsOf(person.name, null)"
+            size="xs"
+            class="-ml-1.5 ring-2 ring-default"
+            :title="person.name"
+          />
+          <span
+            v-if="boardPeople.length > 4"
+            class="tm-chip -ml-1.5"
+            data-board-avatars-more
+          >+{{ boardPeople.length - 4 }}</span>
+        </span>
       </div>
     </Teleport>
     <Teleport
@@ -460,55 +600,6 @@ useSeoMeta({
       to="#app-topbar-actions"
     >
       <div class="flex shrink-0 items-center gap-1">
-        <!-- Label filter -->
-        <UPopover
-          v-if="boardTagCounts.length"
-          :content="{ align: 'end', sideOffset: 6 }"
-        >
-          <UButton
-            icon="i-lucide-filter"
-            size="xs"
-            :color="activeTags.length ? 'primary' : 'neutral'"
-            :variant="activeTags.length ? 'soft' : 'ghost'"
-          >
-            <span class="hidden sm:inline">Labels</span>
-            <span v-if="activeTags.length">{{ activeTags.length }}</span>
-          </UButton>
-
-          <template #content>
-            <div class="w-56 p-1.5">
-              <div class="flex items-center justify-between px-1.5 pb-1.5">
-                <span class="text-xs font-semibold text-muted">Filter by label</span>
-                <button
-                  v-if="activeTags.length"
-                  class="text-xs text-primary hover:underline"
-                  @click="clearTagFilter"
-                >
-                  Clear
-                </button>
-              </div>
-              <button
-                v-for="[tag, count] in boardTagCounts"
-                :key="tag"
-                class="flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-elevated"
-                @click="toggleTagFilter(tag)"
-              >
-                <UIcon
-                  :name="activeTags.includes(tag) ? 'i-lucide-square-check' : 'i-lucide-square'"
-                  class="size-3.5 shrink-0"
-                  :class="activeTags.includes(tag) ? 'text-primary' : 'text-dimmed'"
-                />
-                <KanbanLabelChip
-                  :tag="tag"
-                  :editable="!isCustomerView"
-                  chip-class="min-w-0 flex-1 text-xs"
-                />
-                <span class="shrink-0 text-xs tabular-nums text-dimmed">{{ count }}</span>
-              </button>
-            </div>
-          </template>
-        </UPopover>
-
         <!-- Settings lives here, not in the tab row: at 1280 px the last tab was cut off -->
         <UButton
           v-if="activeProject && !isCustomerView"
@@ -590,59 +681,192 @@ useSeoMeta({
       />
     </div>
 
-    <!-- View tabs -->
-    <nav
-      ref="tabsEl"
-      class="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-default px-4 lg:px-6"
-      aria-label="Project views"
-      :style="tabsMaskStyle"
-      @scroll="updateTabCues"
-    >
-      <template
-        v-for="v in tabViews"
-        :key="v.key"
+    <!-- The view row: the tabs scroll on a phone; Filter, search in this board and New task stay in view at the right. -->
+    <div class="flex shrink-0 items-center gap-2 border-b border-default px-4 lg:px-6">
+      <nav
+        ref="tabsEl"
+        class="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto py-1"
+        aria-label="Project views"
+        :style="tabsMaskStyle"
+        @scroll="updateTabCues"
       >
-        <UDropdownMenu
-          v-if="v.key === 'office' && linkedCrews.length > 1"
-          :items="officeCrewItems"
+        <template
+          v-for="v in primaryViews"
+          :key="v.key"
         >
+          <UDropdownMenu
+            v-if="v.key === 'office' && linkedCrews.length > 1"
+            :items="officeCrewItems"
+          >
+            <button
+              class="relative flex shrink-0 items-center gap-1.5 px-2.5 py-2 text-sm text-muted transition-colors hover:text-default"
+            >
+              <UIcon
+                :name="v.icon"
+                class="size-4"
+              />
+              {{ v.label }}
+              <span class="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-primary opacity-0" />
+            </button>
+          </UDropdownMenu>
           <button
-            class="relative flex shrink-0 items-center gap-1.5 px-2.5 py-2 text-sm text-muted transition-colors hover:text-default"
+            v-else
+            class="relative flex shrink-0 items-center gap-1.5 px-2.5 py-2 text-sm transition-colors"
+            :class="view === v.key ? 'font-medium text-default' : 'text-muted hover:text-default'"
+            :aria-current="view === v.key ? 'page' : undefined"
+            @click="v.key === 'office' ? openOffice() : setView(v.key)"
           >
             <UIcon
               :name="v.icon"
               class="size-4"
             />
             {{ v.label }}
-            <span class="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-primary opacity-0" />
+            <span
+              class="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-primary transition-opacity duration-200"
+              :class="view === v.key ? 'opacity-100' : 'opacity-0'"
+            />
+          </button>
+        </template>
+        <!-- The other views: Overview, Messages, Time, Files and Office sit under More, so the row stays one line. -->
+        <UDropdownMenu
+          v-if="moreItems.length"
+          :items="moreItems"
+        >
+          <button
+            class="relative flex shrink-0 items-center gap-1.5 px-2.5 py-2 text-sm transition-colors"
+            :class="moreViews.some(v => v.key === view) ? 'font-medium text-default' : 'text-muted hover:text-default'"
+            aria-label="More project views"
+            aria-haspopup="menu"
+            data-view-more
+          >
+            More
+            <UIcon
+              name="i-lucide-chevron-down"
+              class="size-4"
+            />
+            <span
+              class="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-primary transition-opacity duration-200"
+              :class="moreViews.some(v => v.key === view) ? 'opacity-100' : 'opacity-0'"
+            />
           </button>
         </UDropdownMenu>
-        <button
-          v-else
-          class="relative flex shrink-0 items-center gap-1.5 px-2.5 py-2 text-sm transition-colors"
-          :class="view === v.key ? 'font-medium text-default' : 'text-muted hover:text-default'"
-          :aria-current="view === v.key ? 'page' : undefined"
-          @click="v.key === 'office' ? openOffice() : setView(v.key)"
-        >
-          <UIcon
-            :name="v.icon"
-            class="size-4"
-          />
-          {{ v.label }}
-          <span
-            class="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-primary transition-opacity duration-200"
-            :class="view === v.key ? 'opacity-100' : 'opacity-0'"
-          />
-        </button>
         <HelpHint
-          v-if="v.key === 'office'"
+          v-if="moreViews.some(v => v.key === 'office')"
           page="agents/office-view"
           label="About the Office view"
         >
           The office shows the crew of this board at work: every task is a folder that moves between the desks as the board changes. On a board with more than one crew, the menu picks which crew to watch.
         </HelpHint>
-      </template>
-    </nav>
+      </nav>
+      <div
+        v-if="view === 'board'"
+        class="flex shrink-0 items-center gap-2 py-1.5"
+      >
+        <!-- Filter: labels, and Show deleted (the trash, which the design puts here too). On the board view on every board, so a fresh one has it. -->
+        <UPopover :content="{ align: 'end', sideOffset: 6 }">
+          <UButton
+            icon="i-lucide-filter"
+            size="xs"
+            :color="activeTags.length ? 'primary' : 'neutral'"
+            :variant="activeTags.length ? 'soft' : 'ghost'"
+            data-filter-button
+          >
+            <span class="hidden sm:inline">Filter</span>
+            <!-- Active filters show as chips inside the button: the first two by name, then a count. -->
+            <!-- The chip takes the label's own colour, as LabelChip draws it everywhere else. -->
+            <span
+              v-for="tag in activeTags.slice(0, 2)"
+              :key="tag"
+              class="max-w-28 truncate rounded-full px-2 py-0.5 text-[length:var(--tm-font-size-label)] font-medium ring-1 ring-inset"
+              :class="tagChipAttrs(tag, boardLabelColor(tag)).class"
+              :style="tagChipAttrs(tag, boardLabelColor(tag)).style"
+              data-filter-chip
+            >{{ tag }}</span>
+            <span
+              v-if="activeTags.length > 2"
+              class="tm-chip"
+              data-filter-more
+            >+{{ activeTags.length - 2 }}</span>
+          </UButton>
+
+          <template #content>
+            <div class="w-56 p-1.5">
+              <div class="flex items-center justify-between px-1.5 pb-1.5">
+                <span class="text-xs font-semibold text-muted">Filter by label</span>
+                <button
+                  v-if="activeTags.length"
+                  class="text-xs text-primary hover:underline"
+                  @click="clearTagFilter"
+                >
+                  Clear
+                </button>
+              </div>
+              <p
+                v-if="!boardTagCounts.length"
+                class="px-1.5 py-1.5 text-xs text-muted"
+              >
+                No labels on this board yet.
+              </p>
+              <button
+                v-for="[tag, count] in boardTagCounts"
+                :key="tag"
+                class="flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-elevated"
+                @click="toggleTagFilter(tag)"
+              >
+                <UIcon
+                  :name="activeTags.includes(tag) ? 'i-lucide-square-check' : 'i-lucide-square'"
+                  class="size-3.5 shrink-0"
+                  :class="activeTags.includes(tag) ? 'text-primary' : 'text-dimmed'"
+                />
+                <KanbanLabelChip
+                  :tag="tag"
+                  :editable="!isCustomerView"
+                  chip-class="min-w-0 flex-1 text-xs"
+                />
+                <span class="shrink-0 text-xs tabular-nums text-dimmed">{{ count }}</span>
+              </button>
+              <div
+                class="mt-1 border-t border-default pt-1.5"
+              >
+                <button
+                  class="flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left text-xs transition-colors hover:bg-elevated"
+                  data-show-deleted
+                  @click="toggleShowTrashed"
+                >
+                  <UIcon
+                    :name="showTrashed ? 'i-lucide-square-check' : 'i-lucide-square'"
+                    class="size-3.5 shrink-0"
+                    :class="showTrashed ? 'text-primary' : 'text-dimmed'"
+                  />
+                  <span>Show deleted</span>
+                  <span class="ml-auto shrink-0 tabular-nums text-dimmed">{{ trashedCount }}</span>
+                </button>
+              </div>
+            </div>
+          </template>
+        </UPopover>
+        <!-- Search in this board: the cards whose title matches, on the board view. -->
+        <input
+          :value="searchText"
+          type="search"
+          placeholder="Search this board"
+          aria-label="Search this board"
+          class="w-32 min-w-0 shrink rounded-md border border-default bg-default px-2 py-1 text-xs text-default outline-none placeholder:text-dimmed focus:border-primary sm:w-40"
+          data-board-search
+          @input="setSearchText(($event.target as HTMLInputElement).value)"
+        >
+        <!-- New task, at the right end of the view row, on the board view. It opens the composer in the first column. -->
+        <UButton
+          v-if="!isReadOnlyBoard && !isCustomerView"
+          label="New task"
+          icon="i-lucide-plus"
+          size="xs"
+          class="shrink-0"
+          data-new-task
+          @click="boardRef?.newTask()"
+        />
+      </div>
+    </div>
 
     <!-- Trash summary. The board itself draws the deleted columns and cards in
          place; this says what is being looked at and how long it has left. -->
@@ -710,7 +934,7 @@ useSeoMeta({
           class="size-6 text-dimmed"
         />
         <p class="text-sm text-muted">
-          {{ teamHint ? `This board is in the team ${teamHint.teamName}.` : "This board is not available in this workspace." }}
+          {{ teamHint ? `This board is in the team ${teamHint.teamName}.` : boardLoadMessage({ invalidId: loadInvalidId, status: loadFailStatus }) }}
         </p>
         <UButton
           v-if="teamHint"
@@ -721,7 +945,15 @@ useSeoMeta({
           @click="switchToHintTeam"
         />
         <UButton
-          label="Back to projects"
+          v-if="!loadInvalidId"
+          label="Try again"
+          size="sm"
+          color="neutral"
+          variant="soft"
+          @click="projectId && openBoard(projectId)"
+        />
+        <UButton
+          label="Back to boards"
           size="sm"
           color="neutral"
           variant="soft"
@@ -735,6 +967,7 @@ useSeoMeta({
         />
         <KanbanBoard
           v-else-if="view === 'board'"
+          ref="boardRef"
           :project-id="projectId"
           @open-task="openDrawerTask($event)"
         />
@@ -777,30 +1010,5 @@ useSeoMeta({
       :task="drawerTask"
       @close="closeDrawer"
     />
-
-    <!-- Mobile bottom nav -->
-    <div
-      class="fixed bottom-0 left-0 right-0 z-20 flex items-center justify-around border-t border-default bg-default/95 px-8 backdrop-blur-sm lg:hidden"
-      style="padding-top: 0.5rem; padding-bottom: max(0.5rem, env(safe-area-inset-bottom))"
-    >
-      <UButton
-        icon="i-lucide-search"
-        color="neutral"
-        variant="ghost"
-        size="md"
-        aria-label="Search"
-        @click="searchOpen = true"
-      />
-      <UButton
-        icon="i-lucide-kanban"
-        color="primary"
-        variant="soft"
-        size="md"
-        aria-label="Projects"
-        @click="navigateTo('/projects')"
-      />
-    </div>
-
-    <div class="h-14 lg:hidden" />
   </div>
 </template>

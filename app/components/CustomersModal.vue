@@ -356,8 +356,10 @@ function confirmRevoke(customerId: string, invitation: CustomerInvitation) {
                       class="flex items-center justify-between gap-2"
                     >
                       <div class="flex min-w-0 items-center gap-2">
-                        <UAvatar
-                          :alt="contact.name || contact.email"
+                        <UserAvatar
+                          :user-id="contact.userId"
+                          :name="contact.name"
+                          :email="contact.email"
                           size="2xs"
                         />
                         <span class="truncate text-xs text-default">{{ contact.name || contact.email }}</span>
@@ -457,12 +459,13 @@ function confirmRevoke(customerId: string, invitation: CustomerInvitation) {
       </template>
     </UModal>
 
-    <!-- Declared last so it stacks above the customers modal. -->
+    <!-- Same modal layer as the popup (app.config.ts), declared last so it opens on top of it. A lower z-index here
+         put the confirmation behind the popup, where nobody could click it. -->
     <UModal
       v-model:open="isConfirmOpen"
       :title="confirmRequest?.title"
       :description="confirmRequest?.description"
-      :ui="{ overlay: 'z-[60]', content: 'z-[60]' }"
+      :ui="{ title: 'min-w-0 break-words pe-10' }"
     >
       <template #body>
         <div class="flex justify-end gap-2">

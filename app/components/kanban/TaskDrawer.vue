@@ -5,7 +5,8 @@ import { relativeTime } from '~/composables/useRelativeTime'
 import type { Visibility, ProjectTask } from '~/composables/useProjects'
 import { dueDayToMs, isOverdueDay } from '~/utils/dueDate'
 import { absoluteUrl, copyTaskLink } from '~/utils/copyTaskLink'
-import { taskPanelPath } from '~/utils/taskPanelUrl'
+import { activityStartsOpen, taskPanelPath } from '~/utils/taskPanelUrl'
+import { taskLink } from '~/utils/taskLink'
 
 interface Task {
   id: string
@@ -32,8 +33,14 @@ const toast = useToast()
 // The task number is its id. The copy control puts a link to the task on the clipboard, as an html anchor with the
 // number as its text, and the bare number as plain text (utils/copyTaskLink.ts).
 const linkCopied = ref(false)
-// On a phone, the Activity sheet is open (the comments and the composer fill the panel).
-const activityOpen = ref(false)
+let copiedTimer: ReturnType<typeof setTimeout> | undefined
+// On a phone, the Activity sheet is open (the comments and the composer fill the panel). A permalink (a comment in the
+// address) opens it, so the comment and its window buttons are on screen.
+const route = useRoute()
+const activityOpen = ref(activityStartsOpen(route.params.comment))
+watch(() => route.params.comment, (comment) => {
+  if (activityStartsOpen(comment)) activityOpen.value = true
+})
 // The phone's tap chevron on an editable property row (the grid gets a third column for it). A read-only panel
 // has no chevron: its rows show values only.
 const chevronRow = `max-md:grid-cols-[6rem_1fr_1rem] max-md:after:content-['›'] max-md:after:text-lg max-md:after:leading-none max-md:after:text-dimmed`
@@ -46,8 +53,10 @@ async function copyTaskNumberLink() {
     toast.add({ title: 'The clipboard refused the link. Select the number and copy it.', icon: 'i-lucide-alert-triangle', color: 'warning' })
     return
   }
+  // A second click restarts the two seconds, and an unmount clears the timer, so no timer writes after the panel is gone.
+  clearTimeout(copiedTimer)
   linkCopied.value = true
-  setTimeout(() => (linkCopied.value = false), 2000)
+  copiedTimer = setTimeout(() => (linkCopied.value = false), 2000)
 }
 const {
   activeProject,
@@ -84,6 +93,22 @@ const open = computed({
 // The panel slides out over ~half a second. It renders the last task it was
 // given rather than the prop, so closing it doesn't empty it mid-animation.
 const shownTask = ref<Task | null>(props.task)
+// Opened from the Inbox, the panel offers "Open on board": the card on its board, at the comment the notification is about.
+const openOnBoardTo = computed(() => {
+  const task = shownTask.value
+  if (!task?.projectId || route.path !== '/projects/inbox') return null
+  // The Inbox names the comment in its query (?comment=), so the link keeps it, as the path form does.
+  return taskLink(task.projectId, task.id, linkedComment.value || null)
+})
+// A link to a comment (the path form, or ?comment= from the Inbox) opens the activity. On a phone the thread sits
+// behind the Activity button, so without this the reply has no height and the jump lands on nothing.
+const linkedComment = computed(() => {
+  if (typeof route.params.comment === 'string') return route.params.comment
+  return typeof route.query.comment === 'string' ? route.query.comment : ''
+})
+watch(linkedComment, (comment) => {
+  if (comment) activityOpen.value = true
+}, { immediate: true })
 
 watch(() => props.task, (task) => {
   if (task) shownTask.value = task
@@ -117,6 +142,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  clearTimeout(copiedTimer)
   window.removeEventListener('resize', measure)
   window.removeEventListener('pointermove', onResizeMove)
   window.removeEventListener('pointerup', onResizeEnd)
@@ -674,6 +700,29 @@ const menuItems = computed(() => [[
               aria-label="Task options"
             />
           </UDropdownMenu>
+          <!-- On a phone the card is full screen: a back arrow returns to the Inbox list (closing the panel). -->
+          <UButton
+            v-if="openOnBoardTo"
+            icon="i-lucide-arrow-left"
+            size="xs"
+            color="neutral"
+            variant="ghost"
+            aria-label="Back to the inbox"
+            class="md:hidden"
+            data-inbox-back
+            @click="emit('close')"
+          />
+          <UButton
+            v-if="openOnBoardTo"
+            class="max-md:hidden"
+            label="Open on board"
+            icon="i-lucide-external-link"
+            size="xs"
+            color="neutral"
+            variant="ghost"
+            :to="openOnBoardTo"
+            data-open-on-board
+          />
           <UButton
             icon="i-lucide-x"
             size="xs"
@@ -708,7 +757,7 @@ const menuItems = computed(() => [[
           <!-- Properties, two columns on a wide panel and rows on a phone, in this order: Assignee, Due date,
                Start date, Labels, the custom fields (Priority). Time, Blocked by and GitHub are full-width blocks
                below them (redesign card 5/9). -->
-          <dl class="grid shrink-0 grid-cols-1 gap-x-6 gap-y-1.5 px-5 pb-3 text-xs md:grid-cols-2">
+          <dl class="grid shrink-0 grid-cols-1 gap-x-6 gap-y-1.5 px-5 pb-3 text-xs md:grid-cols-2 [&>div]:max-md:min-h-11">
             <div
               class="grid grid-cols-[6rem_1fr] items-center gap-x-3"
               :class="readonly ? '' : chevronRow"

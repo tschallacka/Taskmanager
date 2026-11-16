@@ -9,7 +9,7 @@ import { hashInvitationToken } from './customers'
 
 export type InvitationLookup
   = | { kind: 'team', id: string, email: string, role: string, organizationId: string, organizationName: string, inviterName: string | null }
-    | { kind: 'board', id: string, email: string, role: 'editor' | 'manager', projectId: string, projectName: string, inviterName: string | null }
+    | { kind: 'board', id: string, email: string, role: 'editor' | 'manager', projectId: string, projectName: string, organizationName: string | null, inviterName: string | null }
 
 export type InvitationProblem = 'missing' | 'used' | 'expired'
 
@@ -48,17 +48,19 @@ export async function lookupAddressedInvitation(token: string): Promise<Invitati
       status: projectGuestInvitations.status,
       projectId: projectGuestInvitations.projectId,
       projectName: projects.name,
+      organizationName: organization.name,
       inviterName: user.name,
       expiresAt: projectGuestInvitations.expiresAt
     })
     .from(projectGuestInvitations)
     .innerJoin(projects, eq(projects.id, projectGuestInvitations.projectId))
+    .leftJoin(organization, eq(organization.id, projects.teamId))
     .leftJoin(user, eq(user.id, projectGuestInvitations.invitedBy))
     .where(eq(projectGuestInvitations.tokenHash, tokenHash))
   if (board) {
     if (board.status !== 'open') return 'used'
     if (board.expiresAt <= now) return 'expired'
-    return { kind: 'board', id: board.id, email: board.email, role: board.role, projectId: board.projectId, projectName: board.projectName, inviterName: board.inviterName }
+    return { kind: 'board', id: board.id, email: board.email, role: board.role, projectId: board.projectId, projectName: board.projectName, organizationName: board.organizationName, inviterName: board.inviterName }
   }
 
   return 'missing'

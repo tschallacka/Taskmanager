@@ -65,7 +65,7 @@ function runSetup(origin, extra, { token = TOKEN, home } = {}) {
   const env = { ...process.env, HOME: join(scratch, 'home'), CREW_HOME: home, TASKMANAGER_MANAGEMENT_TOKEN: token }
   if (!token) delete env.TASKMANAGER_MANAGEMENT_TOKEN
   return new Promise((resolve) => {
-    const child = spawn(process.execPath, [SETUP, '--origin', origin, '--board', 'real-1', '--repo', '/srv/repo', ...extra], { env })
+    const child = spawn(process.execPath, [SETUP, '--origin', origin, '--board', 'real-1', '--repo', '/srv/repo', '--worktree-base', '/srv/agents/taskmanager-maintenance', ...extra], { env })
     let stdout = ''
     let stderr = ''
     child.stdout.on('data', (chunk) => {
@@ -169,5 +169,17 @@ describe('crew setup', () => {
     const run = spawnSync(process.execPath, [SETUP, '--origin', 'http://127.0.0.1:1', '--board', 'b', '--repo', '/x', '--token', TOKEN], { encoding: 'utf8' })
     assert.equal(run.status, 2)
     assert.match(run.stderr, /unknown flag --token/)
+  })
+
+  test('--worktree-base is required and cannot be the root; both are refused before any call', () => {
+    const base = ['--origin', 'http://127.0.0.1:1', '--board', 'b', '--repo', '/x']
+    const missing = spawnSync(process.execPath, [SETUP, ...base], { encoding: 'utf8' })
+    assert.equal(missing.status, 2)
+    assert.match(missing.stderr, /--worktree-base is required/)
+    const root = spawnSync(process.execPath, [SETUP, ...base, '--worktree-base', '/'], { encoding: 'utf8' })
+    assert.equal(root.status, 2)
+    assert.match(root.stderr, /cannot be \/ \(the root\)/)
+    const rootSlashes = spawnSync(process.execPath, [SETUP, ...base, '--worktree-base', '///'], { encoding: 'utf8' })
+    assert.equal(rootSlashes.status, 2)
   })
 })

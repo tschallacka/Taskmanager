@@ -2,6 +2,192 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.40.0 - 2026-11-16
+
+- **Delete my account: the rules for every column that holds a person's user id.** Each such column is decided in one rule table (delete, keep as "Deleted user", or clear), and a test fails when a new user column has no rule. The deletion itself removes a personal board with no other member, with its tasks and attachment files, keeps a team's work under "Deleted user", and clears the columns the person filled in. It refuses while the person owns a team (the teams are named), for the last instance admin, and for a crew account. Settings > Account has "Delete my account": it lists what happens, and deletes only after the person types their own address. Files: `server/api/account/delete.post.ts`, `server/utils/accountRules.ts`, `server/utils/accountDeletion.ts`, `app/components/DeleteAccountPanel.vue`, `app/pages/settings/index.vue`, `shared/utils/deleteAccountText.ts`, `tests/delete-account-ui.test.ts`, `tests/account-deletion-coverage.test.ts`, `tests/account-deletion.test.ts`, `tests/changelog-fragment-files.test.ts`.
+
+## 0.39.5 - 2026-11-16
+
+- **Sidebar: the task count and the read-only marker stay whole.** On a narrow sidebar the line under a project name was cut off, so "read-only" and the task count were lost. The customer and the time now give way first; the crew name still truncates first, and the count and the marker never truncate. Files: `app/components/ProjectsListPanel.vue`.
+
+- **Sidebar: the arrow keeps every project name in line, and a crew reads as the child of its project.** Every project row reserves the arrow's width, so a project with a crew is no longer indented. A crew under its project is indented with a left rule, a smaller muted name and the label "crew: <name>". Files: `app/components/ProjectsListPanel.vue`, `app/utils/crewTreeRows.ts`, `tests/sidebar-crew-label.test.ts`.
+
+## 0.39.4 - 2026-11-16
+
+- **The Customers popup's confirmation opens on top.** "Remove customer?" (and remove contact, revoke link) opened behind the Customers popup, so a customer could not be deleted. The confirmation now uses the app's modal layer like every other modal and is declared after the popup. Files: `app/components/CustomersModal.vue`, `tests/customers-confirm-layer.test.ts`.
+
+## 0.39.3 - 2026-11-16
+
+- **The first paint says what is loading.** Before the app's code has run, the browser shows a spinner with "Opening your projects…" (app/spa-loading-template.html), so a person who signs in and waits does not see a blank page.
+
+- **Projects load with a visible wait.** On /projects a line reads "Opening your projects…" while the list loads, a failed first load retries instead of showing "No projects yet", and the sidebar's "No projects yet" waits while a person's team is being opened (a person who signs in again in a new browser no longer sees an empty list flash). Files: app/pages/projects/index.vue, app/plugins/init-projects.client.ts, app/components/ProjectsListPanel.vue.
+
+## 0.39.2 - 2026-11-16
+
+- **Invite follow-ups: System by default, and no "Personal Workspace" while the team loads.** A visitor with no stored choice gets System, not a fixed dark theme; a stored choice is kept. The workspace switcher shows "Loading workspace" while the active team loads, so a team member who lands in the team sees a label that agrees with the team's boards. The invitation page uses the theme colours, so a new visitor on a light system sees it light. Files: `nuxt.config.ts`, `app/components/TeamSwitcher.vue`, `app/utils/workspaceLabel.ts`, `app/pages/invite/[token].vue`, `tests/color-mode-default.test.ts`, `tests/team-switcher-label.test.ts`, `tests/invite-page-theme.test.ts`.
+
+## 0.39.1 - 2026-11-16
+
+- Invited people land on their shared work: a customer whose board was shared to their email now opens that board (or the shared list) after accepting the customer invitation, the sidebar lists each shared project once, and a person who cannot create projects no longer sees "No projects yet. Create one" or a New project button.
+
+## 0.39.0 - 2026-11-16
+
+- **Agents get the public link of a customer-visible task.** When a board is shared (its public link is on and not expired), get_task answers a customer-visible task with `publicUrl`: the board's public page, for a key whose owner may share the board (a project admin or a manager guest). The public page shows the board's cards, not one task, so the link opens the board. Staff keys only. Files: `server/utils/mcpBoardTools.ts`, `server/utils/shareLinks.ts`, `tests/mcp-share-links.test.ts`.
+
+- **Agents get a link to share.** The MCP tools that answer with a task, board or update now return `url`: the link that opens it in the app, on this instance (staff keys only; a customer's key gets none). Covers get_task, create_task, update_task, move_task, search_tasks, my_tasks, get_board, list_boards, the update tools, list_notifications, delete_task, restore_task and get_task_github. The tool descriptions and the Tools help page say so. A subtask's link, and the e-mail and push about a subtask, now open its parent's panel, as its Inbox link does (a subtask has no panel of its own). Files: `server/utils/shareLinks.ts`, `server/utils/notifications.ts`, `server/utils/mcpBoardTools.ts`, `server/utils/mcpUpdateTools.ts`, `server/utils/mcpMeTools.ts`, `server/utils/mcpGithubTools.ts`, `server/utils/mcpRegistry.ts`, `docs/agents/tools-overview.md`.
+
+- **An invited person lands where the invitation says.** A customer contact with one board shared lands on that board, with several or none on **Shared with you** (which lists the boards, or says nothing is shared yet). A team member who signs in again in a new browser opens their team, and a customer contact with no team goes to the shared list rather than the first-project form. The invite page's registration form is the default, with a plain **Already have an account? Sign in** link. Files: app/pages/invite/[token].vue, app/pages/projects/index.vue, app/pages/shared-with-me.vue, app/components/AppSidebar.vue, app/utils/inviteLanding.ts, app/utils/projectsEntry.ts, app/utils/teamEntry.ts, app/utils/loginMode.ts, app/utils/inviteLinks.ts, shared/utils/sharedGroups.ts, server/api/shared-with-me.get.ts, server/api/invitations/[token]/accept.post.ts, server/api/invitations/[token]/index.get.ts, server/utils/protectedApi.ts, server/utils/sharedProjectIds.ts, server/middleware/requireAuth.ts, docs/team/invite-a-contact.md, changelog.d/mwidpx1zhcb8izzzqw-invite-landing.md.
+
+## 0.38.1 - 2026-11-15
+
+- Legal documents: the privacy policy and the Impressum 1.0.0 as drafts in legal/, with the version and archive procedure (legal/README.md). The hosting data center (Lauterbourg, France) is filled in from the Contabo data processing agreement.
+
+## 0.38.0 - 2026-11-15
+
+- **Phone: a long-press on a card opens its sheet, and the help page describes the column picker and the swipe.** At phone width a long-press on a card opens the same bottom sheet as its ⋯ button, not the desktop popover; the desktop right-click menu is unchanged. The boards help page now covers the column picker, the swipe between columns and the Add column chip. Files: `app/components/kanban/KanbanCard.vue`, `docs/basics/boards-and-columns.md`, `tests/phone-qa-violations.test.ts`.
+
+- **Phone: the card sheet title stops at the close button, and Add column moves into the column picker.** A long card title on the phone sheet now ends in an ellipsis before the X. The board's Add column no longer peeks in at the right edge on a phone: it is the last chip of the column picker, and its name field shows under the picker. The desktop board is unchanged. Files: `app/components/PhoneCardSheet.vue`, `app/components/PhoneColumnPicker.vue`, `app/components/kanban/KanbanBoard.vue`, `tests/phone-add-column.test.ts`.
+
+- **Phone: a tab bar, one column at a time, and a card sheet.** On a phone the app has a bottom tab bar (Home, Inbox with its unread count, My tasks, Projects, Search) and a floating New. A board shows one column at a time with a column picker, and each card's ⋯ opens a sheet with Mark done, Move to, Assign to, Set due date and Delete. The project page's own bottom bar is gone. Files: `app/components/BottomTabBar.vue`, `app/components/PhoneColumnPicker.vue`, `app/components/PhoneCardSheet.vue`, `app/components/kanban/KanbanBoard.vue`, `app/components/kanban/KanbanCard.vue`, `app/components/kanban/TaskDrawer.vue`, `app/components/kanban/TaskComments.vue`, `app/layouts/app.vue`, `app/pages/projects/home.vue`, `app/pages/projects/[id].vue`, `docs/basics/boards-and-columns.md`.
+
+- **Phone: swipe between columns.** On a phone the board shows one column at a time; a sideways swipe on the board moves to the next or previous column, and a caption under the column picker says "swipe for other columns". The desktop is unchanged. Files: `app/components/kanban/KanbanBoard.vue`, `tests/phone-swipe.test.ts`.
+
+- **Phone: the bottom tab bar keeps clear of the home indicator.** The app asks for `viewport-fit=cover`, so the safe-area insets (the notch and the home indicator) reach the page on a phone. Without it every inset read 0 and the tab bar sat under the home indicator. Files: `app/app.vue`, `tests/app-viewport.test.ts`.
+
+## 0.37.0 - 2026-11-15
+
+- **A comment opened from the Inbox stays in the address.** The card jumps to the reply and the address still names the comment, so a reload or a shared copy of the link scrolls to it again. `app/components/kanban/TaskComments.vue`, `tests/inbox-comment-url.test.ts`.
+
+- **Open on board from the Inbox keeps the comment, and a phone no longer shows it.** The card panel opened from an Inbox comment links to the card at that comment, and on a phone the control is hidden (the back arrow is the way back to the Inbox). `app/components/kanban/TaskDrawer.vue`, `tests/inbox-phone-open.test.ts`, `tests/inbox-comment-link.test.ts`.
+
+## 0.36.0 - 2026-11-15
+
+- **The calendar, the timeline and the More pages get keyboard and tap paths.** A task on the calendar moves with the arrow keys or with its Move control and a tap on a day, undated tasks included; a timeline bar moves with the arrow keys (Shift for its end, Alt for its start; Alt+Left and Alt+Right stay on the bar and do not go Back or Forward in the browser) and with its row's Move-the-bar menu; Overview, Messages, Time and Files sit under a More menu in the board's view row (master's row, which also holds Office). The pointer drags are unchanged. `app/components/kanban/ProjectCalendarView.vue`, `app/components/kanban/ProjectTimelineView.vue`, `app/pages/projects/[id].vue`, `app/utils/calendarKeys.ts`, `app/utils/calendarTap.ts`, `app/utils/timelineKeys.ts`, `app/utils/timelineTap.ts`, `app/utils/dateNudge.ts`.
+
+## 0.35.0 - 2026-11-15
+
+- **Crew up and crew session start take a role file for keys with no worker section.** A session for Nina, Pat or Quincy starts from its own sessions/<key>.role.md; before, crew up reported "no worker role for this key" and `crew session start` needed CREW_ROLE_FILE. Both commands now resolve the role in one order, and CREW_ROLE_FILE, when set, overrides both. The four workers still get their role rebuilt from PROMPTS.md on every start, so a prompt change reaches them. One module, crew/role-file.mjs, holds the role file path and its key check for both commands. Files: crew/role-file.mjs, crew/sessions-up.mjs, crew/session.mjs, crew/kit-files.txt, and their tests.
+
+## 0.34.0 - 2026-11-15
+
+- **The add-a-crew action has a plain name: "Put an AI crew to work on this board".** The board's menu item, the Crews page button, the dialog's title and its button ("Get the prompt") and the help page's title are renamed; the dialog's text names the board and says the token works only on it. The prompt an agent receives now says it puts an AI crew to work on the board in its first line, and uses the plain words "Set up the AI crew for this board" and "Remove the AI crew from this board" for its two actions; the rest of the prompt is unchanged. The help page keeps its address. `app/components/ProjectsListPanel.vue`, `app/components/TeamCrewsPanel.vue`, `app/components/ManagementTokenDialog.vue`, `app/utils/managementPrompt.ts`, `docs/crews/give-a-board-a-crew.md`.
+
+- **Manage an existing crew from its own board: "Manage this crew".** On a crew's own board the board's menu offers **Manage this crew**. It makes a 10-minute token that reaches only that crew: its keys and its people. The window gives two prompts, one to recover the keys (the old keys stop working) and one to add the missing people; each works in the crew's own folder, `~/crew-<slug>`. Only the instance admin, the crew's creator, or an owner or admin of its team can make it; a crew's own accounts cannot. A token made before this change works as before. `server/utils/managementToken.ts`, `server/utils/crewKeyScope.ts`, `server/middleware/crewKeyScope.ts`, `server/db/schema.ts` (an additive, nullable `crew_id` on the key table), `server/api/settings/api-keys/management.post.ts`, `app/components/ManagementTokenDialog.vue`, `app/utils/crewManagePrompt.ts`, `app/components/ProjectsListPanel.vue`.
+
+## 0.33.0 - 2026-11-15
+
+- **The board's top bar and view row follow the redesign.** The top bar shows the Team › Project crumb, the project's health chip (from Overview) and the board's people as avatars, four and then a count. The view row shows Board, List, Calendar, Timeline and Dashboard as tabs, with Overview, Messages, Time, Files and Office under More, and New task at its right end on the Board view. A search box filters the cards by title, the Filter button holds the labels and Show deleted, and a visit opens the view last chosen on that board. Nothing is removed. Files: `app/pages/projects/[id].vue`, `app/components/kanban/KanbanBoard.vue`, `app/composables/useProjects.ts`, `docs/basics/boards-and-columns.md`, `tests/board-page-crumb.test.ts`.
+
+## 0.32.1 - 2026-11-15
+
+- **Help: a page on updating a crew that already exists.** `docs/crews/update-a-crew.md` explains the one-line update, `crew update --check`, what an update replaces and keeps, and `crew people add` for roles a crew is missing. It is linked from the help index and from the page on adding a crew. Docs only.
+
+## 0.32.0 - 2026-11-14
+
+- **The task card is one summary (redesign 4/9).** The whole card opens the panel; the hover-only chevron and the empty assignee slot are gone, and an assignee's picture shows only once someone is set. The chips row is in a fixed order: the first two labels then "+N", the select fields, then the state chips (Overdue, Due soon within two days, Waits for N, Team only, Shared with customer), each shown only with a reason, and none on a finished task. Right-click (long press on a touchscreen) opens the menu: Open, Mark done, Assign to..., Move to column..., Set due date..., Copy link, Delete. Space ticks a focused card done. The trash's button reads "Delete now". Deviations from the card: no Undo toast, no hint strip, no compact cards, no drag tilt yet; a waiting card does not name its blockers on hover. `app/components/kanban/KanbanCard.vue`, `app/components/kanban/KanbanBoard.vue`, `app/utils/cardChips.ts`, `app/utils/dueDate.ts`, `app/utils/taskBlockers.ts`, `tests/card-chips.test.ts`, `tests/task-blockers-ui.test.ts`, `docs/basics/tasks.md`.
+
+## 0.31.0 - 2026-11-14
+
+- Crew: the stale dev-copy report now checks each live copy's own card, not one page of the Done column, so a copy of a finished card is no longer missed.
+
+- Crew: the lab, slice 1. `crew <who> lab submit <branch> [--file tests/x.test.ts] [--repeat n]` writes a request; the lab runner (`crew lab runner loop`, its own process) queues it, takes the heavy-job slot, runs `crew/lab-run.sh` (a fresh worktree of the branch: install, eslint, typecheck, a scratch database lab_<id>, the tests, test:crew), records one RESULT line in `CREW_HOME/lab/<id>/`, and releases the slot. `lab status` and `lab cancel <branch>` read and cancel queued samples. Nothing is pushed, merged or committed.
+
+## 0.30.0 - 2026-11-14
+
+- **A comment in the Inbox opens its card scrolled to the reply, and card ids in text become links.** Clicking a comment or reply notification opens the card at that comment, highlighted for a moment; a card or comment link is the path `/projects/<id>/<task>/<comment>`, and an old `?task=` link is rewritten to it once. A card id in an inbox item, a board message, a reply or a comment links to the card only when you may open it (`POST /api/tasks/openable` says which). `notifications.comment_id` is new (nullable), and `GET /api/notifications` now returns it, so the Inbox knows the comment; the card panel reads the comment from `?comment=` as well as from the path. An old `?task=&comment=` link opens `/projects/<id>/<task>/<comment>`. On a phone the Inbox opens the card, but the scroll to the reply is not guaranteed yet (filed as its own card). `server/api/notifications/index.get.ts`, `app/components/kanban/TaskComments.vue`, `app/pages/projects/inbox.vue`, `app/components/CardIdText.vue`, `app/components/InlineMarkdown.vue`, `app/composables/useOpenableCards.ts`, `app/components/kanban/ProjectMessagesView.vue`, `server/api/tasks/openable.post.ts`, `server/utils/notifyEvents.ts`, `app/utils/cardIdLinks.ts`, `app/utils/taskLink.ts`, `app/utils/taskComments.ts`, `app/pages/projects/[id].vue`, `docs/workspace/inbox.md`.
+
+- **Owner documents get a marker line: kit text above it, the project's own text below it.** `crew update` replaces the kit text above the marker and never reads or changes the text below, so the update no longer reports a CONFLICT for PROJECT-RULES.md, BRIEF.md or JANET.md. A document with no marker is migrated once, with its old content kept entirely below the marker and a backup made first. `crew/owner-file.mjs` (new, listed in `kit-files.txt`), `crew/update.mjs`, `crew/PROJECT-RULES.md.tmpl`, `crew/BRIEF.md.tmpl`, `crew/JANET.md.tmpl`, `crew/README.md`, `crew/kit.test.mjs`, `crew/owner-file.test.mjs`.
+
+## 0.29.0 - 2026-11-14
+
+- **Task panel link tests.** The copy control's clipboard path now has tests: both formats with the exact strings, the fallback without ClipboardItem, and a refused or missing clipboard that resolves false. No change for the reader. Files: tests/copy-task-link.test.ts.
+
+- Crew: `crew/stale-copies.mjs` is a read-only report of the dev copies to look at (older than 4 hours, or of a card that is Done). Janet stops a copy only with a go from Boss. The port registry keeps Boss's dev copy (:3000) and the testers' copies (3105 to 3108) as read-only entries: `serve --check` lists them, and nobody can reserve, start, stop or free them.
+
+## 0.28.2 - 2026-11-14
+
+- **The task panel's copy-link mark no longer writes after the panel is gone.** The "Copied" mark clears its two-second timer when the panel closes, and a second click restarts the two seconds. The tasks help page now says that a read-only panel (a customer's view) hides the custom fields and shows the other properties as values only. Files: `app/components/kanban/TaskDrawer.vue`, `docs/basics/tasks.md`, `tests/copy-task-link.test.ts`.
+
+## 0.28.1 - 2026-11-13
+
+- **`crew up` starts the crew's background sessions and `crew down` stops them.** `crew up` reads `CREW_HOME/sessions/*.json` and starts every recorded person whose session is not running, with the same strict start as `crew session start` (the role file is the person's PROMPTS section plus the CREW.md standing rules, written to `sessions/<key>.role.md`, mode 600); a person with no card is started idle and waits for mail. `crew down` stops them. The daemon's API-error check now reads each person's session transcript in the session's own folder. Files: `crew/sessions-up.mjs`, `crew/up.mjs`, `crew/down.mjs`, `crew/session.mjs`, `crew/session-errors.mjs`, `crew/kit-files.txt`.
+
+- **The person settings file also carries the long-run profile.** `CREW_HOME/settings/<key>.json` now includes the claude-long-run environment (longer command, MCP and stall timeouts); the person's own `CREW_HOME` is set last, so the profile cannot override it. A change to the profile reaches a session on its next start. Files: `crew/session-settings.mjs`, `crew/session-settings.test.mjs`.
+
+- **`crew init` writes Pia's `CLAUDE.md` from a mechanics-only template.** `crew/PIA-CLAUDE.md.tmpl` says how Pia reads her mail and mentions and where the crew documents are; it grants no authority and names no one. Init writes `pia-session/CLAUDE.md` only when the file does not exist; an existing copy is never changed, and `crew update` never touches it. Files: `crew/PIA-CLAUDE.md.tmpl`, `crew/init.mjs`, `crew/kit-files.txt`.
+
+## 0.28.0 - 2026-11-13
+
+- **Set up a crew by approval: the setup prompt carries no token.** On the Crews page, an instance admin picks a board and copies a prompt. The agent asks for a connection, the admin approves the link in the browser with one click, and the agent gets its key once. A link that expires is refused with one sentence. The old management-token prompt keeps working for one release. Files: `app/utils/approvalSetupPrompt.ts`, `app/utils/approvalSetupBoard.ts`, `app/pages/admin/crews/index.vue`, `app/utils/connectPrompt.ts`, `app/pages/connect-approve.vue`, `docs/crews/give-a-board-a-crew.md`, `tests/approval-setup-prompt.test.ts`, `tests/approval-setup-board.test.ts`, `tests/connect-permission-wording.test.ts`.
+
+## 0.27.0 - 2026-11-13
+
+- **Every crew session starts with its own settings file.** Each background session gets `CREW_HOME/settings/<key>.json` (mode 600): the `mcp__git__restart_self` tool is denied for every agent, the person's own crew home is set, and remote control is off. The start passes that one file as its `--settings`. Files: `crew/session-settings.mjs`, `crew/session.mjs`, `crew/session.test.mjs`, `crew/session-settings.test.mjs`, `crew/kit-files.txt`.
+
+- **The crew's role texts say it: never restart or reconfigure an agent (CREW.md rule 14).** Every role template, the PROMPTS and the Susy text name the rule, and a kit test pins it, so a crew agent no longer calls `restart_self` by habit. The enforcing deny rule is in the settings file above.
+
+- **The crew's shared browser no longer fails its own tests under load.** It gets a lock so two users do not start it at the same time, one cleanup removes its temporary profile after Chromium has exited (retrying), and a dropped command is retried only when it is read-only (status, tabs, console, shot), never a click or a submit. Files: `crew/browser-driver.mjs`, `crew/browser-driver.test.mjs`.
+
+## 0.26.0 - 2026-11-13
+
+- **A crew person can run as its own background session.** `crew session start <key> <folder>` starts one person as a `claude --bg` session with remote control off and the crew's own strict mcp config, and records its id in `sessions/<key>.json`; `status`, `list` and `stop` read that record by id. Only the crew kit changes: `crew/session.mjs`, `crew/crew.mjs`, `crew/kit-files.txt`, `crew/session.test.mjs`.
+
+## 0.25.2 - 2026-11-13
+
+- **Crew listener: pid files instead of process scans, and a one-hour listener wait.** Pia's listener and the Boss watches now record their pid in `.listen/<name>.pid`, and the Stop hooks and Susy read that file instead of running `pgrep -f` over every process; Pia's listener waits up to 3600 s (was 600 s) before it exits on quiet, so she is woken less often. Files: `crew/pidfile.mjs` (new), `crew/listen.mjs`, `crew/crew.mjs`, `crew/boss-stop-hook.sh`, `crew/pia-listener-hook.sh`, `crew/susy-collector.mjs`, `crew/susy-activity.mjs`, `crew/PROMPTS.md.tmpl`, and their tests.
+
+## 0.25.1 - 2026-11-13
+
+- **A session that stops on an API error is reported as blocked, and Boss gets one mail.** The daemon reads the last transcript line of each person's session. A line that is an API error (a 403, a login request, or the account limit) shows the session as `blocked: api error` with the error text, not as stuck. Boss gets one mail per distinct error, and a later normal line clears the block. A dry run only reports and never marks a mail as sent.
+
+## 0.25.0 - 2026-11-13
+
+- **Connect a folder or an agent with its own MCP setup, not a shared variable.** The key panel offers two copies. **Copy agent config file** writes a per-agent file, started with `claude --mcp-config <file> --strict-mcp-config`, with a server name unique per instance, board and key. **Copy folder setup** writes only `.mcp.json` and `.claude/settings.local.json` in one folder: the header reads a variable named for the key, and nothing goes to user settings or a shell profile. Both files are excluded from git. The check is `/mcp` inside a session, and a reconnect is a new session (`claude --continue`). A key's name suffix (`-2`, `-3`) and its name slug are stored on its row in two new nullable columns, `api_keys.name_suffix` and `api_keys.name_slug`, with a unique index `api_keys_name_suffix_uidx` on (user, slug, suffix). They are added with `db:push` (the repo keeps no migration SQL). Check on live after deploy: the two columns and the index exist, and the key list returns `nameSuffix`. Files: app/utils/agentConfig.ts, app/components/ApiKeysPanel.vue, docs/agents/create-and-revoke-a-key.md, tests/agent-config-project.test.ts, tests/agent-config-names.test.ts, tests/agent-config.test.ts.
+
+## 0.24.0 - 2026-11-13
+
+- **Settings > API keys gives one prompt to paste into an agent.** After a key is made, the panel shows one "Copy prompt for your agent" button. The prompt carries a one-time pairing code by default (the key stays out of it), removes an old taskmanager server before it adds the new one, so it also serves a re-connect, and lists the key's boards in plain words. The key, the export line and the mcp commands move into a collapsed "Set it up yourself" section. `app/utils/connectPrompt.ts`, `app/components/ApiKeysPanel.vue`, `docs/agents/create-and-revoke-a-key.md`, `tests/key-prompt.test.ts`.
+
+- **Notifications can be archived into a Read box, and the Read box can be emptied.** Every notification in the inbox gets an Archive button, and Archive all takes the shown ones out; archived notifications move to the Read box, where each can be moved back to the inbox. The Read box can be emptied in full or only the notifications archived more than 30 days, 2 months, 6 months or 1 year ago, after the page says how many will go. Emptying deletes for the signed-in person only. A failed archive puts the rows back and says so. Files: `server/utils/notificationBox.ts`, `server/api/notifications/archive.post.ts`, `server/api/notifications/unarchive.post.ts`, `server/api/notifications/empty.post.ts`, `app/pages/projects/inbox.vue`, `app/composables/useNotifications.ts`.
+
+## 0.23.1 - 2026-11-13
+
+- **The default model is the full id, not the bare alias.** A person with no entry in `crew.json` `models` now gets `claude-haiku-5-5`: Claude Code no longer accepts `haiku` ("unrecognized model"), which stopped every agent from starting. Pia's process match accepts the full id and the alias. A kit test fails if a bare alias (`model: haiku`, `--model haiku`, `model: 'haiku'`) appears in the kit's sources or templates. The README's examples and defaults are updated. Not yet: the one-word model check in `init` and `crew update`, and the listener message when Pia cannot answer. Files: `crew/config.mjs`, `crew/activity.mjs`, `crew/model-alias.test.mjs`, `crew/kit.test.mjs`, `crew/README.md`.
+
+## 0.23.0 - 2026-11-13
+
+- **Susy runs as a daemon, with a live mode that acts on the board.** `crew susy-daemon start` puts the loop in its own detached tmux session through `detach.sh`, so it outlives the session that started it; `stop` kills that session; `status` shows the heartbeat. `start --live` (or `loop --live`, or `once --live`) posts Susy's own lines on the board, and mails Boss once per streak when the board gives no answer. Without `--live` the loop only logs what it would post, to `.listen/susy-daemon-dryrun.log`. Each tick writes `.listen/susy-daemon.json`, the heartbeat. A second live loop refuses to start while one runs (pid lock). The start command quotes its paths, so a home or kit folder with spaces or quotes works. The board read in `crew/susy.mjs` is shared with the daemon (`makeCall`, `readBoardCards`). Files: `crew/susy-daemon.mjs`, `crew/susy-daemon.test.mjs`, `crew/kit-imports.test.mjs`, `crew/susy.mjs`, `crew/crew.mjs`, `crew/kit-files.txt`.
+
+- **A board that fails to load says so instead of spinning.** A board the reader cannot open says "You do not have access to this board or it does not exist.", any other failure says "This board could not be loaded.", a request that takes longer than 60 seconds counts as a failure, and a bad board id (board ids are letters and digits only) says "This is not a valid board link." Each with Try again and Back to boards. Files: app/utils/boardLoad.ts, app/composables/useProjects.ts, app/pages/projects/[id].vue, tests/board-load.test.ts.
+
+- **Dev copies: `crew <who> serve`, one per person, with the port registry.** Each worker's copy starts on their `devServers` port, with `--replace`, `--stop` and `--check` (the check passes only for the commit the copy started from). The registry `.listen/ports.json` holds one entry per port under one lock. `prepare worktree` reserves the port. init writes `scripts.serve` where it is missing; the ports come from the one table in `crew-defaults.mjs`. The listener is found with `lsof`, with a `/proc` fallback.
+
+## 0.22.0 - 2026-11-13
+
+- **The crew comes back after a restart of Boss's session.** `crew up` brings the parts in the `up` list of crew.json back in order (already running, started, or failed and why), and is safe to run twice. `crew/detach.sh` keeps Pia's session and the dev services in a detached tmux session, so they outlive the session that started them. `crew restart-brief` lists each standing member's open cards and last update for Pia to start them fresh, and stops with the reason when a board call fails. Files: `crew/up.mjs`, `crew/detach.sh`, `crew/restart-brief.mjs`, `crew/board-call.mjs`, `crew/janet.mjs`, `crew/crew.mjs`, `crew/PROMPTS.md.tmpl`, `crew/SKILL.md`, `crew/kit-files.txt`.
+
+- **Crew sessions get a long-run profile, for that one session only.** `crew/claude-long-run.json` raises Claude Code's shell, MCP and background-agent limits; `crew claude` starts a session with it, and Pia's start line passes it with `--settings`. Other sessions keep the defaults. The README section "Claude Code limits" has the table, what cannot be raised, and the version it was checked against (2.1.319). `crew/claude-long-run.json`, `crew/claude-long-run.comments.md`, `crew/claude.mjs`, `crew/claude.test.mjs`, `crew/crew.mjs`, `crew/PROMPTS.md.tmpl`, `crew/README.md`, `crew/kit-files.txt`.
+
+- **Your picture and display name are yours to change, and a person without a picture gets their initials on a colour that stays the same.** In Settings, Account, upload a PNG, JPEG, WebP or SVG picture (up to 2 MB; cropped to a square and kept at 256 pixels), remove it, or edit your display name in place. The initials and colour come from one shared avatar. `app/components/account/ProfileEditor.vue`, `app/components/UserAvatar.vue`, `server/api/account/`, `docs/workspace/settings.md`.
+
+- **Comment permalinks load a window.** Opening a comment's link shows that comment with the five before and five after; **Load earlier comments** and **Show later comments** load the rest on their side, with the count of what is left. On a phone, a comment's link opens the Activity sheet, so the buttons are visible and work. Files: server/utils/commentWindow.ts, server/api/tasks/[id]/comments.ts, tests/comment-window.test.ts, docs/basics/comments-and-updates.md, changelog.d/mwav0vmcp2v8g8w5rz-comment-window.md.
+
+- **`crew dev-copies` checks the tester copies.** After `crew up`, it checks each card waiting in Verify UX or Verify QA: the owner, the card, the branch linked to the card, the port, and whether a copy answers there. A copy that does not answer gets the line `no copy: ask Boss: tester-copy.sh start <owner> <branch>`. It starts nothing. The board is read in one call (the two gate columns, up to 200 cards each), then one card read per gate card for its branch. A gate column over 200 cards is printed as cut, its cards past 200 are not checked, and the command exits 1. Files: `crew/dev-copies.mjs`, `crew/dev-copies.test.mjs`, `crew/crew.mjs`.
+
+## 0.21.0 - 2026-11-13
+
+- **`tm.mjs` loads Playwright only when it starts a browser.** A plain board call (`crew <who> mcp ...`) no longer loads Playwright at start, which cut the CPU each call used while the crew shares one server. `crew/tm.mjs`, `crew/tm-lazy.test.mjs`, `crew/README.md`.
+
+## 0.20.1 - 2026-11-12
+
+- **The mail routes moved out of the crew gate.** A member's mail was unreachable from a remote machine: the crew gate answers every `/api/crews/*` path with a 404 to a member key, and the mail routes were under `/api/crews`. They are now `/api/crew-mail/<slug>` (send and fetch) and `/api/crew-mail/<slug>/<id>/ack`, and the mailer client uses them. The rules are unchanged. A regression test pins that the mail paths are not crew API paths and that no mail route is left under `/api/crews`. Files: `server/api/crew-mail/[slug]/`, `crew/mail-client.mjs`, `tests/crew-mail-path.test.ts`, `docs/crews/crew-mail.md`.
+
+## 0.20.0 - 2026-11-12
+
+- **Crew rule notes are written by the crew's Boss account, never the board owner.** The built-in crew rules (promotion, gate routing, the time-log check, the failing-test clock) posted their notes as the board owner when no Pia account was on the board, so every reply landed in the owner's inbox. They now post as the Boss account (Pia's if there is none), and a rule with neither skips the note and logs why. A new crew's Boss account is named Cato. `server/utils/crewRules.ts`, `server/utils/ruleActions.ts`, `server/utils/crewProvisioning.ts`, `tests/crew-rule-note-author.test.ts`, `tests/crew-provisioning-boss-name.test.ts`, `tests/crew-server-rules.test.ts`, `docs/crews/crew-rule-notes.md`.
+
+- **The crew's mail goes through the app.** A person's mail is kept by the server until the person's mailer has delivered it, so a mailer on any machine can fetch it once a minute. `POST /api/crews/<slug>/mail` sends (the sender is the caller's own key, never a body field), `GET /api/crews/<slug>/mail?to=<key>` returns the undelivered mail for one person (the boss key may read any), and `POST /api/crews/<slug>/mail/<id>/ack` marks it delivered (only the recipient can). A key of another crew, a customer or a non-crew key gets 403. Text up to 1 MB (the one safety stop; a text is never cut); 30 sends a minute per sender; 500 undelivered per recipient; delivered mail is deleted after 7 days and undelivered after 30. The mailer falls back to its outbox when the endpoint does not answer and flushes it later; a mail is delivered once, even when an ack fails. Files: `server/db/schema.ts` (crew_mail), `server/utils/crewMail.ts`, `server/utils/crewMailRules.ts`, `server/api/crews/[slug]/mail/`, `crew/mail-client.mjs`, `docs/crews/crew-mail.md`.
+
 ## 0.19.1 - 2026-11-12
 
 - **The result of Regenerate key, Edit boards and Add a board shows in the key's own row.** The one-time code and prompt appear under the row that was clicked, which scrolls into view, and the confirmation of a save or an added board shows there too; the box at the top of the Connect page is for a new connection only. `app/components/connect/ConnectTokens.vue`, `docs/agents/create-and-revoke-a-key.md`.

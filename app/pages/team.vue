@@ -508,8 +508,10 @@ async function saveColumns(names: string[]) {
                     data-team-member
                   >
                     <div class="flex items-center gap-2.5 min-w-0">
-                      <UAvatar
-                        :alt="m.user?.name || m.user?.email || 'M'"
+                      <UserAvatar
+                        :user-id="m.userId"
+                        :name="m.user?.name"
+                        :email="m.user?.email"
                         size="xs"
                       />
                       <div class="min-w-0">

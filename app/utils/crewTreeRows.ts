@@ -38,3 +38,28 @@ export function crewTreeRows<P extends TreeProject>(projects: P[], openIds: read
   }
   return rows
 }
+
+/**
+ * What a row reserves at its left edge. A top-level row always reserves the arrow's width: with the arrow when its board
+ * has crews ('toggle'), with an empty spacer when it has none ('spacer'), so every project name lines up. A nested crew
+ * row reserves nothing: its depth indents it ('none').
+ */
+export function rowGutter(row: Pick<TreeRow<TreeProject>, 'depth' | 'shadowCount'>): 'toggle' | 'spacer' | 'none' {
+  if (row.depth === 1) return 'none'
+  return row.shadowCount > 0 ? 'toggle' : 'spacer'
+}
+
+/**
+ * The label of a row in the list. A crew row nested under its project reads "crew: <name>": the project is the line
+ * above it, and repeating it cut "crew:" off on a narrow sidebar. A crew row listed on its own keeps the project in
+ * front of it; a board or a crew home is named as it is.
+ */
+export function crewChildLabel(
+  project: { name: string, role?: string, realBoard?: { name: string } | null, crew?: { name: string } | null },
+  depth: 0 | 1
+): string {
+  if (project.role === 'shadow' && project.realBoard && project.crew) {
+    return depth === 1 ? `crew: ${project.crew.name}` : `${project.realBoard.name} › crew: ${project.crew.name}`
+  }
+  return project.name
+}

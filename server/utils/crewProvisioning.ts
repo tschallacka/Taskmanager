@@ -22,7 +22,7 @@ import { genId } from './projects'
 // The people a crew is made of, in the order the response lists them. `team` is the
 // role in the crew's team; a contact is a customer login and joins no team.
 export const CREW_PEOPLE = [
-  { key: 'boss', name: 'Boss', role: 'owner: reads the reports, owns the bugs column', team: 'admin' },
+  { key: 'boss', name: 'Cato', role: 'owner: reads the reports, owns the bugs column', team: 'admin' },
   { key: 'pia', name: 'Pia Planner', role: 'project manager', team: 'member' },
   { key: 'wren', name: 'Wren Worker', role: 'worker 1', team: 'member' },
   { key: 'wick', name: 'Wick Worker', role: 'worker 2', team: 'member' },
@@ -106,6 +106,8 @@ export interface CrewCaller {
   boardId?: string | null
   // Set for a remote crews:manage key of a person who created a live crew: it reaches only that person's own crews.
   crewOwner?: boolean
+  // Set for a crew-scoped management token (card mwdd9d2vtgqhfr6izq): the one crew it reaches. Null for every other caller.
+  crewId?: string | null
 }
 
 type Minted = Map<string, { password: string, apiKey: string }>
@@ -498,7 +500,7 @@ export async function requireCrewManager(event: H3Event): Promise<CrewCaller> {
   const boardId = boardOfCrewKey(key, ownerIsAdmin)
   const refusal = await crewPermissionRefusal(key.userId, boardId)
   if (refusal) throw createError({ statusCode: 403, message: refusal })
-  return { userId: key.userId, keyId: key.keyId, keyName: key.keyName, boardId }
+  return { userId: key.userId, keyId: key.keyId, keyName: key.keyName, boardId, crewId: key.crewId ?? null }
 }
 
 /** One agent audit row per crew call, read by the key's owner in the Inbox. Never throws. */

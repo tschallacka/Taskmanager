@@ -116,11 +116,15 @@ const slugify = text => String(text).toLowerCase().normalize('NFKD').replace(/[^
 export { CAST, EXTRA_CAST, forkMemberPlan, forkRole }
 
 // The model each person runs on is the Owner's choice, set per person in crew.json under "models" (README, "Models").
-// The kit fixes no model name: a person with no entry gets "haiku", which is Claude Code's name for the cheap tier of
-// Claude, not a model version. "default" in crew.json applies to everyone who is not named.
+// A person with no entry gets the cheap Claude model by its full id. The bare alias "haiku" is not used: Claude Code stopped
+// accepting it in 2026-11 ("unrecognized model"), which stopped every agent from starting (card mwc5aicfyb9r0fvopvf).
+// "default" in crew.json applies to everyone who is not named.
 export const PROVIDERS = ['claude', 'openrouter', 'ollama']
-const CHEAP_CLAUDE = { provider: 'claude', model: 'haiku' }
+export const CHEAP_CLAUDE_MODEL = 'claude-haiku-5-5'
+const CHEAP_CLAUDE = { provider: 'claude', model: CHEAP_CLAUDE_MODEL }
 const MODEL_NAME = /^[A-Za-z0-9][\w.:/@-]{0,99}$/
+// The bare alias that Claude Code stopped accepting; crew.json naming it is reported, never written into an agent file.
+const BARE_HAIKU = 'haiku'
 
 /**
  * Every cast member's { provider, model } from the "models" of crew.json. A string is a Claude model
@@ -150,6 +154,10 @@ function parseModel(entry, key, problems) {
   const model = object.model ?? (provider === 'claude' ? CHEAP_CLAUDE.model : undefined)
   if (typeof model !== 'string' || !MODEL_NAME.test(model)) {
     problems.push(`models.${key}: the model must be a name of letters, digits and . _ : / @ - (it is written into an agent definition)`)
+    return null
+  }
+  if (provider === 'claude' && model === BARE_HAIKU) {
+    problems.push(`models.${key}: "${BARE_HAIKU}" is not a model name Claude Code accepts any more; use "${CHEAP_CLAUDE_MODEL}" or another full model id`)
     return null
   }
   return { provider, model }

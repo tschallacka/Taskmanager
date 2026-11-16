@@ -391,10 +391,10 @@ describe('CREW_HOME and the agent types', () => {
       'acme-wade-worker.md', 'acme-wick-worker.md', 'acme-wren-worker.md', 'acme-wynn-worker.md'
     ])
     const pia = readFileSync(join(agents, 'acme-pia-planner.md'), 'utf8')
-    assert.match(pia, /^---\nname: acme-pia-planner\ndescription: ".+"\nmodel: haiku\n---\n/)
+    assert.match(pia, /^---\nname: acme-pia-planner\ndescription: ".+"\nmodel: claude-haiku-5-5\n---\n/)
     assert.ok(pia.includes(`CREW_HOME=${dir} node ${KIT}/`), 'the definition carries the resolved CREW_HOME')
     const prompts = readFileSync(join(dir, 'PROMPTS.md'), 'utf8')
-    assert.match(prompts, /\| `wren` \| Wren Worker \| wren \| `acme-wren-worker` \| claude: haiku \|/)
+    assert.match(prompts, /\| `wren` \| Wren Worker \| wren \| `acme-wren-worker` \| claude: claude-haiku-5-5 \|/)
     assert.ok(prompts.includes(`CREW_HOME=${dir} node ${KIT}/listen.mjs pia 60`), 'commands carry CREW_HOME')
   })
 
@@ -406,12 +406,12 @@ describe('CREW_HOME and the agent types', () => {
       team: 'Acme Crew',
       crew: { slug: 'acme' },
       board: { url: 'http://127.0.0.1:9' },
-      models: { default: 'haiku', usher: 'sonnet', wick: { provider: 'ollama', model: 'small-local' }, pm: { model: 'opus' } }
+      models: { default: 'claude-haiku-5-5', usher: 'sonnet', wick: { provider: 'ollama', model: 'small-local' }, pm: { model: 'opus' } }
     }))
     const out = run(home, 'init.mjs', '~/crew-home/acme')
     const agents = join(home, '.claude', 'agents')
     assert.match(readFileSync(join(agents, 'acme-usher-xander.md'), 'utf8'), /\nmodel: sonnet\n/)
-    assert.match(readFileSync(join(agents, 'acme-wren-worker.md'), 'utf8'), /\nmodel: haiku\n/)
+    assert.match(readFileSync(join(agents, 'acme-wren-worker.md'), 'utf8'), /\nmodel: claude-haiku-5-5\n/)
     assert.match(readFileSync(join(agents, 'acme-pia-planner.md'), 'utf8'), /\nmodel: opus\n/, 'an old key in models is read as the new one')
     assert.ok(!readdirSync(agents).includes('acme-wick-worker.md'), 'no definition for a provider the kit does not start')
     assert.match(out.stdout, /WARN acme-wick-worker is set to ollama \(small-local\)/)
@@ -438,7 +438,7 @@ describe('CREW_HOME and the agent types', () => {
     assert.equal(out.status, 1)
     const agents = join(home, '.claude', 'agents')
     for (const file of ['acme-wren-worker.md', 'acme-quincy-average.md', 'acme-usher-xander.md']) {
-      assert.match(readFileSync(join(agents, file), 'utf8'), /\nmodel: haiku\n/, file)
+      assert.match(readFileSync(join(agents, file), 'utf8'), /\nmodel: claude-haiku-5-5\n/, file)
     }
   })
 
@@ -477,7 +477,7 @@ describe('CREW_HOME and the agent types', () => {
     const stored = join(dir, 'forks', 'forks-acme-internal-tools.json')
     assert.equal(statSync(stored).mode & 0o777, 0o600, 'the file holds passwords and keys: owner only')
     const wren = readFileSync(join(home, '.claude', 'agents', 'internal-tools-wren.md'), 'utf8')
-    assert.match(wren, /^---\nname: internal-tools-wren\ndescription: ".+Internal Tools.+"\nmodel: haiku\n---\n/)
+    assert.match(wren, /^---\nname: internal-tools-wren\ndescription: ".+Internal Tools.+"\nmodel: claude-haiku-5-5\n---\n/)
     assert.ok(wren.includes('crew.mjs internal-tools-wren'), 'the definition tells the agent to sign in as itself')
     assert.ok(!wren.includes('arn_forkone') && !wren.includes('pw-one'), 'no secret goes into an agent definition')
     // The crew's own members are written as before, next to the forks.
@@ -549,7 +549,7 @@ describe('crew update: the kit folder and the owner files', () => {
     const dir = join(crew.root, 'kitB')
     copyKit(dir, dirA)
     editFile(join(dir, 'CHANGELOG.md'), text => `${text}\n- Test line for the server/ side.\n`)
-    editFile(join(dir, 'PROJECT-RULES.md.tmpl'), text => text.replace('Replace the examples below', 'Replace the examples here'))
+    editFile(join(dir, 'PROJECT-RULES.md.tmpl'), text => text.replace('Write your project\'s own facts', 'Write your own facts'))
     rmSync(join(dir, 'watch.mjs'))
     editFile(join(dir, 'kit-files.txt'), text => text.replace(/^watch\.mjs\n/m, ''))
     return dir
@@ -598,13 +598,13 @@ describe('crew update: the kit folder and the owner files', () => {
     const dirB = newerKit(dirA, crew)
     editFile(ownerFile(crew), text => `${text}\nOwner line kept.\n`)
     const out = await updateKit(dirA, crew, ['--from', dirB, '--kit', dirA])
-    assert.match(out.stdout, /PROJECT-RULES\.md: your edits and the new template merged cleanly/, out.stdout + out.stderr)
+    assert.match(out.stdout, /PROJECT-RULES\.md: the kit text above the marker line is replaced; your text below it is kept/, out.stdout + out.stderr)
     assert.equal(existsSync(join(dirA, 'watch.mjs')), false, 'a file the new kit no longer ships is removed')
     assert.match(readFileSync(join(dirA, 'CHANGELOG.md'), 'utf8'), /Test line for the server\/ side/)
     assert.equal(readFileSync(join(dirA, 'kit-files.txt'), 'utf8'), readFileSync(join(dirB, 'kit-files.txt'), 'utf8'), 'the list of files is installed with the kit')
     const owner = readFileSync(ownerFile(crew), 'utf8')
     assert.match(owner, /Owner line kept\./, 'owner text is not lost')
-    assert.match(owner, /Replace the examples here/, 'the new template line is in')
+    assert.match(owner, /Write your own facts/, 'the new template line is in')
     assert.doesNotMatch(owner, /<<<<<<</)
     assert.match(out.stdout, /server side, not changed here: Test line for the server\/ side\./)
     const [backup] = backupsOf(crew)
@@ -626,6 +626,15 @@ describe('crew update: the kit folder and the owner files', () => {
     writeFileSync(join(crew.home, 'JANET.md'), '# Janet card\n\nOwner janitor line kept.\n')
     writeFileSync(join(crew.home, 'creds.json'), JSON.stringify({ people: { wade: { password: 'test-only' } } }))
     const creds = readFileSync(join(crew.home, 'creds.json'), 'utf8')
+    // The crew.json a running crew holds: its reader, dev ports and start command are already set (init fills in only
+    // what is missing, so a complete crew.json is one it leaves alone).
+    const running = JSON.parse(readFileSync(join(crew.home, 'crew.json'), 'utf8'))
+    writeFileSync(join(crew.home, 'crew.json'), JSON.stringify({
+      ...running,
+      reader: running.reader ?? 'wade',
+      devServers: running.devServers ?? { wade: 3104 },
+      scripts: { ...(running.scripts ?? {}), serve: running.scripts?.serve ?? 'bunx nuxt dev --host 127.0.0.1 --port {port}' }
+    }, null, 2) + '\n')
     const config = readFileSync(join(crew.home, 'crew.json'), 'utf8')
     const out = await updateKit(dirA, crew, ['--from', dirB, '--kit', dirA])
     // init's FAIL line about playwright is expected in a copy with no node_modules, so the exit code is not checked.
@@ -633,41 +642,45 @@ describe('crew update: the kit folder and the owner files', () => {
     assert.doesNotMatch(out.stdout, /CONFLICT:/, out.stdout)
     assert.equal(readFileSync(join(crew.home, 'creds.json'), 'utf8'), creds, 'creds.json is not touched')
     assert.equal(readFileSync(join(crew.home, 'crew.json'), 'utf8'), config, 'crew.json is not touched')
-    assert.equal(readFileSync(join(crew.home, 'JANET.md'), 'utf8'), '# Janet card\n\nOwner janitor line kept.\n', 'the janitor card is the crew\'s own')
+    // The janitor card has no marker yet: it is migrated once, so the crew's own text is kept entirely below the marker.
+    const janet = readFileSync(join(crew.home, 'JANET.md'), 'utf8')
+    assert.ok(janet.endsWith('# Janet card\n\nOwner janitor line kept.\n'), 'the janitor card is the crew\'s own, kept below the marker')
     const rules = readFileSync(ownerFile(crew), 'utf8')
     assert.match(rules, /Owner rules kept\./, 'the rules keep the crew\'s text')
-    assert.match(rules, /Replace the examples here/, 'the new template line is merged in')
+    assert.match(rules, /Write your own facts/, 'the new kit text above the marker line is in')
     assert.doesNotMatch(rules, /<<<<<<</)
     assert.match(readFileSync(join(crew.home, 'BRIEF.md'), 'utf8'), /Owner brief kept\./, 'the brief keeps the crew\'s text')
   })
 
-  test('an owner edit on the line the template changed is a conflict: the owner file is kept', async () => {
+  test('an owner edit above the marker line is kit text: the kit replaces it, with no conflict, and the text below the marker is kept', async () => {
     const crew = newCrew()
     const dirA = await installedKit(crew)
     const dirB = newerKit(dirA, crew)
-    editFile(ownerFile(crew), text => text.replace('Replace the examples below', 'Replace the examples by hand'))
+    editFile(ownerFile(crew), text => text.replace('Write your project\'s own facts', 'Write your facts by hand'))
+    editFile(ownerFile(crew), text => `${text}\nOwner line below the marker.\n`)
     const out = await updateKit(dirA, crew, ['--from', dirB, '--kit', dirA])
-    assert.equal(out.code, 1)
-    assert.match(out.stdout, /CONFLICT PROJECT-RULES\.md/)
+    assert.doesNotMatch(out.stdout, /^CONFLICT /m, out.stdout)
     const owner = readFileSync(ownerFile(crew), 'utf8')
-    assert.match(owner, /Replace the examples by hand/, 'the owner text is kept')
+    assert.match(owner, /Write your own facts/, 'the kit text above the marker is the new kit text')
+    assert.doesNotMatch(owner, /Write your facts by hand/, 'an edit above the marker is replaced: it is kit text')
+    assert.match(owner, /Owner line below the marker\./, 'the text below the marker is kept')
     assert.doesNotMatch(owner, /<<<<<<</)
-    const [backup] = backupsOf(crew)
-    assert.match(readFileSync(join(crew.home, 'backups', backup, 'PROJECT-RULES.md.merged'), 'utf8'), /<<<<<<</, 'the merge with markers is set aside')
   })
 
-  test('a crew home with no recorded template keeps its owner file and sets the new one aside', async () => {
+  test('a file with no marker line is migrated once: the new kit text above a marker, the file kept entirely below it', async () => {
     const crew = newCrew()
     const dirA = await installedKit(crew)
     const dirB = newerKit(dirA, crew)
-    rmSync(join(crew.home, 'kit-base'), { recursive: true, force: true })
-    editFile(ownerFile(crew), text => `${text}\nOwner line kept.\n`)
+    const old = '# Our rules, from before the marker\n\nOwner line kept.\n'
+    writeFileSync(ownerFile(crew), old)
     const out = await updateKit(dirA, crew, ['--from', dirB, '--kit', dirA])
-    assert.match(out.stdout, /WARN PROJECT-RULES\.md: no template was recorded for this file/)
-    assert.ok(existsSync(join(crew.home, 'kit-base', 'PROJECT-RULES.md')), 'the new template is recorded as the base')
-    assert.match(readFileSync(ownerFile(crew), 'utf8'), /Owner line kept\./)
+    assert.match(out.stdout, /PROJECT-RULES\.md: migrated once/, out.stdout + out.stderr)
+    assert.doesNotMatch(out.stdout, /^(WARN PROJECT-RULES|CONFLICT )/m)
+    const owner = readFileSync(ownerFile(crew), 'utf8')
+    assert.ok(owner.endsWith(old), 'the old file is kept entirely below the marker')
+    assert.match(owner, /Write your own facts/, 'the new kit text is above the marker')
     const [backup] = backupsOf(crew)
-    assert.match(readFileSync(join(crew.home, 'backups', backup, 'PROJECT-RULES.md.new'), 'utf8'), /Replace the examples here/)
+    assert.equal(readFileSync(join(crew.home, 'backups', backup, 'PROJECT-RULES.md'), 'utf8'), old, 'a backup of the old file is made')
   })
 
   test('a kit without update.mjs is refused and the kit folder is left alone', async () => {
@@ -784,18 +797,17 @@ describe('crew update: the kit folder and the owner files', () => {
     const crew = newCrew()
     const dirA = await installedKit(crew)
     const dirB = newerKit(dirA, crew)
-    rmSync(join(crew.home, 'kit-base'), { recursive: true, force: true })
-    editFile(ownerFile(crew), text => `${text}\nOwner line kept.\n`)
+    writeFileSync(ownerFile(crew), '# Our rules, from before the marker\n\nOwner line kept.\n')
     const first = await updateKit(dirA, crew, ['--from', dirB, '--kit', dirA])
-    assert.match(first.stdout, /WARN PROJECT-RULES\.md: no template was recorded/)
+    assert.match(first.stdout, /PROJECT-RULES\.md: migrated once/)
     const dirC = join(crew.root, 'kitC')
     copyKit(dirC, dirB)
     editFile(join(dirC, 'PROJECT-RULES.md.tmpl'), text => text.replace('## Editing files', '## Editing code'))
     const second = await updateKit(dirA, crew, ['--from', dirC, '--kit', dirA])
-    assert.match(second.stdout, /PROJECT-RULES\.md: your edits and the new template merged cleanly/, second.stdout + second.stderr)
+    assert.match(second.stdout, /PROJECT-RULES\.md: the kit text above the marker line is replaced; your text below it is kept/, second.stdout + second.stderr)
     const owner = readFileSync(ownerFile(crew), 'utf8')
     assert.match(owner, /Owner line kept\./, 'owner text is not lost')
-    assert.match(owner, /## Editing code/, 'the later template change is in')
+    assert.match(owner, /## Editing code/, 'the later template change is in, above the marker')
     assert.doesNotMatch(owner, /<<<<<<</)
   })
 

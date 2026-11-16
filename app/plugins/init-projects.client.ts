@@ -1,5 +1,6 @@
 import MiniSearch from 'minisearch'
 import { initProjectsStore } from '~/composables/useProjects'
+import { loadInitialProjects } from '~/utils/projectsInitialLoad'
 import type { Project, TaskSearchRow } from '~/composables/useProjects'
 import { authClient } from '~/composables/useAuth'
 
@@ -33,13 +34,11 @@ export default defineNuxtPlugin(async () => {
     }
   })
 
-  try {
-    const [projects, tasks] = await Promise.all([
-      $fetch<Project[]>('/api/projects'),
-      $fetch<TaskSearchRow[]>('/api/tasks')
-    ])
-    initProjectsStore(projects, tasks, boardSearch)
-  } catch {
-    initProjectsStore([], [], boardSearch)
-  }
+  // A failed first read is retried once, and the store is initialised only with the full answer, so the search index is set. If the
+  // retry fails too, the store stays not ready and the page keeps its loading line (not "No projects yet").
+  await loadInitialProjects(
+    () => $fetch<Project[]>('/api/projects'),
+    () => $fetch<TaskSearchRow[]>('/api/tasks'),
+    (projects, tasks) => initProjectsStore(projects, tasks, boardSearch)
+  )
 })

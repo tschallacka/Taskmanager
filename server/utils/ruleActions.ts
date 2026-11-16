@@ -206,7 +206,15 @@ export async function runAction(
     case 'add_comment': {
       // The comment needs an author account. A rule posts under the account that
       // made it, and always as internal: a rule must not put words in front of a customer.
-      if (!rule.createdBy) throw createError({ statusCode: 400, message: 'The rule has no author left to post the comment' })
+      if (!rule.createdBy) {
+        // A crew rule with no crew account on its board (no Boss, no Pia) does its moves and skips the note.
+        // It never falls back to the board owner: a note under the owner's name floods the owner's inbox.
+        if (rule.id.startsWith('crew:')) {
+          console.warn(`crew rule "${rule.name}" on ${project.id}: no Boss or Pia account on the board, the note is skipped`)
+          return
+        }
+        throw createError({ statusCode: 400, message: 'The rule has no author left to post the comment' })
+      }
       const now = Date.now()
       await db.insert(taskComments).values({
         id: genId(),

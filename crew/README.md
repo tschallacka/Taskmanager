@@ -21,7 +21,7 @@ response is the crew's `creds.json`; nothing else is set up by hand.
 3. Run `CREW_HOME=<the crew's home folder> node init.mjs`. It checks the machine (Node, a browser, and the skills and MCP servers the hard rules name, see "Tools the workflow's hard rules need" below),
    renders the agents' documents (`CREW.md`, `PROMPTS.md`, ...) from the `*.tmpl` files, and writes one
    Claude Code agent definition per member into `~/.claude/agents` (`$CLAUDE_CONFIG_DIR/agents` when
-   that is set): `<crew slug>-<person>.md`, such as `acme-pia-planner.md`, with the model from `crew.json` (see "Models"; `haiku` when none is set).
+   that is set): `<crew slug>-<person>.md`, such as `acme-pia-planner.md`, with the model from `crew.json` (see "Models"; `claude-haiku-5-5` when none is set).
    `PROMPTS.md` names each one as the `subagent_type` to launch it with, so Boss can tell the members
    apart. It never overwrites a definition it did not write. **Run init before Boss's Claude Code
    session starts**: Claude Code reads the definitions when a session starts (an open session picks
@@ -55,13 +55,13 @@ Each person runs on the model you choose in `crew.json`. The kit names no model 
 
 ```json
 "models": {
-  "default": { "provider": "claude", "model": "haiku" },
+  "default": { "provider": "claude", "model": "claude-haiku-5-5" },
   "usher": "sonnet",
   "wick": { "provider": "claude", "model": "sonnet" }
 }
 ```
 
-- A person with no entry gets `default`, and without `default` that is `claude` with `haiku`.
+- A person with no entry gets `default`, and without `default` that is `claude` with `claude-haiku-5-5`. The bare alias `haiku` is not used: Claude Code refuses it ("unrecognized model"), which stopped every agent (card mwc5aicfyb9r0fvopvf).
 - A string is a Claude model. An object names the `provider` (`claude`, `openrouter` or `ollama`) and the `model`.
 - The keys are the people: `pia`, `wren`, `wick`, `wynn`, `wade`, `usher`, `nina`, `quincy` and `watcher`. Cato is
   not launched by the kit: he runs on whatever model you chat with.
@@ -105,7 +105,9 @@ The workflow's hard rules (the AI text editor for every document, CodeGraph for 
 `crew setup` (`setup.mjs`) makes one new crew for one board in one go. It is a thin client of the crew
 API, with the management token that "Put an AI crew to work on this board" gives (10 minutes, one board):
 
-    TASKMANAGER_MANAGEMENT_TOKEN=<token> node setup.mjs --origin <url> --board <board id> --repo <path> [--name <crew name>] [--slug <slug>]
+    TASKMANAGER_MANAGEMENT_TOKEN=<token> node setup.mjs --origin <url> --board <board id> --repo <path> --worktree-base <absolute folder> [--name <crew name>] [--slug <slug>]
+
+`--worktree-base` is required: the folder the crew's worktrees go in (for example the folder your repository sits in). It is written to crew.json as `worktreeBase`; `/` is refused.
 
 The token comes from `TASKMANAGER_MANAGEMENT_TOKEN`, or from stdin. It is never read from the command line. A
 crews:manage key does not work here: the remote crew API takes a management token. The crew is always new: a taken
@@ -320,6 +322,46 @@ definition says to use its own name wherever those write a member key. **New key
 keys: run `init --forks` again with the new file, which replaces the old one. **Remove the forks** deletes the
 accounts, after which their definitions and the file are yours to delete.
 
+## Claude Code limits
+
+Long crew work (a full suite, a typecheck, waiting for a board event) runs into Claude Code's default limits. The
+kit raises them for the crew's sessions only, with a profile that is passed to one session at a time.
+
+**The profile.** `claude-long-run.json` in this folder. Start a session with it:
+
+    crew claude                       the owner's wrapper: claude --settings <kit>/claude-long-run.json
+    claude --settings <kit>/claude-long-run.json [other flags]
+
+Pia's start line in PROMPTS.md ("Starting Pia") carries the same `--settings`. Agents that Pia starts run inside her
+session and inherit the profile. A session started without `--settings` keeps Claude Code's defaults. The values and
+what each one does are in `claude-long-run.comments.md`.
+
+**The limits.**
+
+| What | Default | Variable | Profile value |
+|---|---|---|---|
+| A shell command that names no timeout | 2 min | `BASH_DEFAULT_TIMEOUT_MS` | 30 min |
+| The longest a shell command may ask for | 10 min | `BASH_MAX_TIMEOUT_MS` | 2 h |
+| A foreground shell command moved to the background (main session) | off | `CLAUDE_CODE_AUTO_BACKGROUND_TIMEOUT_MS` | 30 min |
+| Shell output read back | 30,000 characters | `BASH_MAX_OUTPUT_LENGTH` | 150,000 (the most Claude Code allows) |
+| MCP server start-up | not documented | `MCP_TIMEOUT` | 60 s |
+| An MCP tool call moved to the background | 2 min | `CLAUDE_CODE_MCP_AUTO_BACKGROUND_MS` | 10 min |
+| An MCP tool call with no progress | 30 min (stdio), 5 min (remote) | `CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT` | 30 min |
+| A background agent counted as stalled | about 10 min | `CLAUDE_ASYNC_AGENT_STALL_TIMEOUT_MS` | 1 h |
+| A Monitor watch | 5 min, at most 30 min | none | cannot be raised |
+
+**What cannot be raised.** Monitor stops at 30 minutes: re-arm the watch when it expires, or use `persistent` where the
+session offers it. Shell output is capped at 150,000 characters: write long output to a file and read the part you need.
+
+**Checked against.** Claude Code 2.1.319, on 2026-11-09 (Claude Code's docs and its code). A newer or older Claude Code may
+change these. `crew claude version` prints the installed version and warns when it is older than the one the profile was
+checked against. Run it after a Claude Code update.
+
+**The PM's settings: one merged file.** Pia's listener hooks are also written to her folder's own `.claude/settings.json`
+(`pia-session.mjs`). Her start line in `PROMPTS.md` first runs `node claude.mjs merge` on `pia-session.settings.json`, which
+writes one file, `pia-session/settings.merged.json`, with the profile's `env` and the PM's `hooks` in it (hooks are joined
+per event). The start then passes that one file as its only `--settings`.
+
 ## Commands
 
     crew <who> <command ...>      board tools as one person (tm.mjs)
@@ -338,6 +380,10 @@ accounts, after which their definitions and the file are yours to delete.
     crew browser status|shutdown  the shared browser for everyone
 
 The old file names (`tm.mjs`, `listen.mjs`, ...) still work.
+
+**Keeping the machine light.** An idle person can wait with `crew listen <who> 600`: the wait returns early when there is
+news, so a long wait costs almost nothing. A listener may run under `nice -n 10`, which is fine. `tm.mjs` loads Playwright
+only for the commands that open a browser (the `mcp` calls and `update` never load it), so a plain board call starts fast.
 
 ## Adding missing people (`crew people add`)
 
@@ -403,6 +449,27 @@ Limits, which the design does not remove:
 - **Dialogs are dismissed** unless asked for. A page can still hold a command for up to two minutes, the request timeout.
 - **`shot` writes PNG or JPEG files only**, never through a link, never over a folder, and never over an existing file without `--overwrite`.
 
+## Dev copies (`crew <who> serve`)
+
+Each worker has one dev copy, on the port `devServers` in `crew.json` gives them (the ports come from the one table in `crew-defaults.mjs`, written into crew.json for the crew's people where they are missing: pia 3100, wren 3101, wick 3102, wynn 3103, wade 3104, quincy 3105, usher 3106, pat 3107, nina 3108). The port registry, `<CREW_HOME>/.listen/ports.json`, records which worktree holds which port (worktree, branch, card, pid, and the commit started from), under one lock file. Stale entries are dropped when their process is gone.
+
+- `crew <who> prepare worktree <task-id>` reserves the port for the new worktree and prints it.
+- `crew <who> serve` starts the worktree's copy with the command in `crew.json` `scripts.serve` (init writes the default, `bunx nuxt dev --host 127.0.0.1 --port {port}`; a project with another stack changes it). A port that another worktree holds is refused, and the message names that worktree and card.
+- `crew <who> serve --replace` stops only your own old copy on the port, and says which one, before it starts the new one.
+- `crew <who> serve --stop` stops the copy and frees the port. `prepare worktree --remove <task-id>` does the same before it removes the folder.
+- `crew <who> serve --check` says which copy answers the port and from which folder. It passes only when that copy serves the worktree's current HEAD, the commit recorded when it started; otherwise it stops with exit 3 and says to run `--replace`. A browser run calls it first.
+
+The listener is found with `lsof`; without `lsof` the `/proc` tables are read instead (`ss` is not used).
+
+## The lab (full-suite samples, slice 1)
+
+A sample is a branch to test on its own: `crew <who> lab submit <branch>` tests the whole suite, and `--file tests/x.test.ts --repeat n` runs one test file n times alone. The command writes a request file under `<CREW_HOME>/lab/requests/`; it runs nothing itself. `crew <who> lab status` shows the running sample and the queue, and `crew <who> lab cancel <branch>` removes a queued sample (a running one is only stopped by Boss).
+
+- The runner is its own process, `crew lab runner loop`, in its own tmux session (started by `crew up`, as the Susy daemon is). It takes the heavy-job slot (`heavy-slot.json`) before each run and releases it after; it refreshes the grant every 5 minutes while the run goes on. One runner at a time: a second start is refused while the first one is alive (`lab/runner.pid`).
+- Each run is `crew/lab-run.sh`: a fresh detached worktree of `origin/<branch>`, install, `eslint .`, typecheck, a scratch database `lab_<id>` (dropped after), then the tests. The run gets only `PATH`, `HOME`, `CREW_HOME` and the `LAB_*` settings. Its logs are in `<CREW_HOME>/lab/<id>/`, and its last line is one `RESULT:` line.
+- The sample id is `lab-<base36 time>-<6 hex>`. The runner and the script refuse any other id before a folder is made or removed.
+- `lab-run.sh` runs `git worktree add` and `remove` in the repository named by `LAB_REPO` (the shared checkout by default). Those folders are added and removed there, so point `LAB_REPO` at a clone if the shared checkout must not change.
+
 ## Updating
 
 To update a crew's kit, run this one line, with the crew home (the folder that holds `crew.json`) as the argument:
@@ -413,10 +480,12 @@ It works from any state: no kit folder yet, a kit from before `update.mjs` exist
 
 Once a crew home is updated, `crew update` brings its kit folder up to date with the kit the board serves. `crew update --check` says whether an update is waiting and writes nothing. `crew update --from <folder or kit.tar.gz>` installs a kit you already have. `crew update --all` runs the update once for every crew home of this kit folder. A home whose record names another kit folder is skipped; a home with no record of its kit (one installed before the record existed) is taken as this one, and its update links it to this folder; a folder without a `crew.json` is named as not a crew home. A kit of another instance is still refused.
 
+The owner documents (`PROJECT-RULES.md`, `BRIEF.md`, `JANET.md`) carry a marker line. The text above the marker is kit text: an update replaces it with the newest kit text, with no merge and no conflict. The text below the marker is the project's: an update never reads or changes it, and where it disagrees with the text above, the text below wins. A document with no marker is migrated once: the new kit text goes above a new marker and the old file is kept entirely below it (a backup is made first). `crew/owner-file.mjs` does the split and the update.
+
 A kit folder belongs to one instance: after an install it records its host and version in `kit-instance.json`. `crew update` refuses a kit folder of another instance in one sentence, and changes nothing. Make a kit folder for each instance (for example `~/crew-kit-<host>`).
 
-When it finishes, the report says the kit version before and after (`X -> Y`), the crew home it updated, and any CONFLICT or FAIL to fix by hand. Your state stays in `CREW_HOME`. The board's archive does not carry `kit-files.txt`, so a board update does not replace that list: it takes the files to remove from `crew-kit.json`, the record of the last install. A crew that was never updated has no record yet, and its removals are read from the `kit-files.txt` it came with.
-Every kit file it replaces or removes is first copied to `CREW_HOME/backups/update-<time>/kit`. The owner's files (`PROJECT-RULES.md`, `BRIEF.md`, `JANET.md`) are merged, so your edits and a template change both survive. A crew made before kit-base existed has no recorded template for these files (and `JANET.md` was not an owner file before, so every crew's first update keeps it as it is and prints a WARN), so its first update keeps them as they are and prints a WARN; a later update merges any template change from there on. When both change the same line, your file is kept, the merge with markers is set aside in the backup, and the update says CONFLICT. The skill copies in the Claude skills folder are refreshed only while they still match the old kit. Then `init` renders the documents from the new templates, and the install is recorded in `CREW_HOME/crew-kit.json`.
+When it finishes, the report says the kit version before and after (`X -> Y`), the crew home it updated, and any FAIL to fix by hand. Your state stays in `CREW_HOME`. The board's archive does not carry `kit-files.txt`, so a board update does not replace that list: it takes the files to remove from `crew-kit.json`, the record of the last install. A crew that was never updated has no record yet, and its removals are read from the `kit-files.txt` it came with.
+Every kit file it replaces or removes is first copied to `CREW_HOME/backups/update-<time>/kit`. The owner's files (`PROJECT-RULES.md`, `BRIEF.md`, `JANET.md`) follow the marker rule above: the kit text above the marker is replaced, and the text below it is kept. An owner edit above the marker line is replaced too, with no warning; the backup keeps the file as it was before the update. A file with no marker is migrated once, and its old content is kept below the marker, for you to delete by hand where it is kit text. Old `kit-base` folders in `CREW_HOME` stay where they are and are never read. The skill copies in the Claude skills folder are refreshed only while they still match the old kit. Then `init` renders the documents from the new templates, and the install is recorded in `CREW_HOME/crew-kit.json`.
 The kit's changes are in `CHANGELOG.md`; a line about the Taskmanager server is listed in the report, never made here. A first install (no kit folder yet) makes the folder, but `init` reports FAIL until the kit folder has its packages: run `npm install` in the kit folder, then `CREW_HOME=<crew home> node <kit folder>/init.mjs` again.
 
 If the one line does not work, the kit can be unpacked by hand. A kit from before this command has no `update.mjs`, so the old folder cannot update itself. Unpack the new kit into a folder of its own, for example `~/crew-kit-new`, and run it against the old folder with the crew's home set:
