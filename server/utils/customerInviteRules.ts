@@ -6,6 +6,16 @@ export interface TiedCustomerInvite {
   email: string | null
   acceptedAt: number | null
   expiresAt: number
+  /** Set when the manager revoked the link; a revoked link is never claimed or accepted. */
+  revokedAt?: number | null
+}
+
+/** The state a customer link is in, for the page. A used link stays used even after a revoke. */
+export function customerLinkState(row: TiedCustomerInvite, now: number): 'open' | 'used' | 'revoked' | 'expired' {
+  if (row.acceptedAt !== null) return 'used'
+  if (row.revokedAt !== null && row.revokedAt !== undefined) return 'revoked'
+  if (row.expiresAt <= now) return 'expired'
+  return 'open'
 }
 
 export function customerInvitesToClaim(rows: TiedCustomerInvite[], addresses: string[], now: number): string[] {
@@ -26,7 +36,7 @@ export function invitedAddressIsMine(input: { invitedEmail: string, verifiedAddr
 
 /** One link, for the accept by id: open, unexpired, tied to one of the account's addresses. */
 export function tiedInviteIsAcceptable(row: TiedCustomerInvite, addresses: string[], now: number): boolean {
-  if (row.email === null || row.acceptedAt !== null || row.expiresAt <= now) return false
+  if (row.email === null || customerLinkState(row, now) !== 'open') return false
   const mine = new Set(addresses.map(address => address.toLowerCase()))
   return mine.has(row.email.toLowerCase())
 }

@@ -17,6 +17,7 @@ export default defineEventHandler(async (event) => {
       id: customerInvitations.id,
       email: customerInvitations.email,
       acceptedAt: customerInvitations.acceptedAt,
+      revokedAt: customerInvitations.revokedAt,
       expiresAt: customerInvitations.expiresAt,
       customerName: customers.name,
       organizationName: organization.name

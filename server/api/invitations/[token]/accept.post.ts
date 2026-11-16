@@ -107,6 +107,7 @@ export default defineEventHandler(async (event) => {
     .where(and(
       eq(customerInvitations.tokenHash, tokenHash),
       isNull(customerInvitations.acceptedAt),
+      isNull(customerInvitations.revokedAt),
       gt(customerInvitations.expiresAt, now)
     ))
     .returning({ customerId: customerInvitations.customerId })

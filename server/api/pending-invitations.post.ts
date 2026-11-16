@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
 
   const addresses = await addressesOfUser(event.context.session.user.id)
   const [row] = await db
-    .select({ id: customerInvitations.id, email: customerInvitations.email, acceptedAt: customerInvitations.acceptedAt, expiresAt: customerInvitations.expiresAt, customerId: customerInvitations.customerId })
+    .select({ id: customerInvitations.id, email: customerInvitations.email, acceptedAt: customerInvitations.acceptedAt, revokedAt: customerInvitations.revokedAt, expiresAt: customerInvitations.expiresAt, customerId: customerInvitations.customerId })
     .from(customerInvitations)
     .where(eq(customerInvitations.id, id))
   const now = Date.now()

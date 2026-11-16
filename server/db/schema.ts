@@ -271,7 +271,9 @@ export const customerInvitations = pgTable(
     createdAt: bigint('created_at', { mode: 'number' }).notNull(),
     expiresAt: bigint('expires_at', { mode: 'number' }).notNull(),
     acceptedBy: text('accepted_by').references(() => user.id, { onDelete: 'set null' }),
-    acceptedAt: bigint('accepted_at', { mode: 'number' })
+    acceptedAt: bigint('accepted_at', { mode: 'number' }),
+    // Set when the manager revokes an open link: the link stops working. Null for a live link.
+    revokedAt: bigint('revoked_at', { mode: 'number' })
   },
   table => [index('customer_invitations_customer_id_idx').on(table.customerId)]
 )

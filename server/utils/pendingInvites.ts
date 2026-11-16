@@ -14,7 +14,7 @@ export async function claimTiedCustomerInvites(userId: string, addresses: string
   if (!addresses.length) return
   const lowered = addresses.map(address => address.toLowerCase())
   const rows = await db
-    .select({ id: customerInvitations.id, email: customerInvitations.email, acceptedAt: customerInvitations.acceptedAt, expiresAt: customerInvitations.expiresAt, customerId: customerInvitations.customerId })
+    .select({ id: customerInvitations.id, email: customerInvitations.email, acceptedAt: customerInvitations.acceptedAt, revokedAt: customerInvitations.revokedAt, expiresAt: customerInvitations.expiresAt, customerId: customerInvitations.customerId })
     .from(customerInvitations)
     .where(and(
       gt(customerInvitations.expiresAt, now),

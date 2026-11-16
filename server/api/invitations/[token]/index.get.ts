@@ -46,6 +46,7 @@ export default defineEventHandler(async (event) => {
       expiresAt: customerInvitations.expiresAt,
       acceptedAt: customerInvitations.acceptedAt,
       acceptedBy: customerInvitations.acceptedBy,
+      revokedAt: customerInvitations.revokedAt,
       email: customerInvitations.email,
       customerId: customers.id,
       customerName: customers.name,
@@ -63,6 +64,7 @@ export default defineEventHandler(async (event) => {
     const acceptedByYou = usedBy !== null && usedBy.user.id === row.acceptedBy
     throw createError({ statusCode: 410, message: 'This invitation has already been used', data: { acceptedByYou } })
   }
+  if (row.revokedAt) throw createError({ statusCode: 410, message: 'This invitation has been revoked' })
   if (row.expiresAt <= Date.now()) throw createError({ statusCode: 410, message: 'This invitation has expired' })
 
   // How many projects are shared with this person as a customer contact: the customer's projects, and the boards

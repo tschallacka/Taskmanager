@@ -70,6 +70,7 @@ watch([usedPlan, sessionPending], () => {
 
 const loadMessage = computed(() => {
   const status = loadError.value?.statusCode
+  if (status === 410 && usedBody.value?.message === 'This invitation has been revoked') return 'This invitation was revoked. Ask for a new link.'
   if (status === 410) return 'This invitation has already been used or has expired.'
   if (status === 404) return 'This invitation link is not valid.'
   return loadError.value ? 'This invitation could not be loaded.' : ''
