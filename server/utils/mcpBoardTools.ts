@@ -19,6 +19,9 @@ import { MAX_PROJECT_DESCRIPTION, PROJECT_STATUSES, parseDueOn, parseProjectStat
 import { projectPeople } from './people'
 import { boardTreeFields, hiddenCrewShadows } from './boardTree'
 import { boardRoleFields, crewRealBoardRefusal, isTakenOff, takenOffRefusal, type BoardRoleFields } from './mcpBoardRoles'
+import { boardShareUrl, openableTaskId, publicBoardShareUrl, taskShareUrl } from './shareLinks'
+import { findPublicProject } from './publicAccess'
+import { requireShareAuthority } from './guestInvites'
 import { readTaskGithubLinks } from './githubTaskLinks'
 import { notifyAssigned, notifyTaskChange } from './notifyEvents'
 import { tellUnblockedAfterBulk, tellUnblockedOnTrash, unfinishedTasksOn } from './unblockedWatch'
@@ -341,6 +344,35 @@ function readDetail(args: Record<string, unknown>): TaskDetail {
 }
 
 /**
+ * The board's public link for a customer-visible task, when the board is shared now (not private, not expired, not a
+ * crew's shadow) and the caller may share it (a project admin or a manager guest). The public page shows the board's
+ * cards, not one task, so the link is the board's public page. Staff keys only.
+ */
+async function boardPublicUrl(board: Project, context: ApiKeyContext): Promise<string | undefined> {
+  if (audienceOf(context, board) !== 'staff') return undefined
+  if (!(await findPublicProject(board.id))) return undefined
+  try {
+    await requireShareAuthority(board, context.userId)
+  } catch (error) {
+    // A caller who may not share gets no link (403). Anything else is a real failure, and it must show.
+    if ((error as { statusCode?: number }).statusCode === 403) return undefined
+    throw error
+  }
+  return publicBoardShareUrl(board.id)
+}
+
+async function publicUrlFor(task: ProjectTask, board: Project, context: ApiKeyContext): Promise<{ publicUrl?: string }> {
+  if (task.visibility !== 'customer') return {}
+  const url = await boardPublicUrl(board, context)
+  return url ? { publicUrl: url } : {}
+}
+
+/** The link to a task for a staff caller. A customer's contact gets no staff link: the board's own page is staff's. */
+function staffTaskUrl(task: ProjectTask, board: Project, context: ApiKeyContext): string | undefined {
+  return audienceOf(context, board) === 'staff' ? taskShareUrl(board.id, openableTaskId(task)) : undefined
+}
+
+/**
  * A task as the board draws it: title, labels and a line of the description.
  * The whole description and the thread of updates live behind get_task, so a
  * board of 200 tasks reads as a board and not as 200 documents.
@@ -358,12 +390,18 @@ function taskCard(task: ProjectTask, options: {
   people?: Map<string, string>
   fields?: Record<string, string | number>
   blocked?: BlockedMark
+  // The link to share with a person; only staff get one (see staffTaskUrl).
+  url?: string
+  // The board's public page, when the board is shared and the caller may share it; a customer-visible card carries it.
+  publicUrl?: string
 } = {}) {
   const detail = options.detail ?? 'summary'
   const terms = options.terms ?? []
 
   return {
     id: task.id,
+    ...(options.url ? { url: options.url } : {}),
+    ...(options.publicUrl && task.visibility === 'customer' ? { publicUrl: options.publicUrl } : {}),
     ...(options.board ? { board: options.board } : {}),
     ...(options.column ? { column: options.column } : {}),
     ...(options.parent ? { parent: options.parent } : {}),
@@ -434,6 +472,9 @@ async function taskDetail(task: ProjectTask, board: Project, context: ApiKeyCont
 
   return {
     id: task.id,
+    // The link to share with a person: it opens this task on its board (shareLinks.ts). Staff only.
+    ...(audience === 'staff' ? { url: taskShareUrl(board.id, openableTaskId(task)) } : {}),
+    ...(await publicUrlFor(task, board, context)),
     board: { id: board.id, name: board.name },
     column: column?.name ?? task.columnId,
     title: task.title,
@@ -712,6 +753,8 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
         total: boards.length,
         boards: boards.slice(0, limit).map(board => ({
           ...boardSummary(board, columnCounts.get(board.id) ?? 0, taskCounts.get(board.id) ?? 0),
+          // The board's link to share: staff only, as the task links are (a customer's contact gets none).
+          ...(audienceOf(context, board) === 'staff' ? { url: boardShareUrl(board.id) } : {}),
           ...roleSummary(roles.get(board.id))
         }))
       }
@@ -789,6 +832,8 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
       const states = await blockedStatesOn(board.id, grouped.flatMap(group => group.shown).map(task => task.id))
       const marks = new Map([...states].map(([id, state]) => [id, blockedMark(state, audience)] as const))
       const people = await peopleNames(board)
+      // The board's public page, for its customer-visible cards (read once, not per card).
+      const sharedUrl = await boardPublicUrl(board, context)
       // Custom fields are the team's own; a contact's board has none to show.
       const fieldDefs = audienceOf(context, board) === 'staff' ? await listFields(board.id) : []
       const fieldValues = fieldDefs.length ? await loadFieldValues(grouped.flatMap(group => group.shown.map(task => task.id))) : {}
@@ -796,6 +841,8 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
       return {
         id: board.id,
         name: board.name,
+        // The board's link to share: staff only, as the task links are.
+        ...(audience === 'staff' ? { url: boardShareUrl(board.id) } : {}),
         ...(board.status ? { status: board.status } : {}),
         ...(board.description ? { description: board.description } : {}),
         ...roleSummary(roles.get(board.id)),
@@ -813,6 +860,8 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
           ...(total > shown.length ? { omitted: total - shown.length } : {}),
           tasks: shown.map(task => taskCard(task, {
             detail,
+            url: staffTaskUrl(task, board, context),
+            publicUrl: sharedUrl,
             updates: counts.get(task.id),
             blocked: marks.get(task.id),
             people,
@@ -912,11 +961,19 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
         return terms.every(term => haystack.includes(term))
       })
 
+      // The public link of each shown task's board, read once per board (only the boards the matches are on).
+      const sharedUrls = new Map<string, string | undefined>()
+      for (const board of new Set(matches.slice(0, limit).map(task => boardsById.get(task.projectId)).filter((b): b is Project => !!b))) {
+        sharedUrls.set(board.id, await boardPublicUrl(board, context))
+      }
+
       return {
         total: matches.length,
         tasks: matches.slice(0, limit).map(task => taskCard(task, {
           detail,
           terms,
+          url: boardsById.get(task.projectId) ? staffTaskUrl(task, boardsById.get(task.projectId)!, context) : undefined,
+          publicUrl: sharedUrls.get(task.projectId),
           board: boardsById.get(task.projectId)?.name ?? task.projectId,
           column: columnsById.get(task.columnId)?.name ?? task.columnId
         }))
@@ -1380,7 +1437,7 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
       return {
         created: true,
         board: { id: board.id, name: board.name },
-        task: taskCard(task!, { column: column.name, parent: parent?.task.id, people: await peopleNames(board), fields: describeFieldValues(fieldDefs, storedValues), blocked: await blockedFor(task!.id, audienceOf(context, board)) })
+        task: taskCard(task!, { url: staffTaskUrl(task!, board, context), publicUrl: await boardPublicUrl(board, context), column: column.name, parent: parent?.task.id, people: await peopleNames(board), fields: describeFieldValues(fieldDefs, storedValues), blocked: await blockedFor(task!.id, audienceOf(context, board)) })
       }
     }
   },
@@ -1461,7 +1518,7 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
       return {
         updated: true,
         board: { id: board.id, name: board.name },
-        task: taskCard(updated!, { column: column.name, people: await peopleNames(board), fields: (await describedFields(board, updated!)).fields, blocked: await blockedFor(updated!.id, audienceOf(context, board)) })
+        task: taskCard(updated!, { url: staffTaskUrl(updated!, board, context), publicUrl: await boardPublicUrl(board, context), column: column.name, people: await peopleNames(board), fields: (await describedFields(board, updated!)).fields, blocked: await blockedFor(updated!.id, audienceOf(context, board)) })
       }
     }
   },
@@ -1522,7 +1579,7 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
         board: { id: board.id, name: board.name },
         from: from.name,
         to: column.name,
-        task: taskCard(updated!, { column: column.name })
+        task: taskCard(updated!, { url: staffTaskUrl(updated!, board, context), publicUrl: await boardPublicUrl(board, context), column: column.name })
       }
     }
   },
@@ -1550,6 +1607,8 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
         id: task.id,
         title: task.title,
         board: { id: board.id, name: board.name },
+        // A trashed task has no page of its own in the app, so its link is the board, where restore_task brings it back.
+        ...(audienceOf(context, board) === 'staff' ? { url: boardShareUrl(board.id) } : {}),
         restoreWith: 'restore_task'
       }
     }
@@ -1597,6 +1656,7 @@ export const MCP_BOARD_TOOLS: McpToolDefinition[] = [
         id: task.id,
         title: task.title,
         board: { id: board.id, name: board.name },
+        ...(audienceOf(context, board) === 'staff' ? { url: taskShareUrl(board.id, openableTaskId(task)) } : {}),
         column: restored?.name ?? columnId
       }
     }
