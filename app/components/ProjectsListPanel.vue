@@ -4,7 +4,7 @@ import type { Project } from '~/composables/useProjects'
 import type { PinnedBoard } from '~/composables/usePins'
 import { crewUpdatePrompt } from '~/utils/crewUpdatePrompt'
 import { taskCountLabel } from '#shared/utils/board'
-import { crewTreeRows } from '~/utils/crewTreeRows'
+import { crewTreeRows, rowGutter } from '~/utils/crewTreeRows'
 import { mayCreateProjects, panelListsProject } from '~/utils/sidebarAccess'
 import { countOpenTasks, healthTint, kindIcon, projectKind } from '~/utils/projectKind'
 
@@ -427,15 +427,16 @@ function menuItems(project: Project) {
         :class="[
           isLabelRow(project) ? '' : 'cursor-pointer',
           activeId === project.id ? 'bg-elevated' : isLabelRow(project) ? '' : 'hover:bg-elevated/60',
-          depth ? 'ml-6 min-h-11 py-1' : ''
+          depth ? 'ml-6 min-h-11 border-l border-default py-1 pl-3' : ''
         ]"
         :data-board-row="project.role ?? 'board'"
         :data-depth="depth"
         :data-label-row="isLabelRow(project) ? '' : undefined"
         @click="openRow(project)"
       >
+        <!-- Every top-level row reserves the arrow's width, so the names line up whether or not the board has crews. -->
         <UButton
-          v-if="shadowCount"
+          v-if="rowGutter({ depth, shadowCount }) === 'toggle'"
           :icon="open ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
           size="sm"
           color="neutral"
@@ -446,15 +447,25 @@ function menuItems(project: Project) {
           data-tree-toggle
           @click.stop="toggleTree(project.id)"
         />
+        <span
+          v-else-if="rowGutter({ depth, shadowCount }) === 'spacer'"
+          class="-my-2 -ml-2 min-h-11 min-w-11 shrink-0"
+          aria-hidden="true"
+          data-tree-spacer
+        />
         <UIcon
           :name="kindIcon(project)"
-          class="mt-0.5 size-4 shrink-0"
-          :class="kindTint(project)"
+          class="mt-0.5 shrink-0"
+          :class="[depth ? 'size-3.5' : 'size-4', kindTint(project)]"
           :data-kind="projectKind(project)"
           :data-health="project.status ?? 'unset'"
         />
         <div class="min-w-0 flex-1">
-          <p class="truncate text-sm font-medium leading-snug text-default">
+          <!-- A nested crew reads as the child: a lighter weight and a muted colour, so the project above it is the main item. -->
+          <p
+            class="truncate leading-snug"
+            :class="depth ? 'text-xs font-normal text-muted' : 'text-sm font-medium text-default'"
+          >
             {{ boardLabel(project) }}
           </p>
           <p
