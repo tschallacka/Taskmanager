@@ -9,7 +9,7 @@ import { lookupAddressedInvitation } from '../../../utils/invitations'
 import { addressesOfUser } from '../../../utils/extraEmails'
 import { guestProjectIdsOf } from '../../../utils/guests'
 import { sharedProjectIds } from '../../../utils/sharedProjectIds'
-import { acceptBoardGuest, claimPendingBoardInvites } from '../../../utils/pendingInvites'
+import { acceptBoardGuest, claimPendingBoardInvites, claimTiedCustomerInvites } from '../../../utils/pendingInvites'
 
 // Turns the signed-in account into a member of the invitation's team, a guest of its board, or a
 // contact of its customer. A link is spent by the first account that accepts it; a team or board
@@ -112,6 +112,8 @@ export default defineEventHandler(async (event) => {
 
   // The owner's rule: a board invitation already sent to this account's address is accepted by itself now.
   await claimPendingBoardInvites(session.user.id, await addressesOfUser(session.user.id), now)
+  // The same for a customer link tied to one of the account's addresses (the owner's rule).
+  await claimTiedCustomerInvites(session.user.id, await addressesOfUser(session.user.id), now)
 
   // The projects shared with this person as a customer contact: the customer's own projects and the boards they
   // hold as a guest. The landing opens the one or lists the several (see utils/inviteLanding).
