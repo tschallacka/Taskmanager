@@ -286,9 +286,25 @@ async function uploadImage(file: File, onProgress?: (progress: number | null) =>
   if (!id) throw new Error('Save the task first, then paste the image.')
   const form = new FormData()
   form.append('file', file)
-  onProgress?.(null)
-  const res = await $fetch<{ url: string }>(`/api/tasks/${id}/attachments`, { method: 'POST', body: form })
-  return res.url
+  // XMLHttpRequest, not $fetch: only it reports how much of the upload has gone out. Without a known length the bar is indeterminate.
+  return new Promise<string>((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', `/api/tasks/${id}/attachments`)
+    xhr.upload.onprogress = e => onProgress?.(e.lengthComputable ? e.loaded / e.total : null)
+    xhr.onload = () => {
+      let body: { url?: string, message?: string } = {}
+      try {
+        body = JSON.parse(xhr.responseText || '{}')
+      } catch {
+        body = {}
+      }
+      if (xhr.status >= 200 && xhr.status < 300 && body.url) resolve(body.url)
+      else reject(new Error(body.message || xhr.statusText || 'The upload failed'))
+    }
+    xhr.onerror = () => reject(new Error('The upload failed: no connection'))
+    onProgress?.(null)
+    xhr.send(form)
+  })
 }
 
 // ─── Labels ────────────────────────────────────────────────
