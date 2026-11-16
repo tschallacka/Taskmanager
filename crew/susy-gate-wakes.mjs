@@ -52,3 +52,33 @@ export function gateWakes(cards, previous, { gates = GATES } = {}) {
   }
   return { wakes, columns }
 }
+
+/**
+ * What one round does with the wakes. Dry-run (live false) logs each wake and keeps none. Live with the switch on
+ * (susy.dispatch.gateWakes is true) keeps each wake as owed until settleGateMail() marks its mail sent, so a failed send
+ * is tried again on the next round. Live with the switch off logs that and keeps nothing. No cards (the board was not
+ * read): the recorded columns are kept as they were.
+ */
+export function planGateRound({ cards, state = {}, live = false, enabled = false }) {
+  if (!cards) return { columns: state.columns ?? {}, owed: state.owed ?? [], mails: [], lines: [] }
+  const { wakes, columns } = gateWakes(cards, state.columns)
+  const lines = []
+  if (!live) {
+    for (const wake of wakes) lines.push(`would mail ${wake.to}: ${wake.text}`)
+    return { columns, owed: [], mails: [], lines }
+  }
+  if (!enabled) {
+    for (const wake of wakes) lines.push(`gate wake off (susy.dispatch.gateWakes is not true): ${wake.cardId} to ${wake.to}`)
+    return { columns, owed: [], mails: [], lines }
+  }
+  const owed = [...(state.owed ?? [])]
+  for (const wake of wakes) {
+    if (!owed.some(item => item.key === wake.key)) owed.push({ key: wake.key, cardId: wake.cardId, column: wake.column, to: wake.to, text: wake.text })
+  }
+  return { columns, owed, mails: owed.map(item => ({ key: item.key, to: item.to, text: item.text, cardId: item.cardId })), lines }
+}
+
+/** The state with one owed wake removed, once its mail has gone out. */
+export function settleGateMail(state, key) {
+  return { ...state, owed: (state.owed ?? []).filter(item => item.key !== key) }
+}

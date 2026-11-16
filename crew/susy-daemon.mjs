@@ -20,6 +20,7 @@ import { DEFAULT_CLEANER, findPokes, keyOfName, makeCall, readBoardCards } from 
 import { collectActivity, listenerRunning, newActivityLines, readLoad } from './susy-collector.mjs'
 import { projectsRoot, readWorkerRows, workerStates } from './susy-workers.mjs'
 import { markMailed, sessionErrorReport } from './session-errors.mjs'
+import { planGateRound, settleGateMail } from './susy-gate-wakes.mjs'
 
 export const TICK_SECONDS = 60
 
@@ -158,6 +159,16 @@ export async function runOnce(home, now = Date.now(), { live = false } = {}) {
   const errors = sessionErrorReport({ home, root: projectsRoot({ crewHome: home, crew }), state: result.state, live })
   result.state.sessionErrors = errors.sessionErrors
   lines.push(...errors.lines)
+  // Phase 2, gate wakes (card mwf201blsqvx3jczev): a card that enters a review gate wakes its owner once. The kill switch
+  // is crew.json susy.dispatch.gateWakes; it must be true for a live mail. A board that was not read changes nothing.
+  const gate = result.ok
+    ? planGateRound({ cards: result.cards, state: result.state, live, enabled: crew?.susy?.dispatch?.gateWakes === true })
+    : null
+  if (gate) {
+    result.state.columns = gate.columns
+    result.state.owed = gate.owed
+    lines.push(...gate.lines)
+  }
   if (live) {
     for (const item of errors.pending) {
       try {
@@ -171,6 +182,17 @@ export async function runOnce(home, now = Date.now(), { live = false } = {}) {
       }
     }
     lines.push(...await postFresh({ fresh: result.fresh, pending: result.state.pending, call }))
+    // Gate wakes: each owed wake is mailed to its owner; it is settled only when the mail went out, so a failure is tried again.
+    for (const mail of gate?.mails ?? []) {
+      try {
+        const { sendMail } = await import('./mail-client.mjs')
+        await sendMail({ base: creds.base, slug: creds.crew?.slug, key, to: mail.to, text: mail.text, mailboxDir: `${home}/mailbox`, makeId: () => crypto.randomUUID().replaceAll('-', '') })
+        result.state = settleGateMail(result.state, mail.key)
+        lines.push(`mailed ${mail.to}: gate wake for ${mail.cardId}`)
+      } catch (error) {
+        lines.push(`could not mail ${mail.to} about ${mail.cardId}, tried again next tick: ${error.message}`)
+      }
+    }
     if (result.mailBoss && key && creds.crew?.slug) {
       try {
         // The mail client ships with the kit once the mailer branch is merged; loaded here so dry-run never needs it.

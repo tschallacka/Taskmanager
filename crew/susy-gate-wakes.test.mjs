@@ -2,7 +2,7 @@
 // Fake boards only: no network, no mail. Run: node --test crew/susy-gate-wakes.test.mjs
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { gateWakes, headOf, GATE_TAGS } from './susy-gate-wakes.mjs'
+import { gateWakes, headOf, GATE_TAGS, planGateRound, settleGateMail } from './susy-gate-wakes.mjs'
 
 const card = (id, column, extra = {}) => ({
   id,
@@ -87,4 +87,47 @@ test('the mail says what the card is, where it entered, and the one thing to do'
   assert.match(text, /Popup fix/)
   assert.match(text, /Verify CQ/)
   assert.match(text, /CQ approved/)
+})
+
+// ---- the round: what the daemon does with the wakes (dry-run logs; live mails once per wake, kill switch) ----
+
+test('dry-run logs each wake and mails nothing', () => {
+  const r1 = planGateRound({ cards: [card('a', 'In progress')], state: {}, live: false, enabled: true })
+  const r2 = planGateRound({ cards: [card('a', 'Verify CQ')], state: { columns: r1.columns }, live: false, enabled: true })
+  assert.deepEqual(r2.mails, [])
+  assert.deepEqual(r2.owed, [])
+  assert.equal(r2.lines.length, 1)
+  assert.match(r2.lines[0], /^would mail nina: /)
+})
+
+test('live with the switch on: the wake is mailed to its owner, and kept until the mail is settled', () => {
+  const r1 = planGateRound({ cards: [card('a', 'In progress')], state: {}, live: true, enabled: true })
+  const r2 = planGateRound({ cards: [card('a', 'Verify CQ')], state: { columns: r1.columns }, live: true, enabled: true })
+  assert.equal(r2.mails.length, 1)
+  assert.equal(r2.mails[0].to, 'nina')
+  assert.equal(r2.owed.length, 1)
+  const settled = settleGateMail({ columns: r2.columns, owed: r2.owed }, r2.mails[0].key)
+  assert.deepEqual(settled.owed, [])
+})
+
+test('a failed mail is not settled: the next round mails it again, with no card change', () => {
+  const r1 = planGateRound({ cards: [card('a', 'In progress')], state: {}, live: true, enabled: true })
+  const r2 = planGateRound({ cards: [card('a', 'Verify CQ')], state: { columns: r1.columns }, live: true, enabled: true })
+  const r3 = planGateRound({ cards: [card('a', 'Verify CQ')], state: { columns: r2.columns, owed: r2.owed }, live: true, enabled: true })
+  assert.equal(r3.mails.length, 1)
+  assert.equal(r3.mails[0].key, r2.mails[0].key)
+})
+
+test('live with the switch off: no mail, and a line says the switch is off', () => {
+  const r1 = planGateRound({ cards: [card('a', 'In progress')], state: {}, live: true, enabled: false })
+  const r2 = planGateRound({ cards: [card('a', 'Verify CQ')], state: { columns: r1.columns }, live: true, enabled: false })
+  assert.deepEqual(r2.mails, [])
+  assert.deepEqual(r2.owed, [])
+  assert.match(r2.lines[0], /gate wake off \(susy\.dispatch\.gateWakes is not true\)/)
+})
+
+test('a board that was not read (no cards) leaves the recorded columns alone', () => {
+  const out = planGateRound({ cards: undefined, state: { columns: { a: 'In progress' } }, live: true, enabled: true })
+  assert.deepEqual(out.columns, { a: 'In progress' })
+  assert.deepEqual(out.mails, [])
 })
