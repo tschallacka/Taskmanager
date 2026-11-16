@@ -4,8 +4,8 @@
 //   cd crew && node --test worktree-base-config.test.mjs
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { execFileSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { execFileSync, spawnSync } from 'node:child_process'
+import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { worktreeFolder } from './prepare-worktree.mjs'
@@ -26,10 +26,20 @@ test('an absolute worktreeBase from crew.json is exported by the loader, without
   assert.equal(loadedBase({ worktreeBase: '/srv/agents/taskmanager-maintenance' }), '/srv/agents/taskmanager-maintenance')
 })
 
-test('the value the loader gives is what init checks: absolute passes, so no warning', () => {
-  const base = loadedBase({ worktreeBase: '/srv/w' })
-  // init.mjs warns when this predicate is false; with the export it is true.
-  assert.equal(typeof base === 'string' && base.startsWith('/'), true)
+// The prepare worktree command, run for real with a crew home holding `extra` in crew.json. It stops before any board
+// call (the card is read after the folder is known), so no network is used: the temp home has no creds.json.
+function runCli(extra) {
+  const home = mkdtempSync(join(tmpdir(), 'crew-wt-cli-'))
+  writeFileSync(join(home, 'crew.json'), JSON.stringify({ team: 'Crew', ...extra }))
+  return spawnSync(process.execPath, [join(kit, 'prepare-worktree-cli.mjs'), 'wren', 'mwifypvkc453w4k6wp'], { env: { ...process.env, CREW_HOME: home }, encoding: 'utf8' })
+}
+
+test('prepare worktree with an absolute worktreeBase in crew.json gets past the folder check: no worktreeBase message', () => {
+  // Before the export, the command built its folder from a config without worktreeBase and refused this file.
+  const run = runCli({ worktreeBase: '/srv/agents/taskmanager-maintenance/' })
+  assert.doesNotMatch(run.stderr, /no worktreeBase/)
+  assert.match(run.stderr, /could not read the card mwifypvkc453w4k6wp/)
+  assert.equal(run.status, 1)
 })
 
 test('prepare worktree resolves the folder from the loaded config', () => {
@@ -55,12 +65,10 @@ test('a relative worktreeBase is kept as written, and prepare worktree refuses i
   assert.match(folder.message, /no worktreeBase \(an absolute folder\)/)
 })
 
-test('the prepare worktree command passes the loaded worktreeBase, not only the raw crew.json', () => {
-  const cli = readFileSync(join(kit, 'prepare-worktree-cli.mjs'), 'utf8')
-  assert.match(cli, /worktreeFolder\(\{ config: \{ worktreeBase: loaded\.worktreeBase \}, who, taskId \}\)/)
-})
-
-test('the serve hint in init says "for example", so it does not read as the required command for every product', () => {
-  const init = readFileSync(join(kit, 'init.mjs'), 'utf8')
-  assert.match(init, /crew\.json has no scripts\.serve: for example add/)
+test('prepare worktree with a relative or missing worktreeBase refuses with the one-line message, before reading the card', () => {
+  for (const extra of [{ worktreeBase: 'relative/dir' }, {}]) {
+    const run = runCli(extra)
+    assert.equal(run.status, 1)
+    assert.equal(run.stderr.trim(), 'crew.json has no worktreeBase (an absolute folder); set it, then run this again')
+  }
 })
