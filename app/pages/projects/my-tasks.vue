@@ -8,7 +8,10 @@ definePageMeta({ layout: 'app' })
 useSeoMeta({ title: 'My tasks' })
 
 const { session } = useAuth()
-const { ready, allTasks, updateTask } = useProjects()
+const { ready, allTasks, updateTask, ensureTasks } = useProjects()
+onMounted(() => {
+  ensureTasks().catch(() => {})
+})
 
 const TABS = ['Upcoming', 'Overdue', 'Completed'] as const
 const tab = ref<(typeof TABS)[number]>('Upcoming')

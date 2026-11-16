@@ -1,6 +1,6 @@
 import MiniSearch from 'minisearch'
 import { initProjectsStore } from '~/composables/useProjects'
-import type { Project, TaskSearchRow } from '~/composables/useProjects'
+import type { Project } from '~/composables/useProjects'
 import { authClient } from '~/composables/useAuth'
 
 type BoardSearchDoc = { id: string, type: 'project' | 'task', name: string, title: string, descriptionText: string }
@@ -34,12 +34,10 @@ export default defineNuxtPlugin(async () => {
   })
 
   try {
-    const [projects, tasks] = await Promise.all([
-      $fetch<Project[]>('/api/projects'),
-      $fetch<TaskSearchRow[]>('/api/tasks')
-    ])
-    initProjectsStore(projects, tasks, boardSearch)
+    // The task list is fetched later, by the first screen or search that reads it (ensureTasks).
+    const projects = await $fetch<Project[]>('/api/projects')
+    initProjectsStore(projects, boardSearch)
   } catch {
-    initProjectsStore([], [], boardSearch)
+    initProjectsStore([], boardSearch)
   }
 })

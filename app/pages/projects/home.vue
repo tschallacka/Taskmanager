@@ -10,7 +10,7 @@ definePageMeta({ layout: 'app' })
 useSeoMeta({ title: 'Home' })
 
 const { session } = useAuth()
-const { ready, projects, allTasks, updateTask } = useProjects()
+const { ready, projects, allTasks, updateTask, ensureTasks } = useProjects()
 
 const greeting = computed(() => {
   const hour = new Date().getHours()
@@ -34,6 +34,7 @@ const { items: inboxItems, unread: inboxUnread, load: loadInbox } = useNotificat
 onMounted(() => {
   loadTimer()
   loadInbox()
+  ensureTasks().catch(() => {})
 })
 const weekStart = computed(() => {
   const now = new Date()

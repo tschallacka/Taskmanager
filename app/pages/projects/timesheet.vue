@@ -9,7 +9,10 @@ definePageMeta({ layout: 'app' })
 
 useSeoMeta({ title: 'Timesheet' })
 
-const { allTasks, projects } = useProjects()
+const { allTasks, projects, ensureTasks } = useProjects()
+onMounted(() => {
+  ensureTasks().catch(() => {})
+})
 const { session } = useAuth()
 const toast = useToast()
 const { revision } = useRunningTimer()
