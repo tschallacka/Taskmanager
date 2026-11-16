@@ -103,6 +103,18 @@ async function accept() {
     accepting.value = false
   }
 }
+
+// An account made through this link (signed up with the invited address, then back here) is a contact by itself, with
+// no second step. Once per visit; a failure leaves the Accept button for a retry.
+const autoAccepted = ref(false)
+watch([session, invitation], () => {
+  const invite = invitation.value
+  const mine = session.value?.user.email?.toLowerCase()
+  if (autoAccepted.value || !session.value || !invite || invite.kind !== 'customer' || !invite.email) return
+  if (mine !== invite.email.toLowerCase()) return
+  autoAccepted.value = true
+  accept()
+}, { immediate: true })
 </script>
 
 <template>
