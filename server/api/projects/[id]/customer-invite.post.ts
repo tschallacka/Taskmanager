@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm'
 import { db } from '../../../db'
 import { customers } from '../../../db/schema'
 import { genId, requireProject } from '../../../utils/projects'
