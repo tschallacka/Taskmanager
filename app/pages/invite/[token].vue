@@ -132,6 +132,12 @@ async function accept() {
       />
 
       <template v-else-if="invitation">
+        <p
+          v-if="invitation.kind === 'customer' && invitation.sharedProjectCount === 0"
+          class="text-sm text-zinc-400 text-center"
+        >
+          Nothing is shared with you yet by {{ invitation.organizationName }}. Their projects show here as soon as they share one.
+        </p>
         <template v-if="session">
           <p class="text-sm text-zinc-400 text-center">
             Signed in as <span class="text-zinc-200">{{ session.user.email }}</span>.
@@ -142,12 +148,6 @@ async function accept() {
             variant="subtle"
             description="This invitation was sent to another address than the one of this account. Sign out and use the invited address, or create an account with it."
           />
-          <p
-            v-if="invitation.kind === 'customer' && invitation.sharedProjectCount === 0"
-            class="text-sm text-zinc-400 text-center"
-          >
-            Nothing is shared with you yet by {{ invitation.organizationName }}. Their projects show here as soon as they share one.
-          </p>
           <UAlert
             v-if="acceptError"
             color="error"
@@ -181,12 +181,6 @@ async function accept() {
             class="text-sm text-zinc-400 text-center"
           >
             Use the email address this invitation was sent to. Anyone else cannot use it.
-          </p>
-          <p
-            v-if="invitation.kind === 'customer' && invitation.sharedProjectCount === 0"
-            class="text-sm text-zinc-400 text-center"
-          >
-            Nothing is shared with you yet by {{ invitation.organizationName }}. Their projects show here as soon as they share one.
           </p>
           <UButton
             block

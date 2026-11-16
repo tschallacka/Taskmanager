@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { entryFor } from '~/utils/projectsEntry'
-import { teamToOpenFor } from '~/utils/teamEntry'
+import { entryFor, mayShowFirstProjectForm } from '~/utils/projectsEntry'
+import { selectTeamOrStay, teamToOpenFor } from '~/utils/teamEntry'
 
 definePageMeta({ layout: 'app' })
 
@@ -28,7 +28,9 @@ const teamEntry = computed(() => !teamsPending.value && ready.value
   : null)
 watch(teamEntry, async (teamId) => {
   if (!teamId) return
-  await setActiveTeam(teamId)
+  // If the team cannot be selected, the person stays in the personal workspace; nothing is thrown.
+  const selected = await selectTeamOrStay(setActiveTeam, teamId)
+  if (!selected) return
   // A full load, so the projects store picks up the team's boards.
   await navigateTo('/projects', { replace: true, external: true })
 }, { immediate: true })
@@ -45,7 +47,13 @@ watch([ready, wantsNew], ([isReady]) => {
 
 // A frame of this page while a redirect is pending reads as a flash of "no
 // projects", so nothing paints until we know there is nothing to open.
-const showEmptyState = computed(() => ready.value && (projects.value.length === 0 || wantsNew.value))
+// The form waits until the page has decided it stays here (see mayShowFirstProjectForm), so it never flashes first.
+const showEmptyState = computed(() => mayShowFirstProjectForm({
+  ready: ready.value,
+  teamsPending: teamsPending.value,
+  sharedLoaded: sharedData.value !== undefined && sharedData.value !== null,
+  redirecting: contactOnlyEntry.value !== null || teamEntry.value !== null
+}) && (projects.value.length === 0 || wantsNew.value))
 
 const name = ref('')
 const creating = ref(false)

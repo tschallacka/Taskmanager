@@ -5,13 +5,24 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { entryFor } from '../app/utils/projectsEntry'
+import { entryFor, mayShowFirstProjectForm } from '../app/utils/projectsEntry'
 
-test('a customer contact with no team and no board is sent to the shared list, even with nothing shared yet', () => {
-  assert.equal(entryFor({ asksNew: false, hasProjects: false, teamCount: 0, contact: true }), '/shared-with-me')
+test('the first-project form does not paint until the page has decided to stay', () => {
+  // Not decided yet: the teams or the shared list are still loading.
+  assert.equal(mayShowFirstProjectForm({ ready: true, teamsPending: true, sharedLoaded: true, redirecting: false }), false)
+  assert.equal(mayShowFirstProjectForm({ ready: true, teamsPending: false, sharedLoaded: false, redirecting: false }), false)
+  assert.equal(mayShowFirstProjectForm({ ready: false, teamsPending: false, sharedLoaded: true, redirecting: false }), false)
 })
 
-test('a guest with no team and no board is sent to the shared list', () => {
+test('the first-project form does not paint while a redirect is on its way', () => {
+  assert.equal(mayShowFirstProjectForm({ ready: true, teamsPending: false, sharedLoaded: true, redirecting: true }), false)
+})
+
+test('once decided and not redirecting, the form may show', () => {
+  assert.equal(mayShowFirstProjectForm({ ready: true, teamsPending: false, sharedLoaded: true, redirecting: false }), true)
+})
+
+test('a customer contact with no team and no board is sent to the shared list, even with nothing shared yet', () => {
   assert.equal(entryFor({ asksNew: false, hasProjects: false, teamCount: 0, contact: true }), '/shared-with-me')
 })
 

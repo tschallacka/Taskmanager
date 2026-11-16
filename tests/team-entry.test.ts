@@ -6,7 +6,23 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { teamToOpenFor } from '../app/utils/teamEntry'
+import { selectTeamOrStay, teamToOpenFor } from '../app/utils/teamEntry'
+
+test('when selecting the team works, the page reloads into it (true)', async () => {
+  let selected: string | null = null
+  const ok = await selectTeamOrStay(async (id) => {
+    selected = id
+  }, 't1')
+  assert.equal(ok, true)
+  assert.equal(selected, 't1')
+})
+
+test('when selecting the team fails, the person stays where they are (false), and nothing is thrown', async () => {
+  const ok = await selectTeamOrStay(async () => {
+    throw new Error('network down')
+  }, 't1')
+  assert.equal(ok, false)
+})
 
 test('a team member with no team selected and an empty personal workspace opens their team', () => {
   assert.equal(teamToOpenFor({ asksNew: false, hasProjects: false, activeTeamId: null, teamIds: ['t1'] }), 't1')

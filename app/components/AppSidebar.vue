@@ -270,9 +270,10 @@ watch(() => route.path, () => emit('close'))
           />
         </section>
 
+        <!-- Keyed by position and name: two groups can share a name (a customer and a guest team), never a key. -->
         <section
-          v-for="group in access.groups"
-          :key="group.label"
+          v-for="(group, index) in access.groups"
+          :key="`${index}:${group.label}`"
           class="mt-3 space-y-0.5"
           :aria-label="group.label"
         >

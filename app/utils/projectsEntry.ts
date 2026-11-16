@@ -12,3 +12,15 @@ export function entryFor(input: EntryInput): string | null {
   if (input.asksNew || input.hasProjects || input.teamCount > 0) return null
   return input.contact ? '/shared-with-me' : null
 }
+
+export interface FormGateInput {
+  ready: boolean
+  teamsPending: boolean
+  sharedLoaded: boolean
+  redirecting: boolean
+}
+
+/** The first-project form paints only once the page has decided to stay: everything loaded, and no redirect pending. */
+export function mayShowFirstProjectForm(input: FormGateInput): boolean {
+  return input.ready && !input.teamsPending && input.sharedLoaded && !input.redirecting
+}

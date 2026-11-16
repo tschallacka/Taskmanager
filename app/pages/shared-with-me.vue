@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import { SHARED_FALLBACK_LABEL } from '#shared/utils/sharedGroups'
+
 definePageMeta({ layout: 'app' })
 
-useSeoMeta({ title: 'Shared with you' })
+useSeoMeta({ title: SHARED_FALLBACK_LABEL })
 
 // The projects a customer contact can open, by customer. Nothing here can be created: this is what was shared.
-type SharedGroup = { label: string, projects: { id: string, name: string }[] }
+type SharedGroup = { key: string, label: string, projects: { id: string, name: string }[] }
 const { data, status } = await useFetch<{ groups: SharedGroup[] }>('/api/shared-with-me', { server: false, lazy: true })
 const groups = computed(() => data.value?.groups ?? [])
 </script>
@@ -38,11 +40,11 @@ const groups = computed(() => data.value?.groups ?? [])
 
         <div
           v-for="group in groups"
-          :key="group.label"
+          :key="group.key"
           class="mb-6"
         >
           <h2 class="text-sm font-semibold text-default mb-2">
-            {{ group.label === 'Shared with you' ? 'Shared with you' : `Shared with you by ${group.label}` }}
+            {{ group.label === SHARED_FALLBACK_LABEL ? SHARED_FALLBACK_LABEL : `Shared with you by ${group.label}` }}
           </h2>
           <ul class="flex flex-col gap-1">
             <li
