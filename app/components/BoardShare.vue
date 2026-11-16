@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { realtimeHeaders } from '~/composables/useRealtime'
 import { errorMessage, untypedFetch } from '~/utils/untypedFetch'
-import { customerInviteInputError } from '#shared/utils/inviteEmail'
+import { customerChoiceError } from '#shared/utils/inviteEmail'
 
 // The Share control in a board's header: an avatar stack and a Share button that opens the dialog
 // where people are let onto the board. A project admin invites guests (editor or manager guest, and
@@ -82,6 +82,7 @@ async function loadListing() {
 // server/api/projects/[id]/customer-invite.post.ts). The input rule is tested in tests/project-customer-invite.test.ts.
 const { customers, refresh: refreshCustomers } = useCustomers()
 const customerChoice = ref('')
+const customerNewName = ref('')
 const customerEmail = ref('')
 const customerError = ref('')
 const customerLink = ref('')
@@ -89,7 +90,7 @@ const customerSending = ref(false)
 const customerItems = computed(() => (customers.value ?? []).map(customer => ({ label: customer.name, value: customer.id })))
 
 async function inviteCustomer() {
-  const problem = customerInviteInputError({ customerId: customerChoice.value, email: customerEmail.value })
+  const problem = customerChoiceError({ customerId: customerChoice.value, customerName: customerNewName.value, email: customerEmail.value })
   if (problem) {
     customerError.value = problem
     return
@@ -100,10 +101,12 @@ async function inviteCustomer() {
     const answer = await untypedFetch<{ url: string }>(`${base.value}/customer-invite`, {
       method: 'POST',
       headers: realtimeHeaders(),
-      body: { customerId: customerChoice.value, email: customerEmail.value.trim() }
+      body: { customerId: customerChoice.value, customerName: customerNewName.value.trim(), email: customerEmail.value.trim() }
     })
     customerLink.value = answer.url
     customerEmail.value = ''
+    customerNewName.value = ''
+    customerChoice.value = ''
     await refreshCustomers()
   } catch (e) {
     customerError.value = errorMessage(e, 'Could not invite that person')
@@ -394,6 +397,11 @@ watch(open, (isOpen) => {
                 v-model="customerChoice"
                 :items="customerItems"
                 placeholder="Choose the customer"
+                class="w-full"
+              />
+              <UInput
+                v-model="customerNewName"
+                placeholder="…or type a new customer's name"
                 class="w-full"
               />
               <UInput

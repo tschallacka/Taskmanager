@@ -15,6 +15,15 @@ export function customerInviteInputError(input: { customerId: string, email: str
   return inviteEmailError(input.email, true)
 }
 
+/** The customer is picked from the list or typed as a new name: exactly one of the two, and an email. */
+export function customerChoiceError(input: { customerId: string, customerName: string, email: string }): string | null {
+  const picked = input.customerId.trim() !== ''
+  const typed = input.customerName.trim() !== ''
+  if (picked && typed) return 'Choose one customer, or type a new name, not both.'
+  if (!picked && !typed) return 'Choose the customer or type a new customer\'s name.'
+  return inviteEmailError(input.email, true)
+}
+
 export function emptyCustomerWarning(input: { customerProjectCount: number, tickedCount: number }): string | null {
   if (input.customerProjectCount > 0 || input.tickedCount > 0) return null
   return 'This customer has no projects yet: they will see nothing.'
