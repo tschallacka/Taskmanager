@@ -3,6 +3,7 @@ import { inviteSentence } from '~/utils/inviteSentence'
 import { inviteLinks } from '~/utils/inviteLinks'
 import { landingFor } from '~/utils/inviteLanding'
 import { shareLine } from '~/utils/inviteShareLine'
+import { inviteFormLink } from '~/utils/lockedEmail'
 
 useSeoMeta({ title: 'Invitation' })
 
@@ -14,7 +15,7 @@ const { session, isPending: sessionPending } = useAuth()
 // page never learns: whoever was invited has to know it. `forYou` says whether the account signed in now is
 // the invited one, and is null when nobody is signed in.
 type InvitationPreview
-  = | { kind: 'customer', customerName: string, organizationName: string, sharedProjectCount: number }
+  = | { kind: 'customer', customerName: string, organizationName: string, sharedProjectCount: number, email?: string | null }
     | { kind: 'team', organizationName: string, inviterName: string | null, role: string, forYou: boolean | null }
     | { kind: 'board', projectName: string, organizationName: string | null, inviterName: string | null, role: string, forYou: boolean | null }
 
@@ -43,7 +44,14 @@ const words = computed(() => {
 })
 
 // The registration form is the default for every kind; the plain link under the button signs in instead.
-const links = computed(() => inviteLinks(token.value))
+// A link tied to an address carries it to the forms, where it is prefilled and locked (see utils/lockedEmail).
+const links = computed(() => {
+  const invite = invitation.value
+  if (invite?.kind === 'customer' && invite.email) {
+    return { primary: inviteFormLink(token.value, 'signup', invite.email), signIn: inviteFormLink(token.value, 'signin', invite.email) }
+  }
+  return inviteLinks(token.value)
+})
 
 // What is shared, said only when the page knows it (see utils/inviteShareLine). A customer invitation only.
 const shareText = computed(() => {
@@ -189,6 +197,12 @@ async function accept() {
             class="text-sm text-zinc-400 text-center"
           >
             Use the email address this invitation was sent to. Anyone else cannot use it.
+          </p>
+          <p
+            v-if="invitation.kind === 'customer' && invitation.email"
+            class="text-sm text-zinc-400 text-center"
+          >
+            This invitation is for <span class="text-zinc-200">{{ invitation.email }}</span>.
           </p>
           <UButton
             block

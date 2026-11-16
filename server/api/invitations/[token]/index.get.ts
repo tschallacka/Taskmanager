@@ -43,6 +43,7 @@ export default defineEventHandler(async (event) => {
     .select({
       expiresAt: customerInvitations.expiresAt,
       acceptedAt: customerInvitations.acceptedAt,
+      email: customerInvitations.email,
       customerId: customers.id,
       customerName: customers.name,
       organizationName: organization.name
@@ -69,6 +70,8 @@ export default defineEventHandler(async (event) => {
     kind: 'customer' as const,
     customerName: row.customerName,
     organizationName: row.organizationName,
+    // The address the link is tied to (approved by Boss: the token holder sees it in full). Null for an anonymous link.
+    email: row.email,
     sharedProjectCount: sharedProjectIds(customerShared.map(project => project.id), [...guestShared, ...pendingIds]).length
   }
 })
