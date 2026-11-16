@@ -5,6 +5,7 @@ import { customerIdsOf } from '../utils/auth-helpers'
 import { guestProjectIdsOf } from '../utils/guests'
 import { sharedProjectIds } from '../utils/sharedProjectIds'
 import { groupKey, SHARED_FALLBACK_LABEL } from '#shared/utils/sharedGroups'
+import { INVITATION_COOKIE } from '../utils/customers'
 
 // The projects shared with the signed-in person: the projects of the customers they are a contact of, and the
 // boards they hold as a guest. Grouped by what shares them (a customer, or the team a board belongs to), and named
@@ -64,5 +65,7 @@ export default defineEventHandler(async (event) => {
   }
 
   // `contact`: the person is a customer contact or a guest of some board, shared or not yet (the projects page uses it).
-  return { groups: [...groups.values()], contact: customerIds.length > 0 || guestIds.length > 0 }
+  // `inviteToken`: an invitation link opened here and not yet accepted (its cookie), so the projects page can return to it.
+  const inviteToken = getCookie(event, INVITATION_COOKIE) ?? null
+  return { groups: [...groups.values()], contact: customerIds.length > 0 || guestIds.length > 0, inviteToken }
 })
