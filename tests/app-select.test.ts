@@ -104,6 +104,16 @@ test('the board share guest role pickers (invite form and each guest row) use Ap
   assert.match(share, /@update:model-value="\(value\) => changeGuestRole\(guest, asGuestRole\(value\)\)"/)
 })
 
+test('the GitHub settings pickers (link visibility, sync column and visibility, new link and default visibility) use AppSelect', () => {
+  const gh = read('app/components/kanban/ProjectGithubSettings.vue')
+  assert.doesNotMatch(gh, /<select[\s>]/, 'the GitHub pickers are no longer native selects')
+  for (const hook of ['data-github-repo-visibility-change', 'data-github-sync-column', 'data-github-sync-visibility', 'data-github-repo-visibility', 'data-github-default-visibility']) {
+    assert.match(gh, new RegExp(`<AppSelect\\s[\\s\\S]*?${hook}`), `${hook} is an AppSelect`)
+  }
+  assert.match(gh, /:options="columnOptions\(row\)"/, 'the column picker lists the board columns, plus the draft value when it is not on the board')
+  assert.match(gh, /@update:model-value="\(value\) => changeVisibility\(row, value\)"/)
+})
+
 test('the team invite role select uses AppSelect, and Admin is offered to owners only', () => {
   const invites = read('app/components/TeamInvitesPanel.vue')
   assert.doesNotMatch(invites, /<select[\s>]/, 'the role select is no longer a native select')
