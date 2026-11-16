@@ -3,13 +3,14 @@
 // and its avatar folder; a team board, or a personal one someone else is on, stays with the 'Deleted user' name.
 import { existsSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
-import { and, eq, isNull, ne, or } from 'drizzle-orm'
+import { and, eq, isNull, like, ne, or } from 'drizzle-orm'
 import { getTableConfig } from 'drizzle-orm/pg-core'
 import { db } from '../db'
 import * as schema from '../db/schema'
 import { ACCOUNT_RULES, DELETED_USER_ID } from './accountRules'
 import type { AccountRule } from './accountRules'
 import { removeTaskAttachments } from './attachments'
+import { isCrewAddress } from './crewAccounts'
 
 const DELETED_EMAIL = 'deleted-user@deleted.invalid'
 
@@ -67,11 +68,51 @@ async function ensureTombstone(tx: typeof db) {
   }).onConflictDoNothing()
 }
 
+export interface AccountRefusal {
+  message: string
+  /** The teams this person owns, when the refusal is the owner rule. */
+  teams?: { id: string, name: string }[]
+}
+
+/**
+ * Why the account may not be deleted yet, or null. A crew account goes with its crew. A team owner hands the team over
+ * (or deletes it) first, and the teams are named. The last instance admin needs another admin first.
+ */
+export async function accountRefusal(userId: string): Promise<AccountRefusal | null> {
+  const [person] = await db.select().from(schema.user).where(eq(schema.user.id, userId))
+  if (!person) return null
+  if (isCrewAddress(person.email)) {
+    return { message: 'This is a crew account: it goes with its crew, and cannot be deleted here.' }
+  }
+  const owned = await db.select({ id: schema.organization.id, name: schema.organization.name })
+    .from(schema.member)
+    .innerJoin(schema.organization, eq(schema.organization.id, schema.member.organizationId))
+    .where(and(eq(schema.member.userId, userId), like(schema.member.role, '%owner%')))
+  if (owned.length) {
+    return {
+      message: 'You own a team. Hand it over to another member, or delete it, before you delete your account.',
+      teams: owned
+    }
+  }
+  if (person.isInstanceAdmin) {
+    const others = await db.select({ id: schema.user.id }).from(schema.user)
+      .where(and(eq(schema.user.isInstanceAdmin, true), ne(schema.user.id, userId)))
+    if (others.length === 0) {
+      return { message: 'You are the only instance admin. Make another person an instance admin before you delete your account.' }
+    }
+  }
+  return null
+}
+
 /**
  * Deletes the person's account as the rules say. Returns what was deleted and what was kept, for the response and the
  * tests. Nothing is removed for a person who no longer exists (a second call is a no-op).
  */
 export async function deleteAccount(userId: string): Promise<DeletionResult> {
+  const refusal = await accountRefusal(userId)
+  if (refusal) {
+    throw createError({ statusCode: 409, statusMessage: 'Conflict', message: refusal.message, data: { teams: refusal.teams ?? [] } })
+  }
   const result: DeletionResult = { deletedBoards: [], tombstonedBoards: [], deletedTasks: [] }
   const avatarFolder = join(process.cwd(), 'data', 'avatars', userId)
 
