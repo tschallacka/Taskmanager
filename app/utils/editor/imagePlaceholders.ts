@@ -65,3 +65,8 @@ export function saveText(text: string, placeholders: Placeholder[]): string {
     return ''
   })
 }
+
+/** The saved HTML without the pending placeholders: an unfinished image is never saved as content. Failed lines stay. */
+export function stripPendingPlaceholders(html: string): string {
+  return html.replace(/<span[^>]*data-image-placeholder="[^"]*"[^>]*data-state="pending"[^>]*>[\s\S]*?<\/span>/g, '')
+}
