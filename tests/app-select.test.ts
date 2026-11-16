@@ -74,6 +74,16 @@ test('the list view group and sort pickers use AppSelect with their options', ()
   assert.match(list, /@update:model-value="setSortBy"/)
 })
 
+test('the secret access pickers (add and edit) use AppSelect with the two access choices', () => {
+  const secrets = read('app/components/kanban/ProjectSecretsSettings.vue')
+  assert.doesNotMatch(secrets, /<select[\s>]/, 'the access pickers are no longer native selects')
+  assert.match(secrets, /<AppSelect\s[\s\S]*?data-secret-access-input/)
+  assert.match(secrets, /<AppSelect\s[\s\S]*?data-secret-edit-access/)
+  assert.match(secrets, /:options="accessOptions"/)
+  assert.match(secrets, /@update:model-value="setAddAccess"/)
+  assert.match(secrets, /@update:model-value="setEditAccess"/)
+})
+
 test('the team invite role select uses AppSelect, and Admin is offered to owners only', () => {
   const invites = read('app/components/TeamInvitesPanel.vue')
   assert.doesNotMatch(invites, /<select[\s>]/, 'the role select is no longer a native select')
