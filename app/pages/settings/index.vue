@@ -287,6 +287,7 @@ function swatchStyle(color: string, selected: boolean) {
                 :image="session?.user?.image ?? null"
                 @changed="refreshSession()"
               />
+              <DeleteAccountPanel />
             </div>
 
             <!-- Passkeys and two-factor -->
