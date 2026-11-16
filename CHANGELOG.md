@@ -2,6 +2,12 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.39.3 - 2026-11-16
+
+- **The first paint says what is loading.** Before the app's code has run, the browser shows a spinner with "Opening your projects…" (app/spa-loading-template.html), so a person who signs in and waits does not see a blank page.
+
+- **Projects load with a visible wait.** On /projects a line reads "Opening your projects…" while the list loads, a failed first load retries instead of showing "No projects yet", and the sidebar's "No projects yet" waits while a person's team is being opened (a person who signs in again in a new browser no longer sees an empty list flash). Files: app/pages/projects/index.vue, app/plugins/init-projects.client.ts, app/components/ProjectsListPanel.vue.
+
 ## 0.39.2 - 2026-11-16
 
 - **Invite follow-ups: System by default, and no "Personal Workspace" while the team loads.** A visitor with no stored choice gets System, not a fixed dark theme; a stored choice is kept. The workspace switcher shows "Loading workspace" while the active team loads, so a team member who lands in the team sees a label that agrees with the team's boards. The invitation page uses the theme colours, so a new visitor on a light system sees it light. Files: `nuxt.config.ts`, `app/components/TeamSwitcher.vue`, `app/utils/workspaceLabel.ts`, `app/pages/invite/[token].vue`, `tests/color-mode-default.test.ts`, `tests/team-switcher-label.test.ts`, `tests/invite-page-theme.test.ts`.
