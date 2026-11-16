@@ -42,7 +42,7 @@ function locate(tableName: string, columnName: string): { table: AnyTable, key: 
 }
 
 /** The user's own rows and the rule for each column: a helper for the transaction below. */
-async function applyColumnRule(tx: typeof db, tableName: string, columnName: string, rule: Exclude<AccountRule, 'by-scope'>, userId: string) {
+async function applyColumnRule(tx: Pick<typeof db, 'delete' | 'update'>, tableName: string, columnName: string, rule: Exclude<AccountRule, 'by-scope'>, userId: string) {
   const found = locate(tableName, columnName)
   if (!found) throw new Error(`account rule ${tableName}.${columnName} names no column`)
   const { table, key, column } = found as unknown as { table: never, key: string, column: never }
@@ -80,7 +80,7 @@ export async function deleteCrewMailFor(tx: Pick<typeof db, 'delete'>, crewId: s
 }
 
 /** The tombstone row: the name shown for the person's kept work. Created once; it cannot sign in. */
-async function ensureTombstone(tx: typeof db) {
+async function ensureTombstone(tx: Pick<typeof db, 'insert'>) {
   const at = new Date()
   await tx.insert(schema.user).values({
     id: DELETED_USER_ID,
