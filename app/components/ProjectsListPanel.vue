@@ -396,7 +396,7 @@ function menuItems(project: Project) {
     </div>
 
     <p
-      v-if="ready && projects.length === 0 && mayCreate"
+      v-if="ready && projects.length === 0 && mayCreate && !teamsPending"
       class="px-2 py-3 text-xs text-dimmed"
     >
       No projects yet.
