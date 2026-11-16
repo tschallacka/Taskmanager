@@ -38,6 +38,15 @@ test('the project owner picker uses AppSelect, lists the staff, and hands the ow
   assert.match(general, /const ownerOptions = computed\(\(\) => staff\.value\.map\(person => \(\{ label: person\.name \|\| person\.email, value: person\.id \}\)\)\)/)
 })
 
+test('the team rule mode picker uses AppSelect with its two modes, and switches the mode on change', () => {
+  const builder = read('app/components/TeamRuleBuilder.vue')
+  assert.doesNotMatch(builder, /<select[\s>]/, 'the mode picker is no longer a native select')
+  assert.match(builder, /<AppSelect\s[\s\S]*?data-rule-mode/)
+  assert.match(builder, /value: 'by_name'/)
+  assert.match(builder, /value: 'column_free'/)
+  assert.match(builder, /@update:model-value="setModeFromPicker"/)
+})
+
 test('the team invite role select uses AppSelect, and Admin is offered to owners only', () => {
   const invites = read('app/components/TeamInvitesPanel.vue')
   assert.doesNotMatch(invites, /<select[\s>]/, 'the role select is no longer a native select')
