@@ -1,0 +1,1 @@
+- **Crew kit: a notice when the board has ready work and the crew is idle.** When cards wait in To do or in a Verify column and nothing has happened for 30 minutes, Pia and Boss get one mail, and another only when the set of ready cards changes. Done and blocked cards are not named. Files: `crew/idle-ready.mjs`, `crew/idle-ready.test.mjs`.
