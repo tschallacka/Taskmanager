@@ -5,6 +5,8 @@ import { hashInvitationToken, INVITATION_COOKIE } from '../../../utils/customers
 import { auth } from '../../../lib/auth'
 import { lookupAddressedInvitation } from '../../../utils/invitations'
 import { addressesOfUser } from '../../../utils/extraEmails'
+import { guestProjectIdsOf } from '../../../utils/guests'
+import { sharedProjectIds } from '../../../utils/sharedProjectIds'
 
 // What an invitation link is for, readable before signing in: the invite page
 // has to say whose portal, team or board it opens. Opening it also drops the token in a cookie,
@@ -53,9 +55,17 @@ export default defineEventHandler(async (event) => {
   if (row.acceptedAt) throw createError({ statusCode: 410, message: 'This invitation has already been used' })
   if (row.expiresAt <= Date.now()) throw createError({ statusCode: 410, message: 'This invitation has expired' })
 
-  // How many projects are shared with this customer, so the page can say before accepting that there are none yet.
-  const shared = await db.select({ id: projects.id }).from(projects).where(eq(projects.customerId, row.customerId))
+  // How many projects are shared with this person as a customer contact: the customer's projects, and the boards
+  // they hold as a guest when they are signed in. The page says before accepting that there are none yet.
+  const customerShared = await db.select({ id: projects.id }).from(projects).where(eq(projects.customerId, row.customerId))
+  const session = await auth.api.getSession({ headers: event.headers }).catch(() => null)
+  const guestShared = session ? await guestProjectIdsOf(session.user.id) : []
 
   rememberToken()
-  return { kind: 'customer' as const, customerName: row.customerName, organizationName: row.organizationName, sharedProjectCount: shared.length }
+  return {
+    kind: 'customer' as const,
+    customerName: row.customerName,
+    organizationName: row.organizationName,
+    sharedProjectCount: sharedProjectIds(customerShared.map(project => project.id), guestShared).length
+  }
 })

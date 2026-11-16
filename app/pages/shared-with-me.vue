@@ -4,7 +4,7 @@ definePageMeta({ layout: 'app' })
 useSeoMeta({ title: 'Shared with you' })
 
 // The projects a customer contact can open, by customer. Nothing here can be created: this is what was shared.
-type SharedGroup = { customerName: string, organizationName: string, projects: { id: string, name: string }[] }
+type SharedGroup = { label: string, projects: { id: string, name: string }[] }
 const { data, status } = await useFetch<{ groups: SharedGroup[] }>('/api/shared-with-me', { server: false, lazy: true })
 const groups = computed(() => data.value?.groups ?? [])
 </script>
@@ -38,11 +38,11 @@ const groups = computed(() => data.value?.groups ?? [])
 
         <div
           v-for="group in groups"
-          :key="group.customerName"
+          :key="group.label"
           class="mb-6"
         >
           <h2 class="text-sm font-semibold text-default mb-2">
-            Shared with you by {{ group.organizationName }}
+            {{ group.label === 'Shared with you' ? 'Shared with you' : `Shared with you by ${group.label}` }}
           </h2>
           <ul class="flex flex-col gap-1">
             <li

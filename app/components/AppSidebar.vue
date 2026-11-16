@@ -10,11 +10,11 @@ const colorMode = useColorMode()
 const { teams, isPending: teamsPending } = useTeams()
 
 // The projects shared with a customer contact, by organisation. Team items show only for a team member.
-type SharedGroup = { organizationName: string, projects: { id: string, name: string }[] }
+type SharedGroup = { label: string, projects: { id: string, name: string }[] }
 const { data: sharedData } = useFetch<{ groups: SharedGroup[] }>('/api/shared-with-me', { server: false, lazy: true })
 const access = computed(() => sidebarAccess({
   teamCount: teams.value.length,
-  sharedGroups: sharedData.value?.groups ?? []
+  sharedGroups: (sharedData.value?.groups ?? []).map(group => ({ organizationName: group.label, projects: group.projects }))
 }))
 // While the teams load, the team items stay, so a member does not see them vanish and come back.
 const showTeamItems = computed(() => teamsPending.value || access.value.teamItems)
@@ -274,10 +274,10 @@ watch(() => route.path, () => emit('close'))
           v-for="group in access.groups"
           :key="group.label"
           class="mt-3 space-y-0.5"
-          :aria-label="`Shared by ${group.label}`"
+          :aria-label="group.label"
         >
           <h2 class="px-2 pb-1 text-xs font-medium uppercase tracking-wide text-muted">
-            Shared by {{ group.label }}
+            {{ group.label }}
           </h2>
           <NuxtLink
             v-for="project in group.projects"
