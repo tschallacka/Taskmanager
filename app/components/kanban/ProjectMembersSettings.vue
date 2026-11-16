@@ -290,7 +290,7 @@ async function remove(person: ProjectPerson) {
             </div>
           </div>
 
-          <div class="ml-auto flex flex-wrap items-center gap-2">
+          <div class="ml-auto flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
             <span
               v-if="person.role !== null || person.isProjectOwner"
               class="shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-xs"

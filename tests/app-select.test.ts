@@ -94,6 +94,7 @@ test('the project members pickers (team, row role, add user, add role) use AppSe
   assert.match(members, /<AppSelect\s[\s\S]*?data-member-add-role/)
   assert.match(members, /@update:model-value="\(value\) => changeRole\(person, value\)"/)
   assert.match(members, /:options="roleOptions"/)
+  assert.match(members, /class="ml-auto flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto"/, 'on a phone the badge, role and remove sit on their own full-width line under the name, so the name is not squeezed')
 })
 
 test('the board share guest role pickers (invite form and each guest row) use AppSelect', () => {
