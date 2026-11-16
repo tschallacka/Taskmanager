@@ -280,25 +280,15 @@ onBeforeUnmount(() => {
 
 // Pasted or dropped into the description. The file is stored with the task and
 // served from the task's own attachment route.
-async function uploadImage(file: File): Promise<string | null> {
+// A failure rejects with the server's reason; the editor puts that reason in the visible line where the image was.
+async function uploadImage(file: File, onProgress?: (progress: number | null) => void): Promise<string | null> {
   const id = props.task?.id
-  if (!id) return null
+  if (!id) throw new Error('Save the task first, then paste the image.')
   const form = new FormData()
   form.append('file', file)
-  try {
-    const res = await $fetch<{ url: string }>(`/api/tasks/${id}/attachments`, { method: 'POST', body: form })
-    return res.url
-  } catch (e) {
-    const err = e as { data?: { message?: string } }
-    toast.add({
-      title: 'Image upload failed',
-      description: err?.data?.message,
-      icon: 'i-lucide-image-off',
-      color: 'error',
-      duration: 3000
-    })
-    return null
-  }
+  onProgress?.(null)
+  const res = await $fetch<{ url: string }>(`/api/tasks/${id}/attachments`, { method: 'POST', body: form })
+  return res.url
 }
 
 // ─── Labels ────────────────────────────────────────────────
