@@ -44,6 +44,7 @@ export default defineEventHandler(async (event) => {
     .select({
       expiresAt: customerInvitations.expiresAt,
       acceptedAt: customerInvitations.acceptedAt,
+      acceptedBy: customerInvitations.acceptedBy,
       email: customerInvitations.email,
       customerId: customers.id,
       customerName: customers.name,
@@ -55,7 +56,12 @@ export default defineEventHandler(async (event) => {
     .where(eq(customerInvitations.tokenHash, hashInvitationToken(token)))
 
   if (!row) throw createError({ statusCode: 404, message: 'This invitation does not exist' })
-  if (row.acceptedAt) throw createError({ statusCode: 410, message: 'This invitation has already been used' })
+  if (row.acceptedAt) {
+    // The page sends the account that accepted the link to its projects (see app/utils/usedInvite.ts).
+    const usedBy = await auth.api.getSession({ headers: event.headers }).catch(() => null)
+    const acceptedByYou = usedBy !== null && usedBy.user.id === row.acceptedBy
+    throw createError({ statusCode: 410, message: 'This invitation has already been used', data: { acceptedByYou } })
+  }
   if (row.expiresAt <= Date.now()) throw createError({ statusCode: 410, message: 'This invitation has expired' })
 
   // How many projects are shared with this person as a customer contact: the customer's projects, and the boards

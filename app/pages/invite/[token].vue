@@ -4,6 +4,7 @@ import { inviteLinks } from '~/utils/inviteLinks'
 import { landingFor } from '~/utils/inviteLanding'
 import { shareLine } from '~/utils/inviteShareLine'
 import { formLinksFor } from '~/utils/lockedEmail'
+import { usedInvitePlan } from '~/utils/usedInvite'
 
 useSeoMeta({ title: 'Invitation' })
 
@@ -56,6 +57,16 @@ const shareText = computed(() => {
   if (!invite || invite.kind !== 'customer') return null
   return shareLine({ count: invite.sharedProjectCount, signedIn: !!session.value, organizationName: invite.organizationName })
 })
+
+// A link already used: the account that accepted it goes to its projects; anyone else gets a button (see utils/usedInvite).
+const usedBody = computed(() => loadError.value?.data as { message?: string, data?: { acceptedByYou?: boolean } } | undefined)
+const usedPlan = computed(() => {
+  if (loadError.value?.statusCode !== 410 || usedBody.value?.message !== 'This invitation has already been used') return null
+  return usedInvitePlan({ signedIn: !!session.value, acceptedByYou: usedBody.value?.data?.acceptedByYou === true })
+})
+watch([usedPlan, sessionPending], () => {
+  if (!sessionPending.value && usedPlan.value?.redirectTo) navigateTo(usedPlan.value.redirectTo, { replace: true })
+}, { immediate: true })
 
 const loadMessage = computed(() => {
   const status = loadError.value?.statusCode
@@ -154,7 +165,21 @@ watch([session, invitation], () => {
         color="error"
         variant="subtle"
         :description="loadMessage"
-      />
+      >
+        <template
+          v-if="usedPlan?.button"
+          #actions
+        >
+          <UButton
+            block
+            size="lg"
+            color="primary"
+            :to="usedPlan.button.to"
+          >
+            {{ usedPlan.button.label }}
+          </UButton>
+        </template>
+      </UAlert>
 
       <template v-else-if="invitation">
         <p
