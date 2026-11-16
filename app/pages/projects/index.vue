@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { entryFor } from '~/utils/projectsEntry'
+import { teamToOpenFor } from '~/utils/teamEntry'
 
 definePageMeta({ layout: 'app' })
 
 const { ready, projects, createProject } = useProjects()
-const { teams, isPending: teamsPending } = useTeams()
+const { teams, activeTeamId, setActiveTeam, isPending: teamsPending } = useTeams()
 const route = useRoute()
 
 // A customer contact or guest with no team and no board goes to the shared list, not to the first-project form.
@@ -14,6 +15,22 @@ const contactOnlyEntry = computed(() => !teamsPending.value && ready.value && sh
   : null)
 watch(contactOnlyEntry, (path) => {
   if (path) navigateTo(path, { replace: true })
+}, { immediate: true })
+
+// A team member who signs in again in a new browser starts in the personal workspace, which is empty: open their team.
+const teamEntry = computed(() => !teamsPending.value && ready.value
+  ? teamToOpenFor({
+      asksNew: route.query.new === '1',
+      hasProjects: projects.value.length > 0,
+      activeTeamId: activeTeamId.value,
+      teamIds: teams.value.map(team => team.id)
+    })
+  : null)
+watch(teamEntry, async (teamId) => {
+  if (!teamId) return
+  await setActiveTeam(teamId)
+  // A full load, so the projects store picks up the team's boards.
+  await navigateTo('/projects', { replace: true, external: true })
 }, { immediate: true })
 
 // Land on the most recently updated board.
