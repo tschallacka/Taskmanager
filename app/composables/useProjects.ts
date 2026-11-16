@@ -234,6 +234,9 @@ const _subtasks = ref<ProjectTask[]>([])
 const _people = ref<ProjectPerson[]>([])
 const _boardLoading = ref(false)
 const _ready = ref(false)
+// The flat task index is fetched on first use (ensureTasks), not at start.
+const _tasksLoaded = ref(false)
+let _tasksRequest: Promise<void> | null = null
 const _comments = ref<TaskComment[]>([])
 const _commentsTaskId = ref<string | null>(null)
 // What is left on each side of the comments shown, when a permalink opened a window (null: the whole thread).
@@ -506,14 +509,13 @@ export function boardLabelColor(tag: string): string | null {
 
 // ─── init (called from plugin) ──────────────────────────────
 
+// The flat task list is not part of the start: ensureTasks() fetches it the first time a screen or the search reads it.
 export function initProjectsStore(
   projects: Project[],
-  tasks: TaskSearchRow[],
   search: MiniSearch<ProjectSearchDoc>
 ) {
   _search = search
   _projects.value = projects
-  _allTasks.value = tasks
   reindexSearch()
   _ready.value = true
 }
@@ -531,27 +533,39 @@ export function useProjects() {
   const isReadOnlyBoard = computed(() => activeProject.value?.readOnly === true)
 
   async function load() {
-    const [projects, tasks] = await Promise.all([
-      $fetch<Project[]>('/api/projects'),
-      $fetch<TaskSearchRow[]>('/api/tasks')
-    ])
-    _projects.value = projects
-    _allTasks.value = tasks
+    _projects.value = await $fetch<Project[]>('/api/projects')
     reindexSearch()
     _ready.value = true
   }
 
+  // Fetches the flat task index once, when a screen or the search first needs it. Concurrent callers share one request.
+  async function ensureTasks() {
+    if (_tasksLoaded.value) return
+    if (!_tasksRequest) {
+      _tasksRequest = $fetch<TaskSearchRow[]>('/api/tasks')
+        .then((tasks) => {
+          _allTasks.value = tasks
+          _tasksLoaded.value = true
+          reindexSearch()
+        })
+        .finally(() => { _tasksRequest = null })
+    }
+    await _tasksRequest
+  }
+
   // Refreshes the board list and the flat task index without dropping the
-  // open board or its label filter.
+  // open board or its label filter. The task index is refreshed only once it has been loaded.
   async function syncProjects() {
     const [projects, tasks] = await Promise.all([
       $fetch<Project[]>('/api/projects'),
-      $fetch<TaskSearchRow[]>('/api/tasks')
+      _tasksLoaded.value ? $fetch<TaskSearchRow[]>('/api/tasks') : Promise.resolve(null)
     ])
     _projects.value = projects
     if (_activeProjectId.value) await refreshArchivedActive(_activeProjectId.value)
-    _allTasks.value = tasks
-    reindexSearch()
+    if (tasks) {
+      _allTasks.value = tasks
+      reindexSearch()
+    }
   }
 
   async function refresh() {
@@ -569,7 +583,12 @@ export function useProjects() {
     _showTrashed.value = false
     _trashedCount.value = 0
     _activeProjectId.value = null
+    // Another team's tasks must not show: a loaded index is fetched again for the new team.
+    const hadTasks = _tasksLoaded.value
+    _tasksLoaded.value = false
+    _allTasks.value = []
     await load()
+    if (hadTasks) await ensureTasks()
   }
 
   async function createProject(name: string, customerId: string | null = null) {
@@ -1244,6 +1263,8 @@ export function useProjects() {
     activity: _activity,
     commentsTaskId: _commentsTaskId,
     load,
+    ensureTasks,
+    tasksLoaded: _tasksLoaded,
     refresh,
     syncProjects,
     reloadBoardQuiet,

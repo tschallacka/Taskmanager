@@ -9,7 +9,7 @@ import { mayCreateProjects, panelListsProject } from '~/utils/sidebarAccess'
 import { teamToOpenFor } from '~/utils/teamEntry'
 import { countOpenTasks, healthTint, kindIcon, projectKind } from '~/utils/projectKind'
 
-const { ready, projects, allTasks, deleteProject, renameProject } = useProjects()
+const { ready, projects, allTasks, deleteProject, renameProject, ensureTasks } = useProjects()
 const route = useRoute()
 const { unread: inboxUnread } = useNotifications()
 const { pins, pinsLoaded, loadPins, isPinned, pinBoard, unpinBoard } = usePins()
@@ -126,6 +126,8 @@ watch([activeId, ready], openActiveTree)
 
 onMounted(() => {
   if (!pinsLoaded.value) loadPins().catch(() => {})
+  // The open count per board reads every task: fetch the list once.
+  ensureTasks().catch(() => {})
 })
 // A team switch can add or drop a membership's boards (joining, leaving), so reload then.
 watch(activeTeamId, () => loadPins().catch(() => {}))

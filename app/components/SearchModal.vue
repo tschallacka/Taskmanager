@@ -4,7 +4,7 @@ import { relativeTime } from '~/composables/useRelativeTime'
 import { tagChipClass } from '~/utils/tagColors'
 import { expandTagToken, type TagRequirement } from '#shared/utils/tags'
 
-const { searchBoards, allTasks } = useProjects()
+const { searchBoards, allTasks, ensureTasks } = useProjects()
 
 const open = useSearchModal()
 const query = ref('')
@@ -68,6 +68,8 @@ watch(open, (v) => {
   if (v) {
     query.value = ''
     highlighted.value = 0
+    // The search reads every task: the first open fetches the list (once).
+    ensureTasks().catch(() => {})
   }
 })
 
