@@ -62,5 +62,6 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  return { groups: [...groups.values()] }
+  // `contact`: the person is a customer contact or a guest of some board, shared or not yet (the projects page uses it).
+  return { groups: [...groups.values()], contact: customerIds.length > 0 || guestIds.length > 0 }
 })

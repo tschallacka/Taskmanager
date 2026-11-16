@@ -1,8 +1,20 @@
 <script setup lang="ts">
+import { entryFor } from '~/utils/projectsEntry'
+
 definePageMeta({ layout: 'app' })
 
 const { ready, projects, createProject } = useProjects()
+const { teams, isPending: teamsPending } = useTeams()
 const route = useRoute()
+
+// A customer contact or guest with no team and no board goes to the shared list, not to the first-project form.
+const { data: sharedData } = useFetch<{ contact: boolean }>('/api/shared-with-me', { server: false, lazy: true })
+const contactOnlyEntry = computed(() => !teamsPending.value && ready.value && sharedData.value
+  ? entryFor({ asksNew: route.query.new === '1', hasProjects: projects.value.length > 0, teamCount: teams.value.length, contact: sharedData.value.contact })
+  : null)
+watch(contactOnlyEntry, (path) => {
+  if (path) navigateTo(path, { replace: true })
+}, { immediate: true })
 
 // Land on the most recently updated board.
 // ?new=1 (the sidebar's new-project button) keeps you here to name one.
