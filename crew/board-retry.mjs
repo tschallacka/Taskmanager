@@ -78,3 +78,17 @@ export async function boardRequest(req, deps = {}) {
     attempt++
   }
 }
+
+/**
+ * The listener's board call. An outage is waited out (boardRequest). A 4xx is a key or a request the board refuses: the
+ * listener logs it once and gets null, as it did before the retry helper, so a bad key does not end the listener.
+ */
+export async function listenerCall(req, deps = {}) {
+  const log = deps.log ?? (line => process.stderr.write(`${line}\n`))
+  try {
+    return await boardRequest(req, deps)
+  } catch (error) {
+    log(`board call refused, the listener goes on: ${error?.message ?? error}`)
+    return null
+  }
+}
