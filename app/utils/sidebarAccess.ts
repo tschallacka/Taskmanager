@@ -20,8 +20,8 @@ export function sidebarAccess(input: { teamCount: number, sharedGroups: SharedGr
 
 /** A person with no team and nothing of their own to see is not offered Create one (a contact only follows boards). */
 export function mayCreateProjects(input: { teamCount: number, contact: boolean, teamsPending?: boolean }): boolean {
-  // While the teams load, nothing is offered: the answer is not known yet.
-  if (input.teamsPending) return false
+  // While the teams load, nothing is hidden: the create entry stays as it is until the answer is known.
+  if (input.teamsPending) return true
   return !(input.teamCount === 0 && input.contact)
 }
 
