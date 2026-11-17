@@ -189,6 +189,9 @@ interface BoardPayload {
   crewBoard?: boolean
   // The crews on this board when it is a real board (its Office view picks one). Staff only; never for a customer.
   linkedCrews?: { id: string, name: string }[]
+  // The people the top bar shows (staff only, masked as /members masks them), and whether the person is notified of new tasks.
+  members?: { id: string, name: string, image?: string | null }[]
+  watching?: boolean
   // The project's custom fields and each task's values. Staff only; a
   // contact's board carries empty ones.
   fields?: ProjectField[]
@@ -224,6 +227,9 @@ const _commentCounts = ref<Record<string, number>>({})
 const _crewBoard = ref(false)
 // The crews linked to the open board when it is a real board. Set with the board it came with.
 const _linkedCrews = ref<{ id: string, name: string }[]>([])
+// The open board's people for the top bar, and whether the person is notified of new tasks: both come with the board.
+const _boardMembers = ref<{ id: string, name: string, image?: string | null }[]>([])
+const _boardWatching = ref(false)
 // The open board's GitHub badges, from the board endpoint. Read by each card.
 const _githubBadges = ref<Record<string, GithubBadge[]>>({})
 // The open board's subtasks. Kept beside the cards rather than among them, so
@@ -325,6 +331,8 @@ const _boardCache = new Map<string, {
   githubBadges: Record<string, GithubBadge[]>
   crewBoard: boolean
   linkedCrews: { id: string, name: string }[]
+  members: { id: string, name: string, image?: string | null }[]
+  watching: boolean
 }>()
 
 function cacheBoard(projectId: string) {
@@ -338,7 +346,9 @@ function cacheBoard(projectId: string) {
     commentCounts: _commentCounts.value,
     githubBadges: _githubBadges.value,
     crewBoard: _crewBoard.value,
-    linkedCrews: _linkedCrews.value
+    linkedCrews: _linkedCrews.value,
+    members: _boardMembers.value,
+    watching: _boardWatching.value
   })
   while (_boardCache.size > BOARD_CACHE_SIZE) _boardCache.delete(_boardCache.keys().next().value!)
 }
@@ -721,6 +731,8 @@ export function useProjects() {
         _githubBadges.value = cached?.githubBadges ?? {}
         _crewBoard.value = cached?.crewBoard ?? false
         _linkedCrews.value = cached?.linkedCrews ?? []
+        _boardMembers.value = cached?.members ?? []
+        _boardWatching.value = cached?.watching ?? false
         _trashedCount.value = 0
       }
       _activeProjectId.value = id
@@ -740,6 +752,8 @@ export function useProjects() {
         _githubBadges.value = board.githubBadges ?? {}
         _crewBoard.value = board.crewBoard ?? false
         _linkedCrews.value = board.linkedCrews ?? []
+        _boardMembers.value = board.members ?? []
+        _boardWatching.value = board.watching ?? false
         _trashedCount.value = board.trashedCount ?? 0
         ingestBoardFields(id, board.fields ?? [], board.fieldValues ?? {})
       }
@@ -915,6 +929,8 @@ export function useProjects() {
         _githubBadges.value = board.githubBadges ?? {}
         _crewBoard.value = board.crewBoard ?? false
         _linkedCrews.value = board.linkedCrews ?? []
+        _boardMembers.value = board.members ?? []
+        _boardWatching.value = board.watching ?? false
         _trashedCount.value = board.trashedCount ?? 0
         ingestBoardFields(projectId, board.fields ?? [], board.fieldValues ?? {})
       }
@@ -1261,6 +1277,8 @@ export function useProjects() {
     labelColor,
     setLabelColor,
     linkedCrews: _linkedCrews,
+    boardMembers: _boardMembers,
+    boardWatching: _boardWatching,
     showTrashed: _showTrashed,
     trashedCount: _trashedCount,
     crewBoard: _crewBoard,

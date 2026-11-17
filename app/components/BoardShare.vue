@@ -253,12 +253,12 @@ const waitingCount = computed(() => listing.value?.invitations.filter(i => i.sta
 
 const boardWatch = useBoardWatch(() => props.projectId)
 
-// Last, so everything they touch is declared by the time the immediate run happens.
+// Last, so everything they touch is declared by the time the immediate run happens. The guest list is fetched when
+// the dialog opens (below), not for every board the page shows.
 watch(() => props.projectId, () => {
   listing.value = null
   staff.value = []
   lastInvite.value = null
-  loadListing()
 }, { immediate: true })
 watch(open, (isOpen) => {
   if (isOpen) {

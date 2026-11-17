@@ -252,11 +252,9 @@ async function unarchiveNow() {
   await unarchiveProject(project.id)
 }
 
-// Whether the person asked to hear about every new task here, read when the board opens.
+// Whether the person asked to hear about every new task here. It comes with the board answer (see the sync below),
+// so opening a board makes no request of its own for it.
 const boardWatch = useBoardWatch(() => projectId.value)
-watch(projectId, (id) => {
-  if (id && /^[a-z0-9]+$/i.test(id)) boardWatch.load()
-}, { immediate: true })
 
 // The trash entry earns its place only when there is something in it — or when
 // it is already on, so there is a way back. A board with nothing deleted looks
@@ -322,24 +320,15 @@ const healthChip = computed(() => {
   const status = activeProject.value?.status
   return status ? HEALTH[status] : null
 })
-// Who is on the board, for the avatars in the top bar: the members list, four shown and a count after. A customer, or
-// anyone the list refuses, sees none.
-const boardPeople = ref<{ id: string, name: string, image?: string | null }[]>([])
-async function loadBoardPeople(id: string) {
-  try {
-    const res = await $fetch<{ people: { id: string, name: string, image?: string | null }[] }>(`/api/projects/${id}/members`)
-    // A reply for a board the page has left is dropped, so a quick switch cannot show one board's people on another.
-    if (projectId.value === id) boardPeople.value = res.people ?? []
-  } catch {
-    if (projectId.value === id) boardPeople.value = []
-  }
-}
-watch(projectId, (id) => {
-  if (id && !isCustomerView.value) loadBoardPeople(id)
-  else boardPeople.value = []
-}, { immediate: true })
 const { switchWorkspace } = useWorkspace()
-const { refresh: refreshProjects } = useProjects()
+const { refresh: refreshProjects, boardMembers, boardWatching } = useProjects()
+// Who is on the board, for the avatars in the top bar: the members list, four shown and a count after. It comes with the
+// board answer (useProjects), so a visit makes no request of its own for it. A customer sees none.
+const boardPeople = computed(() => isCustomerView.value ? [] : boardMembers.value)
+// The notify flag from the board answer, shown in the board's menu.
+watch(boardWatching, (value) => {
+  boardWatch.watching.value = value
+}, { immediate: true })
 const { customers, ensureLoaded: ensureCustomers } = useCustomers()
 const toast = useToast()
 

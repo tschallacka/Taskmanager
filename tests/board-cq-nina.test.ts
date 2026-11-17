@@ -13,14 +13,18 @@ test('the board page has no local initials helper; the avatars use the shared in
   assert.match(page, /:text="initialsOf\(person\.name, null\)"/)
 })
 
-test('a members reply is written only while the page is still on that board (reply branch)', () => {
-  const start = page.indexOf('async function loadBoardPeople(id: string)')
-  const body = page.slice(start, page.indexOf('\n}\n', start))
-  assert.match(body, /if \(projectId\.value === id\) boardPeople\.value = res\.people \?\? \[\]/)
+// The people came from a separate members call before the board answer carried them (speed, step C). The same guard now
+// sits in useProjects: a board's answer is written only while that board is still the open one.
+const composable = readFileSync(new URL('../app/composables/useProjects.ts', import.meta.url), 'utf8')
+
+test('a board answer is written only while the page is still on that board (reply branch)', () => {
+  const at = composable.indexOf('const [board, people] = await Promise.all')
+  const block = composable.slice(at, composable.indexOf('_boardLoadError.value = boardLoadStateAfter', at))
+  assert.match(block, /if \(_activeProjectId\.value === id\) \{[\s\S]*_boardMembers\.value = board\.members \?\? \[\]/)
 })
 
-test('a members error is written only while the page is still on that board (catch branch)', () => {
-  const start = page.indexOf('async function loadBoardPeople(id: string)')
-  const body = page.slice(start, page.indexOf('\n}\n', start))
-  assert.match(body, /catch \{\n {4}if \(projectId\.value === id\) boardPeople\.value = \[\]/)
+test('the people are written from the board answer, the board cache or a reload of the same board, and nowhere else', () => {
+  assert.equal(composable.match(/_boardMembers\.value = /g)?.length, 3)
+  assert.match(composable, /_boardMembers\.value = cached\?\.members \?\? \[\]/)
+  assert.match(composable, /_boardMembers\.value = board\.members \?\? \[\]/)
 })
