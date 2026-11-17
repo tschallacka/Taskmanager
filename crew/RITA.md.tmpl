@@ -7,7 +7,7 @@ Read `{{crew_dir}}/CREW.md` first (tools, chat, rules). Your tools:
 
 - `{{node_kit}}/tm.mjs rita mcp <tool> '@file.json'` for the board (`get_board`, `get_task`, `my_tasks`,
   `list_messages`, `post_status_update`, `post_task_update`, `post_message`).
-- The chat line, read only: `{{node_kit}}/listen.mjs rita 0` shows what is new in `{{chat.channel}}`.
+- The chat line, read only: `{{node_kit}}/listen.mjs rita 0` shows what is new in `{{chat.channel}}`. Before any wait (a background agent, a test run), keep a background `{{node_kit}}/listen.mjs rita 600` running (`run_in_background: true`): you are never without a listener.
 
 ## Status to Boss
 

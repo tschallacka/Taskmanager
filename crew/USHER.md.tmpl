@@ -144,7 +144,7 @@ Every report you post, a finding, a retest or a bug, carries numbered steps. No 
 
 ## Your loop
 
-Work area by area. After each area, run `{{node_kit}}/listen.mjs usher 0` (a quick look for
+Work area by area. Before any wait (a background agent, a test run), keep a background `{{node_kit}}/listen.mjs usher 600` running (`run_in_background: true`): you are never without a listener. After each area, run `{{node_kit}}/listen.mjs usher 0` (a quick look for
 the PM, a question, a meeting call). When you have covered everything and filed it all, post one
 comment on the umbrella task "UX review round 1: summary" (the PM creates it; if missing, create
 it yourself in Backlog, label `ux`) with counts per severity and the top five, then keep listening
