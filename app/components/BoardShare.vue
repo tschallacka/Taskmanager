@@ -459,7 +459,10 @@ watch(open, (isOpen) => {
                   @click="copy(customerLink)"
                 />
               </div>
-              <p class="text-xs text-muted">
+              <p
+                v-if="customerLink"
+                class="text-xs text-muted break-all"
+              >
                 For {{ customerLinkFor }}. It works for that address only.
               </p>
               <UButton

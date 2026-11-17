@@ -378,7 +378,7 @@ function confirmRevoke(customerId: string, invitation: CustomerInvitation) {
                       :key="`pending-${email}`"
                       class="flex items-center justify-between gap-2"
                     >
-                      <p class="min-w-0 truncate text-xs text-muted">
+                      <p class="min-w-0 break-all text-xs text-muted">
                         Invited, not accepted yet: {{ email }}
                       </p>
                       <UButton
@@ -435,7 +435,7 @@ function confirmRevoke(customerId: string, invitation: CustomerInvitation) {
                       :key="inv.id"
                       class="flex items-center justify-between gap-2 text-xs"
                     >
-                      <span class="truncate text-default">{{ inv.email ? `Invited, not accepted yet: ${inv.email}` : (inv.label || 'Unlabelled link') }}</span>
+                      <span class="min-w-0 break-all text-default">{{ inv.email ? `Invited, not accepted yet: ${inv.email}` : (inv.label || 'Unlabelled link') }}</span>
                       <div class="flex shrink-0 items-center gap-1">
                         <span class="text-muted">expires {{ formatDate(inv.expiresAt) }}</span>
                         <UButton
