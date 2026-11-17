@@ -1,6 +1,7 @@
 import { onNotification, realtimeHeaders } from '~/composables/useRealtime'
 import { errorMessage, untypedFetch } from '~/utils/untypedFetch'
 import { taskLink } from '~/utils/taskLink'
+import { archiveAllRequest, keptAfterArchiveAll } from '~/utils/notificationArchive'
 
 export interface NotificationItem {
   id: string
@@ -221,12 +222,13 @@ export function useNotifications() {
     }
   }
 
-  async function archiveAll() {
+  /** Archive all. With `unreadOnly` (under the Unread filter) only the unread rows leave; the read ones stay in the inbox. */
+  async function archiveAll(unreadOnly = false) {
     const before = { items: _items.value, unread: _unread.value }
-    _items.value = []
+    _items.value = keptAfterArchiveAll(_items.value, unreadOnly)
     _unread.value = 0
     try {
-      await request('/api/notifications/archive', { method: 'POST', headers: realtimeHeaders(), body: { all: true } })
+      await request('/api/notifications/archive', { method: 'POST', headers: realtimeHeaders(), body: archiveAllRequest(unreadOnly ? 'unread' : 'all') })
     } catch (error) {
       _items.value = before.items
       _unread.value = before.unread
