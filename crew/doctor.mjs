@@ -2,28 +2,10 @@
 // `crew doctor` (card mwk8koh1xf1jikjrkff, step 3): for each person with a recorded session, the three paths the session needs
 // (its own folder, the crew home, the kit folder) and whether Claude Code trusts each one, and the exact fix when one does not.
 // A folder the crew did not make is listed as refused: crew update does not trust it. Reads only; it writes nothing.
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { configFile, isCrewOwned, readWorktreeBase } from './claude-trust.mjs'
+import { configFile, isCrewOwned, readWorktreeBase, sessionRecords } from './claude-trust.mjs'
 import { crewHome, kitDir } from './home.mjs'
-
-/** Each recorded session: { who, folder }, from sessions/<key>.json (the mcp configs are not records). */
-function sessionRecords(home) {
-  const dir = join(home, 'sessions')
-  if (!existsSync(dir)) return []
-  return readdirSync(dir)
-    .filter(f => f.endsWith('.json') && !f.endsWith('.mcp.json'))
-    .map((f) => {
-      try {
-        const folder = JSON.parse(readFileSync(join(dir, f), 'utf8')).folder
-        return typeof folder === 'string' && folder.length > 0 ? { who: f.slice(0, -5), folder } : null
-      } catch {
-        return null
-      }
-    })
-    .filter(Boolean)
-}
 
 function trustedIn(projects, path) {
   return projects?.[path]?.hasTrustDialogAccepted === true

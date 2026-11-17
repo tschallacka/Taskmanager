@@ -38,20 +38,21 @@ export function crewOwnPaths({ home, kit, worktreeBase, folders = [] }) {
   return { trust, refused }
 }
 
-/** The folder of every recorded session in a crew home (sessions/<key>.json; the mcp configs are not records). */
-export function recordedFolders(home) {
+/** Each recorded session in a crew home: { who, folder } from sessions/<key>.json. The mcp configs and a broken record are skipped. */
+export function sessionRecords(home) {
   const dir = join(home, 'sessions')
   if (!existsSync(dir)) return []
   return readdirSync(dir)
     .filter(f => f.endsWith('.json') && !f.endsWith('.mcp.json'))
     .map((f) => {
       try {
-        return JSON.parse(readFileSync(join(dir, f), 'utf8')).folder
+        const folder = JSON.parse(readFileSync(join(dir, f), 'utf8')).folder
+        return typeof folder === 'string' && folder.length > 0 ? { who: f.slice(0, -5), folder } : null
       } catch {
         return null
       }
     })
-    .filter(folder => typeof folder === 'string' && folder.length > 0)
+    .filter(Boolean)
 }
 
 /** The worktreeBase of a crew home's crew.json, or null when it is not set (then no session folder counts as a crew folder). */
