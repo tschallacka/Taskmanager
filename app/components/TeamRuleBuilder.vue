@@ -32,6 +32,10 @@ const COLUMN_KEY = 'columnName'
 
 const stored = props.rule ?? null
 const mode = ref<TeamRuleMode>(stored?.mode ?? 'by_name')
+const MODE_OPTIONS = [
+  { label: 'By name: columns are written as names, people come from the team', value: 'by_name' },
+  { label: 'Column-free: no columns and no particular person', value: 'column_free' }
+]
 const columnFree = computed(() => mode.value === 'column_free')
 
 const triggerKinds = computed(() => kindList(TRIGGERS, kind => columnFree.value && NEEDS_COLUMN_OR_PERSON.trigger.includes(kind), 'needs "by name"'))
@@ -55,6 +59,11 @@ if (!stored) actions.value = [{ kind: 'add_label', value: '' }]
 
 // Switching to column-free drops what it cannot hold, so the form never shows a step the
 // server would refuse. A step that needs a person's name is dropped too.
+// The mode picker hands over the picked value, or nothing when it is cleared.
+function setModeFromPicker(next: string | null | undefined) {
+  if (next === 'by_name' || next === 'column_free') setMode(next)
+}
+
 function setMode(next: TeamRuleMode) {
   mode.value = next
   if (next !== 'column_free') return
@@ -145,19 +154,12 @@ async function save() {
       <h4 class="text-xs font-semibold uppercase tracking-wide text-muted">
         How the rule refers to columns
       </h4>
-      <select
-        :value="mode"
-        class="rounded-md border border-default bg-default px-2 py-1.5 text-sm text-default outline-none focus:border-primary"
+      <AppSelect
+        :model-value="mode"
+        :options="MODE_OPTIONS"
         data-rule-mode
-        @change="setMode(($event.target as HTMLSelectElement).value as TeamRuleMode)"
-      >
-        <option value="by_name">
-          By name: columns are written as names, people come from the team
-        </option>
-        <option value="column_free">
-          Column-free: no columns and no particular person
-        </option>
-      </select>
+        @update:model-value="setModeFromPicker"
+      />
       <p class="text-xs text-muted">
         <template v-if="columnFree">
           Runs on every board of the team, whatever its columns are called.
