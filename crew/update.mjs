@@ -18,6 +18,7 @@ import { createHash } from 'node:crypto'
 import { chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
+import { recordedFolders, trustCrewFolders } from './claude-trust.mjs'
 import { kitDir } from './home.mjs'
 import { updateOwnerFile } from './owner-file.mjs'
 
@@ -319,6 +320,15 @@ async function finish(planFile) {
     lines.push('FAIL init reported problems (above): fix them, then run init again')
   } else {
     lines.push('init rendered the documents from the new templates')
+  }
+  // The crew's own folders are trusted in Claude Code's config, so a session never fails with 'folder not trusted' (card
+  // mwk8koh1xf1jikjrkff). Only the crew home, the kit folder and the recorded crew folders; never another path.
+  const trusted = trustCrewFolders({ home: here, kit: kitDir, folders: recordedFolders(here) })
+  if (!trusted.ok) {
+    problems++
+    lines.push(`FAIL trust: ${trusted.reason}`)
+  } else {
+    lines.push(`trust: ${trusted.changed.length} crew folder(s) newly trusted in Claude Code's config${trusted.refused.length ? `; not trusted (not crew folders): ${trusted.refused.join(', ')}` : ''}`)
   }
   const files = Object.fromEntries(plan.names.map(name => [name, sha(join(kitDir, name))]))
   writeFileSync(join(here, MANIFEST), `${JSON.stringify({ version: plan.version, source: plan.label, kit: kitDir, installedAt: new Date().toISOString(), files }, null, 2)}\n`, { mode: 0o600 })
