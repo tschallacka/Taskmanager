@@ -248,6 +248,19 @@ test('a second release folder with the same inputs skips when the cache is in BU
   assert.ok(existsSync(join(second, '.output', 'server', 'index.mjs')))
 })
 
+// Nina's should (card mwkf0nartlrd5n8lz2o): copyOutput followed a directory link that points back into the tree, and recursed until the
+// copy failed with no reason. A cyclic link is refused by name, and the run is a full build with the reason printed.
+test('a cache with a cyclic directory link is not skipped: the run builds, and the reason names the cycle', () => {
+  const root = release()
+  const { build, counter } = fakeBuild(root)
+  run({ root, env: {}, build })
+  symlinkSync('..', join(root, 'data', '.build-cache', 'output', 'server', 'loop'))
+  const lines: string[] = []
+  assert.equal(run({ root, env: {}, build, log: l => lines.push(l) }).action, 'built')
+  assert.equal(counter.calls, 2, 'the cyclic cache was not used')
+  assert.match(lines.join('\n'), /full build: .*cyclic/)
+})
+
 test('a run that changes only nix/hashes.json skips', () => {
   const root = release()
   const { build, counter } = fakeBuild(root)
