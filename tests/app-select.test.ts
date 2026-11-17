@@ -155,6 +155,13 @@ test('the open list of AppSelect is drawn above a dialog, so a picker inside a m
   assert.match(draft, /<AppSelect\s[\s\S]*?data-draft-project/, 'the draft task project picker is an AppSelect, so it gets this')
 })
 
+test('the task panel visibility pickers (the drawer and the GitHub link) are as wide as their labels, so Shared with customer is not cut off', () => {
+  // These two are Nuxt UI selects (USelect), not AppSelect: each must carry the same list width on its own.
+  const pick = path => read(path).match(/<USelect[\s\S]*?:items="visibilityItems"[\s\S]*?\/>/)?.[0] ?? ''
+  assert.match(pick('app/components/kanban/TaskDrawer.vue'), /min-w-fit/, 'the drawer visibility list grows to its longest label')
+  assert.match(pick('app/components/kanban/TaskGithub.vue'), /min-w-fit/, 'the GitHub visibility list grows to its longest label')
+})
+
 test('AppSelect can list options under group headings (a label per group)', () => {
   const select = read('app/components/AppSelect.vue')
   assert.match(select, /groups\?: \{ label: string, options: SelectOption\[\] \}\[\]/, 'an optional list of groups')
