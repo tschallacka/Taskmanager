@@ -128,8 +128,7 @@ export function ensureTrusted(paths, { file = configFile(), beforeRename } = {})
     }
     if (changed.length === 0) return { ok: true, changed: [] }
     data.projects = projects
-    // One backup, the file as it was before our first change; never overwritten.
-    if (!existsSync(backup) && existsSync(file)) copyFileSync(file, backup)
+    // One backup, the file as it was before our first change; never overwritten. It is copied in the write's try, below.
     const out = `${JSON.stringify(data, null, 2)}\n`
     if (beforeRename) beforeRename()
     const now = existsSync(file) ? readFileSync(file, 'utf8') : '{}\n'
