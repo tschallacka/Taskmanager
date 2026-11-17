@@ -215,6 +215,22 @@ test('the full-build reason is printed before the build (no cache, a changed inp
   assert.match(lines.join('\n'), /full build: no cache/)
 })
 
+// Nina's must (card mwkf0nartlrd5n8lz2o): the cache inside the release is removed with it on each deploy. The deploy keeps the cache
+// outside every release (BUILD_CACHE_DIR), so the next release with the same inputs skips.
+test('a cache outside the release (BUILD_CACHE_DIR) survives the deploy: the next release with the same inputs skips', () => {
+  const shared = mkdtempSync(join(tmpdir(), 'bic-shared-'))
+  const first = release()
+  const a = fakeBuild(first)
+  assert.equal(run({ root: first, env: { BUILD_CACHE_DIR: shared }, build: a.build }).action, 'built')
+  assert.equal(a.counter.calls, 1)
+  rmSync(first, { recursive: true, force: true }) // the deploy removes the old release
+  const second = release()
+  const b = fakeBuild(second)
+  assert.equal(run({ root: second, env: { BUILD_CACHE_DIR: shared }, build: b.build }).action, 'skipped')
+  assert.equal(b.counter.calls, 0, 'no build in the new release')
+  assert.ok(existsSync(join(second, '.output', 'server', 'index.mjs')), 'the output is in the new release')
+})
+
 test('a run that changes only nix/hashes.json skips', () => {
   const root = release()
   const { build, counter } = fakeBuild(root)

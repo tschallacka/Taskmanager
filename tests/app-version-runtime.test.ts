@@ -37,3 +37,27 @@ test('a VERSION file that is not a version is skipped, and the next source is re
 test('with neither file (dev), the value bundled at build time is the fallback', () => {
   assert.equal(readAppVersion({ cwd: folder(), bundled: '0.41.0' }), '0.41.0')
 })
+
+// Nina's should (card mwkf0nartlrd5n8lz2o): the server runs from state/, not from its release, so the version and the build id come
+// from the release it runs (TASKMANAGER_RELEASE, set by run-server.sh), not from the working folder.
+test('the version is read from the release the server runs, not from its working folder (state/)', () => {
+  const release = folder()
+  mkdirSync(join(release, '.output'))
+  writeFileSync(join(release, '.output', 'VERSION'), '0.47.1\n')
+  const workingFolder = folder()
+  assert.equal(readAppVersion({ cwd: workingFolder, release, bundled: '0.41.0' }), '0.47.1')
+})
+
+test('the build id is read from the release the server runs (REVISION there), not from the working folder', async () => {
+  const release = folder()
+  writeFileSync(join(release, 'REVISION'), '0123456789abcdef0123456789abcdef01234567\n')
+  const before = process.env.TASKMANAGER_RELEASE
+  process.env.TASKMANAGER_RELEASE = release
+  try {
+    const { appBuild } = await import('../server/utils/appVersion')
+    assert.equal(appBuild(), '0123456')
+  } finally {
+    if (before === undefined) delete process.env.TASKMANAGER_RELEASE
+    else process.env.TASKMANAGER_RELEASE = before
+  }
+})
