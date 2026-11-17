@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.45.0 - 2026-11-17
+
+- **The production build is skipped when nothing it reads has changed.** `bun run build` hashes the build inputs (the app, the server, the shared code, the public folder, the docs, the configs, the tool versions and the build-time environment values) and copies the last good output from `data/.build-cache/` when the hash matches; `BUILD_FORCE=1` forces a full build, and `bun run build:full` is the full build. The app's version is read at run time from the release, so a copied build reports its own version. Files: `scripts/build-if-changed.mjs`, `scripts/build-inputs.mjs`, `server/utils/appVersionFile.ts`, `server/utils/appVersion.ts`, `package.json`, `CONTRIBUTING.md`.
+
 ## 0.44.0 - 2026-11-17
 
 - **Archive all under the Unread filter archives only the unread notifications it shows.** The read ones stay in the inbox, where that filter does not show them, so the button no longer takes out rows the person cannot see. Archive all under All still takes every inbox row. Files: `server/utils/notificationBox.ts`, `server/api/notifications/archive.post.ts`, `app/composables/useNotifications.ts`, `app/pages/projects/inbox.vue`, `tests/notifications-archive-db.test.ts`, `changelog.d/mw9rojl3i47djllurn-notifications-archive.md`.
