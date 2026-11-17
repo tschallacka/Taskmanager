@@ -3,6 +3,8 @@ import { inviteSentence } from '~/utils/inviteSentence'
 import { inviteLinks } from '~/utils/inviteLinks'
 import { landingFor } from '~/utils/inviteLanding'
 import { shareLine } from '~/utils/inviteShareLine'
+import { formLinksFor } from '~/utils/lockedEmail'
+import { usedInvitePlan } from '~/utils/usedInvite'
 
 useSeoMeta({ title: 'Invitation' })
 
@@ -14,9 +16,9 @@ const { session, isPending: sessionPending } = useAuth()
 // page never learns: whoever was invited has to know it. `forYou` says whether the account signed in now is
 // the invited one, and is null when nobody is signed in.
 type InvitationPreview
-  = | { kind: 'customer', customerName: string, organizationName: string, sharedProjectCount: number }
-    | { kind: 'team', organizationName: string, inviterName: string | null, role: string, forYou: boolean | null }
-    | { kind: 'board', projectName: string, organizationName: string | null, inviterName: string | null, role: string, forYou: boolean | null }
+  = | { kind: 'customer', customerName: string, organizationName: string, sharedProjectCount: number, email?: string | null }
+    | { kind: 'team', organizationName: string, inviterName: string | null, role: string, forYou: boolean | null, email?: string | null }
+    | { kind: 'board', projectName: string, organizationName: string | null, inviterName: string | null, role: string, forYou: boolean | null, email?: string | null }
 
 // Reading the invitation also sets the cookie that lets its recipient create an
 // account where sign-up is otherwise closed, so it has to happen in the browser.
@@ -43,7 +45,11 @@ const words = computed(() => {
 })
 
 // The registration form is the default for every kind; the plain link under the button signs in instead.
-const links = computed(() => inviteLinks(token.value))
+// A link tied to an address carries it to the forms, where it is prefilled and locked (see utils/lockedEmail).
+const links = computed(() => {
+  const email = invitation.value?.email ?? null
+  return email ? formLinksFor(token.value, email) : inviteLinks(token.value)
+})
 
 // What is shared, said only when the page knows it (see utils/inviteShareLine). A customer invitation only.
 const shareText = computed(() => {
@@ -51,6 +57,16 @@ const shareText = computed(() => {
   if (!invite || invite.kind !== 'customer') return null
   return shareLine({ count: invite.sharedProjectCount, signedIn: !!session.value, organizationName: invite.organizationName })
 })
+
+// A link already used: the account that accepted it goes to its projects; anyone else gets a button (see utils/usedInvite).
+const usedBody = computed(() => loadError.value?.data as { message?: string, data?: { acceptedByYou?: boolean } } | undefined)
+const usedPlan = computed(() => {
+  if (loadError.value?.statusCode !== 410 || usedBody.value?.message !== 'This invitation has already been used') return null
+  return usedInvitePlan({ signedIn: !!session.value, acceptedByYou: usedBody.value?.data?.acceptedByYou === true })
+})
+watch([usedPlan, sessionPending], () => {
+  if (!sessionPending.value && usedPlan.value?.redirectTo) navigateTo(usedPlan.value.redirectTo, { replace: true })
+}, { immediate: true })
 
 const loadMessage = computed(() => {
   const status = loadError.value?.statusCode
@@ -98,6 +114,18 @@ async function accept() {
     accepting.value = false
   }
 }
+
+// An account made through this link (signed up with the invited address, then back here) is a contact by itself, with
+// no second step. Once per visit; a failure leaves the Accept button for a retry.
+const autoAccepted = ref(false)
+watch([session, invitation], () => {
+  const invite = invitation.value
+  const mine = session.value?.user.email?.toLowerCase()
+  if (autoAccepted.value || !session.value || !invite || invite.kind !== 'customer' || !invite.email) return
+  if (mine !== invite.email.toLowerCase()) return
+  autoAccepted.value = true
+  accept()
+}, { immediate: true })
 </script>
 
 <template>
@@ -137,7 +165,21 @@ async function accept() {
         color="error"
         variant="subtle"
         :description="loadMessage"
-      />
+      >
+        <template
+          v-if="usedPlan?.button"
+          #actions
+        >
+          <UButton
+            block
+            size="lg"
+            color="primary"
+            :to="usedPlan.button.to"
+          >
+            {{ usedPlan.button.label }}
+          </UButton>
+        </template>
+      </UAlert>
 
       <template v-else-if="invitation">
         <p
@@ -189,6 +231,12 @@ async function accept() {
             class="text-sm text-muted text-center"
           >
             Use the email address this invitation was sent to. Anyone else cannot use it.
+          </p>
+          <p
+            v-if="invitation.email"
+            class="text-sm text-muted text-center"
+          >
+            This invitation is for <span class="text-default">{{ invitation.email }}</span>.
           </p>
           <UButton
             block

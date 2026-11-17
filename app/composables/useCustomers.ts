@@ -18,6 +18,8 @@ export interface CustomerContact {
 export interface CustomerInvitation {
   id: string
   label: string | null
+  /** The address the link is tied to, or null for an anonymous link. */
+  email?: string | null
   createdAt: number
   expiresAt: number
 }
@@ -75,10 +77,10 @@ export function useCustomers() {
     )
   }
 
-  function createInvitation(id: string, label: string) {
+  function createInvitation(id: string, label: string, email: string, projectIds: string[]) {
     return $fetch<CustomerInvitation & { url: string }>(`/api/customers/${id}/invitations`, {
       method: 'POST',
-      body: { label }
+      body: { label, email, projectIds }
     })
   }
 

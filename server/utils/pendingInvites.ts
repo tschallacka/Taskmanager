@@ -1,9 +1,38 @@
 import { and, eq, gt, inArray, sql } from 'drizzle-orm'
 import { db } from '../db'
-import { member, projectGuestInvitations, projectGuests, projects } from '../db/schema'
+import { customerInvitations, customerMembers, member, projectGuestInvitations, projectGuests, projects } from '../db/schema'
 import { genId } from './projects'
 import { publish, workspaceTopic } from './realtime'
 import { invitesToClaim } from './pendingInviteRules'
+import { customerInvitesToClaim } from './customerInviteRules'
+
+/**
+ * The owner's rule for customers too: an open link tied to one of the account's addresses is accepted by itself, and
+ * the account becomes a contact of that customer. Anonymous links are never claimed here.
+ */
+export async function claimTiedCustomerInvites(userId: string, addresses: string[], now: number): Promise<void> {
+  if (!addresses.length) return
+  const lowered = addresses.map(address => address.toLowerCase())
+  const rows = await db
+    .select({ id: customerInvitations.id, email: customerInvitations.email, acceptedAt: customerInvitations.acceptedAt, expiresAt: customerInvitations.expiresAt, customerId: customerInvitations.customerId })
+    .from(customerInvitations)
+    .where(and(
+      gt(customerInvitations.expiresAt, now),
+      inArray(sql`lower(${customerInvitations.email})`, lowered)
+    ))
+  const ids = customerInvitesToClaim(rows, addresses, now)
+  for (const id of ids) {
+    // One statement per link, so two requests cannot both take it.
+    const [done] = await db
+      .update(customerInvitations)
+      .set({ acceptedBy: userId, acceptedAt: now })
+      .where(and(eq(customerInvitations.id, id), sql`${customerInvitations.acceptedAt} is null`))
+      .returning({ customerId: customerInvitations.customerId })
+    if (done) {
+      await db.insert(customerMembers).values({ id: genId(), customerId: done.customerId, userId, createdAt: now }).onConflictDoNothing()
+    }
+  }
+}
 
 // The owner's rule: one email can be invited to several boards, and a follow-up invitation to an account that already
 // exists is accepted by itself. Every open board invitation sent to one of the account's addresses is claimed when the

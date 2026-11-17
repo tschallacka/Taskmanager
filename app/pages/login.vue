@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { loginMode } from '~/utils/loginMode'
+import { lockedEmailFromQuery } from '~/utils/lockedEmail'
 
 definePageMeta({ middleware: [] }) // skip auth middleware on this page
 
@@ -36,7 +37,9 @@ const mode = ref<'sign-in' | 'sign-up'>(loginMode({
   signin: typeof route.query.signin === 'string' ? route.query.signin : undefined
 }))
 const name = ref('')
-const email = ref('')
+// An invitation tied to an address prefills it, and the field is locked: the invitation is for that address only.
+const lockedEmail = lockedEmailFromQuery(route.query.email)
+const email = ref(lockedEmail)
 const password = ref('')
 const code = ref('')
 const codeSent = ref(false)
@@ -196,6 +199,7 @@ onMounted(async () => {
           <UInput
             v-model="email"
             type="email"
+            :readonly="lockedEmail !== ''"
             :autocomplete="mode === 'sign-in' && isPasskeysEnabled ? 'username webauthn' : 'email'"
             class="w-full"
             required
@@ -248,6 +252,7 @@ onMounted(async () => {
           <UInput
             v-model="email"
             type="email"
+            :readonly="lockedEmail !== ''"
             autocomplete="email"
             class="w-full"
             required

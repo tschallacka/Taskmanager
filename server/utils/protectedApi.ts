@@ -21,7 +21,8 @@ export const PROTECTED_PREFIXES = [
   '/api/github',
   '/api/help',
   '/api/people',
-  '/api/shared-with-me'
+  '/api/shared-with-me',
+  '/api/pending-invitations'
 ]
 
 export function isProtectedApiPath(path: string): boolean {

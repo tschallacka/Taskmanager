@@ -7,9 +7,10 @@ import { isCrewUser } from '../../../utils/crewAccounts'
 import { hashInvitationToken, INVITATION_COOKIE } from '../../../utils/customers'
 import { lookupAddressedInvitation } from '../../../utils/invitations'
 import { addressesOfUser } from '../../../utils/extraEmails'
+import { invitedAddressIsMine } from '../../../utils/customerInviteRules'
 import { guestProjectIdsOf } from '../../../utils/guests'
 import { sharedProjectIds } from '../../../utils/sharedProjectIds'
-import { acceptBoardGuest, claimPendingBoardInvites } from '../../../utils/pendingInvites'
+import { acceptBoardGuest, claimPendingBoardInvites, claimTiedCustomerInvites } from '../../../utils/pendingInvites'
 
 // Turns the signed-in account into a member of the invitation's team, a guest of its board, or a
 // contact of its customer. A link is spent by the first account that accepts it; a team or board
@@ -33,8 +34,14 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 410, message: 'This invitation is no longer valid' })
   }
   if (addressed !== 'missing') {
-    // Any verified address of the account counts: its main one or an extra one that was confirmed.
-    if (!(await addressesOfUser(session.user.id)).includes(addressed.email)) {
+    // Any verified address of the account counts: its main one or an extra one that was confirmed. The account's own
+    // address counts too when it is the invited one: the account was made through this link (invitedAddressIsMine).
+    const allowed = invitedAddressIsMine({
+      invitedEmail: addressed.email,
+      verifiedAddresses: await addressesOfUser(session.user.id),
+      signedInEmail: session.user.email ?? null
+    })
+    if (!allowed) {
       // The address is not repeated here: the person who was invited knows it.
       throw createError({
         statusCode: 403,
@@ -112,6 +119,8 @@ export default defineEventHandler(async (event) => {
 
   // The owner's rule: a board invitation already sent to this account's address is accepted by itself now.
   await claimPendingBoardInvites(session.user.id, await addressesOfUser(session.user.id), now)
+  // The same for a customer link tied to one of the account's addresses (the owner's rule).
+  await claimTiedCustomerInvites(session.user.id, await addressesOfUser(session.user.id), now)
 
   // The projects shared with this person as a customer contact: the customer's own projects and the boards they
   // hold as a guest. The landing opens the one or lists the several (see utils/inviteLanding).
