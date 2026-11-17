@@ -1,1 +1,0 @@
-- **The crew's own folders are trusted by the kit.** `crew update` and `crew session start` mark the crew home, the kit folder and each session's folder as trusted in Claude Code's config file (one backup, never overwritten; nothing else in the file changes), so a session no longer fails with "folder not trusted" (`crew/claude-trust.mjs`, `crew/kit-files.txt`).

@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.47.0 - 2026-11-17
+
+- **The crew's own folders are trusted by the kit.** `crew update` and `crew session start` mark the crew home, the kit folder and each session's folder as trusted in Claude Code's config file (one backup, never overwritten; nothing else in the file changes), so a session no longer fails with "folder not trusted" (`crew/claude-trust.mjs`, `crew/kit-files.txt`).
+
 ## 0.46.0 - 2026-11-17
 
 - **Crew kit: a notice when the board has ready work and the crew is idle.** When cards wait in To do or in a Verify column and nothing has happened for 30 minutes, Pia and Boss get one mail, and another only when the set of ready cards changes. Done and blocked cards are not named. Files: `crew/idle-ready.mjs`, `crew/idle-ready.test.mjs`.
