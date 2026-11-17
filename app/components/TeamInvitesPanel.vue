@@ -112,7 +112,7 @@ async function copy(text: string) {
         v-model="email"
         type="email"
         placeholder="name@example.com"
-        class="min-w-0 flex-1"
+        class="min-w-0 w-full sm:w-auto sm:flex-1"
         data-invite-email
       />
       <select
@@ -183,7 +183,7 @@ async function copy(text: string) {
           class="size-4 shrink-0 text-muted"
         />
         <div class="min-w-0 flex-1">
-          <p class="break-all text-xs text-default">
+          <p class="break-words text-xs text-default">
             {{ invitation.email }}
           </p>
           <p class="text-[11px] text-muted">

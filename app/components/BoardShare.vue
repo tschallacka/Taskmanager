@@ -461,7 +461,7 @@ watch(open, (isOpen) => {
               </div>
               <p
                 v-if="customerLink"
-                class="text-xs text-muted break-all"
+                class="text-xs text-muted break-words"
               >
                 For {{ customerLinkFor }}. It works for that address only.
               </p>

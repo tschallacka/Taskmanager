@@ -243,7 +243,7 @@ function confirmRevoke(customerId: string, invitation: CustomerInvitation) {
       v-model:open="open"
       :title="activeTeam ? `Customers of ${activeTeam.name}` : 'Customers'"
       description="Customers group projects and log in to follow them. They see only the tasks you share with them."
-      :ui="{ content: 'sm:max-w-2xl' }"
+      :ui="{ content: 'sm:max-w-2xl', title: 'pr-10 break-words' }"
     >
       <template #body>
         <div class="space-y-4 text-sm">
@@ -378,7 +378,7 @@ function confirmRevoke(customerId: string, invitation: CustomerInvitation) {
                       :key="`pending-${email}`"
                       class="flex items-center justify-between gap-2"
                     >
-                      <p class="min-w-0 break-all text-xs text-muted">
+                      <p class="min-w-0 break-words text-xs text-muted">
                         Invited, not accepted yet: {{ email }}
                       </p>
                       <UButton
@@ -435,7 +435,7 @@ function confirmRevoke(customerId: string, invitation: CustomerInvitation) {
                       :key="inv.id"
                       class="flex items-center justify-between gap-2 text-xs"
                     >
-                      <span class="min-w-0 break-all text-default">{{ inv.email ? `Invited, not accepted yet: ${inv.email}` : (inv.label || 'Unlabelled link') }}</span>
+                      <span class="min-w-0 break-words text-default">{{ inv.email ? `Invited, not accepted yet: ${inv.email}` : (inv.label || 'Unlabelled link') }}</span>
                       <div class="flex shrink-0 items-center gap-1">
                         <span class="text-muted">expires {{ formatDate(inv.expiresAt) }}</span>
                         <UButton
