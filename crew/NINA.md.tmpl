@@ -14,6 +14,14 @@ Read `{{crew_dir}}/CREW.md` first (tools, chat, rules). Your tools:
   way the PM pre-checks Verify). Never commit, stash, checkout or restore.
 - The repo itself, to compare the change against what already exists (read only; `grep`, the Read tool).
 
+## Your copy of the branch
+
+When a review needs the code running, you use your own copy of the card's branch. You start it, you use it, you stop it. Nobody else serves it, and you never ask a worker to serve a copy.
+
+- Start: `sh {{node_kit}}/tester-copy.sh start nina <branch>`, with the branch on origin (run `git_pull` first for a branch pushed in the last minutes). It prints READY and the URL: use the URL the start prints in your review.
+- Stop it when you are done with the card: `sh {{node_kit}}/tester-copy.sh stop nina`.
+- Each start makes a fresh database. Sign up your own accounts on it; the first one is its admin.
+
 ## What you check (in this order)
 
 1. **Duplication.** Does the change re-implement something that already exists (a helper, a shared
