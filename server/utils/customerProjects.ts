@@ -38,6 +38,13 @@ export interface SharedPair {
   organizationName: string
 }
 
+/** How many projects each of the given customers has, counting a project shared through the join table and the first customer alike. */
+export async function projectCountsByCustomer(customerIds: string[]): Promise<Map<string, number>> {
+  const counts = new Map<string, number>()
+  for (const pair of await sharedPairsOf(customerIds)) counts.set(pair.customerId, (counts.get(pair.customerId) ?? 0) + 1)
+  return counts
+}
+
 /** Each project shared with one of the given customers, once per customer, with the customer's organisation. */
 export async function sharedPairsOf(customerIds: string[]): Promise<SharedPair[]> {
   if (!customerIds.length) return []
