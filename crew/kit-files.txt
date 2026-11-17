@@ -43,6 +43,7 @@ crew.mjs
 detach.sh
 dev-copies.mjs
 devadmin.mjs
+doctor.mjs
 down.mjs
 fonts.conf.tmpl
 guard.sh

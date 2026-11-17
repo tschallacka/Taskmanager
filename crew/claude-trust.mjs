@@ -20,12 +20,20 @@ export function isCrewFolder(path, worktreeBase) {
 }
 
 /**
+ * A folder that is the crew's own for trust: a crew folder, or the crew home or the kit folder itself (the trust already covers them,
+ * and a session record may name the home as its folder).
+ */
+export function isCrewOwned(path, { home, kit, worktreeBase }) {
+  return path === home || path === kit || isCrewFolder(path, worktreeBase)
+}
+
+/**
  * The paths the kit may trust: the crew home, the installed kit folder, and each recorded session folder that is a crew folder.
  * `refused` lists the session folders the kit will not trust (the owner pointed a session somewhere the crew did not make).
  */
 export function crewOwnPaths({ home, kit, worktreeBase, folders = [] }) {
-  const crew = folders.filter(f => isCrewFolder(f, worktreeBase))
-  const refused = [...new Set(folders.filter(f => !isCrewFolder(f, worktreeBase)))].sort()
+  const crew = folders.filter(f => isCrewOwned(f, { home, kit, worktreeBase }))
+  const refused = [...new Set(folders.filter(f => !isCrewOwned(f, { home, kit, worktreeBase })))].sort()
   const trust = [...new Set([home, kit, ...crew])].filter(Boolean).sort()
   return { trust, refused }
 }
@@ -78,7 +86,7 @@ export function notTrustedReason(folder, worktreeBase) {
  * reason }. A folder the crew did not make is refused with notTrustedReason, and nothing is written for it.
  */
 export function trustForStart({ home, kit, folder, file = configFile(), worktreeBase = readWorktreeBase(home), folders = [] }) {
-  if (!isCrewFolder(folder, worktreeBase)) return { ok: false, reason: notTrustedReason(folder, worktreeBase) }
+  if (!isCrewOwned(folder, { home, kit, worktreeBase })) return { ok: false, reason: notTrustedReason(folder, worktreeBase) }
   const { trust } = crewOwnPaths({ home, kit, worktreeBase, folders: [...folders, folder] })
   const res = ensureTrusted(trust, { file })
   return res.ok ? { ok: true, changed: res.changed } : { ok: false, reason: res.reason }
