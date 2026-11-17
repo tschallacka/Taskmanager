@@ -50,6 +50,15 @@ type GroupBy = 'column' | 'assignee'
 type SortBy = 'due' | 'title'
 const groupBy = ref<GroupBy>('column')
 const sortBy = ref<SortBy>('due')
+const groupOptions = [{ label: 'Column', value: 'column' }, { label: 'Assignee', value: 'assignee' }]
+const sortOptions = [{ label: 'Due date', value: 'due' }, { label: 'Title', value: 'title' }]
+// The pickers hand over a string; only the listed values are ever set.
+function setGroupBy(value: string | null | undefined) {
+  if (value === 'column' || value === 'assignee') groupBy.value = value
+}
+function setSortBy(value: string | null | undefined) {
+  if (value === 'due' || value === 'title') sortBy.value = value
+}
 const VIEW_KEY = (boardId: string | null) => `tm-list-view:${boardId ?? ''}`
 
 // The optional columns of each row. Chosen once per board and remembered; the default shows all three.
@@ -173,14 +182,14 @@ function subtaskProgress(taskId: string) {
     >
       <label class="flex items-center gap-1.5 text-xs text-muted">
         Group by
-        <select
-          v-model="groupBy"
-          class="rounded-md border border-default bg-default px-2 py-1 text-xs text-default"
+        <AppSelect
+          :model-value="groupBy"
+          :options="groupOptions"
+          size="sm"
+          class="w-36"
           data-list-group
-        >
-          <option value="column">Column</option>
-          <option value="assignee">Assignee</option>
-        </select>
+          @update:model-value="setGroupBy"
+        />
       </label>
       <div
         class="flex items-center gap-1 text-xs text-muted"
@@ -202,14 +211,14 @@ function subtaskProgress(taskId: string) {
       </div>
       <label class="flex items-center gap-1.5 text-xs text-muted">
         Sort
-        <select
-          v-model="sortBy"
-          class="rounded-md border border-default bg-default px-2 py-1 text-xs text-default"
+        <AppSelect
+          :model-value="sortBy"
+          :options="sortOptions"
+          size="sm"
+          class="w-36"
           data-list-sort
-        >
-          <option value="due">Due date</option>
-          <option value="title">Title</option>
-        </select>
+          @update:model-value="setSortBy"
+        />
       </label>
     </div>
     <!-- The table's one header row, under the controls, on a wide screen. Its names sit over the cells, which read the

@@ -14,34 +14,40 @@ const emit = defineEmits<{ change: [value: string | null] }>()
 
 const selected = computed(() => props.field.options.find(option => option.id === props.value))
 
+// An item cannot have an empty value, so the empty choice ("—") uses a sentinel, reported to the caller as null.
+const NONE = '__none__'
+const selectOptions = computed(() => [
+  { label: '—', value: NONE },
+  ...props.field.options.map(option => ({ label: option.label, value: option.id }))
+])
+
 function onChange(event: Event) {
   const raw = (event.target as HTMLInputElement | HTMLSelectElement).value
   emit('change', raw === '' ? null : raw)
+}
+
+function onSelect(value: string | null | undefined) {
+  emit('change', !value || value === NONE ? null : value)
 }
 </script>
 
 <template>
   <span class="flex min-w-0 items-center gap-1.5">
-    <select
+    <!-- The wrapper stops a click on the picker (or its open list's trigger) from reaching the row. -->
+    <span
       v-if="field.type === 'select'"
-      :value="value ?? ''"
-      class="min-w-0 max-w-full cursor-pointer appearance-none rounded bg-transparent px-1 py-0.5 text-xs outline-none transition-colors hover:bg-elevated focus:ring-1 focus:ring-primary"
-      :class="value ? 'text-default' : 'text-dimmed'"
-      :data-field-input="field.name"
+      class="min-w-0 max-w-full"
       @click.stop
-      @change="onChange"
     >
-      <option value="">
-        —
-      </option>
-      <option
-        v-for="option in field.options"
-        :key="option.id"
-        :value="option.id"
-      >
-        {{ option.label }}
-      </option>
-    </select>
+      <AppSelect
+        :model-value="value || NONE"
+        :options="selectOptions"
+        size="sm"
+        class="min-w-0"
+        :data-field-input="field.name"
+        @update:model-value="onSelect"
+      />
+    </span>
     <span
       v-if="field.type === 'select' && selected"
       class="size-2 shrink-0 rounded-full"

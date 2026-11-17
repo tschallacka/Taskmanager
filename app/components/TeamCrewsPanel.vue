@@ -13,7 +13,8 @@ const { switchWorkspace } = useWorkspace()
 
 const data = ref<TeamCrewsList | null>(null)
 const loading = ref(false)
-const projectId = ref('')
+const projectId = ref<string | null>(null)
+const boardOptions = computed(() => (data.value?.boards ?? []).map(board => ({ label: board.name, value: board.id })))
 // The board whose "Put an AI crew to work on this board" window is open.
 const managementBoard = ref<{ id: string, name: string } | null>(null)
 const confirmDetach = ref<TeamCrewLink | null>(null)
@@ -71,7 +72,7 @@ async function load() {
 }
 
 watch(() => props.teamId, () => {
-  projectId.value = ''
+  projectId.value = null
   load()
 }, { immediate: true })
 
@@ -88,7 +89,7 @@ function addCrew() {
 function onManagementOpen(open: boolean) {
   if (open) return
   managementBoard.value = null
-  projectId.value = ''
+  projectId.value = null
   load()
 }
 
@@ -120,8 +121,6 @@ const isDetachOpen = computed({
     if (!open) confirmDetach.value = null
   }
 })
-
-const SELECT_CLASS = 'min-w-0 flex-1 rounded-md border border-default bg-default px-2 py-1.5 text-sm text-default outline-none focus:border-primary'
 </script>
 
 <template>
@@ -188,26 +187,14 @@ const SELECT_CLASS = 'min-w-0 flex-1 rounded-md border border-default bg-default
         </HelpHint>
       </p>
       <div class="flex flex-wrap items-center gap-2">
-        <select
+        <AppSelect
           v-model="projectId"
-          :class="SELECT_CLASS"
+          :options="boardOptions"
+          placeholder="Pick a board"
+          class="min-w-0 flex-1"
           aria-label="Board"
           data-team-crew-board
-        >
-          <option
-            value=""
-            disabled
-          >
-            Pick a board
-          </option>
-          <option
-            v-for="board in data.boards"
-            :key="board.id"
-            :value="board.id"
-          >
-            {{ board.name }}
-          </option>
-        </select>
+        />
         <UButton
           type="submit"
           size="sm"

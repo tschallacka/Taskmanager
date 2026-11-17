@@ -50,13 +50,30 @@ const { refresh: refreshProjects } = useProjects()
 const pickedTeam = ref('')
 const teamForNew = computed(() => pickedTeam.value || teams.value[0]?.id || '')
 const startingTeamProject = ref(false)
-function pickTeam(event: Event) {
-  pickedTeam.value = (event.target as HTMLSelectElement).value
+function pickTeam(value: string | null | undefined) {
+  pickedTeam.value = value ?? ''
+}
+// The pickers hand over strings: the add form's person ('' means none yet) and role (only the two roles).
+const teamOptions = computed(() => teams.value.map(team => ({ label: team.name, value: team.id })))
+function setNewUser(value: string | null | undefined) {
+  newUserId.value = value ?? ''
+}
+function setNewRole(value: string | null | undefined) {
+  if (value === 'member' || value === 'manager') newRole.value = value
 }
 // Team members who are not on the project yet, in the order the server lists them.
 const candidates = computed(() => people.value.filter(person => person.role === null))
 
 const ROLE_LABELS: Record<VaultRole, string> = { manager: 'Manager', member: 'Member' }
+const roleOptions: { label: string, value: string }[] = [
+  { label: ROLE_LABELS.manager, value: 'manager' },
+  { label: ROLE_LABELS.member, value: 'member' }
+]
+const candidateOptions = computed(() => candidates.value.map(person => ({ label: person.name || person.email || '', value: person.id })))
+const addRoleOptions = [
+  { label: 'Member: sees the shared secrets', value: 'member' },
+  { label: 'Manager: sees and changes every secret', value: 'manager' }
+]
 
 // The badge says what a person may do; the line under the name says why.
 function badgeOf(person: ProjectPerson): { label: string, classes: string } {
@@ -147,9 +164,9 @@ async function add() {
   }
 }
 
-async function changeRole(person: ProjectPerson, event: Event) {
-  const select = event.target as HTMLSelectElement
-  const role = select.value as VaultRole
+async function changeRole(person: ProjectPerson, value: string | null | undefined) {
+  if (value !== 'manager' && value !== 'member') return
+  const role: VaultRole = value
   busyId.value = person.id
   error.value = ''
   notice.value = ''
@@ -161,8 +178,7 @@ async function changeRole(person: ProjectPerson, event: Event) {
     flashSaved()
   } catch (e) {
     error.value = messageOf(e, 'Could not change the role')
-    // Put the select back on what the server holds.
-    select.value = person.role ?? ''
+    // The picker shows the role the person has, so a reload puts it back on what the server holds.
     await load()
   } finally {
     busyId.value = ''
@@ -217,20 +233,13 @@ async function remove(person: ProjectPerson) {
           class="block text-sm"
         >
           <span class="text-muted">Team</span>
-          <select
-            :value="teamForNew"
-            class="mt-1 block rounded-lg border border-default bg-default px-3 py-2 text-sm text-default outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+          <AppSelect
+            :model-value="teamForNew"
+            :options="teamOptions"
+            class="mt-1"
             data-members-team-pick
-            @change="pickTeam"
-          >
-            <option
-              v-for="team in teams"
-              :key="team.id"
-              :value="team.id"
-            >
-              {{ team.name }}
-            </option>
-          </select>
+            @update:model-value="pickTeam"
+          />
         </label>
         <button
           type="button"
@@ -281,7 +290,7 @@ async function remove(person: ProjectPerson) {
             </div>
           </div>
 
-          <div class="ml-auto flex flex-wrap items-center gap-2">
+          <div class="ml-auto flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
             <span
               v-if="person.role !== null || person.isProjectOwner"
               class="shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-xs"
@@ -292,21 +301,16 @@ async function remove(person: ProjectPerson) {
             </span>
 
             <template v-if="canManage && person.explicit">
-              <select
-                :value="person.role ?? ''"
+              <AppSelect
+                :model-value="person.role ?? null"
+                :options="roleOptions"
+                size="sm"
                 :disabled="busyId === person.id || confirmingId === person.id"
-                class="rounded-lg border border-default bg-default px-2 py-1 text-xs text-default outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
+                class="w-32"
                 :aria-label="`Role of ${person.name || person.email}`"
                 data-member-role-change
-                @change="changeRole(person, $event)"
-              >
-                <option value="manager">
-                  {{ ROLE_LABELS.manager }}
-                </option>
-                <option value="member">
-                  {{ ROLE_LABELS.member }}
-                </option>
-              </select>
+                @update:model-value="(value) => changeRole(person, value)"
+              />
 
               <template v-if="confirmingId === person.id">
                 <button
@@ -357,39 +361,26 @@ async function remove(person: ProjectPerson) {
       >
         <label class="block text-sm">
           <span class="text-muted">Add a team member</span>
-          <select
-            v-model="newUserId"
+          <AppSelect
+            :model-value="newUserId || null"
+            :options="candidateOptions"
+            placeholder="Choose a person"
             :disabled="adding"
-            class="mt-1 w-full rounded-lg border border-default bg-default px-3 py-2 text-sm text-default outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+            class="mt-1"
             data-member-add-user
-          >
-            <option value="">
-              Choose a person
-            </option>
-            <option
-              v-for="person in candidates"
-              :key="person.id"
-              :value="person.id"
-            >
-              {{ person.name || person.email }}
-            </option>
-          </select>
+            @update:model-value="setNewUser"
+          />
         </label>
         <label class="block text-sm">
           <span class="text-muted">Role</span>
-          <select
-            v-model="newRole"
+          <AppSelect
+            :model-value="newRole"
+            :options="addRoleOptions"
             :disabled="adding"
-            class="mt-1 w-full rounded-lg border border-default bg-default px-3 py-2 text-sm text-default outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+            class="mt-1"
             data-member-add-role
-          >
-            <option value="member">
-              Member: sees the shared secrets
-            </option>
-            <option value="manager">
-              Manager: sees and changes every secret
-            </option>
-          </select>
+            @update:model-value="setNewRole"
+          />
         </label>
         <button
           type="submit"
