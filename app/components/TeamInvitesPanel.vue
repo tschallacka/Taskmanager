@@ -8,7 +8,7 @@ import { errorMessage, untypedFetch } from '~/utils/untypedFetch'
 const props = defineProps<{ teamId: string, isOwner: boolean }>()
 
 interface OpenInvitation { id: string, email: string, role: string, createdAt: number, expiresAt: number, canWithdraw: boolean }
-interface Issued { id: string, email: string, role: string, url: string, emailed: boolean }
+interface Issued { id: string, email: string, role: string, url: string, emailed: boolean, mailConfigured?: boolean }
 
 const toast = useToast()
 const email = ref('')
@@ -153,7 +153,7 @@ async function copy(text: string) {
       data-invite-issued
     >
       <p class="text-xs text-default">
-        {{ issued.emailed ? `Invitation mailed to ${issued.email}.` : `Send this link to ${issued.email}. This instance cannot send mail, or it failed.` }}
+        {{ issued.emailed ? `Invitation mailed to ${issued.email}.` : `Send this link to ${issued.email}. ${issued.mailConfigured === false ? 'This instance cannot send mail, so send this link yourself.' : 'Sending the mail failed. Send this link yourself.'}` }}
       </p>
       <div class="flex items-center gap-2">
         <code class="min-w-0 flex-1 truncate rounded bg-default px-2 py-1 text-xs">{{ issued.url }}</code>

@@ -108,6 +108,11 @@ function escapeHtml(text: string): string {
   return text.replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' })[ch]!)
 }
 
+/** Whether this instance is set up to send mail at all (a failed send is a different case, see mailInvitation). */
+export function mailIsConfigured(): boolean {
+  return mailEnabled
+}
+
 /**
  * Mails an invitation link. Best effort: without SMTP nothing is sent and the inviter copies the link
  * from the answer instead; a failure to send is logged. Says whether a mail was handed over.
