@@ -4,8 +4,9 @@ import type { Project } from '~/composables/useProjects'
 import type { PinnedBoard } from '~/composables/usePins'
 import { crewUpdatePrompt } from '~/utils/crewUpdatePrompt'
 import { taskCountLabel } from '#shared/utils/board'
-import { crewTreeRows } from '~/utils/crewTreeRows'
+import { crewChildLabel, crewTreeRows, rowGutter } from '~/utils/crewTreeRows'
 import { mayCreateProjects, panelListsProject } from '~/utils/sidebarAccess'
+import { teamToOpenFor } from '~/utils/teamEntry'
 import { countOpenTasks, healthTint, kindIcon, projectKind } from '~/utils/projectKind'
 
 const { ready, projects, allTasks, deleteProject, renameProject } = useProjects()
@@ -21,6 +22,10 @@ const { data: sharedData } = useFetch<{ groups: { projects: { id: string }[] }[]
 const sharedIds = computed(() => new Set((sharedData.value?.groups ?? []).flatMap(group => group.projects.map(project => project.id))))
 const listedProjects = computed(() => projects.value.filter(project => panelListsProject({ teamCount: teams.value.length, sharedIds: sharedIds.value, teamsPending: teamsPending.value }, project.id)))
 const mayCreate = computed(() => mayCreateProjects({ teamCount: teams.value.length, contact: sharedData.value?.contact ?? false, teamsPending: teamsPending.value }))
+// A person who signs in again in a new browser starts in the personal workspace; the projects page then opens their team (and reloads).
+// Until that happens the list is empty for them, so the empty line waits. asksNew is false here on purpose: the sidebar's own "new project"
+// link (?new=1) is not a reason to keep the team unopened, so only the projects page reads it.
+const openingTeam = computed(() => teamToOpenFor({ asksNew: false, hasProjects: projects.value.length > 0, activeTeamId: activeTeamId.value, teamIds: teams.value.map(team => team.id) }) !== null)
 const { switchWorkspace } = useWorkspace()
 const toast = useToast()
 
@@ -68,12 +73,9 @@ function toggleTree(id: string) {
 // The arrow and the nested rows come from the same computation (app/utils/crewTreeRows.ts).
 const treeRows = computed(() => crewTreeRows(listedProjects.value, openTrees.value))
 
-// A shadow board nested under its real board reads "Real board › crew: Crew name"; the crew's home board is named as is.
-function boardLabel(project: Project) {
-  if (project.role === 'shadow' && project.realBoard && project.crew) {
-    return `${project.realBoard.name} › crew: ${project.crew.name}`
-  }
-  return project.name
+// A shadow board reads "crew: Crew name" under its project and "Real board › crew: Crew name" on its own (see crewChildLabel).
+function boardLabel(project: Project, depth: 0 | 1 = 0) {
+  return crewChildLabel(project, depth)
 }
 
 // A real board a crew's member sees beside the crew's shadow is a label: it opens nothing and shows no tasks here.
@@ -93,12 +95,17 @@ async function openRow(project: Project) {
   openProject(project.id)
 }
 
-// The line under a board's name: the customer, the time, and the task count (the small words say whose board it is).
+// The line under a board's name, in two parts. `start` (the customer, the time) may truncate. `end` (the read-only
+// marker and the task count) never does: a cut-off count tells the reader nothing, so the long part gives way first.
 function rowNote(project: Project) {
   const customer = project.customerName ? `${project.customerName} · ` : ''
-  if (isLabelRow(project)) return `${customer}crew's real board · read-only`
-  const kind = project.role === 'crew_home' ? 'crew home · ' : project.readOnly ? 'read-only · ' : ''
-  return `${kind}${customer}${relativeTime(project.updatedAt)} · ${countLabel(project)} ${countsFor(project).total === 1 ? 'task' : 'tasks'}`
+  if (isLabelRow(project)) return { start: `${customer}crew's real board`, end: 'read-only' }
+  const kind = project.role === 'crew_home' ? 'crew home · ' : ''
+  const marker = project.readOnly ? 'read-only · ' : ''
+  return {
+    start: `${kind}${customer}${relativeTime(project.updatedAt)}`,
+    end: `${marker}${countLabel(project)} ${countsFor(project).total === 1 ? 'task' : 'tasks'}`
+  }
 }
 
 // Opening a shadow board from the URL, or from the board header's link, opens the tree it sits in. It runs again
@@ -396,7 +403,7 @@ function menuItems(project: Project) {
     </div>
 
     <p
-      v-if="ready && projects.length === 0 && mayCreate"
+      v-if="ready && projects.length === 0 && mayCreate && !teamsPending && !openingTeam"
       class="px-2 py-3 text-xs text-dimmed"
     >
       No projects yet.
@@ -427,15 +434,16 @@ function menuItems(project: Project) {
         :class="[
           isLabelRow(project) ? '' : 'cursor-pointer',
           activeId === project.id ? 'bg-elevated' : isLabelRow(project) ? '' : 'hover:bg-elevated/60',
-          depth ? 'ml-6 min-h-11 py-1' : ''
+          depth ? 'ml-6 min-h-11 border-l border-default py-1 pl-3' : ''
         ]"
         :data-board-row="project.role ?? 'board'"
         :data-depth="depth"
         :data-label-row="isLabelRow(project) ? '' : undefined"
         @click="openRow(project)"
       >
+        <!-- Every top-level row reserves the arrow's width, so the names line up whether or not the board has crews. -->
         <UButton
-          v-if="shadowCount"
+          v-if="rowGutter({ depth, shadowCount }) === 'toggle'"
           :icon="open ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
           size="sm"
           color="neutral"
@@ -446,22 +454,36 @@ function menuItems(project: Project) {
           data-tree-toggle
           @click.stop="toggleTree(project.id)"
         />
+        <span
+          v-else-if="rowGutter({ depth, shadowCount }) === 'spacer'"
+          class="-my-2 -ml-2 min-h-11 min-w-11 shrink-0"
+          aria-hidden="true"
+          data-tree-spacer
+        />
         <UIcon
           :name="kindIcon(project)"
-          class="mt-0.5 size-4 shrink-0"
-          :class="kindTint(project)"
+          class="mt-0.5 shrink-0"
+          :class="[depth ? 'size-3.5' : 'size-4', kindTint(project)]"
           :data-kind="projectKind(project)"
           :data-health="project.status ?? 'unset'"
         />
         <div class="min-w-0 flex-1">
-          <p class="truncate text-sm font-medium leading-snug text-default">
-            {{ boardLabel(project) }}
+          <!-- A nested crew reads as the child: a lighter weight and a muted colour, so the project above it is the main item. -->
+          <p
+            class="truncate leading-snug"
+            :class="depth ? 'text-xs font-normal text-muted' : 'text-sm font-medium text-default'"
+          >
+            {{ boardLabel(project, depth) }}
           </p>
           <p
-            class="truncate text-xs text-muted"
+            class="flex min-w-0 text-xs text-muted"
             :title="countTitle(project)"
           >
-            {{ rowNote(project) }}
+            <span class="min-w-0 truncate">{{ rowNote(project).start }}</span>
+            <span
+              v-if="rowNote(project).end"
+              class="shrink-0 whitespace-nowrap"
+            >&nbsp;· {{ rowNote(project).end }}</span>
           </p>
         </div>
         <!-- The open count, in the board's health tint: the design's number at the row's right edge. -->

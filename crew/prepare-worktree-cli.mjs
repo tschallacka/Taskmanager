@@ -6,6 +6,7 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { config as loaded } from './config.mjs'
 import { prepareWorktree, removePlan, reservationFailure, worktreeFolder } from './prepare-worktree.mjs'
 import { aliveProcess, planRelease, planReserve, portOf, pruned, readRegistry, registryFile, stopGroup, withLock, writeRegistry } from './port-registry.mjs'
 
@@ -24,7 +25,7 @@ if (!who || !taskId) fail('usage: crew <who> prepare worktree [--remove] <task-i
 const crewHome = process.env.CREW_HOME
 const config = crewHome && existsSync(join(crewHome, 'crew.json')) ? JSON.parse(readFileSync(join(crewHome, 'crew.json'), 'utf8')) : {}
 // The worktree folder comes from crew.json worktreeBase, which is required (no guessing from CREW_HOME).
-const folder = worktreeFolder({ config, who, taskId })
+const folder = worktreeFolder({ config: { worktreeBase: loaded.worktreeBase }, who, taskId })
 if (!folder.ok) fail(folder.message)
 const worktree = folder.path
 

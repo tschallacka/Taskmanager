@@ -2,6 +2,42 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.42.1 - 2026-11-17
+
+- **Crew kit: the worktree folder from crew.json is read, and the serve hint says "for example".** `init` no longer warns that a set worktreeBase is missing, and `crew <who> prepare worktree` takes the folder from the loaded config. The serve hint for a non-Nuxt product no longer reads as the required command. Files: `crew/config.mjs`, `crew/prepare-worktree-cli.mjs`, `crew/init.mjs`, `crew/worktree-base-config.test.mjs`.
+
+## 0.42.0 - 2026-11-17
+
+- **Invite by email, and a later sign-in shows what was invited.** A customer invitation can be tied to an email address: the form asks for it, the team's projects the person may see are ticked and filed under the customer, and a link made for an address shows as "Invited, not accepted yet". The address is prefilled and locked on the sign-in and sign-up forms. A customer link tied to an address is accepted by the account itself, and a person who signs in later with an invitation they never accepted sees it on /pending-invitations, with Accept invitation. Schema change: a new nullable `email` column on customer invitations (`customer_invitations.email`), to be applied by the owner. Files: app/components/CustomersModal.vue, app/pages/invite/[token].vue, app/pages/login.vue, app/pages/pending-invitations.vue, app/pages/projects/index.vue, app/utils/lockedEmail.ts, app/utils/pendingInvitationEntry.ts, shared/utils/inviteEmail.ts, server/api/pending-invitations.get.ts, server/api/pending-invitations.post.ts, server/api/customers/[id]/invitations.post.ts, server/api/customers/[id]/contacts.ts, server/api/invitations/[token]/index.get.ts, server/utils/customerInviteRules.ts, server/utils/pendingInvites.ts, server/db/schema.ts, docs/team/invite-a-contact.md, changelog.d/mwj64qza593kf3pdo5i-invite-by-email.md.
+
+## 0.41.1 - 2026-11-17
+
+- **Time: a time logged from a task row is dated on your own day.** A time logged from the list row carried no day, so the server dated it by UTC: a Sunday evening in New York landed on Monday, a week later. The row now sends your local day, as the timesheet and the timer already do. Files: `app/components/kanban/ListRowMeta.vue`, `tests/time-log-day.test.ts`, `tests/time-view-weeks.test.ts`.
+
+## 0.41.0 - 2026-11-17
+
+- **Crews on a new board: `POST /api/crews` with `newBoard`.** A crew call can make its board in the same request: `newBoard: { name }` with `teamId` (instead of `projectId`) makes a board in that team with the team's default columns, owned by the key's owner, and binds the crew to it as `projectId` does. The key's owner must be a member of the team, as the UI requires to make a board (403 otherwise); a management token gets 403. A refused crew leaves no board behind. `GET /api/crews/targets` lists the owner's teams as before, plus a team where the owner is only a member while it has no boards (`userboards: []`), with `canCreateBoard`. The audit row for a made board carries its id. Files: `server/api/crews/index.post.ts`, `server/utils/crewBoards.ts`, `server/utils/crewProvisioning.ts`, `tests/crew-newboard.test.ts`, `docs/admin/crews-on-your-instance.md`, `crew/README.md`.
+
+## 0.40.0 - 2026-11-16
+
+- **Delete my account: the rules for every column that holds a person's user id.** Each such column is decided in one rule table (delete, keep as "Deleted user", or clear), and a test fails when a new user column has no rule. The deletion itself removes a personal board with no other member, with its tasks and attachment files, keeps a team's work under "Deleted user", and clears the columns the person filled in. It refuses while the person owns a team (the teams are named), for the last instance admin, and for a crew account. Settings > Account has "Delete my account": it lists what happens, and deletes only after the person types their own address. Files: `server/api/account/delete.post.ts`, `server/utils/accountRules.ts`, `server/utils/accountDeletion.ts`, `app/components/DeleteAccountPanel.vue`, `app/pages/settings/index.vue`, `shared/utils/deleteAccountText.ts`, `tests/delete-account-ui.test.ts`, `tests/account-deletion-coverage.test.ts`, `tests/account-deletion.test.ts`, `tests/changelog-fragment-files.test.ts`.
+
+## 0.39.5 - 2026-11-16
+
+- **Sidebar: the task count and the read-only marker stay whole.** On a narrow sidebar the line under a project name was cut off, so "read-only" and the task count were lost. The customer and the time now give way first; the crew name still truncates first, and the count and the marker never truncate. Files: `app/components/ProjectsListPanel.vue`.
+
+- **Sidebar: the arrow keeps every project name in line, and a crew reads as the child of its project.** Every project row reserves the arrow's width, so a project with a crew is no longer indented. A crew under its project is indented with a left rule, a smaller muted name and the label "crew: <name>". Files: `app/components/ProjectsListPanel.vue`, `app/utils/crewTreeRows.ts`, `tests/sidebar-crew-label.test.ts`.
+
+## 0.39.4 - 2026-11-16
+
+- **The Customers popup's confirmation opens on top.** "Remove customer?" (and remove contact, revoke link) opened behind the Customers popup, so a customer could not be deleted. The confirmation now uses the app's modal layer like every other modal and is declared after the popup. Files: `app/components/CustomersModal.vue`, `tests/customers-confirm-layer.test.ts`.
+
+## 0.39.3 - 2026-11-16
+
+- **The first paint says what is loading.** Before the app's code has run, the browser shows a spinner with "Opening your projects…" (app/spa-loading-template.html), so a person who signs in and waits does not see a blank page.
+
+- **Projects load with a visible wait.** On /projects a line reads "Opening your projects…" while the list loads, a failed first load retries instead of showing "No projects yet", and the sidebar's "No projects yet" waits while a person's team is being opened (a person who signs in again in a new browser no longer sees an empty list flash). Files: app/pages/projects/index.vue, app/plugins/init-projects.client.ts, app/components/ProjectsListPanel.vue.
+
 ## 0.39.2 - 2026-11-16
 
 - **Invite follow-ups: System by default, and no "Personal Workspace" while the team loads.** A visitor with no stored choice gets System, not a fixed dark theme; a stored choice is kept. The workspace switcher shows "Loading workspace" while the active team loads, so a team member who lands in the team sees a label that agrees with the team's boards. The invitation page uses the theme colours, so a new visitor on a light system sees it light. Files: `nuxt.config.ts`, `app/components/TeamSwitcher.vue`, `app/utils/workspaceLabel.ts`, `app/pages/invite/[token].vue`, `tests/color-mode-default.test.ts`, `tests/team-switcher-label.test.ts`, `tests/invite-page-theme.test.ts`.

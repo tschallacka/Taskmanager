@@ -22,7 +22,7 @@ type InvitationPreview
 
 // Reading the invitation also sets the cookie that lets its recipient create an
 // account where sign-up is otherwise closed, so it has to happen in the browser.
-const { data: invitation, error: loadError, pending } = await useFetch<InvitationPreview>(
+const { data: invitation, error: loadError, pending } = useFetch<InvitationPreview>(
   () => `/api/invitations/${token.value}`,
   { server: false }
 )
@@ -116,14 +116,19 @@ async function accept() {
   }
 }
 
-// An account made through this link (signed up with the invited address, then back here) is a contact by itself, with
-// no second step. Once per visit; a failure leaves the Accept button for a retry.
+// An account made through this link (signed up with the invited address, then back here) is the invitee by itself, with
+// no second step: a customer link when the signed-in address is the invited one, a team or board link when the server
+// says it is for this account (forYou, the same rule as the accept route). Once per visit; a failure leaves the Accept
+// button for a retry.
 const autoAccepted = ref(false)
 watch([session, invitation], () => {
   const invite = invitation.value
   const mine = session.value?.user.email?.toLowerCase()
-  if (autoAccepted.value || !session.value || !invite || invite.kind !== 'customer' || !invite.email) return
-  if (mine !== invite.email.toLowerCase()) return
+  if (autoAccepted.value || !session.value || !invite) return
+  const isMine = invite.kind === 'customer'
+    ? !!invite.email && mine === invite.email.toLowerCase()
+    : invite.forYou === true
+  if (!isMine) return
   autoAccepted.value = true
   accept()
 }, { immediate: true })
