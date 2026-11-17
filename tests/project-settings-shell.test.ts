@@ -11,15 +11,15 @@ const shell = readFileSync(new URL('../app/components/settings/ProjectShell.vue'
 const view = readFileSync(new URL('../app/components/kanban/ProjectSettingsView.vue', import.meta.url), 'utf8')
 const account = readFileSync(new URL('../app/components/settings/Shell.vue', import.meta.url), 'utf8')
 
-test('the built sections are the six the view can draw, in the card order, each on its own address', () => {
+test('the built sections are the ten the card lists, in the card order, each on its own address', () => {
   const built = builtProjectSections()
-  assert.deepEqual(built.map(s => s.key), ['general', 'members', 'github', 'rules', 'secrets', 'fields'])
+  assert.deepEqual(built.map(s => s.key), ['general', 'members', 'customers', 'github', 'rules', 'secrets', 'fields', 'import', 'trash', 'archive'])
   assert.equal(built.find(s => s.key === 'github')?.path('42'), '/projects/42/settings/github')
 })
 
-test('the sections with no panel yet are not listed', () => {
+test('every section is listed, Customer access, Import, Trash and Archive included', () => {
   const keys = builtProjectSections().map(s => s.key)
-  for (const key of ['customers', 'import', 'trash', 'archive']) assert.equal(keys.includes(key as never), false, key)
+  for (const key of ['customers', 'import', 'trash', 'archive']) assert.equal(keys.includes(key as never), true, key)
 })
 
 test('the shell draws the list from the table, and every item links to its address', () => {

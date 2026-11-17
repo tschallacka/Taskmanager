@@ -33,10 +33,8 @@ test('each panel lives under project-settings/, and its old kanban file is gone'
   }
 })
 
-test('the sections with no panel in this step are not in the component map', () => {
-  for (const key of ['customers', 'fields', 'import', 'trash', 'archive']) {
-    assert.equal(PROJECT_PANEL_COMPONENTS[key as keyof typeof PROJECT_PANEL_COMPONENTS], undefined, `${key} has no component yet`)
-  }
+test('Custom fields is the only section with no panel component (its block stays in the view)', () => {
+  assert.equal(PROJECT_PANEL_COMPONENTS.fields, undefined)
 })
 
 test('the view renders each panel from its component, not from the kanban folder', () => {
