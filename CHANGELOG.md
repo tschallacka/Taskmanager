@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## Unreleased
+
+- **Each account settings section has its own address.** Your stats, Account, Appearance, API keys and MCP, and AI open at `/settings`, `/settings/account`, `/settings/appearance`, `/settings/api-keys` and `/settings/ai`, and the left list links to them. An old link to a section on the settings page (`/settings#account` and the others) goes to that section's address. The extra email addresses link from a confirmation mail goes to Account. Nothing is removed or moved in the data.
+
 ## 0.31.0 - 2026-11-14
 
 - Crew: the stale dev-copy report now checks each live copy's own card, not one page of the Done column, so a copy of a finished card is no longer missed.

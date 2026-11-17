@@ -15,7 +15,7 @@ test('the notice says plainly that this instance cannot send mail', () => {
   assert.match(NO_MAIL_NOTICE, /cannot send mail/)
 })
 
-test('the confirm page link lands on the panel on Settings', () => {
-  assert.equal(EXTRA_EMAILS_LINK, `/settings#${EXTRA_EMAILS_ANCHOR}`)
-  assert.equal(EXTRA_EMAILS_LINK, '/settings#extra-emails', 'the panel root carries this id')
+test('the confirm page link lands on the panel in the Account section', () => {
+  assert.equal(EXTRA_EMAILS_LINK, `/settings/account#${EXTRA_EMAILS_ANCHOR}`)
+  assert.equal(EXTRA_EMAILS_LINK, '/settings/account#extra-emails', 'the panel root carries this id')
 })

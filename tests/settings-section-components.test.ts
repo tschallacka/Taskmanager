@@ -27,7 +27,8 @@ test('the page no longer holds the moved sections inline', () => {
   assert.equal(page.includes('AI (OpenRouter)'), false)
 })
 
-test('the page keeps the section list and the shell', () => {
-  assert.ok(page.includes('aria-label="Settings sections"'))
-  assert.ok(page.includes('v-for="s in sections"'))
+test('the shell keeps the section list (step C moved the list and the shell into Shell.vue)', () => {
+  const shell = readFileSync(new URL('../app/components/settings/Shell.vue', import.meta.url), 'utf8')
+  assert.ok(shell.includes('aria-label="Settings sections"'))
+  assert.ok(shell.includes('v-for="s in sections"'))
 })
