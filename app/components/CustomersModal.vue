@@ -92,8 +92,9 @@ const tickedProjectIds = ref<string[]>([])
 const inviting = ref(false)
 
 const teamProjects = computed(() => projects.value.filter(project => project.teamId === (activeTeam.value?.id ?? null)))
+// The server's count: a project shared through the join table counts for every customer it is shared with.
 function customerProjectCount(customerId: string) {
-  return projects.value.filter(project => project.customerId === customerId).length
+  return customers.value.find(customer => customer.id === customerId)?.projectCount ?? 0
 }
 function toggleProject(id: string) {
   tickedProjectIds.value = tickedProjectIds.value.includes(id)
@@ -142,7 +143,8 @@ async function handleInvite(customerId: string) {
     tickedProjectIds.value = []
     copied.value = false
     invitations.value = [res, ...invitations.value]
-    await refreshProjects()
+    // The counts (projects, contacts) and the customer's contacts reload, so the popup shows the change without a reload.
+    await Promise.all([refreshProjects(), refresh(), loadDetail(customerId)])
   } catch (e) {
     fail(e, 'Could not create an invitation link')
   } finally {
