@@ -241,7 +241,11 @@ function removeGuest(guest: Guest) {
 }
 
 function withdraw(invitation: Invitation) {
-  return act(`i:${invitation.id}`, () => untypedFetch(`${base.value}/guests/invitations/${invitation.id}`, { method: 'DELETE', headers: realtimeHeaders() }), 'Could not withdraw that')
+  return act(`i:${invitation.id}`, async () => {
+    await untypedFetch(`${base.value}/guests/invitations/${invitation.id}`, { method: 'DELETE', headers: realtimeHeaders() })
+    // The link box shows the link of the invitation just made: once that invitation is withdrawn, the box goes too.
+    if (lastInvite.value?.id === invitation.id) lastInvite.value = null
+  }, 'Could not withdraw that')
 }
 
 const approvedLink = ref<{ email: string, url: string, emailed: boolean } | null>(null)
