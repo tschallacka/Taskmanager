@@ -63,6 +63,7 @@ owner-file.mjs
 package.json
 people.mjs
 pia-listener-hook.sh
+pia-modal-check.mjs
 pia-session.mjs
 pia-session.settings.json
 pidfile.mjs
