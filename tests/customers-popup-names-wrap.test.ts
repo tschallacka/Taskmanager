@@ -6,7 +6,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 const source = readFileSync(new URL('../app/components/CustomersModal.vue', import.meta.url), 'utf8')
-const start = source.indexOf('<span class="truncate font-medium text-default">{{ c.name }}</span>')
+const start = source.indexOf('{{ c.name }}')
 const row = source.slice(source.lastIndexOf('<button', start), source.indexOf('</button>', start) + 9)
 const nameTag = row.slice(row.lastIndexOf('<span', row.indexOf('{{ c.name }}')), row.indexOf('{{ c.name }}'))
 const countsTag = row.slice(row.lastIndexOf('<span', row.indexOf('projectCount')), row.indexOf('projectCount'))

@@ -315,15 +315,15 @@ function confirmRevoke(customerId: string, invitation: CustomerInvitation) {
                 <template v-else>
                   <button
                     type="button"
-                    class="flex min-w-0 flex-1 items-center gap-2 text-left"
+                    class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5 text-left"
                     @click="toggle(c.id)"
                   >
                     <UIcon
                       :name="expandedId === c.id ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
                       class="size-4 shrink-0 text-muted"
                     />
-                    <span class="truncate font-medium text-default">{{ c.name }}</span>
-                    <span class="shrink-0 text-xs text-muted">
+                    <span class="min-w-0 break-words font-medium text-default">{{ c.name }}</span>
+                    <span class="text-xs text-muted">
                       {{ c.projectCount }} {{ c.projectCount === 1 ? 'project' : 'projects' }} ·
                       {{ c.contactCount }} {{ c.contactCount === 1 ? 'contact' : 'contacts' }}
                     </span>
