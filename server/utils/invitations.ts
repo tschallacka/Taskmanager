@@ -11,7 +11,8 @@ export type InvitationLookup
   = | { kind: 'team', id: string, email: string, role: string, organizationId: string, organizationName: string, inviterName: string | null }
     | { kind: 'board', id: string, email: string, role: 'editor' | 'manager', projectId: string, projectName: string, organizationName: string | null, inviterName: string | null }
 
-export type InvitationProblem = 'missing' | 'used' | 'expired'
+// 'revoked': the owner withdrew the link (a team invitation); 'missing' also covers a withdrawn board guest link, whose row is gone.
+export type InvitationProblem = 'missing' | 'used' | 'expired' | 'revoked'
 
 /** What a team or board invitation link is for, or why it is not usable. Customer links are read elsewhere. */
 export async function lookupAddressedInvitation(token: string): Promise<InvitationLookup | InvitationProblem> {
@@ -35,7 +36,8 @@ export async function lookupAddressedInvitation(token: string): Promise<Invitati
     .leftJoin(user, eq(user.id, teamInvitations.invitedBy))
     .where(eq(teamInvitations.tokenHash, tokenHash))
   if (team) {
-    if (team.acceptedAt || team.revokedAt) return 'used'
+    if (team.acceptedAt) return 'used'
+    if (team.revokedAt) return 'revoked'
     if (team.expiresAt <= now) return 'expired'
     return { kind: 'team', id: team.id, email: team.email, role: team.role, organizationId: team.organizationId, organizationName: team.organizationName, inviterName: team.inviterName }
   }

@@ -31,6 +31,7 @@ export default defineEventHandler(async (event) => {
   if (addressed !== 'missing') {
     if (addressed === 'used') throw createError({ statusCode: 410, message: 'This invitation has already been used' })
     if (addressed === 'expired') throw createError({ statusCode: 410, message: 'This invitation has expired' })
+    if (addressed === 'revoked') throw createError({ statusCode: 410, message: 'This invitation was withdrawn or revoked.' })
     rememberToken()
     // The address stays out of the answer: whoever holds the link has to know it, not read it here.
     // `forYou` only says whether the account signed in right now (if any) is the one invited.
@@ -72,7 +73,7 @@ export default defineEventHandler(async (event) => {
     const acceptedByYou = usedBy !== null && usedBy.user.id === row.acceptedBy
     throw createError({ statusCode: 410, message: 'This invitation has already been used', data: { acceptedByYou } })
   }
-  if (row.revokedAt) throw createError({ statusCode: 410, message: 'This invitation has been revoked' })
+  if (row.revokedAt) throw createError({ statusCode: 410, message: 'This invitation was withdrawn or revoked.' })
   if (row.expiresAt <= Date.now()) throw createError({ statusCode: 410, message: 'This invitation has expired' })
 
   // How many projects are shared with this person as a customer contact: the customer's projects, and the boards

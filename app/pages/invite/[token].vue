@@ -70,9 +70,11 @@ watch([usedPlan, sessionPending], () => {
 
 const loadMessage = computed(() => {
   const status = loadError.value?.statusCode
-  if (status === 410 && usedBody.value?.message === 'This invitation has been revoked') return 'This invitation was revoked. Ask for a new link.'
+  // A withdrawn link (the owner took it back: the row is gone, 404; or revoked, 410) gets one sentence, whatever the kind.
+  if (status === 404 || (status === 410 && usedBody.value?.message === 'This invitation was withdrawn or revoked.')) {
+    return 'This invitation was withdrawn or revoked. Ask for a new link.'
+  }
   if (status === 410) return 'This invitation has already been used or has expired.'
-  if (status === 404) return 'This invitation link is not valid.'
   return loadError.value ? 'This invitation could not be loaded.' : ''
 })
 
