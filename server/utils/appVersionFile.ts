@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 
 // The version the running server reports (card mwkf0nartlrd5n8lz2o). It is read at run time, so a build copied from the cache (a
 // skipped build) still reports the version of its own release. In order: the VERSION file the build wrapper writes into .output, the
@@ -22,9 +22,28 @@ function fromPackageJson(file: string): string | null {
   }
 }
 
-/** The version for the release that `cwd` is, with `bundled` as the last resort. */
-export function readAppVersion({ cwd, bundled }: { cwd: string, bundled: string }): string {
-  return fromVersionFile(join(cwd, '.output', 'VERSION'))
+// The VERSION file of the release the running code is in: the first `.output` folder above `moduleDir` that has one. A
+// supervisor may start the server from another folder, so the working folder is only the second choice.
+function fromOwnRelease(moduleDir: string): string | null {
+  let dir = moduleDir
+  for (;;) {
+    if (basename(dir) === '.output') {
+      const version = fromVersionFile(join(dir, 'VERSION'))
+      if (version !== null) return version
+    }
+    const up = dirname(dir)
+    if (up === dir) return null
+    dir = up
+  }
+}
+
+/**
+ * The version for the release the server runs from: its own release (`moduleDir`, the folder of the running code), then the
+ * working folder `cwd`, with `bundled` as the last resort.
+ */
+export function readAppVersion({ cwd, bundled, moduleDir }: { cwd: string, bundled: string, moduleDir?: string }): string {
+  return (moduleDir ? fromOwnRelease(moduleDir) : null)
+    ?? fromVersionFile(join(cwd, '.output', 'VERSION'))
     ?? fromPackageJson(join(cwd, 'package.json'))
     ?? bundled
 }
