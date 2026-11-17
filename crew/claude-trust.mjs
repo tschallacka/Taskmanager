@@ -5,7 +5,6 @@
 // is the same as it was when we read it; otherwise it is re-read and the change redone, up to three tries. Nothing is written when
 // the file is not valid JSON, or when it keeps changing.
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
-// (readFileSync and existsSync are used by readWorktreeBase too.)
 import { homedir } from 'node:os'
 import { basename, dirname, isAbsolute, join } from 'node:path'
 

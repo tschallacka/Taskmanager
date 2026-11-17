@@ -88,7 +88,7 @@ test('a relative path is refused, and nothing is written', () => {
   const res = ensureTrusted(['relative/path'], { file })
   assert.equal(res.ok, false)
   assert.match(res.reason, /absolute path/)
-  assert.equal(JSON.parse(readFileSync(file, 'utf8')).projects[ 'relative/path'], undefined)
+  assert.equal(JSON.parse(readFileSync(file, 'utf8')).projects['relative/path'], undefined)
 })
 
 test('a file that changes between the read and the write is re-read and the change redone; after three changes nothing is written', () => {
@@ -139,7 +139,9 @@ test('a write that cannot be done is a sentence, not an exception, and nothing i
   writeFileSync(blocker, 'x')
   const file = join(blocker, '.claude.json')
   let res
-  assert.doesNotThrow(() => { res = ensureTrusted([CREW], { file }) })
+  assert.doesNotThrow(() => {
+    res = ensureTrusted([CREW], { file })
+  })
   assert.equal(res.ok, false)
   assert.match(res.reason, /could not be written/)
 })
@@ -153,7 +155,9 @@ test('a backup that cannot be copied is a sentence, not an exception, and the fi
   chmodSync(dir, 0o500)
   try {
     let res
-    assert.doesNotThrow(() => { res = ensureTrusted([CREW], { file }) })
+    assert.doesNotThrow(() => {
+      res = ensureTrusted([CREW], { file })
+    })
     assert.equal(res.ok, false)
     assert.match(res.reason, /could not be written/)
     assert.equal(readFileSync(file, 'utf8'), original)

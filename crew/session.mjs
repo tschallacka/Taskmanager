@@ -135,7 +135,6 @@ export function listAgents(opts = {}) {
   return run.ok ? parseAgents(run.stdout) : null
 }
 
-
 /**
  * Starts the person's session, unless the recorded one is live. Records the id of the new session. Before the start, the crew's
  * own folders are trusted in Claude Code's config (`trust`, claude-trust.mjs); a folder the crew did not make is refused with a
