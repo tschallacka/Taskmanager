@@ -24,10 +24,13 @@ test('Import has its own section on the tab', () => {
 
 test('a key that is not a section lands on the tab’s General', () => {
   assert.equal(settingsTargetFor('p1', 'nope'), '/projects/p1?view=settings')
-  // Customer access, Trash and Archive still land on General until their own steps below give them a section.
+  // Customer access and Archive still land on General until their own steps below give them a section.
   assert.equal(settingsTargetFor('p1', 'customers'), '/projects/p1?view=settings')
-  assert.equal(settingsTargetFor('p1', 'trash'), '/projects/p1?view=settings')
   assert.equal(settingsTargetFor('p1', 'archive'), '/projects/p1?view=settings')
+})
+
+test('Trash has its own section on the tab', () => {
+  assert.equal(settingsTargetFor('p1', 'trash'), '/projects/p1?view=settings&section=trash')
 })
 
 test('the route is registered as a sibling of the board page, with a redirect component', () => {
