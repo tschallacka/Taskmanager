@@ -8,7 +8,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { UNASSIGNED, isBoardFiltering, matchesBoardFilter, type BoardFilter } from '../app/utils/boardFilter'
+import { UNASSIGNED, isBoardFiltering, matchesBoardFilter, personLabel, type BoardFilter } from '../app/utils/boardFilter'
 
 const ROOT = process.cwd()
 const read = (...parts: string[]) => readFileSync(join(ROOT, ...parts), 'utf8')
@@ -89,9 +89,22 @@ test('the board filters with the shared rule and passes Compact cards to every c
   assert.match(board, /:compact="compactCards"/)
 })
 
-test('a compact card shows no snippet and no cover, and keeps the title and the labels', () => {
+test('a compact card drops the snippet and the cover, and keeps the title and the label chips', () => {
   assert.match(card, /compact\?: boolean/)
   assert.match(card, /v-if="cover && !trashed && !compact"/)
   assert.match(card, /v-if="snippet && !completed && !compact"/)
   assert.match(card, /\{\{ task\.title \}\}/)
+  // The label chip row is not gated on compact: its v-if names the chips and not the switch.
+  const chipRowIf = 'v-if="!completed && (labelChips.shown.length || fieldChips.length || stateChips.length)"'
+  assert.equal(card.split(chipRowIf).length - 1, 1, 'one chip row, gated on the chips only')
+  assert.match(card, /<KanbanLabelChip|labelChips\.shown/)
+})
+
+test('the Filter names an assignee the same way in the button and in the rows, with the same fallback', () => {
+  assert.equal(personLabel({ name: 'Ana', email: 'ana@example.test' }), 'Ana')
+  assert.equal(personLabel({ name: '', email: 'ana@example.test' }), 'ana@example.test')
+  assert.equal(personLabel({ name: null, email: null }), 'Someone')
+  assert.match(page, /return person \? personLabel\(person\) : 'Assignee'/)
+  assert.match(page, /\{\{ personLabel\(person\) \}\}/)
+  assert.doesNotMatch(page, /person\.name \|\| person\.email \|\| 'Someone'/)
 })

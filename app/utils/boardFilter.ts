@@ -20,6 +20,11 @@ export interface FilterableTask {
   assigneeId?: string | null
 }
 
+/** The name a person shows as in the Filter: the name, else the email, else "Someone". Used by the rows and the button alike. */
+export function personLabel(person: { name?: string | null, email?: string | null }): string {
+  return person.name || person.email || 'Someone'
+}
+
 /** True when any part of the Filter is on: the labels, the assignee or a search. */
 export function isBoardFiltering(filter: BoardFilter): boolean {
   return filter.labels.length > 0 || filter.assigneeId !== null || filter.search.trim() !== ''

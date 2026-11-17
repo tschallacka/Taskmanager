@@ -6,7 +6,7 @@ import { queryForView } from '~/utils/projectViewQuery'
 import { initialsOf } from '~/utils/avatarInitials'
 import { tagChipAttrs } from '~/utils/tagColors'
 import { boardLabelColor, boardPeople as projectPeople } from '~/composables/useProjects'
-import { UNASSIGNED } from '~/utils/boardFilter'
+import { UNASSIGNED, personLabel } from '~/utils/boardFilter'
 import { queryWithoutTask, taskPanelPath, taskQueryAsPanelAddress } from '~/utils/taskPanelUrl'
 
 // One page for the board and for its task panel addresses: the same key keeps the board mounted while the panel opens.
@@ -155,7 +155,8 @@ const assignablePeople = computed(() => projectPeople())
 const assigneeFilterLabel = computed(() => {
   if (assigneeFilter.value === null) return ''
   if (assigneeFilter.value === UNASSIGNED) return 'Unassigned'
-  return assignablePeople.value.find(person => person.id === assigneeFilter.value)?.name || 'Assignee'
+  const person = assignablePeople.value.find(p => p.id === assigneeFilter.value)
+  return person ? personLabel(person) : 'Assignee'
 })
 onMounted(() => {
   restoreCompactCards()
@@ -872,7 +873,7 @@ useSeoMeta({
                     class="size-3.5 shrink-0"
                     :class="assigneeFilter === person.id ? 'text-primary' : 'text-dimmed'"
                   />
-                  <span class="min-w-0 flex-1 truncate">{{ person.name || person.email || 'Someone' }}</span>
+                  <span class="min-w-0 flex-1 truncate">{{ personLabel(person) }}</span>
                 </button>
                 <button
                   class="flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left text-xs transition-colors hover:bg-elevated"
