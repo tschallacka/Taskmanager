@@ -44,3 +44,19 @@ export function sectionKeyForQuery(value: unknown): ProjectSettingsKey | undefin
   if (typeof value !== 'string') return undefined
   return OLD_QUERY[value]
 }
+
+// The section keys the settings view has today, by the key it reads from ?section= (the view is in the board page).
+const VIEW_SECTION: Partial<Record<ProjectSettingsKey, string>> = {
+  general: 'general',
+  members: 'members',
+  rules: 'rules',
+  secrets: 'secrets',
+  fields: 'fields',
+  github: 'repositories'
+}
+
+/** Where a section's address goes: the board page's settings tab, on that section. Sections the view lacks land on General. */
+export function settingsTargetFor(projectId: string, key: string): string {
+  const legacy = VIEW_SECTION[key as ProjectSettingsKey]
+  return legacy ? `/projects/${projectId}?view=settings&section=${legacy}` : `/projects/${projectId}?view=settings`
+}

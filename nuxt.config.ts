@@ -96,6 +96,17 @@ export default defineNuxtConfig({
       ]
     }
   },
+  hooks: {
+    // The per-section address of a project's settings (/projects/<id>/settings/<key>) is a sibling of the board page: it
+    // only redirects to the board page's settings tab (settingsTargetFor). The board page itself is not changed.
+    'pages:extend': (pages) => {
+      pages.push({
+        name: 'project-settings-section',
+        path: '/projects/:id/settings/:section',
+        file: fileURLToPath(new URL('./app/components/settings/ProjectSettingsRedirect.vue', import.meta.url))
+      })
+    }
+  },
 
   eslint: {
     config: {
