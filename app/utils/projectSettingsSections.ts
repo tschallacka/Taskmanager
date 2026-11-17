@@ -27,7 +27,7 @@ export const PROJECT_SECTIONS: ProjectSettingsSection[] = [
 
 /**
  * The component that renders each section's panel, by the name Nuxt gives it under app/components/project-settings/.
- * Custom fields has no panel: its block stays in the view. Customer access, Trash and Archive get theirs in later steps.
+ * Custom fields has no panel: its block stays in the view. Every other section has its panel.
  */
 export const PROJECT_PANEL_COMPONENTS: Partial<Record<ProjectSettingsKey, string>> = {
   general: 'ProjectSettingsProjectGeneralSettings',
@@ -46,8 +46,8 @@ export function projectSettingsPath(projectId: string, key: ProjectSettingsKey):
   return `/projects/${projectId}/settings/${key}`
 }
 
-// The sections the settings view can draw today. Customer access, Import, Trash and Archive are listed once they have
-// a panel (later steps), so the left list never offers a section with nothing behind it.
+// The sections the left list shows: each one has a panel in the settings view, so the list never offers a section with
+// nothing behind it.
 const BUILT_KEYS: ProjectSettingsKey[] = ['general', 'members', 'customers', 'github', 'rules', 'secrets', 'fields', 'import', 'trash', 'archive']
 
 /** The sections the left list shows, in the card's order. Each one's path(projectId) is its address. */
