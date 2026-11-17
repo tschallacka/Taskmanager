@@ -77,7 +77,7 @@ async function loadListing() {
   }
 }
 
-// ─── Invite as a customer contact ──────────────────────────
+// ─── Invite by email (a customer contact) ──────────────────
 // The project is filed under a customer and an email invitation is made in one step (see
 // server/api/projects/[id]/customer-invite.post.ts). The input rule is tested in tests/project-customer-invite.test.ts.
 const { customers, refresh: refreshCustomers } = useCustomers()
@@ -384,7 +384,7 @@ watch(open, (isOpen) => {
             data-share-customer
           >
             <h3 class="text-sm font-semibold text-default">
-              Invite as a customer contact
+              Invite by email
             </h3>
             <p class="text-xs text-muted">
               The project is filed under the customer, and the invitation is tied to the email. Nothing is sent: copy the link.
