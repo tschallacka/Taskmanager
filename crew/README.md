@@ -324,6 +324,8 @@ accounts, after which their definitions and the file are yours to delete.
 
 ## Claude Code limits
 
+Trust of folders: Claude Code asks, per folder, whether to trust it before a session starts in it. The kit manages that for the crew's own folders only: the crew home, the kit folder, and each worker's folder (a worktree the crew made). `crew update` and `crew session start` mark them trusted in Claude Code's config, and `crew doctor` lists each path and whether it is trusted. Nobody is asked to accept a prompt for them. A folder you point a session at (a repository, anything else) is not trusted by the kit: trust it in Claude Code yourself.
+
 Long crew work (a full suite, a typecheck, waiting for a board event) runs into Claude Code's default limits. The
 kit raises them for the crew's sessions only, with a profile that is passed to one session at a time.
 

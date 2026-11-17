@@ -116,6 +116,8 @@ Columns: Backlog, To do, In progress, **Verify PM**, **Verify UX**, **Verify CQ*
 
 ## Pitfalls seen
 
+- Trust of folders: the kit manages Claude Code's trust for the crew's own folders (the crew home, the kit folder, each worker folder the crew made). `crew update` and `crew session start` set it, and `crew doctor` lists each path. Nobody is asked to accept a prompt for them. A folder you point a session at is not trusted by the kit; trust it in Claude Code yourself.
+
 - The dev server hot-reloads whenever anyone saves, and answers 503 for seconds; a blank page is
   not a bug until it repeats a minute later.
 - A fresh worker's first `listen.mjs` run reads the whole channel history, and an old "standing

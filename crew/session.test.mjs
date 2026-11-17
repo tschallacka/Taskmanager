@@ -12,6 +12,20 @@ import {
 } from './session.mjs'
 import { settingsPath } from './session-settings.mjs'
 
+// These tests cover the start itself. The trust check before a start has its own tests (claude-trust-session.test.mjs), so here
+// the folder is trusted by a stub: the real config file is never touched.
+const NO_TRUST = () => ({ ok: true })
+
+// A crew folder for the CLI tests: under a temp base that the home's crew.json names, with a temp Claude config. The CLI start trusts
+// that folder there, and nothing real is written.
+function crewCli(home) {
+  const base = mkdtempSync(join(tmpdir(), 'session-cli-base-'))
+  const folder = join(base, 'taskmanager-test-x')
+  mkdirSync(folder)
+  writeFileSync(join(home, 'crew.json'), `${JSON.stringify({ worktreeBase: base })}\n`)
+  return { folder, env: { CLAUDE_CONFIG_DIR: mkdtempSync(join(tmpdir(), 'session-cli-cfg-')) } }
+}
+
 test('a session starts with strict mcp config, and that config holds only the crew taskmanager entry', () => {
   const home = mkdtempSync(join(tmpdir(), 'session-mcp-'))
   const { args } = startArgs({ key: 'wren', folder: '/tmp', home, kit: '/kit', role: 'r' })
@@ -37,7 +51,7 @@ test('the worktree rule is the last line of the role the session gets, and the r
 test('a start writes the session mcp config file before it runs claude', () => {
   const fake = fakeClaude()
   const home = mkdtempSync(join(tmpdir(), 'session-home-'))
-  const out = startSession({ home, kit: HERE, key: 'wren', folder: '/tmp', role: 'r', bin: fake.bin })
+  const out = startSession({ home, kit: HERE, key: 'wren', folder: '/tmp', role: 'r', bin: fake.bin, trust: NO_TRUST })
   assert.equal(out.ok, true)
   assert.ok(existsSync(mcpConfigPath(home, 'wren')))
   const cfg = JSON.parse(readFileSync(mcpConfigPath(home, 'wren'), 'utf8'))
@@ -132,7 +146,7 @@ test('start records the new session id, and a second start while it is live does
   const fake = fakeClaude()
   const home = mkdtempSync(join(tmpdir(), 'session-home-'))
   const kit = HERE
-  const first = startSession({ home, kit, key: 'wren', folder: '/tmp', role: 'role text', bin: fake.bin })
+  const first = startSession({ home, kit, key: 'wren', folder: '/tmp', role: 'role text', bin: fake.bin, trust: NO_TRUST })
   assert.equal(first.ok, true)
   assert.equal(first.started, true)
   assert.equal(readRecord(home, 'wren').id, first.id)
@@ -141,7 +155,7 @@ test('start records the new session id, and a second start while it is live does
   const file = JSON.parse(readFileSync(settingsPath(home, 'wren'), 'utf8'))
   assert.equal(file.remoteControlAtStartup, false, 'remote control is off in the file the start passes')
 
-  const second = startSession({ home, kit, key: 'wren', folder: '/tmp', role: 'role text', bin: fake.bin })
+  const second = startSession({ home, kit, key: 'wren', folder: '/tmp', role: 'role text', bin: fake.bin, trust: NO_TRUST })
   assert.equal(second.started, false)
   assert.equal(second.note, 'already running')
   assert.equal(calls(fake).filter(args => args.includes('--bg')).length, 1, 'no second session was started')
@@ -150,7 +164,7 @@ test('start records the new session id, and a second start while it is live does
 test('status and list read the recorded id, and report a session that was stopped as not live', () => {
   const fake = fakeClaude()
   const home = mkdtempSync(join(tmpdir(), 'session-home-'))
-  const started = startSession({ home, kit: HERE, key: 'wick', folder: '/tmp', role: 'r', bin: fake.bin })
+  const started = startSession({ home, kit: HERE, key: 'wick', folder: '/tmp', role: 'r', bin: fake.bin, trust: NO_TRUST })
   assert.equal(sessionStatus({ home, key: 'wick', bin: fake.bin }).live, true)
   assert.equal(sessionStatus({ home, key: 'wren', bin: fake.bin }).recorded, false)
   assert.equal(sessionList({ home, bin: fake.bin }).length, 1)
@@ -169,7 +183,7 @@ test('a start that claude refuses is reported with its reason, and nothing is re
   const broken = join(fake.dir, 'broken')
   writeFileSync(broken, '#!/bin/sh\necho refused >&2\nexit 3\n')
   chmodSync(broken, 0o755)
-  const out = startSession({ home, kit: HERE, key: 'wynn', folder: '/tmp', role: 'r', bin: broken })
+  const out = startSession({ home, kit: HERE, key: 'wynn', folder: '/tmp', role: 'r', bin: broken, trust: NO_TRUST })
   assert.equal(out.ok, false)
   assert.match(out.reason, /refused/)
   assert.equal(readRecord(home, 'wynn'), null)
@@ -184,7 +198,8 @@ test('crew session start reads the role file of the key when CREW_ROLE_FILE is n
   writeFileSync(join(home, 'sessions', 'nina.role.md'), 'NINA CLI ROLE MARKER\n')
   const env = { ...process.env, CREW_HOME: home, CREW_CLAUDE_BIN: fake.bin }
   delete env.CREW_ROLE_FILE
-  const run = spawnSync(process.execPath, [join(HERE, 'session.mjs'), 'start', 'nina', '/tmp'], { encoding: 'utf8', env })
+  const crew = crewCli(home)
+  const run = spawnSync(process.execPath, [join(HERE, 'session.mjs'), 'start', 'nina', crew.folder], { encoding: 'utf8', env: { ...env, ...crew.env } })
   assert.equal(run.status, 0, run.stderr || run.stdout)
   const start = calls(fake).find(args => args.includes('--bg'))
   assert.ok(start, 'claude --bg was run')
@@ -200,7 +215,8 @@ test('crew session start rebuilds a worker role from PROMPTS.md over a stale rol
   writeFileSync(join(home, 'sessions', 'wynn.role.md'), 'STALE ROLE MARKER\n')
   const env = { ...process.env, CREW_HOME: home, CREW_CLAUDE_BIN: fake.bin }
   delete env.CREW_ROLE_FILE
-  const run = spawnSync(process.execPath, [join(HERE, 'session.mjs'), 'start', 'wynn', '/tmp'], { encoding: 'utf8', env })
+  const crew = crewCli(home)
+  const run = spawnSync(process.execPath, [join(HERE, 'session.mjs'), 'start', 'wynn', crew.folder], { encoding: 'utf8', env: { ...env, ...crew.env } })
   assert.equal(run.status, 0, run.stderr || run.stdout)
   const start = calls(fake).find(args => args.includes('--bg'))
   const role = start[start.indexOf('--append-system-prompt') + 1]
