@@ -4,7 +4,7 @@
 //   cd crew && node --test idle-ready.test.mjs
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readyCards, idleState, noticeFor, runIdleCheck, QUIET_MINUTES, columnsOf, checkOnce } from './idle-ready.mjs'
+import { readyCards, idleState, noticeFor, runIdleCheck, QUIET_MINUTES, columnsOf, checkOnce, senderKey } from './idle-ready.mjs'
 
 const NOW = 1_700_000_000_000
 const minutesAgo = m => NOW - m * 60_000
@@ -143,14 +143,23 @@ test('a ready column cut by get_board stops the check: no mail, and the saved st
 })
 
 // The command's path with a fake board: the fetch and the mail are stubs, so no server is touched.
-const fakeCreds = { base: 'https://board.example', board: { id: 'b1' }, people: { boss: { apiKey: 'not-a-real-key' } } }
+const fakeCreds = {
+  base: 'https://board.example',
+  board: { id: 'b1' },
+  people: { susy: { apiKey: 'susy-test-key' }, boss: { apiKey: 'boss-test-key' } }
+}
+// The notice is Susy's: her key reads the board and sends the mail. Boss's key is never used for it.
+test('the notice is sent with Susy\'s key, not Boss\'s', () => {
+  assert.equal(senderKey(fakeCreds), 'susy-test-key')
+  assert.throws(() => senderKey({ ...fakeCreds, people: { boss: { apiKey: 'boss-test-key' } } }), /no Susy account/)
+})
 const boardReply = (reply, status = 200) => async () => ({
   ok: status === 200,
   status,
   json: async () => ({ result: { content: [{ text: JSON.stringify(reply) }] } })
 })
 
-test('the check reads get_board with the boss key and mails Pia and Boss once when the crew is idle', async () => {
+test('the check reads get_board with Susy\'s key and mails Pia and Boss once when the crew is idle', async () => {
   const calls = []
   const fetchImpl = async (url, init) => {
     calls.push({ url, init })
@@ -163,7 +172,7 @@ test('the check reads get_board with the boss key and mails Pia and Boss once wh
   assert.equal(calls.length, 1)
   assert.equal(calls[0].url, 'https://board.example/api/mcp')
   assert.match(calls[0].init.body, /"name":"get_board"/)
-  assert.equal(calls[0].init.headers.authorization, 'Bearer not-a-real-key')
+  assert.equal(calls[0].init.headers.authorization, 'Bearer susy-test-key')
   assert.deepEqual(sent.sort(), ['boss', 'pia'])
 })
 

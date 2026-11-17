@@ -99,11 +99,21 @@ export function runIdleCheck({ columns, activity, now, store, send }) {
 }
 
 /**
- * One check of the board, the command's path: reads get_board with the boss key (through `fetchImpl`, a fetch stand-in
+ * The key the notice uses, for the board read and the mail: Susy's, as the crew's own sender (crew/susy.mjs reads with it too).
+ * Boss's key is not used for it. No Susy account means no notice: the check does not run.
+ */
+export function senderKey(creds) {
+  const key = creds.people?.susy?.apiKey
+  if (!key) throw new Error('no Susy account in creds.json: the idle notice does not run')
+  return key
+}
+
+/**
+ * One check of the board, the command's path: reads get_board with Susy's key (through `fetchImpl`, a fetch stand-in
  * in tests), then runs the check. A failed read or a reply with no columns throws before any state is written or mailed.
  */
 export async function checkOnce({ creds, fetchImpl = fetch, activity, store, send, now = Date.now() }) {
-  const key = creds.people.boss.apiKey
+  const key = senderKey(creds)
   const res = await fetchImpl(`${creds.base}/api/mcp`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'accept': 'application/json, text/event-stream', 'authorization': `Bearer ${key}` },
@@ -128,7 +138,7 @@ async function main() {
     write: state => writeFileSync(file, JSON.stringify(state))
   }
   const send = (to, text) => sendMail({
-    base: creds.base, slug: creds.crew?.slug, key: creds.people.boss.apiKey, to, text,
+    base: creds.base, slug: creds.crew?.slug, key: senderKey(creds), to, text,
     mailboxDir: join(here, 'mailbox'), makeId: () => crypto.randomUUID().replaceAll('-', '')
   })
   const sendLogged = (to, text) => {
