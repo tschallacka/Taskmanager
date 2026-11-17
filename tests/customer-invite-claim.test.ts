@@ -1,0 +1,55 @@
+// Which customer invitations an account claims by itself: an open, unexpired link tied to one of the account's
+// addresses (the owner's rule: an invitation to an account that already exists is accepted by itself). An anonymous
+// link (no address) is never claimed this way. Pure. Run:
+//   node --import tsx --test tests/customer-invite-claim.test.ts
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+
+import { customerInvitesToClaim, tiedInviteIsAcceptable } from '../server/utils/customerInviteRules'
+
+test('the later-sign-in accept takes only an open, unexpired link tied to one of the account addresses', () => {
+  const row = { id: 'c1', email: 'ada@example.com', acceptedAt: null, expiresAt: later }
+  assert.equal(tiedInviteIsAcceptable(row, ['ada@example.com'], now), true)
+  assert.equal(tiedInviteIsAcceptable(row, ['other@example.com'], now), false)
+  assert.equal(tiedInviteIsAcceptable({ ...row, acceptedAt: now - 1 }, ['ada@example.com'], now), false)
+  assert.equal(tiedInviteIsAcceptable({ ...row, expiresAt: earlier }, ['ada@example.com'], now), false)
+  assert.equal(tiedInviteIsAcceptable({ ...row, email: null }, ['ada@example.com'], now), false)
+})
+
+const now = Date.parse('2026-11-16T10:00:00Z')
+const later = now + 60_000
+const earlier = now - 60_000
+
+test('an open link tied to one of the account addresses is claimed', () => {
+  const rows = [{ id: 'c1', email: 'ada@example.com', acceptedAt: null, expiresAt: later }]
+  assert.deepEqual(customerInvitesToClaim(rows, ['ada@example.com'], now), ['c1'])
+})
+
+test('an anonymous link is never claimed by an address', () => {
+  const rows = [{ id: 'c1', email: null, acceptedAt: null, expiresAt: later }]
+  assert.deepEqual(customerInvitesToClaim(rows, ['ada@example.com'], now), [])
+})
+
+test('a used, expired, or other-address link is left alone', () => {
+  const rows = [
+    { id: 'used', email: 'ada@example.com', acceptedAt: now - 1, expiresAt: later },
+    { id: 'old', email: 'ada@example.com', acceptedAt: null, expiresAt: earlier },
+    { id: 'other', email: 'x@example.com', acceptedAt: null, expiresAt: later }
+  ]
+  assert.deepEqual(customerInvitesToClaim(rows, ['ada@example.com'], now), [])
+})
+
+test('one address invited to two customers: both links are claimed, each on its own', () => {
+  const rows = [
+    { id: 'alpha', email: 'ada@example.com', acceptedAt: null, expiresAt: later },
+    { id: 'beta', email: 'ada@example.com', acceptedAt: null, expiresAt: later }
+  ]
+  assert.deepEqual(customerInvitesToClaim(rows, ['ada@example.com'], now), ['alpha', 'beta'])
+  // Accepting one does not spend the other.
+  assert.deepEqual(customerInvitesToClaim([rows[1]!], ['ada@example.com'], now), ['beta'])
+})
+
+test('the address match ignores case', () => {
+  const rows = [{ id: 'c1', email: 'Ada@Example.com', acceptedAt: null, expiresAt: later }]
+  assert.deepEqual(customerInvitesToClaim(rows, ['ada@example.com'], now), ['c1'])
+})

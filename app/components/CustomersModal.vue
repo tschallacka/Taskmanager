@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type { CustomerContact, CustomerInvitation } from '~/composables/useCustomers'
+import { emptyCustomerWarning, inviteEmailError } from '#shared/utils/inviteEmail'
+import { pendingInvitedEmails, showNobodyLine } from '~/utils/contactsPanel'
 
 const open = defineModel<boolean>('open', { default: false })
 
@@ -16,7 +18,7 @@ const {
   revokeInvitation,
   removeContact
 } = useCustomers()
-const { refresh: refreshProjects } = useProjects()
+const { refresh: refreshProjects, projects } = useProjects()
 const toast = useToast()
 
 function fail(e: unknown, fallback: string) {
@@ -83,7 +85,21 @@ const contacts = ref<CustomerContact[]>([])
 const invitations = ref<CustomerInvitation[]>([])
 const detailLoading = ref(false)
 const inviteLabel = ref('')
+const inviteEmail = ref('')
+const inviteEmailProblem = ref<string | null>(null)
+// The team's projects the person may see: ticked ones are filed under the customer when the link is made.
+const tickedProjectIds = ref<string[]>([])
 const inviting = ref(false)
+
+const teamProjects = computed(() => projects.value.filter(project => project.teamId === (activeTeam.value?.id ?? null)))
+function customerProjectCount(customerId: string) {
+  return projects.value.filter(project => project.customerId === customerId).length
+}
+function toggleProject(id: string) {
+  tickedProjectIds.value = tickedProjectIds.value.includes(id)
+    ? tickedProjectIds.value.filter(x => x !== id)
+    : [...tickedProjectIds.value, id]
+}
 // The link exists in full only in the response that created it.
 const freshLink = ref<{ customerId: string, url: string } | null>(null)
 const copied = ref(false)
@@ -115,13 +131,18 @@ async function toggle(id: string) {
 }
 
 async function handleInvite(customerId: string) {
+  inviteEmailProblem.value = inviteEmailError(inviteEmail.value, false)
+  if (inviteEmailProblem.value) return
   inviting.value = true
   try {
-    const res = await createInvitation(customerId, inviteLabel.value.trim())
+    const res = await createInvitation(customerId, inviteLabel.value.trim(), inviteEmail.value.trim(), tickedProjectIds.value)
     freshLink.value = { customerId, url: res.url }
     inviteLabel.value = ''
+    inviteEmail.value = ''
+    tickedProjectIds.value = []
     copied.value = false
     invitations.value = [res, ...invitations.value]
+    await refreshProjects()
   } catch (e) {
     fail(e, 'Could not create an invitation link')
   } finally {
@@ -345,10 +366,17 @@ function confirmRevoke(customerId: string, invitation: CustomerInvitation) {
                       Contacts
                     </p>
                     <p
-                      v-if="contacts.length === 0"
+                      v-if="showNobodyLine(contacts.length, pendingInvitedEmails(invitations).length)"
                       class="text-xs text-muted"
                     >
                       Nobody logs in for {{ c.name }} yet.
+                    </p>
+                    <p
+                      v-for="email in pendingInvitedEmails(invitations)"
+                      :key="`pending-${email}`"
+                      class="text-xs text-muted"
+                    >
+                      Invited, not accepted yet: {{ email }}
                     </p>
                     <div
                       v-for="contact in contacts"
@@ -395,7 +423,7 @@ function confirmRevoke(customerId: string, invitation: CustomerInvitation) {
                       :key="inv.id"
                       class="flex items-center justify-between gap-2 text-xs"
                     >
-                      <span class="truncate text-default">{{ inv.label || 'Unlabelled link' }}</span>
+                      <span class="truncate text-default">{{ inv.email ? `Invited, not accepted yet: ${inv.email}` : (inv.label || 'Unlabelled link') }}</span>
                       <div class="flex shrink-0 items-center gap-1">
                         <span class="text-muted">expires {{ formatDate(inv.expiresAt) }}</span>
                         <UButton
@@ -427,19 +455,59 @@ function confirmRevoke(customerId: string, invitation: CustomerInvitation) {
                       v-if="freshLink?.customerId === c.id"
                       class="text-[11px] text-muted"
                     >
-                      Copy it now: the link is shown once. It works for one person, for 14 days.
+                      Copy it now: the link is shown once. It works for one person, for 14 days. Nothing was sent: copy this link and send it.
                     </p>
 
                     <form
-                      class="flex items-center gap-2"
+                      class="space-y-2"
                       @submit.prevent="handleInvite(c.id)"
                     >
+                      <UInput
+                        v-model="inviteEmail"
+                        type="email"
+                        size="sm"
+                        placeholder="Email address (for an email invite)"
+                        class="w-full"
+                        :color="inviteEmailProblem ? 'error' : 'neutral'"
+                      />
+                      <p
+                        v-if="inviteEmailProblem"
+                        class="text-[11px] text-error"
+                      >
+                        {{ inviteEmailProblem }}
+                      </p>
                       <UInput
                         v-model="inviteLabel"
                         size="sm"
                         placeholder="Who is it for? (optional)"
-                        class="flex-1"
+                        class="w-full"
                       />
+                      <div
+                        v-if="teamProjects.length"
+                        class="space-y-1"
+                      >
+                        <p class="text-[11px] font-semibold text-muted">
+                          Which projects can they see?
+                        </p>
+                        <label
+                          v-for="project in teamProjects"
+                          :key="project.id"
+                          class="flex items-center gap-2 text-xs text-default"
+                        >
+                          <input
+                            type="checkbox"
+                            :checked="tickedProjectIds.includes(project.id)"
+                            @change="toggleProject(project.id)"
+                          >
+                          {{ project.name }}
+                        </label>
+                      </div>
+                      <p
+                        v-if="emptyCustomerWarning({ customerProjectCount: customerProjectCount(c.id), tickedCount: tickedProjectIds.length })"
+                        class="text-[11px] text-warning"
+                      >
+                        {{ emptyCustomerWarning({ customerProjectCount: customerProjectCount(c.id), tickedCount: tickedProjectIds.length }) }}
+                      </p>
                       <UButton
                         type="submit"
                         size="sm"

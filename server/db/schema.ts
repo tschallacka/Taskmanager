@@ -249,6 +249,8 @@ export const customerInvitations = pgTable(
     tokenHash: text('token_hash').notNull().unique(),
     // Who the link was meant for, as a label for the list of open invitations.
     label: text('label'),
+    // The address the link is tied to (an email invite); null for an anonymous link.
+    email: text('email'),
     createdBy: text('created_by').references(() => user.id, { onDelete: 'set null' }),
     createdAt: bigint('created_at', { mode: 'number' }).notNull(),
     expiresAt: bigint('expires_at', { mode: 'number' }).notNull(),

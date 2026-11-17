@@ -2,6 +2,7 @@
 import { entryFor, firstRedirect, mayShowFirstProjectForm, redirectPending, sharedDecided } from '~/utils/projectsEntry'
 import { selectTeamOrStay, teamRedirectAllowed, teamToOpenFor } from '~/utils/teamEntry'
 import { pendingInviteEntry } from '~/utils/pendingInviteEntry'
+import { autoClaimDue, pendingInvitationEntry } from '~/utils/pendingInvitationEntry'
 
 definePageMeta({ layout: 'app' })
 
@@ -19,14 +20,42 @@ const inviteEntry = computed(() => !teamsPending.value && ready.value && sharedD
   ? pendingInviteEntry({ asksNew: route.query.new === '1', hasProjects: projects.value.length > 0, teamCount: teams.value.length, inviteToken: sharedData.value.inviteToken })
   : null)
 
-// One navigation for the two (see firstRedirect): the invitation first, then the shared list.
-watch(() => firstRedirect(contactOnlyEntry.value, inviteEntry.value), (path) => {
+// Invitations sent to this account's address that it has not accepted: a later sign-in shows them, with Accept invitation.
+const { data: pendingData } = useFetch<{ invitations: unknown[] }>('/api/pending-invitations', { key: 'pending-invitations', server: false, lazy: true })
+// The owner's rule: an invitation tied to the signed-in verified address is accepted by itself, once, here. Until that is
+// done, nothing is sent to the pending page, so the Accept button does not show for a tied invitation.
+const autoClaiming = ref(false)
+const autoClaimed = ref(false)
+watch(() => autoClaimDue({
+  ready: ready.value,
+  teamsPending: teamsPending.value,
+  pendingCount: pendingData.value?.invitations.length ?? 0,
+  done: autoClaimed.value || autoClaiming.value
+}), async (due) => {
+  if (!due) return
+  autoClaiming.value = true
+  try {
+    await $fetch('/api/pending-invitations/claim', { method: 'POST' })
+  } catch {
+    // Nothing to show here: whatever is left stays on the pending page.
+  }
+  autoClaimed.value = true
+  autoClaiming.value = false
+  await Promise.all([refreshNuxtData('pending-invitations'), refreshNuxtData('shared-with-me')])
+}, { immediate: true })
+
+const pendingEntry = computed(() => autoClaimed.value && !teamsPending.value && ready.value && pendingData.value
+  ? pendingInvitationEntry({ asksNew: route.query.new === '1', hasProjects: projects.value.length > 0, teamCount: teams.value.length, pendingCount: pendingData.value.invitations.length })
+  : null)
+
+// One navigation at a time (see firstRedirect): a link from the address first, then the pending list, then the shared list.
+watch(() => firstRedirect(contactOnlyEntry.value, inviteEntry.value ?? pendingEntry.value), (path) => {
   if (path) navigateTo(path, { replace: true })
 }, { immediate: true })
 
 // A team member who signs in again in a new browser starts in the personal workspace, which is empty: open their team.
 const teamEntry = computed(() => !teamsPending.value && ready.value && teamRedirectAllowed({
-  contactTarget: contactOnlyEntry.value,
+  contactTarget: contactOnlyEntry.value ?? pendingEntry.value,
   inviteTarget: inviteEntry.value
 })
   ? teamToOpenFor({
@@ -67,7 +96,7 @@ const showEmptyState = computed(() => mayShowFirstProjectForm({
   ready: ready.value,
   teamsPending: teamsPending.value,
   sharedLoaded: sharedDecided(sharedStatus.value),
-  redirecting: redirectPending(contactOnlyEntry.value, false) || redirectPending(inviteEntry.value, false) || redirectPending(teamEntry.value, teamSelectFailed.value)
+  redirecting: redirectPending(contactOnlyEntry.value, false) || redirectPending(inviteEntry.value, false) || redirectPending(pendingEntry.value, false) || redirectPending(teamEntry.value, teamSelectFailed.value)
 }) && (projects.value.length === 0 || wantsNew.value))
 
 const name = ref('')

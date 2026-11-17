@@ -10,6 +10,10 @@ test('the shared-with-me list needs a session', () => {
   assert.equal(isProtectedApiPath('/api/shared-with-me'), true)
 })
 
+test('the pending-invitations list needs a session', () => {
+  assert.equal(isProtectedApiPath('/api/pending-invitations'), true)
+})
+
 test('the invitation links stay open before sign-in', () => {
   assert.equal(isProtectedApiPath('/api/invitations/abc'), false)
   assert.equal(isProtectedApiPath('/api/invitations/abc/accept'), false)

@@ -35,14 +35,17 @@ export default defineEventHandler(async (event) => {
     const session = await auth.api.getSession({ headers: event.headers }).catch(() => null)
     const forYou = session ? (await addressesOfUser(session.user.id)).includes(addressed.email) : null
     return addressed.kind === 'team'
-      ? { kind: 'team' as const, organizationName: addressed.organizationName, inviterName: addressed.inviterName, role: addressed.role, forYou }
-      : { kind: 'board' as const, projectName: addressed.projectName, organizationName: addressed.organizationName, inviterName: addressed.inviterName, role: addressed.role, forYou }
+      // The address is shown in full to whoever holds the link (approved by Boss), so the forms can prefill and lock it.
+      ? { kind: 'team' as const, organizationName: addressed.organizationName, inviterName: addressed.inviterName, role: addressed.role, forYou, email: addressed.email }
+      : { kind: 'board' as const, projectName: addressed.projectName, organizationName: addressed.organizationName, inviterName: addressed.inviterName, role: addressed.role, forYou, email: addressed.email }
   }
 
   const [row] = await db
     .select({
       expiresAt: customerInvitations.expiresAt,
       acceptedAt: customerInvitations.acceptedAt,
+      acceptedBy: customerInvitations.acceptedBy,
+      email: customerInvitations.email,
       customerId: customers.id,
       customerName: customers.name,
       organizationName: organization.name
@@ -53,7 +56,12 @@ export default defineEventHandler(async (event) => {
     .where(eq(customerInvitations.tokenHash, hashInvitationToken(token)))
 
   if (!row) throw createError({ statusCode: 404, message: 'This invitation does not exist' })
-  if (row.acceptedAt) throw createError({ statusCode: 410, message: 'This invitation has already been used' })
+  if (row.acceptedAt) {
+    // The page sends the account that accepted the link to its projects (see app/utils/usedInvite.ts).
+    const usedBy = await auth.api.getSession({ headers: event.headers }).catch(() => null)
+    const acceptedByYou = usedBy !== null && usedBy.user.id === row.acceptedBy
+    throw createError({ statusCode: 410, message: 'This invitation has already been used', data: { acceptedByYou } })
+  }
   if (row.expiresAt <= Date.now()) throw createError({ statusCode: 410, message: 'This invitation has expired' })
 
   // How many projects are shared with this person as a customer contact: the customer's projects, and the boards
@@ -69,6 +77,8 @@ export default defineEventHandler(async (event) => {
     kind: 'customer' as const,
     customerName: row.customerName,
     organizationName: row.organizationName,
+    // The address the link is tied to (approved by Boss: the token holder sees it in full). Null for an anonymous link.
+    email: row.email,
     sharedProjectCount: sharedProjectIds(customerShared.map(project => project.id), [...guestShared, ...pendingIds]).length
   }
 })
