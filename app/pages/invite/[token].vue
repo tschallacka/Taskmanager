@@ -22,7 +22,7 @@ type InvitationPreview
 
 // Reading the invitation also sets the cookie that lets its recipient create an
 // account where sign-up is otherwise closed, so it has to happen in the browser.
-const { data: invitation, error: loadError, pending } = await useFetch<InvitationPreview>(
+const { data: invitation, error: loadError, pending } = useFetch<InvitationPreview>(
   () => `/api/invitations/${token.value}`,
   { server: false }
 )
@@ -157,12 +157,14 @@ watch([session, invitation], () => {
 
       <div
         v-if="pending || sessionPending"
-        class="flex justify-center py-2"
+        class="flex items-center justify-center gap-2 py-2 text-sm text-muted"
+        role="status"
       >
         <UIcon
           name="i-lucide-loader-2"
           class="size-5 animate-spin text-dimmed"
         />
+        <span>Loading your invitation…</span>
       </div>
 
       <UAlert
