@@ -384,10 +384,11 @@ watch(open, (isOpen) => {
             data-share-customer
           >
             <h3 class="text-sm font-semibold text-default">
-              Invite by email
+              Invite a customer contact
             </h3>
             <p class="text-xs text-muted">
               The project is filed under the customer, and the invitation is tied to the email. Nothing is sent: copy the link.
+              Only a project of a team can have a customer; a personal project cannot.
             </p>
             <form
               class="space-y-2"
@@ -435,7 +436,7 @@ watch(open, (isOpen) => {
 
           <section class="space-y-2">
             <h3 class="flex items-center gap-1.5 text-sm font-semibold text-default">
-              Invite with email
+              Invite a guest to this board
               <HelpHint page="basics/share-with-guests">
                 A guest sees this board and the tasks that are not marked private. A manager guest can invite people at their own domain.
               </HelpHint>
