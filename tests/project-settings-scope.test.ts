@@ -45,6 +45,31 @@ test('the import, trash, archive and customer sections each have an address of t
   }
 })
 
+// A panel that does not exist yet reads as empty, so its test fails on the assertion, not on the load.
+const panelSource = (file: string) => existsSync(new URL(`project-settings/${file}.vue`, root)) ? readFileSync(new URL(`project-settings/${file}.vue`, root), 'utf8') : ''
+const trashPanel = panelSource('ProjectTrashSettings')
+const archivePanel = panelSource('ProjectArchiveSettings')
+const customerPanel = panelSource('ProjectCustomerSettings')
+
+test('Trash shows what is in the board trash and turns Show trashed on or off, from the board state', () => {
+  assert.match(trashPanel, /trashedCount/)
+  assert.match(trashPanel, /toggleShowTrashed/)
+  assert.match(trashPanel, /data-trash-toggle/)
+  assert.match(trashPanel, /Show trashed/)
+})
+
+test('Archive holds the archive toggle and the delete action, boxed, last in the list', () => {
+  assert.match(archivePanel, /data-archive-toggle/)
+  assert.match(archivePanel, /data-delete-open/)
+  assert.match(archivePanel, /data-delete-confirm/)
+})
+
+test('Customer access shows the customer the project is filed under, read from the open project', () => {
+  assert.match(customerPanel, /activeProject/)
+  assert.match(customerPanel, /customerName/)
+  assert.match(customerPanel, /data-customer-access/)
+})
+
 test('the settings view draws the four new sections (its accepted ?section= values include them)', () => {
   const line = view.match(/const VIEW_SECTIONS = \[([^\]]*)\]/)?.[1] ?? ''
   for (const key of ['customers', 'import', 'trash', 'archive']) assert.match(line, new RegExp(`'${key}'`), key)
