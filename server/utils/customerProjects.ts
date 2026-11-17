@@ -35,6 +35,8 @@ export interface SharedPair {
   projectId: string
   projectName: string
   customerId: string
+  /** The customer's own name: shown only to that customer's contacts (see customerNames.ts). */
+  customerName: string
   organizationName: string
 }
 
@@ -49,14 +51,14 @@ export async function projectCountsByCustomer(customerIds: string[]): Promise<Ma
 export async function sharedPairsOf(customerIds: string[]): Promise<SharedPair[]> {
   if (!customerIds.length) return []
   const joined = await db
-    .select({ projectId: projects.id, projectName: projects.name, customerId: customers.id, organizationName: organization.name })
+    .select({ projectId: projects.id, projectName: projects.name, customerId: customers.id, customerName: customers.name, organizationName: organization.name })
     .from(customerProjects)
     .innerJoin(projects, eq(projects.id, customerProjects.projectId))
     .innerJoin(customers, eq(customers.id, customerProjects.customerId))
     .innerJoin(organization, eq(organization.id, customers.organizationId))
     .where(inArray(customerProjects.customerId, customerIds))
   const legacy = await db
-    .select({ projectId: projects.id, projectName: projects.name, customerId: customers.id, organizationName: organization.name })
+    .select({ projectId: projects.id, projectName: projects.name, customerId: customers.id, customerName: customers.name, organizationName: organization.name })
     .from(projects)
     .innerJoin(customers, eq(customers.id, projects.customerId))
     .innerJoin(organization, eq(organization.id, customers.organizationId))

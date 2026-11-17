@@ -2,7 +2,9 @@ import { db } from '../db'
 import { customers, projects, projectColumns } from '../db/schema'
 import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm'
 import { getProjectAccessFilter, genId } from '../utils/projects'
-import { audienceFor, getUserActiveTeamId } from '../utils/auth-helpers'
+import { audienceFor, customerIdsOf, getUserActiveTeamId } from '../utils/auth-helpers'
+import { customerNameForAudience } from '../utils/customerNames'
+import { sharedPairsOf } from '../utils/customerProjects'
 import { requireOrgCustomer } from '../utils/customers'
 import { publishFromEvent } from '../utils/realtime'
 import { terminalColumnIds } from '#shared/utils/board'
@@ -79,6 +81,12 @@ export default defineEventHandler(async (event) => {
       if (link) deletable.set(project.id, await mayDeleteCrewBoard(userId, link))
     }
 
+    // The name of the viewer's own customer on each project (a contact of a customer that shares it). Only those names.
+    const ownCustomerNameOf = new Map<string, string>()
+    for (const pair of await sharedPairsOf(await customerIdsOf(userId))) {
+      if (!ownCustomerNameOf.has(pair.projectId)) ownCustomerNameOf.set(pair.projectId, pair.customerName)
+    }
+
     return rows.map(({ project, customerName }) => {
       const columnsOf = byProject.get(project.id) ?? []
       // A crew shadow added beside the list is read-only from here, and the staff of its crew's team see it as staff.
@@ -88,10 +96,12 @@ export default defineEventHandler(async (event) => {
       const realNeighbour = realNeighbourIds.has(project.id)
       if (realNeighbour && !realNeighbourIsOpenable(project.teamId, memberTeams)) return labelRowOf(project)
       const shadowNeighbour = shadowNeighbourIds.has(project.id)
+      const audience = shadowNeighbour || realNeighbour ? 'staff' as const : audienceFor(userId, teamId, project)
       return {
         ...project,
-        customerName,
-        audience: shadowNeighbour || realNeighbour ? 'staff' as const : audienceFor(userId, teamId, project),
+        // A contact sees only their own customer's name on this project, never the first customer's (customerNames.ts).
+        customerName: customerNameForAudience({ audience, staffName: customerName, ownName: ownCustomerNameOf.get(project.id) }),
+        audience,
         ...(shadowNeighbour && { readOnly: true }),
         ...(deletable.has(project.id) && { crewDeletable: deletable.get(project.id) }),
         ...tree.get(project.id),

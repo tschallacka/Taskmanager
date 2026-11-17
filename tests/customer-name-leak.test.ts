@@ -15,6 +15,12 @@ test('a contact sees the name of their own customer on a shared project, not the
   assert.equal(customerNameForAudience({ audience: 'customer', staffName: 'Alpha', ownName: 'Beta' }), 'Beta')
 })
 
+test('the project list answers a contact with their own customer’s name only (wiring)', () => {
+  const route = readFileSync(new URL('../server/api/projects.ts', import.meta.url), 'utf8')
+  assert.match(route, /customerNameForAudience\(\{ audience, staffName: customerName, ownName: ownCustomerNameOf\.get\(project\.id\) \}\)/)
+  assert.match(route, /sharedPairsOf\(await customerIdsOf\(userId\)\)/)
+})
+
 test('a contact with no customer on the project sees no name at all, never the first customer’s', () => {
   assert.equal(customerNameForAudience({ audience: 'customer', staffName: 'Alpha', ownName: undefined }), null)
 })
