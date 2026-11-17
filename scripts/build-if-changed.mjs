@@ -7,11 +7,40 @@
 // (each release is a new folder, so a cache inside one is gone on the next deploy). Unset, it is data/.build-cache of the release.
 // Every run prints one line: build-if-changed: skipped|built|failed, hash <12>, wall Ns, cpu Ns, peak MB.
 import { spawnSync } from 'node:child_process'
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { hashTree } from './build-inputs.mjs'
+
+/**
+ * Copies a build output with its symlinks resolved. Nitro's output holds symlinks whose targets are ABSOLUTE paths inside the output
+ * of the release that built it; a plain copy keeps them, so the copy points into the old release, and the deploy later prunes that
+ * release (the app then fails to start). Resolving them makes the copy stand on its own.
+ */
+export function copyOutput(from, to) {
+  // Not cpSync with dereference: Node keeps the link (with a resolved target) instead of copying what it points to.
+  const info = statSync(from)
+  if (info.isDirectory()) {
+    mkdirSync(to, { recursive: true })
+    for (const name of readdirSync(from)) copyOutput(join(from, name), join(to, name))
+  } else {
+    cpSync(from, to)
+  }
+}
+
+/** True when `dir` holds any symlink: a copy made by copyOutput holds none, so one means the copy cannot be trusted. */
+export function hasBrokenLinks(dir) {
+  const walk = (current) => {
+    for (const name of readdirSync(current)) {
+      const full = join(current, name)
+      if (lstatSync(full).isSymbolicLink()) return true
+      if (lstatSync(full).isDirectory() && walk(full)) return true
+    }
+    return false
+  }
+  return walk(dir)
+}
 
 const ENTRY = join('server', 'index.mjs')
 const VERSION = 'VERSION'
@@ -61,7 +90,7 @@ function writeVersion(root) {
 function storeCache(root, cacheDir, hash) {
   mkdirSync(cacheDir, { recursive: true })
   const tmp = mkdtempSync(join(cacheDir, '.tmp-'))
-  cpSync(join(root, '.output'), join(tmp, 'output'), { recursive: true })
+  copyOutput(join(root, '.output'), join(tmp, 'output'))
   rmSync(join(cacheDir, 'output'), { recursive: true, force: true })
   renameSync(join(tmp, 'output'), join(cacheDir, 'output'))
   rmSync(tmp, { recursive: true, force: true })
@@ -84,7 +113,8 @@ export function run({ root, env = {}, build, bunVersion = '', nodeVersion = '', 
   if (d.action === 'skip') {
     try {
       rmSync(join(root, '.output'), { recursive: true, force: true })
-      cpSync(join(cacheDir, 'output'), join(root, '.output'), { recursive: true })
+      copyOutput(join(cacheDir, 'output'), join(root, '.output'))
+      if (hasBrokenLinks(join(root, '.output'))) throw new Error('the copied output holds symlinks')
       writeVersion(root)
       line('skipped')
       return { action: 'skipped', status: 0, hash }

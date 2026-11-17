@@ -39,9 +39,14 @@ function comparable(path, buf) {
  * The hash over the build inputs. `files` maps a relative path to its content (a string or a Buffer); only the build inputs count. `env`
  * holds the environment; only the build-time values count. `bun` and `node` are the tool versions: a new tool forces a build.
  */
+// The format of the cached output. Raise it when the way the cache is written or restored changes: every older cache then no longer
+// matches and the next deploy builds in full. 2: the output is copied with its symlinks resolved (Nitro's output holds symlinks with
+// absolute targets into the release that built it; a copy that kept them pointed into a release the deploy later pruned).
+export const CACHE_FORMAT = 2
+
 export function hashInputs(files, { bun = '', node = '', env = {} } = {}) {
   const h = createHash('sha256')
-  h.update(`bun ${bun}\nnode ${node}\n`)
+  h.update(`cache-format ${CACHE_FORMAT}\nbun ${bun}\nnode ${node}\n`)
   for (const name of Object.keys(files).filter(isBuildInput).sort()) {
     const raw = Buffer.isBuffer(files[name]) ? files[name] : Buffer.from(files[name])
     const buf = comparable(name.split(sep).join('/'), raw)
