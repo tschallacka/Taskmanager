@@ -61,6 +61,9 @@ export const config = {
   devLog: raw.devLog ?? `${here}dev.log`,
   // The folder Boss runs its Claude Code session in: init writes Boss's Stop hook there (boss-session.mjs). Empty: none is written.
   bossSession: raw.bossSession ? String(raw.bossSession).replace(/\/$/, '') : '',
+  // The folder the card worktrees are made in (`crew <who> prepare worktree`). Read as written: a relative or missing
+  // value is refused there with a clear message, never guessed. Trailing slashes are trimmed, as bossSession is.
+  worktreeBase: typeof raw.worktreeBase === 'string' ? raw.worktreeBase.trim().replace(/\/+$/, '') : '',
   // The merger's `crew publish` (publish.mjs validates it and names every problem); the repository defaults to the product's.
   publish: { repo: raw.product?.repo ?? '', ...raw.publish }
 }
