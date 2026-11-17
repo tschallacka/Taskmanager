@@ -54,6 +54,12 @@ test('Unassigned keeps only the cards with nobody on them', () => {
   assert.equal(matchesBoardFilter(task({ assigneeId: 'u1' }), free), false)
 })
 
+test('a task that leaves the assignee out counts as unassigned, for both the person and Unassigned filters', () => {
+  const { assigneeId: _left, ...noField } = task({})
+  assert.equal(matchesBoardFilter(noField, { ...NONE, assigneeId: UNASSIGNED }), true)
+  assert.equal(matchesBoardFilter(noField, { ...NONE, assigneeId: 'u1' }), false)
+})
+
 test('the assignee filter stacks with the labels and the search', () => {
   const all: BoardFilter = { labels: ['billing'], assigneeId: 'u1', search: 'release' }
   assert.equal(matchesBoardFilter(task({ tags: ['billing'], assigneeId: 'u1' }), all), true)

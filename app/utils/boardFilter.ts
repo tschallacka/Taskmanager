@@ -16,7 +16,8 @@ export interface BoardFilter {
 export interface FilterableTask {
   title: string
   tags: string[]
-  assigneeId: string | null
+  // A task from the API may leave the field out; a missing assignee is nobody, the same as null.
+  assigneeId?: string | null
 }
 
 /** True when any part of the Filter is on: the labels, the assignee or a search. */
