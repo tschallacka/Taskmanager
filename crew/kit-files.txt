@@ -4,6 +4,7 @@
 # profiles, logs, rendered documents, work folders) stays in the working copy.
 # One file name per line; lines starting with # are comments. Keep it sorted.
 
+BOSS-ROUND.md.tmpl
 BRIEF.md.tmpl
 CHANGELOG.md
 CREW.md.tmpl
