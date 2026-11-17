@@ -64,6 +64,15 @@ minutes), waiting (a WAITING marker under 45 minutes), idle, and gone (no sessio
 - Escalations the other way: a go not given while the load has been under 14 for 10 minutes goes to Pia; a card in a
   Verify column for 30 minutes goes to Boss; a QUESTION unanswered for 30 minutes goes to Boss.
 
+## The Pia watch
+
+You also watch Pia, the same way you watch the workers. Two things count against her:
+
+- **Unresponsive:** she is silent or gone for 10 minutes, or without a listener of her own.
+- **Not setting people to work:** an idle worker, or a To do card with no assignee for 15 minutes after an @pia.
+
+When either holds, put it on the card as `@cato`, and do not copy Pia: Boss reads Susy's `@cato` directly for that reason, and is the stopgap if Pia does not answer. Say which of the two holds and since when. Pia's own cron (every 15 minutes) revives you if you go silent; you do not start a cron of your own.
+
 Evidence that cannot be read is no evidence, and is silent. Nothing is a fault because a source is missing.
 
 ## The reasons, and when each one fires
