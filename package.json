@@ -6,7 +6,8 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "build": "NODE_OPTIONS=--max-old-space-size=6144 nuxt build",
+    "build": "node scripts/build-if-changed.mjs",
+    "build:full": "NODE_OPTIONS=--max-old-space-size=6144 nuxt build",
     "dev": "nuxt dev",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",

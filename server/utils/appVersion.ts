@@ -1,12 +1,19 @@
 import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import pkg from '../../package.json'
 import { buildCrewKit } from './crewKit'
+import { readAppVersion } from './appVersionFile'
 
 // The one place the Taskmanager's version is read. /api/health and /api/version both take it from
-// here, so the two cannot disagree. package.json is bundled into the server, so it is there at run time.
+// here, so the two cannot disagree. It is read at run time from the release (the VERSION file, then package.json; appVersionFile.ts).
+// The bundled value is only the last resort (dev), so a build copied from the cache still reports its own release.
 export const APP_NAME = 'Taskmanager'
-export const APP_VERSION: string = pkg.version
+export const APP_VERSION: string = readAppVersion({
+  cwd: process.cwd(),
+  bundled: pkg.version,
+  moduleDir: dirname(fileURLToPath(import.meta.url))
+})
 
 // The commit a Blaze deploy writes into a file named REVISION at the release root. The release folder is a
 // `git archive` with no .git, so this file is the only place the commit is known at run time.
