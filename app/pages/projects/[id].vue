@@ -699,10 +699,10 @@ useSeoMeta({
     </div>
 
     <!-- The view row: the tabs scroll on a phone; Filter, search in this board and New task stay in view at the right. -->
-    <div class="flex shrink-0 items-center gap-2 border-b border-default px-4 lg:px-6">
+    <div class="flex flex-wrap items-center gap-2 border-b border-default px-4 lg:px-6">
       <nav
         ref="tabsEl"
-        class="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto py-1"
+        class="flex min-w-0 flex-1 basis-full items-center gap-1 overflow-x-auto py-1 lg:basis-0"
         aria-label="Project views"
         :style="tabsMaskStyle"
         @scroll="updateTabCues"
@@ -777,7 +777,7 @@ useSeoMeta({
       </nav>
       <div
         v-if="view === 'board'"
-        class="flex shrink-0 items-center gap-2 py-1.5"
+        class="flex min-w-0 flex-wrap items-center justify-end gap-2 py-1.5"
       >
         <!-- Filter: labels, and Show deleted (the trash, which the design puts here too). On the board view on every board, so a fresh one has it. -->
         <UPopover :content="{ align: 'end', sideOffset: 6 }">
