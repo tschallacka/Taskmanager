@@ -4,10 +4,10 @@
 // redone, up to three tries, then nothing is written.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, readFileSync, statSync, writeFileSync, existsSync } from 'node:fs'
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { ensureTrusted, configFile } from './claude-trust.mjs'
+import { ensureTrusted, configFile, sessionRecords } from './claude-trust.mjs'
 
 function fakeConfig(content) {
   const dir = mkdtempSync(join(tmpdir(), 'claude-trust-'))
@@ -142,6 +142,33 @@ test('a write that cannot be done is a sentence, not an exception, and nothing i
   assert.doesNotThrow(() => { res = ensureTrusted([CREW], { file }) })
   assert.equal(res.ok, false)
   assert.match(res.reason, /could not be written/)
+})
+
+test('a backup that cannot be copied is a sentence, not an exception, and the file is as it was', () => {
+  // The folder is read-only: the backup copy (and the temp file) cannot be written. Nothing may throw, and the config is unchanged.
+  const dir = mkdtempSync(join(tmpdir(), 'claude-trust-ro-'))
+  const file = join(dir, '.claude.json')
+  const original = `${JSON.stringify({ projects: {}, keep: 'original' }, null, 2)}\n`
+  writeFileSync(file, original, { mode: 0o600 })
+  chmodSync(dir, 0o500)
+  try {
+    let res
+    assert.doesNotThrow(() => { res = ensureTrusted([CREW], { file }) })
+    assert.equal(res.ok, false)
+    assert.match(res.reason, /could not be written/)
+    assert.equal(readFileSync(file, 'utf8'), original)
+  } finally {
+    chmodSync(dir, 0o700)
+  }
+})
+
+test('sessionRecords is the one reader of the session records: who and folder, the mcp configs and a broken record skipped', () => {
+  const home = mkdtempSync(join(tmpdir(), 'claude-trust-sessions-'))
+  mkdirSync(join(home, 'sessions'))
+  writeFileSync(join(home, 'sessions', 'wick.json'), JSON.stringify({ folder: '/a/taskmanager-wick-x' }))
+  writeFileSync(join(home, 'sessions', 'wick.mcp.json'), JSON.stringify({ folder: '/not/a/record' }))
+  writeFileSync(join(home, 'sessions', 'broken.json'), '{')
+  assert.deepEqual(sessionRecords(home), [{ who: 'wick', folder: '/a/taskmanager-wick-x' }])
 })
 
 test('the config file is CLAUDE_CONFIG_DIR/.claude.json when the variable is set, else HOME/.claude.json', () => {

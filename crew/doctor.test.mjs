@@ -3,7 +3,7 @@
 // fake config only.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { trustReport, formatReport } from './doctor.mjs'
@@ -72,4 +72,20 @@ test('a session folder the owner pointed at is listed as refused, with the sente
   const text = formatReport(rep)
   assert.match(text, /not a crew folder/)
   assert.match(text, /crew update/)
+})
+
+test('crew doctor reads the session records with the one reader in claude-trust.mjs, not a copy of it', () => {
+  const src = readFileSync(new URL('./doctor.mjs', import.meta.url), 'utf8')
+  assert.doesNotMatch(src, /function sessionRecords/, 'no second copy of the session reader')
+  assert.match(src, /import \{[^}]*\bsessionRecords\b[^}]*\} from '\.\/claude-trust\.mjs'/)
+})
+
+test('an unreadable config is reported as not valid JSON, not as untrusted paths with the crew update fix', () => {
+  const { home, file } = fixture({ wick: WICK }, () => ({}))
+  writeFileSync(file, '{ "projects": ')
+  const rep = trustReport({ home, kit: KIT, file })
+  assert.match(rep.configError, /not valid JSON/)
+  assert.match(rep.fix, /not valid JSON/)
+  assert.doesNotMatch(rep.fix, /^crew update trusts/, 'the fix is not the crew update line')
+  assert.match(formatReport(rep), /not valid JSON/)
 })
