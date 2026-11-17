@@ -25,6 +25,18 @@ export const PROJECT_SECTIONS: ProjectSettingsSection[] = [
   { key: 'archive', label: 'Archive', icon: 'i-lucide-archive', path: id => projectSettingsPath(id, 'archive') }
 ]
 
+/**
+ * The component that renders each section's panel, by the name Nuxt gives it under app/components/project-settings/.
+ * Only the sections with a panel are here: Customer access, Custom fields, Import, Trash and Archive have none yet.
+ */
+export const PROJECT_PANEL_COMPONENTS: Partial<Record<ProjectSettingsKey, string>> = {
+  general: 'ProjectSettingsProjectGeneralSettings',
+  github: 'ProjectSettingsProjectGithubSettings',
+  rules: 'ProjectSettingsProjectRulesSettings',
+  members: 'ProjectSettingsProjectMembersSettings',
+  secrets: 'ProjectSettingsProjectSecretsSettings'
+}
+
 /** The address of one section of a project. */
 export function projectSettingsPath(projectId: string, key: ProjectSettingsKey): string {
   return `/projects/${projectId}/settings/${key}`

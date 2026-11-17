@@ -117,27 +117,27 @@ function dropField(fieldId: string) {
           {{ sectionLabel }}
         </h2>
 
-        <KanbanProjectGeneralSettings
+        <ProjectSettingsProjectGeneralSettings
           v-if="section === 'general'"
           class="mt-4"
           :project-id="projectId"
         />
-        <KanbanProjectGithubSettings
+        <ProjectSettingsProjectGithubSettings
           v-else-if="section === 'repositories'"
           class="mt-4"
           :project-id="projectId"
         />
-        <KanbanProjectRulesSettings
+        <ProjectSettingsProjectRulesSettings
           v-else-if="section === 'rules'"
           :project-id="projectId"
           class="mt-4"
         />
-        <KanbanProjectMembersSettings
+        <ProjectSettingsProjectMembersSettings
           v-else-if="section === 'members'"
           class="mt-4"
           :project-id="projectId"
         />
-        <KanbanProjectSecretsSettings
+        <ProjectSettingsProjectSecretsSettings
           v-else-if="section === 'secrets'"
           class="mt-4"
           :project-id="projectId"
