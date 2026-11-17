@@ -9,7 +9,7 @@ const props = defineProps<{ projectId: string }>()
 const route = useRoute()
 
 // The view's own keys for ?section=: the GitHub section is still 'repositories' in the URL the redirect writes.
-const VIEW_SECTIONS = ['general', 'repositories', 'rules', 'members', 'secrets', 'fields', 'import', 'trash'] as const
+const VIEW_SECTIONS = ['general', 'repositories', 'rules', 'members', 'secrets', 'fields', 'import', 'trash', 'archive'] as const
 
 const section = computed(() => VIEW_SECTIONS.find(s => s === route.query.section) ?? 'general')
 // The key the left list marks as current, from the section table.
@@ -123,6 +123,11 @@ function dropField(fieldId: string) {
       />
       <ProjectSettingsProjectTrashSettings
         v-else-if="section === 'trash'"
+        class="mt-4"
+        :project-id="projectId"
+      />
+      <ProjectSettingsProjectArchiveSettings
+        v-else-if="section === 'archive'"
         class="mt-4"
         :project-id="projectId"
       />
