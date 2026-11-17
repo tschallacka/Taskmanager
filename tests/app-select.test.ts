@@ -140,10 +140,10 @@ test('the custom field select cell uses AppSelect, keeps its clicks from the row
   assert.match(field, /emit\('change', raw === '' \? null : raw\)/, 'an empty choice still reports null')
 })
 
-test('the open list of AppSelect has a minimum width, so the labels of a narrow picker (a task panel field at 390 px) are not cut off', () => {
+test('the open list of AppSelect is as wide as its longest label (min-width fit-content), so the labels of a narrow picker (a task panel field at 390 px) are not cut off', () => {
   const select = read('app/components/AppSelect.vue')
   const content = select.match(/content: '([^']*)'/)?.[1] ?? ''
-  assert.match(content, /\bmin-w-40\b/, 'the list is at least 10 rem wide, whatever the width of its trigger')
+  assert.match(content, /\bmin-w-fit\b/, 'the list grows to its longest label (Shared with customer), whatever the width of its trigger')
   assert.match(content, /max-w-\[calc\(100vw-2rem\)\]/, 'and it still stays inside the screen')
 })
 
