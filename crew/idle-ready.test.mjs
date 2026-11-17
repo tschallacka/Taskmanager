@@ -4,7 +4,7 @@
 //   cd crew && node --test idle-ready.test.mjs
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readyCards, idleState, noticeFor, runIdleCheck, QUIET_MINUTES } from './idle-ready.mjs'
+import { readyCards, idleState, noticeFor, runIdleCheck, QUIET_MINUTES, columnsOf } from './idle-ready.mjs'
 
 const NOW = 1_700_000_000_000
 const minutesAgo = m => NOW - m * 60_000
@@ -19,6 +19,15 @@ const board = () => [
   { name: 'Blocked', tasks: [card('blocked1')] }
 ]
 const quiet = mins => [{ key: 'wren', state: 'silent', mins, what: 'read the card' }]
+const memoryStore = () => ({
+  value: null,
+  read() {
+    return this.value
+  },
+  write(v) {
+    this.value = v
+  }
+})
 
 test('the ready cards are To do and Verify cards, not Done, not blocked (the blocked flag or label)', () => {
   const ids = readyCards(board()).map(c => c.id).sort()
@@ -114,4 +123,32 @@ test('a check mails Pia and Boss once, and saves the state so the next run does 
   assert.deepEqual(sent.map(s => s.to).sort(), ['boss', 'pia'])
   assert.equal(runIdleCheck(args), null, 'a second run in the same state sends nothing')
   assert.equal(sent.length, 2)
+})
+
+test('a board reply with no columns list is an error, not an empty board', () => {
+  assert.throws(() => columnsOf({ error: 'board unreachable' }), /no columns list/)
+  assert.throws(() => columnsOf(null), /no columns list/)
+  assert.deepEqual(columnsOf({ columns: [] }), [])
+})
+
+test('a ready column cut by get_board stops the check: no mail, and the saved state is not written', () => {
+  const columns = board()
+  columns[1].omitted = 3 // To do, a ready column, cut to 50 cards
+  const store = memoryStore()
+  const sent = []
+  const notice = runIdleCheck({ columns, activity: quiet(40), now: NOW, store, send: to => sent.push(to) })
+  assert.equal(notice, null)
+  assert.equal(store.value, null)
+  assert.deepEqual(sent, [])
+})
+
+test('a cut column that is not ready (Done, Backlog) does not stop the check', () => {
+  const columns = board()
+  columns[0].omitted = 25 // Backlog
+  columns[5].omitted = 25 // Done
+  const store = memoryStore()
+  const sent = []
+  const notice = runIdleCheck({ columns, activity: quiet(40), now: NOW, store, send: to => sent.push(to) })
+  assert.equal(notice?.kind, 'idle')
+  assert.deepEqual(sent.sort(), ['boss', 'pia'])
 })

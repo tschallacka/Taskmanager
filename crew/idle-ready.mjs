@@ -5,7 +5,8 @@
 // blocker, or a `blocked` or `test failing` label). get_board does not return a card's update text, so a `BLOCKED ON`
 // line is not read here: a card that waits on one is moved to Blocked, which is not a ready column.
 // "Something happened": a crew member's last step (crew/activity.mjs) or any card update or move on the board.
-//   CREW_HOME=<crew home> node idle-ready.mjs            one check (run it from a timer or a Monitor loop)
+//   CREW_HOME=<crew home> node idle-ready.mjs            one check. Nothing calls it yet. To run it, use a Monitor loop
+//                                                        that runs it every 5 minutes: `while true; do <that command>; sleep 300; done`
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -65,11 +66,27 @@ export function noticeFor(prev, next) {
   return null
 }
 
+/** The columns of a get_board reply. A reply with no columns list is an error, not an empty board: an empty board reads as "nothing ready". */
+export function columnsOf(reply) {
+  if (!Array.isArray(reply?.columns)) throw new Error('the board reply has no columns list')
+  return reply.columns
+}
+
+/**
+ * Whether every ready column came back whole. get_board cuts a column to 50 cards and says how many it left out
+ * (`omitted`); a cut ready column could hide ready cards, so the check then waits. Cut columns that are not ready do not matter.
+ */
+export function readyColumnsWhole(columns) {
+  return columns.every(column => !READY_COLUMNS(column.name) || !(column.omitted > 0))
+}
+
 /**
  * One check: reads the saved state, works out the new one, mails the notice (if any) to Pia and Boss, and saves the new
- * state. `store` is { read(), write(state) }; `send` is (to, text). Returns the notice sent, or null.
+ * state. `store` is { read(), write(state) }; `send` is (to, text). Returns the notice sent, or null. A board that is cut
+ * in a ready column returns null before anything is read or written, so the saved state keeps its last whole reading.
  */
 export function runIdleCheck({ columns, activity, now, store, send }) {
+  if (!readyColumnsWhole(columns)) return null
   const prev = store.read()
   const next = idleState({ columns, activity, now })
   const notice = noticeFor(prev, next)
@@ -105,12 +122,12 @@ async function main() {
     base: creds.base, slug: creds.crew?.slug, key, to, text,
     mailboxDir: join(here, 'mailbox'), makeId: () => crypto.randomUUID().replaceAll('-', '')
   })
-  const sendNow = (to, text) => {
+  const sendLogged = (to, text) => {
     send(to, text).catch((error) => {
       console.error(`idle-ready: mail to ${to} failed: ${error?.message ?? error}`)
     })
   }
-  const notice = runIdleCheck({ columns: board?.columns ?? [], activity, now: Date.now(), store, send: sendNow })
+  const notice = runIdleCheck({ columns: columnsOf(board), activity, now: Date.now(), store, send: sendLogged })
   console.log(notice ? `sent: ${notice.text}` : 'nothing to send')
 }
 
