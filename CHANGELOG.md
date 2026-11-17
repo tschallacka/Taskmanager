@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.48.0 - 2026-11-17
+
+- **Custom select.** Every native select in the app is now the app's own select (`AppSelect`, built on Nuxt UI), so its open list follows light and dark mode: the team invite role select, the board and project pickers, the rule builder, the members, secrets, GitHub and field pickers, and the timesheet task picker. Admin, and every other option, reads in dark mode. Files: `app/components/AppSelect.vue` and the pickers that use it.
+
 ## 0.47.1 - 2026-11-17
 
 - **The build cache copy no longer breaks the app after a skipped build.** Nitro's build output holds symlinks with absolute targets into the release that built it; the cached copy kept them, and when the deploy pruned that release the app failed to start (502). The cache and the restored output are now copied with their symlinks resolved, a restored copy that still holds a symlink is not trusted (the real build runs), and the cache format is part of the hash, so the next deploy builds in full and replaces the old cache. Files: `scripts/build-if-changed.mjs`, `scripts/build-inputs.mjs`, `tests/build-cache-symlinks.test.ts`.
