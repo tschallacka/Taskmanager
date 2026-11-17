@@ -2,6 +2,34 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.48.0 - 2026-11-17
+
+- **Custom select.** Every native select in the app is now the app's own select (`AppSelect`, built on Nuxt UI), so its open list follows light and dark mode: the team invite role select, the board and project pickers, the rule builder, the members, secrets, GitHub and field pickers, and the timesheet task picker. Admin, and every other option, reads in dark mode. Files: `app/components/AppSelect.vue` and the pickers that use it.
+
+## 0.47.1 - 2026-11-17
+
+- **The build cache copy no longer breaks the app after a skipped build.** Nitro's build output holds symlinks with absolute targets into the release that built it; the cached copy kept them, and when the deploy pruned that release the app failed to start (502). The cache and the restored output are now copied with their symlinks resolved, a restored copy that still holds a symlink is not trusted (the real build runs), and the cache format is part of the hash, so the next deploy builds in full and replaces the old cache. Files: `scripts/build-if-changed.mjs`, `scripts/build-inputs.mjs`, `tests/build-cache-symlinks.test.ts`.
+
+## 0.47.0 - 2026-11-17
+
+- **The crew's own folders are trusted by the kit.** `crew update` and `crew session start` mark the crew home, the kit folder and each session's folder as trusted in Claude Code's config file (one backup, never overwritten; nothing else in the file changes), so a session no longer fails with "folder not trusted" (`crew/claude-trust.mjs`, `crew/kit-files.txt`).
+
+## 0.46.0 - 2026-11-17
+
+- **Crew kit: a notice when the board has ready work and the crew is idle.** When cards wait in To do or in a Verify column and nothing has happened for 30 minutes, Pia and Boss get one mail, and another only when the set of ready cards changes. Done and blocked cards are not named. Files: `crew/idle-ready.mjs`, `crew/idle-ready.test.mjs`.
+
+## 0.45.0 - 2026-11-17
+
+- **The production build is skipped when nothing it reads has changed.** `bun run build` hashes the build inputs (the app, the server, the shared code, the public folder, the docs, the configs, the tool versions and the build-time environment values) and copies the last good output from `data/.build-cache/` when the hash matches; `BUILD_FORCE=1` forces a full build, and `bun run build:full` is the full build. The app's version is read at run time from the release, so a copied build reports its own version. Files: `scripts/build-if-changed.mjs`, `scripts/build-inputs.mjs`, `server/utils/appVersionFile.ts`, `server/utils/appVersion.ts`, `package.json`, `CONTRIBUTING.md`.
+
+## 0.44.0 - 2026-11-17
+
+- **Archive all under the Unread filter archives only the unread notifications it shows.** The read ones stay in the inbox, where that filter does not show them, so the button no longer takes out rows the person cannot see. Archive all under All still takes every inbox row. Files: `server/utils/notificationBox.ts`, `server/api/notifications/archive.post.ts`, `app/composables/useNotifications.ts`, `app/pages/projects/inbox.vue`, `tests/notifications-archive-db.test.ts`, `changelog.d/mw9rojl3i47djllurn-notifications-archive.md`.
+
+## 0.43.0 - 2026-11-17
+
+- **Board Filter: assignee and Compact cards.** The Filter now narrows the board by one assignee (or Unassigned), next to the labels and the search, and its Compact cards switch hides each card's snippet and cover; the switch is kept in the browser. Files: `app/utils/boardFilter.ts`, `app/composables/useProjects.ts`, `app/pages/projects/[id].vue`, `app/components/kanban/KanbanBoard.vue`, `app/components/kanban/KanbanCard.vue`, `docs/basics/boards-and-columns.md`.
+
 ## 0.42.1 - 2026-11-17
 
 - **Crew kit: the worktree folder from crew.json is read, and the serve hint says "for example".** `init` no longer warns that a set worktreeBase is missing, and `crew <who> prepare worktree` takes the folder from the loaded config. The serve hint for a non-Nuxt product no longer reads as the required command. Files: `crew/config.mjs`, `crew/prepare-worktree-cli.mjs`, `crew/init.mjs`, `crew/worktree-base-config.test.mjs`.

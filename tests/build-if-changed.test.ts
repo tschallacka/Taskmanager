@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { decide, formatLine, run } from '../scripts/build-if-changed.mjs'
+import { cacheDirFor, decide, formatLine, run } from '../scripts/build-if-changed.mjs'
 
 const GOOD = { hash: 'abc123', entry: true, version: true }
 
@@ -229,6 +229,23 @@ test('a cache outside the release (BUILD_CACHE_DIR) survives the deploy: the nex
   assert.equal(run({ root: second, env: { BUILD_CACHE_DIR: shared }, build: b.build }).action, 'skipped')
   assert.equal(b.counter.calls, 0, 'no build in the new release')
   assert.ok(existsSync(join(second, '.output', 'server', 'index.mjs')), 'the output is in the new release')
+})
+
+test('the cache is in BUILD_CACHE_DIR when it is set, and in data/.build-cache of the release when it is not', () => {
+  assert.equal(cacheDirFor('/rel/a', { BUILD_CACHE_DIR: '/var/lib/tm/build-cache' }), '/var/lib/tm/build-cache')
+  assert.equal(cacheDirFor('/rel/a', {}), join('/rel/a', 'data', '.build-cache'))
+})
+
+// The must: each deploy builds a new release folder (a new git worktree), so a cache inside the release is gone on the next one.
+test('a second release folder with the same inputs skips when the cache is in BUILD_CACHE_DIR', () => {
+  const cache = mkdtempSync(join(tmpdir(), 'bic-shared-cache-'))
+  const first = release()
+  assert.equal(run({ root: first, env: { BUILD_CACHE_DIR: cache }, build: fakeBuild(first).build }).action, 'built')
+  const second = release()
+  const { build, counter } = fakeBuild(second)
+  assert.equal(run({ root: second, env: { BUILD_CACHE_DIR: cache }, build }).action, 'skipped')
+  assert.equal(counter.calls, 0, 'the new release copies the cached output and does not build')
+  assert.ok(existsSync(join(second, '.output', 'server', 'index.mjs')))
 })
 
 test('a run that changes only nix/hashes.json skips', () => {

@@ -21,8 +21,6 @@ PGSOCK=$WB/data/run/taskmanager
 PGPORT=5435
 export PATH="$WB/profile/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 export NODE_OPTIONS=--max-old-space-size=6144
-# The build cache lives outside the releases: each deploy removes the release folder, and the cache must outlive it.
-export BUILD_CACHE_DIR=$TM_HOME/build-cache
 
 WATCH=
 FORCE=
@@ -130,7 +128,8 @@ deploy() {
   log "$BRANCH is at ${sha:0:12}, running ${running:-nothing}; building it"
   [ -d "$rel" ] && remove_release "$rel"
   git -C "$TM_HOME/repo.git" worktree add --quiet --detach "$rel" "$sha" || return 1
-  if ! (cd "$rel" && bun install --frozen-lockfile && bun run build); then
+  # The build cache lives outside the release: each release is a new folder, so a cache inside it is gone on the next deploy.
+  if ! (cd "$rel" && bun install --frozen-lockfile && BUILD_CACHE_DIR="$TM_HOME/build-cache" bun run build); then
     log "the build of ${sha:0:12} failed; staying on ${running:-nothing}"
     touch "$rel.failed"; remove_release "$rel"; return 1
   fi

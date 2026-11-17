@@ -142,7 +142,8 @@ async function tryArchive(ids: string[]) {
 async function tryArchiveAll() {
   actionError.value = ''
   try {
-    await archiveAll()
+    // Under the Unread filter the button archives what that filter shows: the unread rows only.
+    await archiveAll(filter.value === 'unread')
   } catch (error) {
     actionError.value = errorText(error, 'Could not archive. The notifications are back in the inbox.')
   }

@@ -5,7 +5,8 @@ import { boardLoadMessage, isBoardId } from '~/utils/boardLoad'
 import { queryForView } from '~/utils/projectViewQuery'
 import { initialsOf } from '~/utils/avatarInitials'
 import { tagChipAttrs } from '~/utils/tagColors'
-import { boardLabelColor } from '~/composables/useProjects'
+import { boardLabelColor, boardPeople as projectPeople } from '~/composables/useProjects'
+import { UNASSIGNED, personLabel } from '~/utils/boardFilter'
 import { queryWithoutTask, taskPanelPath, taskQueryAsPanelAddress } from '~/utils/taskPanelUrl'
 
 // One page for the board and for its task panel addresses: the same key keeps the board mounted while the panel opens.
@@ -33,6 +34,13 @@ const {
   boardTagCounts,
   toggleTagFilter,
   clearTagFilter,
+  assigneeFilter,
+  boardFiltering,
+  toggleAssigneeFilter,
+  clearAssigneeFilter,
+  compactCards,
+  toggleCompactCards,
+  restoreCompactCards,
   showTrashed,
   trashedCount,
   toggleShowTrashed,
@@ -142,7 +150,16 @@ const tabsMaskStyle = computed(() => {
   return { maskImage: mask, WebkitMaskImage: mask }
 })
 watch(visibleViews, () => nextTick(updateTabCues))
+// The Filter's assignee rows: everyone the board's tasks can be assigned to, and the name the Filter button shows.
+const assignablePeople = computed(() => projectPeople())
+const assigneeFilterLabel = computed(() => {
+  if (assigneeFilter.value === null) return ''
+  if (assigneeFilter.value === UNASSIGNED) return 'Unassigned'
+  const person = assignablePeople.value.find(p => p.id === assigneeFilter.value)
+  return person ? personLabel(person) : 'Assignee'
+})
 onMounted(() => {
+  restoreCompactCards()
   updateTabCues()
   window.addEventListener('resize', updateTabCues)
 })
@@ -682,10 +699,10 @@ useSeoMeta({
     </div>
 
     <!-- The view row: the tabs scroll on a phone; Filter, search in this board and New task stay in view at the right. -->
-    <div class="flex shrink-0 items-center gap-2 border-b border-default px-4 lg:px-6">
+    <div class="flex flex-wrap items-center gap-2 border-b border-default px-4 lg:px-6">
       <nav
         ref="tabsEl"
-        class="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto py-1"
+        class="flex min-w-0 flex-1 basis-full items-center gap-1 overflow-x-auto py-1 lg:basis-0"
         aria-label="Project views"
         :style="tabsMaskStyle"
         @scroll="updateTabCues"
@@ -760,15 +777,15 @@ useSeoMeta({
       </nav>
       <div
         v-if="view === 'board'"
-        class="flex shrink-0 items-center gap-2 py-1.5"
+        class="flex min-w-0 flex-wrap items-center justify-end gap-2 py-1.5"
       >
         <!-- Filter: labels, and Show deleted (the trash, which the design puts here too). On the board view on every board, so a fresh one has it. -->
         <UPopover :content="{ align: 'end', sideOffset: 6 }">
           <UButton
             icon="i-lucide-filter"
             size="xs"
-            :color="activeTags.length ? 'primary' : 'neutral'"
-            :variant="activeTags.length ? 'soft' : 'ghost'"
+            :color="boardFiltering ? 'primary' : 'neutral'"
+            :variant="boardFiltering ? 'soft' : 'ghost'"
             data-filter-button
           >
             <span class="hidden sm:inline">Filter</span>
@@ -787,6 +804,11 @@ useSeoMeta({
               class="tm-chip"
               data-filter-more
             >+{{ activeTags.length - 2 }}</span>
+            <span
+              v-if="assigneeFilter !== null"
+              class="max-w-28 truncate rounded-full bg-elevated px-2 py-0.5 text-[length:var(--tm-font-size-label)] font-medium text-default ring-1 ring-inset ring-default"
+              data-filter-assignee-chip
+            >{{ assigneeFilterLabel }}</span>
           </UButton>
 
           <template #content>
@@ -828,6 +850,47 @@ useSeoMeta({
               <div
                 class="mt-1 border-t border-default pt-1.5"
               >
+                <div class="flex items-center justify-between px-1.5 pb-1.5">
+                  <span class="text-xs font-semibold text-muted">Assignee</span>
+                  <button
+                    v-if="assigneeFilter !== null"
+                    class="text-xs text-primary hover:underline"
+                    data-assignee-clear
+                    @click="clearAssigneeFilter"
+                  >
+                    Clear
+                  </button>
+                </div>
+                <button
+                  v-for="person in assignablePeople"
+                  :key="person.id"
+                  class="flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left text-xs transition-colors hover:bg-elevated"
+                  data-assignee-filter
+                  @click="toggleAssigneeFilter(person.id)"
+                >
+                  <UIcon
+                    :name="assigneeFilter === person.id ? 'i-lucide-square-check' : 'i-lucide-square'"
+                    class="size-3.5 shrink-0"
+                    :class="assigneeFilter === person.id ? 'text-primary' : 'text-dimmed'"
+                  />
+                  <span class="min-w-0 flex-1 truncate">{{ personLabel(person) }}</span>
+                </button>
+                <button
+                  class="flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left text-xs transition-colors hover:bg-elevated"
+                  data-assignee-unassigned
+                  @click="toggleAssigneeFilter(UNASSIGNED)"
+                >
+                  <UIcon
+                    :name="assigneeFilter === UNASSIGNED ? 'i-lucide-square-check' : 'i-lucide-square'"
+                    class="size-3.5 shrink-0"
+                    :class="assigneeFilter === UNASSIGNED ? 'text-primary' : 'text-dimmed'"
+                  />
+                  <span class="min-w-0 flex-1 truncate">Unassigned</span>
+                </button>
+              </div>
+              <div
+                class="mt-1 border-t border-default pt-1.5"
+              >
                 <button
                   class="flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left text-xs transition-colors hover:bg-elevated"
                   data-show-deleted
@@ -840,6 +903,20 @@ useSeoMeta({
                   />
                   <span>Show deleted</span>
                   <span class="ml-auto shrink-0 tabular-nums text-dimmed">{{ trashedCount }}</span>
+                </button>
+              </div>
+              <div class="mt-1 border-t border-default pt-1.5">
+                <button
+                  class="flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left text-xs transition-colors hover:bg-elevated"
+                  data-compact-cards
+                  @click="toggleCompactCards"
+                >
+                  <UIcon
+                    :name="compactCards ? 'i-lucide-square-check' : 'i-lucide-square'"
+                    class="size-3.5 shrink-0"
+                    :class="compactCards ? 'text-primary' : 'text-dimmed'"
+                  />
+                  <span>Compact cards</span>
                 </button>
               </div>
             </div>

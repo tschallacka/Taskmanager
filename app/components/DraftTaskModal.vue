@@ -10,6 +10,7 @@ const props = defineProps<{
   boards: { id: string, name: string }[]
 }>()
 const open = defineModel<boolean>('open', { default: false })
+const boardOptions = computed(() => props.boards.map(board => ({ label: board.name, value: board.id })))
 
 const toast = useToast()
 const { activeProject } = useProjects()
@@ -89,20 +90,14 @@ async function create() {
             {{ person.name }}
           </span>
           <span>in</span>
-          <select
+          <AppSelect
             v-model="projectId"
-            class="min-w-0 max-w-56 rounded-md border border-dashed border-default bg-transparent px-2 py-1 text-sm text-default outline-none focus:border-primary"
+            :options="boardOptions"
+            size="sm"
+            class="min-w-0 max-w-56"
             aria-label="Project"
             data-draft-project
-          >
-            <option
-              v-for="board in boards"
-              :key="board.id"
-              :value="board.id"
-            >
-              {{ board.name }}
-            </option>
-          </select>
+          />
         </div>
         <UTextarea
           v-model="description"

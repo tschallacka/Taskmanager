@@ -61,3 +61,30 @@ test('the build id is read from the release the server runs (REVISION there), no
     else process.env.TASKMANAGER_RELEASE = before
   }
 })
+
+// The should: a supervisor may start the server from another folder than its release root. The server reads the VERSION of the
+// release its own code runs from (the .output above its module), so a different working folder cannot report another version.
+test('the release the server runs from wins over the working folder', () => {
+  const release = folder()
+  mkdirSync(join(release, '.output', 'server', 'chunks', 'nitro'), { recursive: true })
+  writeFileSync(join(release, '.output', 'VERSION'), '0.42.2\n')
+  const otherWorkingFolder = folder()
+  mkdirSync(join(otherWorkingFolder, '.output'))
+  writeFileSync(join(otherWorkingFolder, '.output', 'VERSION'), '0.42.1\n')
+  const moduleDir = join(release, '.output', 'server', 'chunks', 'nitro')
+  assert.equal(readAppVersion({ cwd: otherWorkingFolder, bundled: '0.41.0', moduleDir }), '0.42.2')
+})
+
+test('a server whose working folder is its release root reads the same VERSION', () => {
+  const release = folder()
+  mkdirSync(join(release, '.output', 'server'), { recursive: true })
+  writeFileSync(join(release, '.output', 'VERSION'), '0.42.2\n')
+  assert.equal(readAppVersion({ cwd: release, bundled: '0.41.0', moduleDir: join(release, '.output', 'server') }), '0.42.2')
+})
+
+test('from the source tree (dev, no .output above the module), the working folder is read as before', () => {
+  const cwd = folder()
+  mkdirSync(join(cwd, '.output'))
+  writeFileSync(join(cwd, '.output', 'VERSION'), '0.42.1\n')
+  assert.equal(readAppVersion({ cwd, bundled: '0.41.0', moduleDir: join(folder(), 'server', 'utils') }), '0.42.1')
+})

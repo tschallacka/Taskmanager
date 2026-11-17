@@ -3,16 +3,47 @@
 // runs this file. If the build inputs (scripts/build-inputs.mjs) hash to the value the last good build was made from, and that build's
 // output is still there, the output is copied to .output and the build is skipped. Otherwise the real build runs (`build:full`) and its
 // output becomes the cache. Any doubt runs the real build. BUILD_FORCE=1 always runs it.
-// Cache: data/.build-cache/inputs.sha256 (the hash) and data/.build-cache/output (a copy of .output). data/ is the one path kept between
-// releases on the server. Every run prints one line: build-if-changed: skipped|built|failed, hash <12>, wall Ns, cpu Ns, peak MB.
-// Links: every copy dereferences symlinks (a link is stored as the file it points at), and a tree with an absolute link, a link that
-// leaves .output, a broken link, or a text file that names the build root is never skipped and never stored. The reason is printed.
+// Cache: inputs.sha256 (the hash) and output (a copy of .output), in BUILD_CACHE_DIR. The deploy sets it to a folder outside the release
+// (each release is a new folder, so a cache inside one is gone on the next deploy). Unset, it is data/.build-cache of the release.
+// Links: a copy resolves symlinks (a link is stored as the file it points at). A tree with an absolute link, a link that leaves it, a
+// broken link, or a text file that names the build root is never skipped and never stored, and the reason is printed.
+// Every run prints one line: build-if-changed: skipped|built|failed, hash <12>, wall Ns, cpu Ns, peak MB.
 import { spawnSync } from 'node:child_process'
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, extname, isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { hashTree } from './build-inputs.mjs'
+
+/**
+ * Copies a build output with its symlinks resolved. Nitro's output holds symlinks whose targets are ABSOLUTE paths inside the output
+ * of the release that built it; a plain copy keeps them, so the copy points into the old release, and the deploy later prunes that
+ * release (the app then fails to start). Resolving them makes the copy stand on its own.
+ */
+export function copyOutput(from, to) {
+  // A directory is walked, so a link to a directory is followed. A file is copied with its link resolved: cpSync without
+  // `dereference` copies a file link as a link (a file link would then point into the old release too).
+  const info = statSync(from)
+  if (info.isDirectory()) {
+    mkdirSync(to, { recursive: true })
+    for (const name of readdirSync(from)) copyOutput(join(from, name), join(to, name))
+  } else {
+    cpSync(from, to, { dereference: true })
+  }
+}
+
+/** True when `dir` holds any symlink: a copy made by copyOutput holds none, so one means the copy cannot be trusted. */
+export function hasBrokenLinks(dir) {
+  const walk = (current) => {
+    for (const name of readdirSync(current)) {
+      const full = join(current, name)
+      if (lstatSync(full).isSymbolicLink()) return true
+      if (lstatSync(full).isDirectory() && walk(full)) return true
+    }
+    return false
+  }
+  return walk(dir)
+}
 
 const ENTRY = join('server', 'index.mjs')
 const VERSION = 'VERSION'
@@ -66,6 +97,11 @@ export function formatLine({ action, hash, wallS, cpuS, peakMB }) {
   return `build-if-changed: ${action}, hash ${String(hash).slice(0, 12)}, wall ${wallS.toFixed(1)}s, cpu ${cpuS.toFixed(1)}s, peak ${Math.round(peakMB)} MB`
 }
 
+/** Where the cache lives: BUILD_CACHE_DIR when the deploy sets it (outside the release), else data/.build-cache of the release. */
+export function cacheDirFor(root, env = {}) {
+  return env.BUILD_CACHE_DIR ? env.BUILD_CACHE_DIR : join(root, 'data', '.build-cache')
+}
+
 function cacheState(cacheDir) {
   const outDir = join(cacheDir, 'output')
   if (!existsSync(outDir)) return null
@@ -85,13 +121,13 @@ function writeVersion(root) {
 }
 
 // The cache is written only after a good build, in a temp folder first, then renamed into place: a half-written cache is never used.
-// The copy dereferences links, and the copy is checked before it replaces the cache. A refused or failed copy leaves no cache for
-// the old inputs either, so nothing can be skipped against it. Returns true when the cache was stored.
+// The copy resolves links, and the copy is checked before it replaces the cache. A refused or failed copy leaves no cache for the old
+// inputs either, so nothing can be skipped against it. Returns true when the cache was stored.
 function storeCache(root, cacheDir, hash, log) {
   mkdirSync(cacheDir, { recursive: true })
   const tmp = mkdtempSync(join(cacheDir, '.tmp-'))
   try {
-    cpSync(join(root, '.output'), join(tmp, 'output'), { recursive: true, dereference: true })
+    copyOutput(join(root, '.output'), join(tmp, 'output'))
     const bad = treeProblem(join(tmp, 'output'), root)
     if (bad) {
       log(`build-if-changed: not stored: ${bad}`)
@@ -104,7 +140,7 @@ function storeCache(root, cacheDir, hash, log) {
     renameSync(join(cacheDir, 'inputs.sha256.tmp'), join(cacheDir, 'inputs.sha256'))
     return true
   } catch (error) {
-    log(`build-if-changed: not stored, the copy failed: ${error.message}`)
+    log(`build-if-changed: not stored: the copy failed: ${error.message}`)
     rmSync(join(cacheDir, 'inputs.sha256'), { force: true })
     return false
   } finally {
@@ -119,9 +155,7 @@ function storeCache(root, cacheDir, hash, log) {
 export function run({ root, env = {}, build, bunVersion = '', nodeVersion = '', log = console.log }) {
   const start = Date.now()
   const hash = hashTree(root, { bun: bunVersion, node: nodeVersion, env })
-  // BUILD_CACHE_DIR, when the deploy sets it, keeps the cache outside the release (the release is removed on each deploy). Otherwise
-  // the cache is data/.build-cache in the release, which is the local and dev layout.
-  const cacheDir = env.BUILD_CACHE_DIR || join(root, 'data', '.build-cache')
+  const cacheDir = cacheDirFor(root, env)
   const cache = cacheState(cacheDir)
   let d = decide({ force: env.BUILD_FORCE === '1', hash, cache })
   if (d.dropCache) rmSync(cacheDir, { recursive: true, force: true })
@@ -134,7 +168,8 @@ export function run({ root, env = {}, build, bunVersion = '', nodeVersion = '', 
   if (d.action === 'skip') {
     try {
       rmSync(join(root, '.output'), { recursive: true, force: true })
-      cpSync(join(cacheDir, 'output'), join(root, '.output'), { recursive: true, dereference: true })
+      copyOutput(join(cacheDir, 'output'), join(root, '.output'))
+      if (hasBrokenLinks(join(root, '.output'))) throw new Error('the copied output holds symlinks')
       writeVersion(root)
       const bad = treeProblem(join(root, '.output'), root)
       if (bad) throw new Error(bad)

@@ -32,6 +32,11 @@ watch(() => props.projectId, () => {
 }, { immediate: true })
 
 const FIELD_TYPE_LABELS: Record<FieldType, string> = { text: 'Text', number: 'Number', select: 'Dropdown', date: 'Date' }
+const fieldTypeOptions = Object.entries(FIELD_TYPE_LABELS).map(([value, label]) => ({ label, value }))
+// The picker hands over a string; only the four field types are ever set.
+function setNewFieldType(value: string | null | undefined) {
+  if (value && value in FIELD_TYPE_LABELS) newField.type = value as FieldType
+}
 const FIELD_TYPE_ICONS: Record<FieldType, string> = {
   text: 'i-lucide-type', number: 'i-lucide-hash', select: 'i-lucide-list', date: 'i-lucide-calendar'
 }
@@ -218,19 +223,13 @@ function dropField(fieldId: string) {
               data-new-field-name
             >
             <div class="flex gap-2">
-              <select
-                v-model="newField.type"
-                class="flex-1 rounded-md border border-default bg-transparent px-2 py-1.5 text-sm text-default outline-none focus:border-primary"
+              <AppSelect
+                :model-value="newField.type"
+                :options="fieldTypeOptions"
+                class="flex-1"
                 data-new-field-type
-              >
-                <option
-                  v-for="(label, type) in FIELD_TYPE_LABELS"
-                  :key="type"
-                  :value="type"
-                >
-                  {{ label }}
-                </option>
-              </select>
+                @update:model-value="setNewFieldType"
+              />
               <UButton
                 type="submit"
                 label="Add"
