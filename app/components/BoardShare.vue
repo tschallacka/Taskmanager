@@ -89,7 +89,6 @@ const customerLink = ref('')
 // The address the link was made for: the form clears the email field, so the link box keeps it.
 const customerLinkFor = ref('')
 const customerSending = ref(false)
-const customerItems = computed(() => (customers.value ?? []).map(customer => ({ label: customer.name, value: customer.id })))
 
 async function inviteCustomer() {
   const problem = customerChoiceError({ customerId: customerChoice.value, customerName: customerNewName.value, email: customerEmail.value })
@@ -412,12 +411,23 @@ watch(open, (isOpen) => {
               class="space-y-2"
               @submit.prevent="inviteCustomer"
             >
-              <USelect
+              <select
                 v-model="customerChoice"
-                :items="customerItems"
-                placeholder="Choose the customer"
-                class="w-full"
-              />
+                class="w-full rounded-md border border-default bg-transparent px-2 py-1.5 text-sm text-default outline-none focus:border-primary"
+                aria-label="The customer"
+                data-share-customer-choice
+              >
+                <option value="">
+                  Choose the customer
+                </option>
+                <option
+                  v-for="customer in customers"
+                  :key="customer.id"
+                  :value="customer.id"
+                >
+                  {{ customer.name }}
+                </option>
+              </select>
               <UInput
                 v-model="customerNewName"
                 placeholder="…or type a new customer's name"
