@@ -2,8 +2,9 @@ import { db } from '../db'
 import { customers, projects, projectColumns } from '../db/schema'
 import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm'
 import { getProjectAccessFilter, genId } from '../utils/projects'
-import { audienceFor, customerIdsOf, getUserActiveTeamId } from '../utils/auth-helpers'
+import { customerIdsOf, getUserActiveTeamId } from '../utils/auth-helpers'
 import { customerNameForAudience } from '../utils/customerNames'
+import { audienceByMembership } from '#shared/utils/projectAudience'
 import { sharedPairsOf } from '../utils/customerProjects'
 import { requireOrgCustomer } from '../utils/customers'
 import { publishFromEvent } from '../utils/realtime'
@@ -17,7 +18,6 @@ export default defineEventHandler(async (event) => {
 
   if (event.method === 'GET') {
     const filter = await getProjectAccessFilter(event)
-    const teamId = await getUserActiveTeamId(event)
     const archivedView = getQuery(event).archived === '1'
     const own = await db
       .select({ project: projects, customerName: customers.name })
@@ -96,7 +96,7 @@ export default defineEventHandler(async (event) => {
       const realNeighbour = realNeighbourIds.has(project.id)
       if (realNeighbour && !realNeighbourIsOpenable(project.teamId, memberTeams)) return labelRowOf(project)
       const shadowNeighbour = shadowNeighbourIds.has(project.id)
-      const audience = shadowNeighbour || realNeighbour ? 'staff' as const : audienceFor(userId, teamId, project)
+      const audience = shadowNeighbour || realNeighbour ? 'staff' as const : audienceByMembership(userId, memberTeams, project)
       return {
         ...project,
         // A contact sees only their own customer's name on this project, never the first customer's (customerNames.ts).
