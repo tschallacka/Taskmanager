@@ -9,9 +9,9 @@
 // broken link, or a text file that names the build root is never skipped and never stored, and the reason is printed.
 // Every run prints one line: build-if-changed: skipped|built|failed, hash <12>, wall Ns, cpu Ns, peak MB.
 import { spawnSync } from 'node:child_process'
-import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, extname, isAbsolute, join, relative, resolve } from 'node:path'
+import { dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { hashTree } from './build-inputs.mjs'
 
@@ -20,16 +20,28 @@ import { hashTree } from './build-inputs.mjs'
  * of the release that built it; a plain copy keeps them, so the copy points into the old release, and the deploy later prunes that
  * release (the app then fails to start). Resolving them makes the copy stand on its own.
  */
-export function copyOutput(from, to) {
-  // A directory is walked, so a link to a directory is followed. A file is copied with its link resolved: cpSync without
-  // `dereference` copies a file link as a link (a file link would then point into the old release too).
-  const info = statSync(from)
-  if (info.isDirectory()) {
+export function copyOutput(from, to, scope = null) {
+  // `scope` is the real path of the output being copied and the real paths of the directories above `from`. A directory link that
+  // leads back to one of them is a cycle, and a link whose real path leaves the output is refused: both throw, with the reason, and
+  // the caller then runs the full build (or stores nothing). A file is copied with its link resolved (cpSync without `dereference`
+  // would copy a file link as a link, which points into the old release).
+  const here = scope ?? { root: realpathSync(from), ancestors: [] }
+  const real = realpathSync(from)
+  if (!inside(real, here.root)) throw new Error(`a link leaves the output: ${from}`)
+  if (statSync(from).isDirectory()) {
+    if (here.ancestors.includes(real)) throw new Error(`cyclic link at ${from}`)
     mkdirSync(to, { recursive: true })
-    for (const name of readdirSync(from)) copyOutput(join(from, name), join(to, name))
+    for (const name of readdirSync(from)) {
+      copyOutput(join(from, name), join(to, name), { root: here.root, ancestors: [...here.ancestors, real] })
+    }
   } else {
     cpSync(from, to, { dereference: true })
   }
+}
+
+// True when `path` is `root` or inside it (both real paths).
+function inside(path, root) {
+  return path === root || path.startsWith(root + sep)
 }
 
 /** True when `dir` holds any symlink: a copy made by copyOutput holds none, so one means the copy cannot be trusted. */
