@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.46.0 - 2026-11-17
+
+- **Crew kit: a notice when the board has ready work and the crew is idle.** When cards wait in To do or in a Verify column and nothing has happened for 30 minutes, Pia and Boss get one mail, and another only when the set of ready cards changes. Done and blocked cards are not named. Files: `crew/idle-ready.mjs`, `crew/idle-ready.test.mjs`.
+
 ## 0.45.0 - 2026-11-17
 
 - **The production build is skipped when nothing it reads has changed.** `bun run build` hashes the build inputs (the app, the server, the shared code, the public folder, the docs, the configs, the tool versions and the build-time environment values) and copies the last good output from `data/.build-cache/` when the hash matches; `BUILD_FORCE=1` forces a full build, and `bun run build:full` is the full build. The app's version is read at run time from the release, so a copied build reports its own version. Files: `scripts/build-if-changed.mjs`, `scripts/build-inputs.mjs`, `server/utils/appVersionFile.ts`, `server/utils/appVersion.ts`, `package.json`, `CONTRIBUTING.md`.
