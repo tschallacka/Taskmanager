@@ -8,7 +8,13 @@ import { readAppVersion } from './appVersionFile'
 // here, so the two cannot disagree. It is read at run time from the release (the VERSION file, then package.json; appVersionFile.ts).
 // The bundled value is only the last resort (dev), so a build copied from the cache still reports its own release.
 export const APP_NAME = 'Taskmanager'
-export const APP_VERSION: string = readAppVersion({ cwd: process.cwd(), bundled: pkg.version })
+// The release the server runs: TASKMANAGER_RELEASE (run-server.sh sets it to the release `current` points at), else the working folder.
+// The server runs from state/, so the working folder is not the release (card mwkf0nartlrd5n8lz2o).
+export function releaseRoot(): string {
+  return process.env.TASKMANAGER_RELEASE?.trim() || process.cwd()
+}
+
+export const APP_VERSION: string = readAppVersion({ cwd: process.cwd(), release: releaseRoot(), bundled: pkg.version })
 
 // The commit a Blaze deploy writes into a file named REVISION at the release root. The release folder is a
 // `git archive` with no .git, so this file is the only place the commit is known at run time.
@@ -31,7 +37,7 @@ export function readRevision(dir: string): string | null {
 // REVISION is read once per working directory and kept, so a request never touches the disk for it.
 const revisionByDir = new Map<string, string | null>()
 function revisionHere(): string | null {
-  const dir = process.cwd()
+  const dir = releaseRoot()
   if (!revisionByDir.has(dir)) revisionByDir.set(dir, readRevision(dir))
   return revisionByDir.get(dir) ?? null
 }

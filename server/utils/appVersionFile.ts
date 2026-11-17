@@ -22,9 +22,12 @@ function fromPackageJson(file: string): string | null {
   }
 }
 
-/** The version for the release that `cwd` is, with `bundled` as the last resort. */
-export function readAppVersion({ cwd, bundled }: { cwd: string, bundled: string }): string {
-  return fromVersionFile(join(cwd, '.output', 'VERSION'))
-    ?? fromPackageJson(join(cwd, 'package.json'))
+/**
+ * The version of the release the server runs: `release` (TASKMANAGER_RELEASE, set by run-server.sh; the server runs from state/, not
+ * from its release), else the working folder `cwd`. `bundled` is the last resort.
+ */
+export function readAppVersion({ cwd, release = cwd, bundled }: { cwd: string, release?: string, bundled: string }): string {
+  return fromVersionFile(join(release, '.output', 'VERSION'))
+    ?? fromPackageJson(join(release, 'package.json'))
     ?? bundled
 }
