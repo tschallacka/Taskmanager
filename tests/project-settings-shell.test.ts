@@ -12,13 +12,13 @@ const view = readFileSync(new URL('../app/components/kanban/ProjectSettingsView.
 const account = readFileSync(new URL('../app/components/settings/Shell.vue', import.meta.url), 'utf8')
 
 test('the built sections are the six the view can draw, in the card order, each on its own address', () => {
-  const built = builtProjectSections('42')
+  const built = builtProjectSections()
   assert.deepEqual(built.map(s => s.key), ['general', 'members', 'github', 'rules', 'secrets', 'fields'])
   assert.equal(built.find(s => s.key === 'github')?.path('42'), '/projects/42/settings/github')
 })
 
 test('the sections with no panel yet are not listed', () => {
-  const keys = builtProjectSections('42').map(s => s.key)
+  const keys = builtProjectSections().map(s => s.key)
   for (const key of ['customers', 'import', 'trash', 'archive']) assert.equal(keys.includes(key as never), false, key)
 })
 
