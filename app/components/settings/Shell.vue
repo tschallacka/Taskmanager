@@ -14,13 +14,15 @@ const icons: Record<string, string> = {
   'ai': 'i-lucide-sparkles'
 }
 
-const sections = [
+// A computed, so the list follows the session: an instance admin whose session loads after setup sees Crews and agents
+// without a reload (the old v-if was reactive; a plain array was not).
+const sections = computed(() => [
   ...ACCOUNT_SECTIONS.map(section => ({ label: section.label, icon: icons[section.key]!, to: section.path })),
   { label: 'Sprocket', icon: 'i-lucide-cog', to: '/settings/sprocket' },
   { label: 'AI history', icon: 'i-lucide-history', to: '/settings/ai-history' },
   // The admin's own pages are reached from here too, for an instance admin only.
   ...(isInstanceAdmin.value ? [{ label: 'Crews and agents', icon: 'i-lucide-bot', to: '/admin/crews' }] : [])
-]
+])
 </script>
 
 <template>
