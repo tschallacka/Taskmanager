@@ -26,7 +26,7 @@ const sections = builtProjectSections()
         variant="ghost"
         size="sm"
         class="shrink-0 justify-start"
-        :active="s.key === current"
+        :class="s.key === current ? 'bg-elevated font-medium text-default' : ''"
         :aria-current="s.key === current ? 'page' : undefined"
       />
     </nav>
