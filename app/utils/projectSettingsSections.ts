@@ -27,14 +27,15 @@ export const PROJECT_SECTIONS: ProjectSettingsSection[] = [
 
 /**
  * The component that renders each section's panel, by the name Nuxt gives it under app/components/project-settings/.
- * Only the sections with a panel are here: Customer access, Custom fields, Import, Trash and Archive have none yet.
+ * Custom fields has no panel: its block stays in the view. Customer access, Trash and Archive get theirs in later steps.
  */
 export const PROJECT_PANEL_COMPONENTS: Partial<Record<ProjectSettingsKey, string>> = {
   general: 'ProjectSettingsProjectGeneralSettings',
   github: 'ProjectSettingsProjectGithubSettings',
   rules: 'ProjectSettingsProjectRulesSettings',
   members: 'ProjectSettingsProjectMembersSettings',
-  secrets: 'ProjectSettingsProjectSecretsSettings'
+  secrets: 'ProjectSettingsProjectSecretsSettings',
+  import: 'ProjectSettingsProjectImportSettings'
 }
 
 /** The address of one section of a project. */
@@ -44,7 +45,7 @@ export function projectSettingsPath(projectId: string, key: ProjectSettingsKey):
 
 // The sections the settings view can draw today. Customer access, Import, Trash and Archive are listed once they have
 // a panel (later steps), so the left list never offers a section with nothing behind it.
-const BUILT_KEYS: ProjectSettingsKey[] = ['general', 'members', 'github', 'rules', 'secrets', 'fields']
+const BUILT_KEYS: ProjectSettingsKey[] = ['general', 'members', 'github', 'rules', 'secrets', 'fields', 'import']
 
 /** The sections the left list shows, in the card's order. Each one's path(projectId) is its address. */
 export function builtProjectSections(): ProjectSettingsSection[] {
@@ -73,7 +74,8 @@ const VIEW_SECTION: Partial<Record<ProjectSettingsKey, string>> = {
   rules: 'rules',
   secrets: 'secrets',
   fields: 'fields',
-  github: 'repositories'
+  github: 'repositories',
+  import: 'import'
 }
 
 /** Where a section's address goes: the board page's settings tab, on that section. Sections the view lacks land on General. */

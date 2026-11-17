@@ -18,9 +18,14 @@ test('an existing section redirects to the board page settings tab, with its leg
   assert.equal(settingsTargetFor('p1', 'github'), '/projects/p1?view=settings&section=repositories')
 })
 
-test('a section the view does not have yet lands on the tab’s General', () => {
+test('Import has its own section on the tab', () => {
+  assert.equal(settingsTargetFor('p1', 'import'), '/projects/p1?view=settings&section=import')
+})
+
+test('a key that is not a section lands on the tab’s General', () => {
+  assert.equal(settingsTargetFor('p1', 'nope'), '/projects/p1?view=settings')
+  // Customer access, Trash and Archive still land on General until their own steps below give them a section.
   assert.equal(settingsTargetFor('p1', 'customers'), '/projects/p1?view=settings')
-  assert.equal(settingsTargetFor('p1', 'import'), '/projects/p1?view=settings')
   assert.equal(settingsTargetFor('p1', 'trash'), '/projects/p1?view=settings')
   assert.equal(settingsTargetFor('p1', 'archive'), '/projects/p1?view=settings')
 })
