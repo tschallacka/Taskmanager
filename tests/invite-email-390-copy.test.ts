@@ -56,3 +56,15 @@ test('the team invite email field takes a full row on a phone, so it is not 105 
   assert.match(input, /\bw-full\b/)
   assert.match(input, /\bsm:w-auto\b/)
 })
+
+// Quincy's third round (a810a38, subtask mwl5n5d4vv6ba1d0ux8): in the Members pending row the address shares the line with
+// the Resend and Withdraw buttons, so at 390 px it is squeezed to a few characters ('team- / a810@exa / mple.test'). The row
+// wraps, and the address takes a full line on a phone.
+test('a pending team invite row wraps, and its address takes a full line on a phone', () => {
+  const row = openingTagBefore(teamInvites, 'data-invite-open')
+  assert.match(row, /\bflex-wrap\b/)
+  const address = teamInvites.slice(teamInvites.indexOf('data-invite-open'), teamInvites.indexOf('{{ invitation.email }}'))
+  const column = address.slice(address.lastIndexOf('<div'))
+  assert.match(column, /\bbasis-full\b/)
+  assert.match(column, /\bsm:basis-auto\b/)
+})
