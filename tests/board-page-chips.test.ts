@@ -37,7 +37,7 @@ test('the drop slot shows only in an empty Done column with no filter on, and sa
 
 test('the filter chips take the label colour through tagChipAttrs, as LabelChip does', () => {
   assert.match(page, /import \{ tagChipAttrs \} from '~\/utils\/tagColors'/)
-  assert.match(page, /import \{ boardLabelColor \} from '~\/composables\/useProjects'/)
+  assert.match(page, /import \{ boardLabelColor(, boardPeople as projectPeople)? \} from '~\/composables\/useProjects'/)
   assert.match(page, /v-for="tag in activeTags\.slice\(0, 2\)"/)
   assert.match(page, /:class="tagChipAttrs\(tag, boardLabelColor\(tag\)\)\.class"/)
   assert.match(page, /:style="tagChipAttrs\(tag, boardLabelColor\(tag\)\)\.style"/)

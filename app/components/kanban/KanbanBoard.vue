@@ -21,7 +21,9 @@ const {
   visibleColumnTasks,
   commentCount,
   activeTags,
-  searchText,
+  assigneeFilter,
+  boardFiltering,
+  compactCards,
   isTrashed,
   createTask,
   moveTask,
@@ -605,7 +607,8 @@ async function submitColumn() {
   if (name) await addColumn(props.projectId, name)
 }
 
-const isFiltering = computed(() => activeTags.value.length > 0 || searchText.value.trim() !== '')
+// Labels, the assignee or a search: any of them on means the board is filtered (no drop slot, no folding).
+const isFiltering = boardFiltering
 
 // The Done column gets the dashed drop slot when it is empty: finished work lands here.
 
@@ -633,7 +636,7 @@ const expandedColumns = ref(new Set<string>())
 
 // Opening one board and then another should not carry the first one's expanded
 // columns over, and neither should filtering down to a handful of cards.
-watch([() => props.projectId, activeTags], () => {
+watch([() => props.projectId, activeTags, assigneeFilter], () => {
   expandedColumns.value = new Set()
 })
 
@@ -1002,6 +1005,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onBoardKeydown))
             :readonly="isCustomerView"
             :columns="liveColumns.filter(other => other.id !== column.id)"
             :customer-board="!!activeProject?.customerId"
+            :compact="compactCards"
             @open="emit('openTask', $event)"
             @toggle-complete="onToggleComplete"
             @menu="phoneSheetTaskId = $event"
