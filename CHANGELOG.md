@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.47.1 - 2026-11-17
+
+- **The build cache copy no longer breaks the app after a skipped build.** Nitro's build output holds symlinks with absolute targets into the release that built it; the cached copy kept them, and when the deploy pruned that release the app failed to start (502). The cache and the restored output are now copied with their symlinks resolved, a restored copy that still holds a symlink is not trusted (the real build runs), and the cache format is part of the hash, so the next deploy builds in full and replaces the old cache. Files: `scripts/build-if-changed.mjs`, `scripts/build-inputs.mjs`, `tests/build-cache-symlinks.test.ts`.
+
 ## 0.47.0 - 2026-11-17
 
 - **The crew's own folders are trusted by the kit.** `crew update` and `crew session start` mark the crew home, the kit folder and each session's folder as trusted in Claude Code's config file (one backup, never overwritten; nothing else in the file changes), so a session no longer fails with "folder not trusted" (`crew/claude-trust.mjs`, `crew/kit-files.txt`).
