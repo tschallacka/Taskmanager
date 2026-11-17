@@ -1,6 +1,6 @@
 import { and, eq, gt, inArray, sql } from 'drizzle-orm'
 import { db } from '../db'
-import { customerInvitations, customerMembers, member, projectGuestInvitations, projectGuests, projects } from '../db/schema'
+import { customerInvitations, customerMembers, member, projectGuestInvitations, projectGuests, projects, teamInvitations } from '../db/schema'
 import { genId } from './projects'
 import { publish, workspaceTopic } from './realtime'
 import { invitesToClaim } from './pendingInviteRules'
@@ -90,6 +90,34 @@ export async function pendingBoardProjectIdsFor(addresses: string[], now: number
   if (!addresses.length) return []
   const rows = await openInvitesTo(addresses, now)
   return [...new Set(rows.filter(row => row.status === 'open' && row.expiresAt > now).map(row => row.projectId))]
+}
+
+/**
+ * The team's rule for sign-in: an open team invitation to one of the account's addresses is accepted by itself, and the
+ * account becomes a member of that team with the invited role. A revoked or used invitation is never claimed.
+ */
+export async function claimPendingTeamInvites(userId: string, addresses: string[], now: number): Promise<void> {
+  if (!addresses.length) return
+  const lowered = addresses.map(address => address.toLowerCase())
+  const rows = await db
+    .select({ id: teamInvitations.id, email: teamInvitations.email, acceptedAt: teamInvitations.acceptedAt, revokedAt: teamInvitations.revokedAt, expiresAt: teamInvitations.expiresAt })
+    .from(teamInvitations)
+    .where(and(gt(teamInvitations.expiresAt, now), inArray(sql`lower(${teamInvitations.email})`, lowered)))
+  const ids = rows.filter(row => row.acceptedAt === null && row.revokedAt === null).map(row => row.id)
+  for (const id of ids) {
+    // Claimed in one statement per invitation, so two requests cannot both take it.
+    const [done] = await db
+      .update(teamInvitations)
+      .set({ acceptedBy: userId, acceptedAt: now })
+      .where(and(eq(teamInvitations.id, id), sql`${teamInvitations.acceptedAt} is null`, sql`${teamInvitations.revokedAt} is null`))
+      .returning({ organizationId: teamInvitations.organizationId, role: teamInvitations.role })
+    if (!done) continue
+    const [already] = await db.select({ id: member.id }).from(member)
+      .where(and(eq(member.organizationId, done.organizationId), eq(member.userId, userId)))
+    if (!already) {
+      await db.insert(member).values({ id: genId(), organizationId: done.organizationId, userId, role: done.role, createdAt: new Date() })
+    }
+  }
 }
 
 /** Claims every open board invitation to these addresses: the invitation is accepted and the account becomes a guest. */
