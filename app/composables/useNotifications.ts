@@ -218,12 +218,13 @@ export function useNotifications() {
     }
   }
 
-  async function archiveAll() {
+  /** Archive all. With `unreadOnly` (under the Unread filter) only the unread rows leave; the read ones stay in the inbox. */
+  async function archiveAll(unreadOnly = false) {
     const before = { items: _items.value, unread: _unread.value }
-    _items.value = []
+    _items.value = unreadOnly ? _items.value.filter(item => item.readAt) : []
     _unread.value = 0
     try {
-      await request('/api/notifications/archive', { method: 'POST', headers: realtimeHeaders(), body: { all: true } })
+      await request('/api/notifications/archive', { method: 'POST', headers: realtimeHeaders(), body: { all: true, unreadOnly } })
     } catch (error) {
       _items.value = before.items
       _unread.value = before.unread
