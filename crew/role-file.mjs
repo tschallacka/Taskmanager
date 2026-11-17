@@ -67,6 +67,19 @@ export function writeRoleFile(home, key, text) {
 }
 
 /**
+ * The first line of every person's role: who the session is, and what it may run. A session that reads only this and its
+ * role file knows its key (card mwghrx2k8dwf8h93say); the user instructions no longer reach it (session.mjs, sources).
+ */
+export function identityLine(key) {
+  return `Your key is ${key}. Run only crew ${key} (for example crew ${key} mcp, crew ${key} update). Never run crew boss or crew pm. Every post is under your own name.`
+}
+
+/** The role with the identity line first, once. Pure. */
+export function withIdentity(key, role) {
+  return `${identityLine(key)}\n\n${String(role ?? '').replace(/^\s*\n/, '')}`
+}
+
+/**
  * The role for `crew session start <key>` (and for `crew up`, through upSessions). Pure: it reads and returns, and writes
  * nothing. Returns { role, source, write } or { role: '', reason }. `write` is true only for a worker's rebuilt section: the
  * caller writes it with writeRoleFile before the start, so the file is written where the start is, not inside this call.
@@ -76,13 +89,13 @@ export function resolveStartRole({ home, key, promptsText, crewText, env = proce
   if (!validKey(key)) return { role: '', reason: `no such person key: ${key}` }
   if (env.CREW_ROLE_FILE) {
     return existsSync(env.CREW_ROLE_FILE)
-      ? { role: readFileSync(env.CREW_ROLE_FILE, 'utf8'), source: 'CREW_ROLE_FILE', write: false }
+      ? { role: withIdentity(key, readFileSync(env.CREW_ROLE_FILE, 'utf8')), source: 'CREW_ROLE_FILE', write: false }
       : { role: '', reason: `CREW_ROLE_FILE does not exist: ${env.CREW_ROLE_FILE}` }
   }
   if (workerRole(promptsText, key)) {
-    return { role: roleFileText(promptsText, crewText, key), source: 'PROMPTS.md', write: true }
+    return { role: withIdentity(key, roleFileText(promptsText, crewText, key)), source: 'PROMPTS.md', write: true }
   }
   const own = readOwnRoleFile(home, key)
-  if (own !== null) return { role: own, source: 'sessions role file', write: false }
+  if (own !== null) return { role: withIdentity(key, own), source: 'sessions role file', write: false }
   return { role: '', reason: `no role for ${key}: no worker section in PROMPTS.md and no sessions/${key}.role.md` }
 }
