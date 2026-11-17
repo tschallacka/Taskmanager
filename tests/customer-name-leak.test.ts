@@ -3,6 +3,7 @@
 // Staff keep the name of the project's customer. Pure: the rule the project list and the pins answer with.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { customerNameForAudience } from '../server/utils/customerNames'
 
 test('staff see the name of the project’s customer, as before', () => {
