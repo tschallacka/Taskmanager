@@ -31,3 +31,12 @@ test('the project section table says Customer access, Import, Trash and Archive 
   assert.equal(table.includes('get theirs in later steps'), false, 'stale comment above PROJECT_PANEL_COMPONENTS')
   assert.equal(table.includes('listed once they have a panel (later steps)'), false, 'stale comment above BUILT_KEYS')
 })
+
+// Nina's should (CQ, e5ccf17): the account shell built its list once, at setup, so an instance admin whose session loads later
+// did not see Crews and agents until a reload. The list is a computed, like AppSidebar's teamLinks.
+test('the account shell builds its item list as a computed, so it follows the session', () => {
+  const account = read('components/settings/Shell.vue')
+  assert.match(account, /const sections = computed\(\(\) => \[/)
+  assert.match(account, /isInstanceAdmin\.value/)
+  assert.match(account, /<SectionNav :items="sections" \/>/)
+})
