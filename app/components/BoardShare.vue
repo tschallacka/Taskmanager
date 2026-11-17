@@ -251,6 +251,17 @@ function withdraw(invitation: Invitation) {
   }, 'Could not withdraw that')
 }
 
+// The guest invitation the owner is asked about before it is withdrawn (the confirm below does it).
+const pendingWithdraw = ref<Invitation | null>(null)
+function askWithdraw(invitation: Invitation) {
+  pendingWithdraw.value = invitation
+}
+function confirmWithdraw() {
+  const invitation = pendingWithdraw.value
+  pendingWithdraw.value = null
+  if (invitation) withdraw(invitation)
+}
+
 const approvedLink = ref<{ email: string, url: string, emailed: boolean } | null>(null)
 
 // A fresh link replaces the old one (only a hash is kept, so the old link cannot be shown again). It is
@@ -809,8 +820,32 @@ watch(open, (isOpen) => {
                     color="neutral"
                     variant="ghost"
                     :disabled="busy === `i:${invitation.id}`"
-                    @click="withdraw(invitation)"
+                    @click="askWithdraw(invitation)"
                   />
+                  <!-- Withdraw takes the link back at once, so it asks first. -->
+                  <UModal
+                    :open="pendingWithdraw?.id === invitation.id"
+                    title="Withdraw this invitation?"
+                    description="The link stops working for that address. You can invite the person again later."
+                    @update:open="(open: boolean) => { if (!open) pendingWithdraw = null }"
+                  >
+                    <template #body>
+                      <div class="flex justify-end gap-2">
+                        <UButton
+                          label="Keep it"
+                          color="neutral"
+                          variant="ghost"
+                          @click="pendingWithdraw = null"
+                        />
+                        <UButton
+                          label="Withdraw"
+                          color="error"
+                          data-invite-withdraw-confirm
+                          @click="confirmWithdraw"
+                        />
+                      </div>
+                    </template>
+                  </UModal>
                 </div>
                 <p
                   v-if="invitation.reason && invitation.status === 'awaiting_approval'"

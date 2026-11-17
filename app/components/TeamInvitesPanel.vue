@@ -58,6 +58,17 @@ async function resend(invitation: OpenInvitation) {
   }
 }
 
+// The invitation the owner is asked about before it is withdrawn (the confirm below does it).
+const pendingWithdraw = ref<OpenInvitation | null>(null)
+function askWithdraw(invitation: OpenInvitation) {
+  pendingWithdraw.value = invitation
+}
+async function confirmWithdraw() {
+  const invitation = pendingWithdraw.value
+  pendingWithdraw.value = null
+  if (invitation) await withdraw(invitation)
+}
+
 async function withdraw(invitation: OpenInvitation) {
   busy.value = invitation.id
   try {
@@ -196,9 +207,33 @@ async function copy(text: string) {
           color="neutral"
           variant="ghost"
           :disabled="busy === invitation.id"
-          @click="withdraw(invitation)"
+          @click="askWithdraw(invitation)"
         />
       </li>
     </ul>
+    <!-- Withdraw takes the link back at once, so it asks first. -->
+    <UModal
+      :open="pendingWithdraw !== null"
+      title="Withdraw this invitation?"
+      description="The link stops working for that address. You can invite the person again later."
+      @update:open="(open: boolean) => { if (!open) pendingWithdraw = null }"
+    >
+      <template #body>
+        <div class="flex justify-end gap-2">
+          <UButton
+            label="Keep it"
+            color="neutral"
+            variant="ghost"
+            @click="pendingWithdraw = null"
+          />
+          <UButton
+            label="Withdraw"
+            color="error"
+            data-invite-withdraw-confirm
+            @click="confirmWithdraw"
+          />
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>
