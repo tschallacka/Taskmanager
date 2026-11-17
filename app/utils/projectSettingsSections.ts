@@ -37,7 +37,8 @@ export const PROJECT_PANEL_COMPONENTS: Partial<Record<ProjectSettingsKey, string
   secrets: 'ProjectSettingsProjectSecretsSettings',
   import: 'ProjectSettingsProjectImportSettings',
   trash: 'ProjectSettingsProjectTrashSettings',
-  archive: 'ProjectSettingsProjectArchiveSettings'
+  archive: 'ProjectSettingsProjectArchiveSettings',
+  customers: 'ProjectSettingsProjectCustomerSettings'
 }
 
 /** The address of one section of a project. */
@@ -47,7 +48,7 @@ export function projectSettingsPath(projectId: string, key: ProjectSettingsKey):
 
 // The sections the settings view can draw today. Customer access, Import, Trash and Archive are listed once they have
 // a panel (later steps), so the left list never offers a section with nothing behind it.
-const BUILT_KEYS: ProjectSettingsKey[] = ['general', 'members', 'github', 'rules', 'secrets', 'fields', 'import', 'trash', 'archive']
+const BUILT_KEYS: ProjectSettingsKey[] = ['general', 'members', 'customers', 'github', 'rules', 'secrets', 'fields', 'import', 'trash', 'archive']
 
 /** The sections the left list shows, in the card's order. Each one's path(projectId) is its address. */
 export function builtProjectSections(): ProjectSettingsSection[] {
@@ -79,7 +80,8 @@ const VIEW_SECTION: Partial<Record<ProjectSettingsKey, string>> = {
   github: 'repositories',
   import: 'import',
   trash: 'trash',
-  archive: 'archive'
+  archive: 'archive',
+  customers: 'customers'
 }
 
 /** Where a section's address goes: the board page's settings tab, on that section. Sections the view lacks land on General. */
