@@ -294,7 +294,8 @@ test('a team invitation is looked up by its link, and is spent or withdrawn for 
   assert.equal(await isLiveAddressedInvitation(token), true)
 
   await db.update(teamInvitations).set({ revokedAt: Date.now() }).where(eq(teamInvitations.tokenHash, hashInvitationToken(token)))
-  assert.equal(await lookupAddressedInvitation(token), 'used')
+  // A withdrawn team link is 'revoked' (its own wording on the invite page), no longer 'used' (one wording for withdrawn links).
+  assert.equal(await lookupAddressedInvitation(token), 'revoked')
   assert.equal(await isLiveAddressedInvitation(token), false)
   assert.equal(await lookupAddressedInvitation('no-such-token'), 'missing')
 })
