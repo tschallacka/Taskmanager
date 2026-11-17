@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.42.1 - 2026-11-17
+
+- **Crew kit: the worktree folder from crew.json is read, and the serve hint says "for example".** `init` no longer warns that a set worktreeBase is missing, and `crew <who> prepare worktree` takes the folder from the loaded config. The serve hint for a non-Nuxt product no longer reads as the required command. Files: `crew/config.mjs`, `crew/prepare-worktree-cli.mjs`, `crew/init.mjs`, `crew/worktree-base-config.test.mjs`.
+
 ## 0.42.0 - 2026-11-17
 
 - **Invite by email, and a later sign-in shows what was invited.** A customer invitation can be tied to an email address: the form asks for it, the team's projects the person may see are ticked and filed under the customer, and a link made for an address shows as "Invited, not accepted yet". The address is prefilled and locked on the sign-in and sign-up forms. A customer link tied to an address is accepted by the account itself, and a person who signs in later with an invitation they never accepted sees it on /pending-invitations, with Accept invitation. Schema change: a new nullable `email` column on customer invitations (`customer_invitations.email`), to be applied by the owner. Files: app/components/CustomersModal.vue, app/pages/invite/[token].vue, app/pages/login.vue, app/pages/pending-invitations.vue, app/pages/projects/index.vue, app/utils/lockedEmail.ts, app/utils/pendingInvitationEntry.ts, shared/utils/inviteEmail.ts, server/api/pending-invitations.get.ts, server/api/pending-invitations.post.ts, server/api/customers/[id]/invitations.post.ts, server/api/customers/[id]/contacts.ts, server/api/invitations/[token]/index.get.ts, server/utils/customerInviteRules.ts, server/utils/pendingInvites.ts, server/db/schema.ts, docs/team/invite-a-contact.md, changelog.d/mwj64qza593kf3pdo5i-invite-by-email.md.
