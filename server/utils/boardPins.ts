@@ -2,6 +2,9 @@ import { and, asc, eq, isNull, sql } from 'drizzle-orm'
 import { db } from '../db'
 import { boardPins, customers, organization, projects } from '../db/schema'
 import { hiddenCrewShadows } from './boardTree'
+import { customerIdsOf } from './auth-helpers'
+import { customerNameForAudience } from './customerNames'
+import { sharedPairsOf } from './customerProjects'
 import { reachOf, workspaceTeam } from './workspaces'
 
 /** A pinned board, with the workspace it opens in: a team, or the personal workspace (null). */
@@ -32,9 +35,20 @@ export async function listPins(userId: string): Promise<PinnedBoard[]> {
     .orderBy(asc(boardPins.createdAt))
 
   const hidden = await hiddenCrewShadows(userId, rows.map(row => row.projectId))
+  // A contact sees only their own customer's name on a pinned board, never the first customer's (customerNames.ts).
+  const ownCustomerNameOf = new Map<string, string>()
+  for (const pair of await sharedPairsOf(await customerIdsOf(userId))) {
+    if (!ownCustomerNameOf.has(pair.projectId)) ownCustomerNameOf.set(pair.projectId, pair.customerName)
+  }
   return rows.filter(row => !hidden.has(row.projectId)).map((row) => {
     const teamId = workspaceTeam(teamIds, row.teamId)
-    return { ...row, teamId, teamName: teamId ? row.teamName : null }
+    const audience = teamId ? 'staff' as const : 'customer' as const
+    return {
+      ...row,
+      customerName: customerNameForAudience({ audience, staffName: row.customerName, ownName: ownCustomerNameOf.get(row.projectId) }),
+      teamId,
+      teamName: teamId ? row.teamName : null
+    }
   })
 }
 

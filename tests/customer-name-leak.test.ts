@@ -22,6 +22,12 @@ test('the project list answers a contact with their own customer’s name only (
   assert.match(route, /sharedPairsOf\(await customerIdsOf\(userId\)\)/)
 })
 
+test('the pinned boards answer a contact with their own customer’s name only (wiring)', () => {
+  const pins = readFileSync(new URL('../server/utils/boardPins.ts', import.meta.url), 'utf8')
+  assert.match(pins, /customerNameForAudience\(/)
+  assert.match(pins, /sharedPairsOf\(await customerIdsOf\(userId\)\)/)
+})
+
 test('a contact with no customer on the project sees no name at all, never the first customer’s', () => {
   assert.equal(customerNameForAudience({ audience: 'customer', staffName: 'Alpha', ownName: undefined }), null)
 })
