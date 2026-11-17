@@ -1,8 +1,10 @@
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, type InjectionKey } from 'vue'
 import { formatContextLength, formatPricePerMillion } from '~/utils/aiSettingsFormat'
 
 // The AI part of the settings page: the API key, the model choice and its catalogue, and the AI history totals.
-// The page reads these refs and calls these functions; nothing here reads the page.
+// The page reads these refs and calls these functions; nothing here reads the page. The page calls it once and
+// provides the result under AI_SETTINGS_KEY, so the stats and the AI section share one set of refs.
+export const AI_SETTINGS_KEY: InjectionKey<ReturnType<typeof useAiSettings>> = Symbol('aiSettings')
 
 type ModelCatalog = {
   models: Array<{ id: string, name: string, contextLength: number | null, modality: string | null, inputPrice: number | null, outputPrice: number | null }>

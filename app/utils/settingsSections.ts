@@ -14,6 +14,15 @@ export const ACCOUNT_SECTIONS: SettingsSection[] = [
   { key: 'ai', label: 'AI', path: '/settings/ai' }
 ]
 
+// The component that draws each section, in app/components/settings/ (its file is the name without the Settings prefix).
+export const SECTION_COMPONENTS: Record<SettingsSection['key'], string> = {
+  'stats': 'SettingsStats',
+  'account': 'SettingsAccount',
+  'appearance': 'SettingsAppearance',
+  'api-keys': 'SettingsApiKeys',
+  'ai': 'SettingsAi'
+}
+
 // The address a section's old hash link (/settings#account) goes to. Undefined for any other hash.
 export function sectionPathForHash(hash: string): string | undefined {
   const key = hash.replace(/^#/, '')

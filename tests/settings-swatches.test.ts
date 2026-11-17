@@ -1,11 +1,11 @@
-// The Appearance swatches have a visible name and a keyboard focus ring (redesign 8/9). Read from the page source, as the
-// other settings tests do. Run:
+// The Appearance swatches have a visible name and a keyboard focus ring (redesign 8/9). Read from the section's source
+// (app/components/settings/Appearance.vue since step B), as the other settings tests do. Run:
 //   TSX_TSCONFIG_PATH=.nuxt/tsconfig.server.json node --import tsx --test tests/settings-swatches.test.ts
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
-const page = readFileSync(new URL('../app/pages/settings/index.vue', import.meta.url), 'utf8')
+const page = readFileSync(new URL('../app/components/settings/Appearance.vue', import.meta.url), 'utf8')
 
 test('each accent and neutral swatch shows its name as visible text', () => {
   assert.match(page, /<span class="text-xs text-muted capitalize">\{\{ color \}\}<\/span>/)

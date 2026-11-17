@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { format } from 'date-fns'
-import { colorHex } from '#shared/utils/colors'
-import { formatMoney } from '~/utils/aiSettingsFormat'
+import { AI_SETTINGS_KEY, useAiSettings } from '~/composables/useAiSettings'
 
 definePageMeta({ layout: 'app' })
 
 useSeoMeta({ title: 'Settings' })
 
-const { session, signOut, isInstanceAdmin, refreshSession } = useAuth()
-const { primaryColor, neutralColor, PRIMARY_COLORS, NEUTRAL_COLORS, setPrimaryColor, setNeutralColor } = useUserSettings()
+const { isInstanceAdmin } = useAuth()
+
+// One set of AI refs for the page: the stats and the AI section both read it, so the models are fetched once.
+provide(AI_SETTINGS_KEY, useAiSettings())
 
 // The settings section list: each entry jumps to a section on this page (or to a settings page).
 // A jump to a section of this page scrolls the page's own scroll box to it: a plain #hash does not scroll
@@ -27,47 +27,6 @@ const sections = [
   { label: 'Sprocket', icon: 'i-lucide-cog', to: '/settings/sprocket' },
   { label: 'AI history', icon: 'i-lucide-history', to: '/settings/ai-history' }
 ]
-
-// ─── AI settings: the state and functions live in useAiSettings ─────────────
-const {
-  apiKeyInput,
-  showApiKey,
-  apiKeySaving,
-  apiKeyDirty,
-  modelInput,
-  modelCatalogStatus,
-  modelsRefreshing,
-  modelOptions,
-  refreshModelCatalog,
-  forceRefreshModelCatalog,
-  saveApiKey,
-  clearApiKey,
-  changeModel,
-  openrouterDocsUrl,
-  openrouterApiKeyMasked,
-  openrouterModel,
-  totalPrompts,
-  totalAiCost
-} = useAiSettings()
-
-const memberSince = computed(() => {
-  const date = session.value?.user?.createdAt
-  if (!date) return '—'
-  return format(new Date(date), 'MMMM yyyy')
-})
-
-function swatchStyle(color: string, selected: boolean) {
-  return {
-    backgroundColor: colorHex(color),
-    ...(selected
-      ? {
-          transform: 'scale(1.15)',
-          outline: `3px solid ${colorHex(color)}`,
-          outlineOffset: '2px'
-        }
-      : {})
-  }
-}
 </script>
 
 <template>
@@ -116,88 +75,10 @@ function swatchStyle(color: string, selected: boolean) {
       <div class="flex-1 min-w-0 overflow-y-auto">
         <UContainer class="py-6">
           <div class="flex flex-col gap-4">
-            <!-- Stats — full width -->
-            <div
-              id="stats"
-              class="rounded-xl border border-default bg-default overflow-hidden"
-            >
-              <div class="px-5 py-3 border-b border-default bg-elevated/40">
-                <span class="text-xs font-semibold text-muted uppercase tracking-wider">Your stats</span>
-              </div>
-              <div class="grid grid-cols-2 divide-x divide-default">
-                <div class="p-5 flex items-center gap-3">
-                  <div class="size-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                    <UIcon
-                      name="i-lucide-sparkles"
-                      class="size-4 text-primary"
-                    />
-                  </div>
-                  <div>
-                    <p class="text-xl font-bold tabular-nums leading-none">
-                      {{ totalPrompts }}
-                    </p>
-                    <p class="text-xs text-muted mt-1">
-                      {{ totalPrompts === 1 ? 'AI prompt' : 'AI prompts' }}
-                    </p>
-                  </div>
-                </div>
-                <div class="p-5 flex items-center gap-3">
-                  <div class="size-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                    <UIcon
-                      name="i-lucide-wallet-cards"
-                      class="size-4 text-primary"
-                    />
-                  </div>
-                  <div>
-                    <p class="text-xl font-bold tabular-nums leading-none">
-                      {{ formatMoney(totalAiCost) }}
-                    </p>
-                    <p class="text-xs text-muted mt-1">
-                      AI spent
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <!-- Each section is its own component (app/components/settings/); the order is the list's order. -->
+            <SettingsStats />
 
-            <!-- Account -->
-            <div
-              id="account"
-              class="rounded-xl border border-default bg-default overflow-hidden"
-            >
-              <div class="px-5 py-3 border-b border-default bg-elevated/40">
-                <span class="text-xs font-semibold text-muted uppercase tracking-wider">Account</span>
-              </div>
-              <div class="p-5 flex items-center gap-4">
-                <div class="min-w-0">
-                  <p class="font-semibold truncate">
-                    {{ session?.user?.name }}
-                  </p>
-                  <p class="text-sm text-muted truncate">
-                    {{ session?.user?.email }}
-                  </p>
-                  <p class="text-xs text-muted mt-1">
-                    Member since {{ memberSince }}
-                  </p>
-                </div>
-                <UButton
-                  label="Sign out"
-                  icon="i-lucide-log-out"
-                  variant="ghost"
-                  color="error"
-                  size="sm"
-                  class="ml-auto shrink-0"
-                  @click="signOut"
-                />
-              </div>
-              <AccountProfileEditor
-                :user-id="session?.user?.id ?? ''"
-                :name="session?.user?.name ?? null"
-                :email="session?.user?.email ?? null"
-                :image="session?.user?.image ?? null"
-                @changed="refreshSession()"
-              />
-            </div>
+            <SettingsAccount />
 
             <!-- Passkeys and two-factor -->
             <SecurityPanel />
@@ -205,279 +86,11 @@ function swatchStyle(color: string, selected: boolean) {
             <!-- Who may see this address -->
             <EmailPrivacyPanel />
 
-            <!-- Appearance -->
-            <div
-              id="appearance"
-              class="rounded-xl border border-default bg-default overflow-hidden"
-            >
-              <div class="px-5 py-3 border-b border-default bg-elevated/40">
-                <span class="text-xs font-semibold text-muted uppercase tracking-wider">Appearance</span>
-              </div>
+            <SettingsAppearance />
 
-              <!-- The colour mode is set in one place: the account menu's Appearance row (AppSidebar.vue). -->
-              <div class="divide-y divide-default">
-                <!-- Primary color -->
-                <div class="px-5 py-4 space-y-3">
-                  <div class="flex items-center gap-4">
-                    <div class="size-8 rounded-lg bg-elevated flex items-center justify-center shrink-0">
-                      <UIcon
-                        name="i-lucide-palette"
-                        class="size-4 text-default"
-                      />
-                    </div>
-                    <div>
-                      <p class="text-sm font-medium">
-                        Accent color
-                      </p>
-                      <p class="text-xs text-muted mt-0.5">
-                        Buttons, highlights and interactive elements
-                      </p>
-                    </div>
-                  </div>
-                  <div class="flex flex-wrap gap-2 pl-12">
-                    <div
-                      v-for="color in PRIMARY_COLORS"
-                      :key="color"
-                      class="flex flex-col items-center gap-1"
-                    >
-                      <button
-                        :title="color"
-                        :aria-label="`Accent ${color}`"
-                        :aria-pressed="primaryColor === color"
-                        class="size-7 rounded-full transition-transform hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                        :style="swatchStyle(color, primaryColor === color)"
-                        @click="setPrimaryColor(color as any)"
-                      >
-                        <UIcon
-                          v-if="primaryColor === color"
-                          name="i-lucide-check"
-                          class="size-3.5 text-white mx-auto drop-shadow"
-                        />
-                      </button>
-                      <span class="text-xs text-muted capitalize">{{ color }}</span>
-                    </div>
-                  </div>
-                </div>
+            <SettingsApiKeys />
 
-                <!-- Neutral color -->
-                <div class="px-5 py-4 space-y-3">
-                  <div class="flex items-center gap-4">
-                    <div class="size-8 rounded-lg bg-elevated flex items-center justify-center shrink-0">
-                      <UIcon
-                        name="i-lucide-circle-half-stroke"
-                        class="size-4 text-default"
-                      />
-                    </div>
-                    <div>
-                      <p class="text-sm font-medium">
-                        Neutral color
-                      </p>
-                      <p class="text-xs text-muted mt-0.5">
-                        Backgrounds, borders and text
-                      </p>
-                    </div>
-                  </div>
-                  <div class="flex flex-wrap gap-2 pl-12">
-                    <div
-                      v-for="color in NEUTRAL_COLORS"
-                      :key="color"
-                      class="flex flex-col items-center gap-1"
-                    >
-                      <button
-                        :title="color"
-                        :aria-label="`Neutral ${color}`"
-                        :aria-pressed="neutralColor === color"
-                        class="size-7 rounded-full transition-transform hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                        :style="swatchStyle(color, neutralColor === color)"
-                        @click="setNeutralColor(color as any)"
-                      >
-                        <UIcon
-                          v-if="neutralColor === color"
-                          name="i-lucide-check"
-                          class="size-3.5 text-white mx-auto drop-shadow"
-                        />
-                      </button>
-                      <span class="text-xs text-muted capitalize">{{ color }}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- API keys and MCP -->
-            <div id="api-keys">
-              <ApiKeysPanel />
-            </div>
-
-            <!-- AI -->
-            <div
-              id="ai"
-              class="rounded-xl border border-default bg-default overflow-hidden"
-            >
-              <div class="px-5 py-3 border-b border-default bg-elevated/40 flex items-center gap-2">
-                <UIcon
-                  name="i-lucide-sparkles"
-                  class="size-4 text-primary"
-                />
-                <span class="text-xs font-semibold text-muted uppercase tracking-wider">AI (OpenRouter)</span>
-              </div>
-              <p class="px-5 pt-3 text-xs text-muted">
-                The key powers the AI chat panel and the AI actions in the editor. Without a key, the chat asks you to add one, and the editor shows a message and stops. <a
-                  href="https://openrouter.ai/"
-                  target="_blank"
-                  rel="noopener"
-                  class="text-primary underline"
-                >What is OpenRouter?</a>
-                Sprocket can answer through Claude Code instead, as one of your agents:
-                <NuxtLink
-                  to="/settings/sprocket"
-                  class="text-primary underline"
-                >Sprocket settings</NuxtLink>.
-              </p>
-
-              <div class="divide-y divide-default">
-                <!-- API key -->
-                <div class="px-5 py-4 space-y-3">
-                  <div class="flex items-center gap-4">
-                    <div class="size-8 rounded-lg bg-elevated flex items-center justify-center shrink-0">
-                      <UIcon
-                        name="i-lucide-key-round"
-                        class="size-4 text-default"
-                      />
-                    </div>
-                    <div class="flex-1 min-w-0">
-                      <p class="text-sm font-medium">
-                        API key
-                      </p>
-                      <p class="text-xs text-muted mt-0.5">
-                        Stored securely on your account. Get one at
-                        <a
-                          :href="openrouterDocsUrl"
-                          target="_blank"
-                          rel="noopener"
-                          class="text-primary underline"
-                        >openrouter.ai/keys</a>
-                      </p>
-                    </div>
-                    <UButton
-                      icon="i-lucide-refresh-cw"
-                      color="neutral"
-                      variant="ghost"
-                      size="xs"
-                      :loading="modelsRefreshing"
-                      aria-label="Refresh OpenRouter models and pricing"
-                      title="Reload the model list and prices from OpenRouter"
-                      @click="forceRefreshModelCatalog"
-                    />
-                  </div>
-
-                  <div class="pl-12 space-y-2">
-                    <div
-                      v-if="openrouterApiKeyMasked"
-                      class="flex items-center gap-2 text-xs text-muted"
-                    >
-                      <UIcon
-                        name="i-lucide-check-circle-2"
-                        class="size-3.5 text-primary"
-                      />
-                      <span>Current key: <code class="font-mono">{{ openrouterApiKeyMasked }}</code></span>
-                      <UButton
-                        size="xs"
-                        variant="ghost"
-                        color="error"
-                        icon="i-lucide-trash-2"
-                        label="Remove"
-                        :loading="apiKeySaving"
-                        @click="clearApiKey"
-                      />
-                    </div>
-
-                    <div class="flex gap-2">
-                      <UInput
-                        v-model="apiKeyInput"
-                        :type="showApiKey ? 'text' : 'password'"
-                        placeholder="sk-or-v1-…"
-                        icon="i-lucide-key"
-                        class="flex-1"
-                        :ui="{ trailing: 'pe-1' }"
-                      >
-                        <template #trailing>
-                          <UButton
-                            color="neutral"
-                            variant="link"
-                            size="sm"
-                            :icon="showApiKey ? 'i-lucide-eye-off' : 'i-lucide-eye'"
-                            :aria-label="showApiKey ? 'Hide key' : 'Show key'"
-                            @click="showApiKey = !showApiKey"
-                          />
-                        </template>
-                      </UInput>
-                      <UButton
-                        label="Save"
-                        icon="i-lucide-check"
-                        size="sm"
-                        color="primary"
-                        :disabled="!apiKeyDirty"
-                        :loading="apiKeySaving"
-                        @click="saveApiKey"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Model -->
-                <div class="px-5 py-4 space-y-3">
-                  <div class="flex items-center gap-4">
-                    <div class="size-8 rounded-lg bg-elevated flex items-center justify-center shrink-0">
-                      <UIcon
-                        name="i-lucide-cpu"
-                        class="size-4 text-default"
-                      />
-                    </div>
-                    <div class="flex-1 min-w-0">
-                      <p class="text-sm font-medium">
-                        Model
-                      </p>
-                      <p class="text-xs text-muted mt-0.5">
-                        Compare input and output prices per million tokens before choosing a model
-                      </p>
-                    </div>
-                  </div>
-                  <div class="pl-12">
-                    <USelectMenu
-                      v-model="modelInput"
-                      :items="modelOptions"
-                      value-key="value"
-                      placeholder="Pick a model"
-                      create-item
-                      virtualize
-                      :loading="modelCatalogStatus === 'pending'"
-                      :search-input="{ placeholder: 'Search all OpenRouter models…' }"
-                      :filter-fields="['label', 'value']"
-                      class="w-full"
-                      @update:model-value="changeModel"
-                      @create="changeModel"
-                    />
-                    <p class="text-xs text-muted mt-1.5">
-                      Active: <code class="font-mono">{{ openrouterModel }}</code>
-                      <span class="block mt-0.5">
-                        <template v-if="modelCatalogStatus === 'error'">
-                          Could not load the catalog.
-                          <button
-                            type="button"
-                            class="text-primary underline"
-                            @click="refreshModelCatalog()"
-                          >Try again</button>, or type any OpenRouter slug and press Enter.
-                        </template>
-                        <template v-else>
-                          Prices come from OpenRouter and are shown per million input and output tokens. Search the complete catalog, or type any model slug and press Enter.
-                        </template>
-                      </span>
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <SettingsAi />
           </div>
         </UContainer>
       </div>
