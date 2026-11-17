@@ -3,8 +3,9 @@
 // runs this file. If the build inputs (scripts/build-inputs.mjs) hash to the value the last good build was made from, and that build's
 // output is still there, the output is copied to .output and the build is skipped. Otherwise the real build runs (`build:full`) and its
 // output becomes the cache. Any doubt runs the real build. BUILD_FORCE=1 always runs it.
-// Cache: data/.build-cache/inputs.sha256 (the hash) and data/.build-cache/output (a copy of .output). data/ is the one path kept between
-// releases on the server. Every run prints one line: build-if-changed: skipped|built|failed, hash <12>, wall Ns, cpu Ns, peak MB.
+// Cache: inputs.sha256 (the hash) and output (a copy of .output), in BUILD_CACHE_DIR. The deploy sets it to a folder outside the release
+// (each release is a new folder, so a cache inside one is gone on the next deploy). Unset, it is data/.build-cache of the release.
+// Every run prints one line: build-if-changed: skipped|built|failed, hash <12>, wall Ns, cpu Ns, peak MB.
 import { spawnSync } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -31,6 +32,11 @@ export function decide({ force, hash, cache }) {
 /** The one line the deploy log gets for every run. */
 export function formatLine({ action, hash, wallS, cpuS, peakMB }) {
   return `build-if-changed: ${action}, hash ${String(hash).slice(0, 12)}, wall ${wallS.toFixed(1)}s, cpu ${cpuS.toFixed(1)}s, peak ${Math.round(peakMB)} MB`
+}
+
+/** Where the cache lives: BUILD_CACHE_DIR when the deploy sets it (outside the release), else data/.build-cache of the release. */
+export function cacheDirFor(root, env = {}) {
+  return env.BUILD_CACHE_DIR ? env.BUILD_CACHE_DIR : join(root, 'data', '.build-cache')
 }
 
 function cacheState(cacheDir) {
@@ -70,7 +76,7 @@ function storeCache(root, cacheDir, hash) {
 export function run({ root, env = {}, build, bunVersion = '', nodeVersion = '', log = console.log }) {
   const start = Date.now()
   const hash = hashTree(root, { bun: bunVersion, node: nodeVersion, env })
-  const cacheDir = join(root, 'data', '.build-cache')
+  const cacheDir = cacheDirFor(root, env)
   const cache = cacheState(cacheDir)
   const d = decide({ force: env.BUILD_FORCE === '1', hash, cache })
   if (d.dropCache) rmSync(cacheDir, { recursive: true, force: true })
