@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.41.1 - 2026-11-17
+
+- **Time: a time logged from a task row is dated on your own day.** A time logged from the list row carried no day, so the server dated it by UTC: a Sunday evening in New York landed on Monday, a week later. The row now sends your local day, as the timesheet and the timer already do. Files: `app/components/kanban/ListRowMeta.vue`, `tests/time-log-day.test.ts`, `tests/time-view-weeks.test.ts`.
+
 ## 0.41.0 - 2026-11-17
 
 - **Crews on a new board: `POST /api/crews` with `newBoard`.** A crew call can make its board in the same request: `newBoard: { name }` with `teamId` (instead of `projectId`) makes a board in that team with the team's default columns, owned by the key's owner, and binds the crew to it as `projectId` does. The key's owner must be a member of the team, as the UI requires to make a board (403 otherwise); a management token gets 403. A refused crew leaves no board behind. `GET /api/crews/targets` lists the owner's teams as before, plus a team where the owner is only a member while it has no boards (`userboards: []`), with `canCreateBoard`. The audit row for a made board carries its id. Files: `server/api/crews/index.post.ts`, `server/utils/crewBoards.ts`, `server/utils/crewProvisioning.ts`, `tests/crew-newboard.test.ts`, `docs/admin/crews-on-your-instance.md`, `crew/README.md`.
