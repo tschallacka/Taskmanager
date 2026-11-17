@@ -11,29 +11,36 @@ function trustedIn(projects, path) {
   return projects?.[path]?.hasTrustDialogAccepted === true
 }
 
+/** The projects of the config file. A file that is not valid JSON gives configError: no path can be read as trusted from it. */
 function readProjects(file) {
-  if (!existsSync(file)) return {}
+  if (!existsSync(file)) return { projects: {}, configError: null }
   try {
-    return JSON.parse(readFileSync(file, 'utf8')).projects ?? {}
+    return { projects: JSON.parse(readFileSync(file, 'utf8')).projects ?? {}, configError: null }
   } catch {
-    return {}
+    return { projects: {}, configError: `${file} is not valid JSON, so crew doctor cannot read which folders are trusted.` }
   }
 }
 
-/** The report: a row per person and path, the refused folders, and the fix line (null when every crew path is trusted). */
+/**
+ * The report: a row per person and path, the refused folders, and the fix line (null when every crew path is trusted). A row's
+ * `trusted` is null when the config cannot be read; then the fix line says to repair the file, not to run crew update.
+ */
 export function trustReport({ home, kit, file = configFile(), worktreeBase = readWorktreeBase(home) }) {
-  const projects = readProjects(file)
+  const { projects, configError } = readProjects(file)
+  const trusted = path => (configError ? null : trustedIn(projects, path))
   const rows = []
   for (const { who, folder } of sessionRecords(home)) {
     const crew = isCrewOwned(folder, { home, kit, worktreeBase })
-    rows.push({ who, role: 'session folder', path: folder, trusted: trustedIn(projects, folder), crew })
-    rows.push({ who, role: 'crew home', path: home, trusted: trustedIn(projects, home), crew: true })
-    rows.push({ who, role: 'kit folder', path: kit, trusted: trustedIn(projects, kit), crew: true })
+    rows.push({ who, role: 'session folder', path: folder, trusted: trusted(folder), crew })
+    rows.push({ who, role: 'crew home', path: home, trusted: trusted(home), crew: true })
+    rows.push({ who, role: 'kit folder', path: kit, trusted: trusted(kit), crew: true })
   }
   const refused = [...new Set(rows.filter(r => !r.crew).map(r => r.path))].sort()
   const untrusted = rows.filter(r => r.crew && !r.trusted)
-  const fix = untrusted.length > 0 ? 'crew update trusts the crew home, the kit folder and the crew folders above: run crew update.' : null
-  return { rows, refused, fix }
+  let fix = null
+  if (configError) fix = `${file} is not valid JSON: fix or move it, then run crew update again.`
+  else if (untrusted.length > 0) fix = 'crew update trusts the crew home, the kit folder and the crew folders above: run crew update.'
+  return { rows, refused, fix, configError }
 }
 
 /** The report as lines for a person to read. */
@@ -41,7 +48,8 @@ export function formatReport(report) {
   if (report.rows.length === 0) return 'no sessions are recorded: nothing to trust yet (crew session start records one)'
   const lines = report.rows.map((r) => {
     if (!r.crew) return `${r.who}: ${r.role} ${r.path} is not a crew folder: the kit does not trust it, and crew update does not either. Trust it in Claude Code yourself, or start the session in a crew folder.`
-    return `${r.who}: ${r.role} ${r.path} ${r.trusted ? 'trusted' : 'not trusted'}`
+    const state = r.trusted === null ? 'unknown (the config file cannot be read)' : (r.trusted ? 'trusted' : 'not trusted')
+    return `${r.who}: ${r.role} ${r.path} ${state}`
   })
   lines.push(report.fix ?? 'all trusted: every crew path of every session is trusted in Claude Code')
   return lines.join('\n')

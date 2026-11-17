@@ -55,6 +55,11 @@ export function sessionRecords(home) {
     .filter(Boolean)
 }
 
+/** The folder of every recorded session in a crew home: sessionRecords without the names. */
+export function recordedFolders(home) {
+  return sessionRecords(home).map(r => r.folder)
+}
+
 /** The worktreeBase of a crew home's crew.json, or null when it is not set (then no session folder counts as a crew folder). */
 export function readWorktreeBase(home) {
   const file = join(home, 'crew.json')
