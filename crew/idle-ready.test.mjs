@@ -4,7 +4,7 @@
 //   cd crew && node --test idle-ready.test.mjs
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readyCards, idleState, noticeFor, runIdleCheck, QUIET_MINUTES, columnsOf } from './idle-ready.mjs'
+import { readyCards, idleState, noticeFor, runIdleCheck, QUIET_MINUTES, columnsOf, checkOnce } from './idle-ready.mjs'
 
 const NOW = 1_700_000_000_000
 const minutesAgo = m => NOW - m * 60_000
@@ -140,6 +140,51 @@ test('a ready column cut by get_board stops the check: no mail, and the saved st
   assert.equal(notice, null)
   assert.equal(store.value, null)
   assert.deepEqual(sent, [])
+})
+
+// The command's path with a fake board: the fetch and the mail are stubs, so no server is touched.
+const fakeCreds = { base: 'https://board.example', board: { id: 'b1' }, people: { boss: { apiKey: 'not-a-real-key' } } }
+const boardReply = (reply, status = 200) => async () => ({
+  ok: status === 200,
+  status,
+  json: async () => ({ result: { content: [{ text: JSON.stringify(reply) }] } })
+})
+
+test('the check reads get_board with the boss key and mails Pia and Boss once when the crew is idle', async () => {
+  const calls = []
+  const fetchImpl = async (url, init) => {
+    calls.push({ url, init })
+    return boardReply({ columns: board() })()
+  }
+  const sent = []
+  const store = memoryStore()
+  const notice = await checkOnce({ creds: fakeCreds, fetchImpl, activity: quiet(40), now: NOW, store, send: to => sent.push(to) })
+  assert.equal(notice?.kind, 'idle')
+  assert.equal(calls.length, 1)
+  assert.equal(calls[0].url, 'https://board.example/api/mcp')
+  assert.match(calls[0].init.body, /"name":"get_board"/)
+  assert.equal(calls[0].init.headers.authorization, 'Bearer not-a-real-key')
+  assert.deepEqual(sent.sort(), ['boss', 'pia'])
+})
+
+test('a board reply with no columns stops the check: no mail, and the saved state is not written', async () => {
+  const store = memoryStore()
+  const sent = []
+  await assert.rejects(
+    checkOnce({ creds: fakeCreds, fetchImpl: boardReply({ error: 'board unreachable' }), activity: quiet(40), now: NOW, store, send: to => sent.push(to) }),
+    /no columns list/
+  )
+  assert.equal(store.value, null)
+  assert.deepEqual(sent, [])
+})
+
+test('a board that answers with an HTTP error stops the check', async () => {
+  const store = memoryStore()
+  await assert.rejects(
+    checkOnce({ creds: fakeCreds, fetchImpl: boardReply({}, 503), activity: quiet(40), now: NOW, store, send: () => {} }),
+    /503/
+  )
+  assert.equal(store.value, null)
 })
 
 test('a cut column that is not ready (Done, Backlog) does not stop the check', () => {

@@ -366,12 +366,19 @@ per event). The start then passes that one file as its only `--settings`.
     crew publish <slug> <branch> <title> <msg-file> <pr-file>   the merger's one command: squash a branch onto a fresh base, check the merged tree, push, open the pull request (publish.mjs, below)
     crew <who> browser goto|shot|eval|console|tabs|close-tab|done   the shared browser (browser.mjs)
     crew browser status|shutdown  the shared browser for everyone
+    node idle-ready.mjs           the idle notice: one check of the board; mails Pia and Boss once when ready work waits 30 minutes with no activity (idle-ready.mjs)
 
 The old file names (`tm.mjs`, `listen.mjs`, ...) still work.
 
 **Keeping the machine light.** An idle person can wait with `crew listen <who> 600`: the wait returns early when there is
 news, so a long wait costs almost nothing. A listener may run under `nice -n 10`, which is fine. `tm.mjs` loads Playwright
 only for the commands that open a browser (the `mcp` calls and `update` never load it), so a plain board call starts fast.
+
+**The idle notice (`idle-ready.mjs`).** One check of the crew board: when cards in To do or a Verify column wait and nothing
+has happened for 30 minutes, Pia and Boss get one mail, and another only when the set of ready cards changes. Nothing
+calls it yet. To run it, use a Monitor loop every 5 minutes, for example
+`while true; do CREW_HOME=<crew home> node idle-ready.mjs; sleep 300; done`. State is kept in `CREW_HOME/.idle-ready.json`.
+A board that cannot be read, a reply with no columns, or a cut ready column (50-card limit) stops the check without a mail.
 
 ## Adding missing people (`crew people add`)
 

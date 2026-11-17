@@ -98,19 +98,28 @@ export function runIdleCheck({ columns, activity, now, store, send }) {
   return notice
 }
 
+/**
+ * One check of the board, the command's path: reads get_board with the boss key (through `fetchImpl`, a fetch stand-in
+ * in tests), then runs the check. A failed read or a reply with no columns throws before any state is written or mailed.
+ */
+export async function checkOnce({ creds, fetchImpl = fetch, activity, store, send, now = Date.now() }) {
+  const key = creds.people.boss.apiKey
+  const res = await fetchImpl(`${creds.base}/api/mcp`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'accept': 'application/json, text/event-stream', 'authorization': `Bearer ${key}` },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'get_board', arguments: { board: creds.board.id } } })
+  })
+  if (!res.ok) throw new Error(`the board answered ${res.status}`)
+  const board = JSON.parse((await res.json()).result?.content?.[0]?.text ?? 'null')
+  return runIdleCheck({ columns: columnsOf(board), activity, now, store, send })
+}
+
 // The command: reads the board and the crew's activity, and keeps its state in CREW_HOME/.idle-ready.json.
 async function main() {
   const { loadCreds, here } = await import('./config.mjs')
   const { activityRows, readCmdlines, piaProjectsDir } = await import('./activity.mjs')
   const { sendMail } = await import('./mail-client.mjs')
   const creds = loadCreds()
-  const key = creds.people.boss.apiKey
-  const res = await fetch(`${creds.base}/api/mcp`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'accept': 'application/json, text/event-stream', 'authorization': `Bearer ${key}` },
-    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'get_board', arguments: { board: creds.board.id } } })
-  })
-  const board = JSON.parse((await res.json()).result?.content?.[0]?.text ?? 'null')
   const cmdlines = readCmdlines()
   const activity = activityRows({ root: piaProjectsDir(here), hours: 6, now: Date.now(), cmdlines, alive: true })
   const file = join(here, '.idle-ready.json')
@@ -119,7 +128,7 @@ async function main() {
     write: state => writeFileSync(file, JSON.stringify(state))
   }
   const send = (to, text) => sendMail({
-    base: creds.base, slug: creds.crew?.slug, key, to, text,
+    base: creds.base, slug: creds.crew?.slug, key: creds.people.boss.apiKey, to, text,
     mailboxDir: join(here, 'mailbox'), makeId: () => crypto.randomUUID().replaceAll('-', '')
   })
   const sendLogged = (to, text) => {
@@ -127,7 +136,7 @@ async function main() {
       console.error(`idle-ready: mail to ${to} failed: ${error?.message ?? error}`)
     })
   }
-  const notice = runIdleCheck({ columns: columnsOf(board), activity, now: Date.now(), store, send: sendLogged })
+  const notice = await checkOnce({ creds, activity, store, send: sendLogged })
   console.log(notice ? `sent: ${notice.text}` : 'nothing to send')
 }
 
