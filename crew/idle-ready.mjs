@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 // The idle notice (card mwjdf1cyigzw8f1apu): when the board has ready work and nothing has happened for 30 minutes, the
 // kit mails Pia and Boss once, and again only when the set of ready cards changes; one line when it is back at work.
-// Ready work: a card in To do or in a Verify column, not Done, not blocked (a `blocked` or `test failing` label, or a
-// latest update that starts `BLOCKED ON`). "Something happened": a crew member's last step (crew/activity.mjs) or any
-// card update or move on the board.
+// Ready work: a card in To do or in a Verify column, not Done, not blocked (the board's `blocked` flag for an open
+// blocker, or a `blocked` or `test failing` label). get_board does not return a card's update text, so a `BLOCKED ON`
+// line is not read here: a card that waits on one is moved to Blocked, which is not a ready column.
+// "Something happened": a crew member's last step (crew/activity.mjs) or any card update or move on the board.
 //   CREW_HOME=<crew home> node idle-ready.mjs            one check (run it from a timer or a Monitor loop)
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
@@ -18,8 +19,8 @@ const BLOCKED_LABELS = ['blocked', 'test failing']
 /** Whether one card is ready work in its column. */
 function isReady(task, columnName) {
   if (!READY_COLUMNS(columnName)) return false
+  if (task.blocked === true) return false
   if ((task.labels ?? []).some(label => BLOCKED_LABELS.includes(label))) return false
-  if (/^BLOCKED ON/.test(task.latestUpdate ?? '')) return false
   return true
 }
 

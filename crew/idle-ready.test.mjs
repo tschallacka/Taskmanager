@@ -8,21 +8,33 @@ import { readyCards, idleState, noticeFor, runIdleCheck, QUIET_MINUTES } from '.
 
 const NOW = 1_700_000_000_000
 const minutesAgo = m => NOW - m * 60_000
-const card = (id, extra = {}) => ({ id, title: `card ${id}`, labels: [], updatedAt: minutesAgo(600), latestUpdate: '', ...extra })
+const card = (id, extra = {}) => ({ id, title: `card ${id}`, labels: [], blocked: false, updatedAt: minutesAgo(600), ...extra })
 const board = () => [
   { name: 'Backlog', tasks: [card('bl1')] },
   { name: 'To do', tasks: [card('todo1'), card('todo-blocked', { labels: ['blocked'] }), card('todo-failing', { labels: ['test failing'] })] },
   { name: 'In progress', tasks: [card('wip1')] },
-  { name: 'Verify PM', tasks: [card('vpm1'), card('vpm-blocked-line', { latestUpdate: 'BLOCKED ON boss: push actor_id' })] },
+  { name: 'Verify PM', tasks: [card('vpm1'), card('vpm-blocked', { blocked: true })] },
   { name: 'Verify CQ', tasks: [card('vcq1')] },
   { name: 'Done', tasks: [card('done1')] },
   { name: 'Blocked', tasks: [card('blocked1')] }
 ]
 const quiet = mins => [{ key: 'wren', state: 'silent', mins, what: 'read the card' }]
 
-test('the ready cards are To do and Verify cards, not Done, not blocked, not on a BLOCKED ON line', () => {
+test('the ready cards are To do and Verify cards, not Done, not blocked (the blocked flag or label)', () => {
   const ids = readyCards(board()).map(c => c.id).sort()
   assert.deepEqual(ids, ['todo1', 'vcq1', 'vpm1'])
+})
+
+test('the board read as get_board returns it: a card with an open blocker is not ready work', () => {
+  // The fields get_board really returns: `blocked`, `labels`, `updates` (a count) and `updatedAt`. There is no latestUpdate.
+  const columns = [
+    { name: 'To do', tasks: [
+      { id: 'open', title: 'open', labels: [], blocked: false, summary: '', updates: 2, updatedAt: minutesAgo(600) },
+      { id: 'blocker', title: 'has an open blocker', labels: [], blocked: true, summary: '', updates: 1, updatedAt: minutesAgo(600) }
+    ] },
+    { name: 'Verify QA', tasks: [{ id: 'qa', title: 'qa', labels: [], blocked: false, summary: '', updates: 0, updatedAt: minutesAgo(600) }] }
+  ]
+  assert.deepEqual(readyCards(columns).map(c => c.id).sort(), ['open', 'qa'])
 })
 
 test('a card with no ready column (Backlog, In progress) is not ready work', () => {
