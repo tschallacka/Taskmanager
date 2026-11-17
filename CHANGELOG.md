@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.44.0 - 2026-11-17
+
+- **Archive all under the Unread filter archives only the unread notifications it shows.** The read ones stay in the inbox, where that filter does not show them, so the button no longer takes out rows the person cannot see. Archive all under All still takes every inbox row. Files: `server/utils/notificationBox.ts`, `server/api/notifications/archive.post.ts`, `app/composables/useNotifications.ts`, `app/pages/projects/inbox.vue`, `tests/notifications-archive-db.test.ts`, `changelog.d/mw9rojl3i47djllurn-notifications-archive.md`.
+
 ## 0.43.0 - 2026-11-17
 
 - **Board Filter: assignee and Compact cards.** The Filter now narrows the board by one assignee (or Unassigned), next to the labels and the search, and its Compact cards switch hides each card's snippet and cover; the switch is kept in the browser. Files: `app/utils/boardFilter.ts`, `app/composables/useProjects.ts`, `app/pages/projects/[id].vue`, `app/components/kanban/KanbanBoard.vue`, `app/components/kanban/KanbanCard.vue`, `docs/basics/boards-and-columns.md`.

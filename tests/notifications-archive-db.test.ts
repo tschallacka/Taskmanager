@@ -99,9 +99,38 @@ test('a second person cannot archive, unarchive or empty the first person rows, 
 })
 
 test('emptying all for the first person leaves the second person rows alone', async () => {
+  // Bob gets a Read box row of his own here: the test before has emptied the rows he had, so nothing of his was left to check.
+  const bobFresh = id('b-fresh-archived')
+  await db.insert(notifications).values(row(bobFresh, bob, now, now))
+  const bobBefore = await emptyReadBox(db, bob, { all: true, days: null, dryRun: true }, now)
+  assert.deepEqual(bobBefore, { count: 1 }, 'bob has one Read box row before alice empties hers')
+
   const deleted = await emptyReadBox(db, alice, { all: true, days: null, dryRun: false }, now)
   assert.deepEqual(deleted, { deleted: 2 }, 'alice Read box holds the 29-day and the just-archived row')
   const aliceLeft = await present([aged.archived29, aged.archivedNow, aged.inbox31])
   assert.equal(aliceLeft.size, 1, 'only the inbox row stays')
   assert.equal(aliceLeft.has(aged.inbox31), true)
+
+  assert.equal((await present([bobFresh])).has(bobFresh), true, 'bob Read box row is still there')
+  const bobAfter = await emptyReadBox(db, bob, { all: true, days: null, dryRun: true }, now)
+  assert.deepEqual(bobAfter, { count: 1 }, 'bob Read box is unchanged by alice emptying hers')
+})
+
+test('archive all under the Unread filter archives only the unread inbox rows, and leaves the read ones', async () => {
+  const carol = id('carol')
+  const unread = id('c-unread')
+  const read = id('c-read')
+  await db.insert(user).values({ id: carol, name: carol, email: `${carol}@staff.test`, emailVerified: true, createdAt: at, updatedAt: at })
+  await db.insert(notifications).values([row(unread, carol, null, null), row(read, carol, null, now - DAY)])
+  try {
+    const result = await archiveNotifications(db, carol, { ids: [], all: true, unreadOnly: true }, now)
+    assert.deepEqual(result, { archived: 1 }, 'only the unread row goes to the Read box')
+    const rows = await db.select({ id: notifications.id, archivedAt: notifications.archivedAt }).from(notifications).where(inArray(notifications.id, [unread, read]))
+    const archivedAt = new Map(rows.map(item => [item.id, item.archivedAt]))
+    assert.notEqual(archivedAt.get(unread), null, 'the unread row is archived')
+    assert.equal(archivedAt.get(read), null, 'the read row stays in the inbox')
+  } finally {
+    await db.delete(notifications).where(inArray(notifications.id, [unread, read]))
+    await db.delete(user).where(inArray(user.id, [carol]))
+  }
 })
