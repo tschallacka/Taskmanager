@@ -8,11 +8,12 @@ import { readFileSync } from 'node:fs'
 const source = readFileSync(new URL('../app/composables/useProjects.ts', import.meta.url), 'utf8')
 
 test('the search text is reset on the same line as the label filter, when the board is opened', () => {
-  assert.match(source, /_activeTags\.value = \[\]\n {8}_searchText\.value = ''\n {8}\/\/ A board is opened with its trash closed/)
+  // The assignee filter is reset on the same run of lines: a person picked on one board does not narrow the next.
+  assert.match(source, /_activeTags\.value = \[\]\n {8}_searchText\.value = ''\n {8}_assigneeFilter\.value = null\n {8}\/\/ A board is opened with its trash closed/)
 })
 
 test('the search text is reset with the label filter when the project is left', () => {
-  assert.match(source, /_activeTags\.value = \[\]\n {4}_searchText\.value = ''\n {4}_showTrashed\.value = false/)
+  assert.match(source, /_activeTags\.value = \[\]\n {4}_searchText\.value = ''\n {4}_assigneeFilter\.value = null\n {4}_showTrashed\.value = false/)
 })
 
 test('clearing the label filter leaves the search text alone', () => {
