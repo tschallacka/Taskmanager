@@ -125,6 +125,25 @@ test('a single change in between is retried, and the trust is written on the sec
   assert.equal(after.n, 9, 'the other writer’s change is kept')
 })
 
+test('a config folder that does not exist yet is created, and the trust is written', () => {
+  const dir = join(mkdtempSync(join(tmpdir(), 'claude-trust-new-')), 'claude')
+  const file = join(dir, '.claude.json')
+  const res = ensureTrusted([CREW], { file })
+  assert.equal(res.ok, true)
+  assert.equal(JSON.parse(readFileSync(file, 'utf8')).projects[CREW].hasTrustDialogAccepted, true)
+})
+
+test('a write that cannot be done is a sentence, not an exception, and nothing is changed', () => {
+  // The config path runs through a file, so the folder cannot be made: the write fails, and the caller gets a sentence.
+  const blocker = join(mkdtempSync(join(tmpdir(), 'claude-trust-block-')), 'not-a-folder')
+  writeFileSync(blocker, 'x')
+  const file = join(blocker, '.claude.json')
+  let res
+  assert.doesNotThrow(() => { res = ensureTrusted([CREW], { file }) })
+  assert.equal(res.ok, false)
+  assert.match(res.reason, /could not be written/)
+})
+
 test('the config file is CLAUDE_CONFIG_DIR/.claude.json when the variable is set, else HOME/.claude.json', () => {
   assert.equal(configFile({ CLAUDE_CONFIG_DIR: '/cfg' }, '/home/u'), '/cfg/.claude.json')
   assert.equal(configFile({}, '/home/u'), '/home/u/.claude.json')
