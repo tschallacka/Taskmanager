@@ -38,8 +38,9 @@ test('the shell has the account shell\'s list markup: a labelled nav, ghost butt
   assert.match(account, /variant="ghost"/)
 })
 
-test('the shell marks the current section and keeps the top bar and phone nav to the account shell', () => {
+test('the shell marks the current section, and the mark is seen (a filled background), not only in the markup', () => {
   assert.match(shell, /aria-current/)
+  assert.match(shell, /bg-elevated[^'"]*font-medium/)
   assert.equal(shell.includes('Teleport'), false, 'no top-bar title inside the board page')
 })
 
