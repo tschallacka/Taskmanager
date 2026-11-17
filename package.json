@@ -1,12 +1,13 @@
 {
   "name": "arnotes",
-  "version": "0.44.0",
+  "version": "0.45.0",
   "description": "A self-hosted, tag-based note-taking application.",
   "private": true,
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "build": "NODE_OPTIONS=--max-old-space-size=6144 nuxt build",
+    "build": "node scripts/build-if-changed.mjs",
+    "build:full": "NODE_OPTIONS=--max-old-space-size=6144 nuxt build",
     "dev": "nuxt dev",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
