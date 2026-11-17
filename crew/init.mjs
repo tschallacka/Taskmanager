@@ -273,7 +273,7 @@ if (typeof config.worktreeBase !== 'string' || !config.worktreeBase.startsWith('
 // The dev copies' start command (scripts.serve): crew.json is the owner's, so init only says what to add when it is missing.
 {
   const serveDefault = withServeCommand(config)
-  if (serveDefault.changed) warn(`crew.json has no scripts.serve: add ${JSON.stringify({ serve: serveDefault.config.scripts.serve })} under "scripts" (crew.json is yours, init does not change it)`)
+  if (serveDefault.changed) warn(`crew.json has no scripts.serve: for example add ${JSON.stringify({ serve: serveDefault.config.scripts.serve })} under "scripts" (crew.json is yours, init does not change it)`)
 }
 
 // Boss's session: its Stop hook keeps the two crew watches running (boss-stop-hook.sh). Written into the folder that
