@@ -8,6 +8,7 @@ import { addressesOfUser } from '../../../utils/extraEmails'
 import { guestProjectIdsOf } from '../../../utils/guests'
 import { sharedProjectIds } from '../../../utils/sharedProjectIds'
 import { pendingBoardProjectIdsFor } from '../../../utils/pendingInvites'
+import { invitedAddressIsMine } from '../../../utils/customerInviteRules'
 
 // What an invitation link is for, readable before signing in: the invite page
 // has to say whose portal, team or board it opens. Opening it also drops the token in a cookie,
@@ -33,7 +34,14 @@ export default defineEventHandler(async (event) => {
     // The address stays out of the answer: whoever holds the link has to know it, not read it here.
     // `forYou` only says whether the account signed in right now (if any) is the one invited.
     const session = await auth.api.getSession({ headers: event.headers }).catch(() => null)
-    const forYou = session ? (await addressesOfUser(session.user.id)).includes(addressed.email) : null
+    // The same rule the accept route uses (invitedAddressIsMine): a verified address, or the account made through this link.
+    const forYou = session
+      ? invitedAddressIsMine({
+          invitedEmail: addressed.email,
+          verifiedAddresses: await addressesOfUser(session.user.id),
+          signedInEmail: session.user.email ?? null
+        })
+      : null
     return addressed.kind === 'team'
       // The address is shown in full to whoever holds the link (approved by Boss), so the forms can prefill and lock it.
       ? { kind: 'team' as const, organizationName: addressed.organizationName, inviterName: addressed.inviterName, role: addressed.role, forYou, email: addressed.email }
