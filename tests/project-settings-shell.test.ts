@@ -22,25 +22,29 @@ test('every section is listed, Customer access, Import, Trash and Archive includ
   for (const key of ['customers', 'import', 'trash', 'archive']) assert.equal(keys.includes(key as never), true, key)
 })
 
+// CQ 1 on 8/9 (Nina, 47d5aa1): the item buttons are one shared component, SectionNav.vue. The shell builds its items from
+// the section table and hands them over; the markup, the ghost buttons and the current mark live in SectionNav.vue.
+const sectionNav = readFileSync(new URL('../app/components/SectionNav.vue', import.meta.url), 'utf8')
+
 test('the shell draws the list from the table, and every item links to its address', () => {
   assert.match(shell, /builtProjectSections/)
-  assert.match(shell, /:to="s\.path\(projectId\)"/)
-  assert.match(shell, /:key="s\.key"/)
+  assert.match(shell, /to: s\.path\(props\.projectId\)/)
+  assert.match(shell, /<SectionNav/)
 })
 
-test('the shell has the account shell\'s list markup: a labelled nav, ghost buttons with icons, the same left column', () => {
+test('the shell keeps the account shell\'s labelled nav and the same left column; the items are ghost buttons with icons', () => {
   assert.match(shell, /<nav[\s\S]*aria-label="Settings sections"/)
-  assert.match(shell, /variant="ghost"/)
-  assert.match(shell, /size="sm"/)
   assert.match(shell, /lg:grid-cols-\[12rem_1fr\]/)
+  assert.match(sectionNav, /variant="ghost"/)
+  assert.match(sectionNav, /size="sm"/)
   // The account shell has the same labelled nav; the two lists read the same way.
   assert.match(account, /aria-label="Settings sections"/)
-  assert.match(account, /variant="ghost"/)
 })
 
 test('the shell marks the current section, and the mark is seen (a filled background), not only in the markup', () => {
-  assert.match(shell, /aria-current/)
-  assert.match(shell, /bg-elevated[^'"]*font-medium/)
+  assert.match(sectionNav, /aria-current/)
+  assert.match(sectionNav, /bg-elevated[^'"]*font-medium/)
+  assert.match(shell, /:current="current"/)
   assert.equal(shell.includes('Teleport'), false, 'no top-bar title inside the board page')
 })
 

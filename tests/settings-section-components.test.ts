@@ -30,5 +30,6 @@ test('the page no longer holds the moved sections inline', () => {
 test('the shell keeps the section list (step C moved the list and the shell into Shell.vue)', () => {
   const shell = readFileSync(new URL('../app/components/settings/Shell.vue', import.meta.url), 'utf8')
   assert.ok(shell.includes('aria-label="Settings sections"'))
-  assert.ok(shell.includes('v-for="s in sections"'))
+  // CQ 1 (8/9): the items are drawn by the one shared component, from the list the shell builds.
+  assert.ok(shell.includes('<SectionNav :items="sections" />'))
 })

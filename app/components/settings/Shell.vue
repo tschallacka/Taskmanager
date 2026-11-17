@@ -17,7 +17,9 @@ const icons: Record<string, string> = {
 const sections = [
   ...ACCOUNT_SECTIONS.map(section => ({ label: section.label, icon: icons[section.key]!, to: section.path })),
   { label: 'Sprocket', icon: 'i-lucide-cog', to: '/settings/sprocket' },
-  { label: 'AI history', icon: 'i-lucide-history', to: '/settings/ai-history' }
+  { label: 'AI history', icon: 'i-lucide-history', to: '/settings/ai-history' },
+  // The admin's own pages are reached from here too, for an instance admin only.
+  ...(isInstanceAdmin.value ? [{ label: 'Crews and agents', icon: 'i-lucide-bot', to: '/admin/crews' }] : [])
 ]
 </script>
 
@@ -40,28 +42,7 @@ const sections = [
         aria-label="Settings sections"
         class="flex shrink-0 gap-1 overflow-x-auto border-b border-default p-2 lg:w-52 lg:flex-col lg:gap-0.5 lg:overflow-y-auto lg:border-b-0 lg:border-r lg:p-3"
       >
-        <UButton
-          v-for="s in sections"
-          :key="s.to"
-          :to="s.to"
-          :label="s.label"
-          :icon="s.icon"
-          color="neutral"
-          variant="ghost"
-          size="sm"
-          class="shrink-0 justify-start"
-        />
-        <UButton
-          v-if="isInstanceAdmin"
-          to="/admin/crews"
-          label="Crews and agents"
-          icon="i-lucide-bot"
-          color="neutral"
-          variant="ghost"
-          size="sm"
-          block
-          class="justify-start"
-        />
+        <SectionNav :items="sections" />
       </nav>
       <div class="flex-1 min-w-0 overflow-y-auto">
         <UContainer class="py-6">

@@ -5,9 +5,9 @@ import { builtProjectSections, type ProjectSettingsKey } from '~/utils/projectSe
 // drawn from the section table, and each item links to the section's own address, so the router takes it to the settings
 // view (the redirect route, see ProjectSettingsRedirect.vue). It has the account shell's list markup. It has no top-bar
 // title and no phone bottom nav, because the settings tab sits inside the board page.
-defineProps<{ projectId: string, current: ProjectSettingsKey }>()
+const props = defineProps<{ projectId: string, current: ProjectSettingsKey }>()
 
-const sections = builtProjectSections()
+const items = computed(() => builtProjectSections().map(s => ({ key: s.key, label: s.label, icon: s.icon, to: s.path(props.projectId) })))
 </script>
 
 <template>
@@ -16,18 +16,9 @@ const sections = builtProjectSections()
       aria-label="Settings sections"
       class="flex flex-wrap gap-1 lg:flex-col"
     >
-      <UButton
-        v-for="s in sections"
-        :key="s.key"
-        :to="s.path(projectId)"
-        :label="s.label"
-        :icon="s.icon"
-        color="neutral"
-        variant="ghost"
-        size="sm"
-        class="shrink-0 justify-start"
-        :class="s.key === current ? 'bg-elevated font-medium text-default' : ''"
-        :aria-current="s.key === current ? 'page' : undefined"
+      <SectionNav
+        :items="items"
+        :current="current"
       />
     </nav>
     <div class="min-w-0 max-w-2xl">
