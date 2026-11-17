@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.43.0 - 2026-11-17
+
+- **Board Filter: assignee and Compact cards.** The Filter now narrows the board by one assignee (or Unassigned), next to the labels and the search, and its Compact cards switch hides each card's snippet and cover; the switch is kept in the browser. Files: `app/utils/boardFilter.ts`, `app/composables/useProjects.ts`, `app/pages/projects/[id].vue`, `app/components/kanban/KanbanBoard.vue`, `app/components/kanban/KanbanCard.vue`, `docs/basics/boards-and-columns.md`.
+
 ## 0.42.1 - 2026-11-17
 
 - **Crew kit: the worktree folder from crew.json is read, and the serve hint says "for example".** `init` no longer warns that a set worktreeBase is missing, and `crew <who> prepare worktree` takes the folder from the loaded config. The serve hint for a non-Nuxt product no longer reads as the required command. Files: `crew/config.mjs`, `crew/prepare-worktree-cli.mjs`, `crew/init.mjs`, `crew/worktree-base-config.test.mjs`.
