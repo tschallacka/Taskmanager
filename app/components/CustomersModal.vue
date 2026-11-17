@@ -373,13 +373,23 @@ function confirmRevoke(customerId: string, invitation: CustomerInvitation) {
                     >
                       Nobody logs in for {{ c.name }} yet.
                     </p>
-                    <p
+                    <div
                       v-for="email in pendingInvitedEmails(invitations)"
                       :key="`pending-${email}`"
-                      class="text-xs text-muted"
+                      class="flex items-center justify-between gap-2"
                     >
-                      Invited, not accepted yet: {{ email }}
-                    </p>
+                      <p class="min-w-0 truncate text-xs text-muted">
+                        Invited, not accepted yet: {{ email }}
+                      </p>
+                      <UButton
+                        label="Revoke"
+                        icon="i-lucide-x"
+                        size="xs"
+                        color="error"
+                        variant="ghost"
+                        @click="confirmRevoke(c.id, invitations.find(invitation => invitation.email === email)!)"
+                      />
+                    </div>
                     <div
                       v-for="contact in contacts"
                       :key="contact.userId"
