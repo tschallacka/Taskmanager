@@ -140,6 +140,21 @@ test('the custom field select cell uses AppSelect, keeps its clicks from the row
   assert.match(field, /emit\('change', raw === '' \? null : raw\)/, 'an empty choice still reports null')
 })
 
+test('the open list of AppSelect has a minimum width, so the labels of a narrow picker (a task panel field at 390 px) are not cut off', () => {
+  const select = read('app/components/AppSelect.vue')
+  const content = select.match(/content: '([^']*)'/)?.[1] ?? ''
+  assert.match(content, /\bmin-w-40\b/, 'the list is at least 10 rem wide, whatever the width of its trigger')
+  assert.match(content, /max-w-\[calc\(100vw-2rem\)\]/, 'and it still stays inside the screen')
+})
+
+test('the open list of AppSelect is drawn above a dialog, so a picker inside a modal (the draft task project) is not hidden under the overlay', () => {
+  const select = read('app/components/AppSelect.vue')
+  const content = select.match(/content: '([^']*)'/)?.[1] ?? ''
+  assert.match(content, /\bz-\[80\]/, 'the list sits above the dialog overlay, which is z-70')
+  const draft = read('app/components/DraftTaskModal.vue')
+  assert.match(draft, /<AppSelect\s[\s\S]*?data-draft-project/, 'the draft task project picker is an AppSelect, so it gets this')
+})
+
 test('AppSelect can list options under group headings (a label per group)', () => {
   const select = read('app/components/AppSelect.vue')
   assert.match(select, /groups\?: \{ label: string, options: SelectOption\[\] \}\[\]/, 'an optional list of groups')
