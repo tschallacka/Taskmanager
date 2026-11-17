@@ -86,6 +86,8 @@ const customerNewName = ref('')
 const customerEmail = ref('')
 const customerError = ref('')
 const customerLink = ref('')
+// The address the link was made for: the form clears the email field, so the link box keeps it.
+const customerLinkFor = ref('')
 const customerSending = ref(false)
 const customerItems = computed(() => (customers.value ?? []).map(customer => ({ label: customer.name, value: customer.id })))
 
@@ -104,6 +106,7 @@ async function inviteCustomer() {
       body: { customerId: customerChoice.value, customerName: customerNewName.value.trim(), email: customerEmail.value.trim() }
     })
     customerLink.value = answer.url
+    customerLinkFor.value = customerEmail.value.trim()
     customerEmail.value = ''
     customerNewName.value = ''
     customerChoice.value = ''
@@ -426,7 +429,18 @@ watch(open, (isOpen) => {
                 class="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 p-2"
               >
                 <code class="min-w-0 flex-1 truncate text-[11px]">{{ customerLink }}</code>
+                <UButton
+                  label="Copy"
+                  icon="i-lucide-copy"
+                  size="xs"
+                  color="neutral"
+                  variant="soft"
+                  @click="copy(customerLink)"
+                />
               </div>
+              <p class="text-xs text-muted">
+                For {{ customerLinkFor }}. It works for that address only.
+              </p>
               <UButton
                 type="submit"
                 size="sm"
