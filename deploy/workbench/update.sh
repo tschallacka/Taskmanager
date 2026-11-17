@@ -21,6 +21,8 @@ PGSOCK=$WB/data/run/taskmanager
 PGPORT=5435
 export PATH="$WB/profile/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 export NODE_OPTIONS=--max-old-space-size=6144
+# The build cache lives outside the releases: each deploy removes the release folder, and the cache must outlive it.
+export BUILD_CACHE_DIR=$TM_HOME/build-cache
 
 WATCH=
 FORCE=

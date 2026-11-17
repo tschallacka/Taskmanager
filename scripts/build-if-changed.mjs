@@ -119,7 +119,9 @@ function storeCache(root, cacheDir, hash, log) {
 export function run({ root, env = {}, build, bunVersion = '', nodeVersion = '', log = console.log }) {
   const start = Date.now()
   const hash = hashTree(root, { bun: bunVersion, node: nodeVersion, env })
-  const cacheDir = join(root, 'data', '.build-cache')
+  // BUILD_CACHE_DIR, when the deploy sets it, keeps the cache outside the release (the release is removed on each deploy). Otherwise
+  // the cache is data/.build-cache in the release, which is the local and dev layout.
+  const cacheDir = env.BUILD_CACHE_DIR || join(root, 'data', '.build-cache')
   const cache = cacheState(cacheDir)
   let d = decide({ force: env.BUILD_FORCE === '1', hash, cache })
   if (d.dropCache) rmSync(cacheDir, { recursive: true, force: true })
