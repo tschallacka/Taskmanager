@@ -69,9 +69,12 @@ test('search in this board: a box in row 2 narrows the cards by title, and count
   assert.match(page, /@input="setSearchText\(\(\$event\.target as HTMLInputElement\)\.value\)"/)
   const composable = readFileSync(join(process.cwd(), 'app', 'composables', 'useProjects.ts'), 'utf8')
   assert.match(composable, /const _searchText = ref\(''\)/)
-  assert.match(composable, /return needle \? byLabel\.filter\(t => t\.title\.toLowerCase\(\)\.includes\(needle\)\) : byLabel/)
+  // The search now runs in the shared Filter rule (app/utils/boardFilter.ts, tested in board-filter.test.ts).
+  assert.match(composable, /matchesBoardFilter\(t, \{ labels: selected, assigneeId: _assigneeFilter\.value, search: _searchText\.value \}\)/)
   const board = readFileSync(join(process.cwd(), 'app', 'components', 'kanban', 'KanbanBoard.vue'), 'utf8')
-  assert.match(board, /const isFiltering = computed\(\(\) => activeTags\.value\.length > 0 \|\| searchText\.value\.trim\(\) !== ''\)/)
+  assert.match(board, /const isFiltering = boardFiltering/)
+  const filterRule = readFileSync(join(process.cwd(), 'app', 'utils', 'boardFilter.ts'), 'utf8')
+  assert.match(filterRule, /const needle = filter\.search\.trim\(\)\.toLowerCase\(\)/)
 })
 
 test('the Filter button holds the labels and Show deleted, and opens with the trash or a label present', () => {

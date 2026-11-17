@@ -35,6 +35,8 @@ const props = defineProps<{
   columns?: { id: string, name: string }[]
   // The board is filed under a customer: only then can a task be "Shared with customer".
   customerBoard?: boolean
+  // Compact cards (the Filter's switch): the card drops its snippet and its cover, and keeps the title and the labels.
+  compact?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -232,7 +234,7 @@ const hasCounts = computed(() =>
     >
       <!-- The task's first attached image, bled to the card edges as its cover. -->
       <img
-        v-if="cover && !trashed"
+        v-if="cover && !trashed && !compact"
         :src="cover"
         alt=""
         loading="lazy"
@@ -291,7 +293,7 @@ const hasCounts = computed(() =>
       </div>
 
       <p
-        v-if="snippet && !completed"
+        v-if="snippet && !completed && !compact"
         class="mt-1 line-clamp-2 text-xs leading-relaxed text-muted"
       >
         {{ snippet }}

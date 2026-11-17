@@ -7,6 +7,7 @@ import { BOARD_LOAD_TIMEOUT_MS, boardLoadStateAfter, withTimeout, type BoardLoad
 import { clearCustomFields, ingestBoardFields } from '~/composables/useCustomFields'
 import type { FieldValues, ProjectField } from '~/composables/useCustomFields'
 import { matchesTagRequirements, type TagRequirement } from '#shared/utils/tags'
+import { isBoardFiltering, matchesBoardFilter } from '~/utils/boardFilter'
 
 // A permalink's window as the API returns it (server/utils/commentWindow.ts): the comments and what is left either side.
 interface CommentWindowPage {
@@ -246,6 +247,12 @@ const _activity = ref<TaskActivityItem[]>([])
 const _activeTags = ref<string[]>([])
 // The board's search: the cards whose title has this text (any case). Empty shows every card.
 const _searchText = ref('')
+// The Filter's assignee: null for none, UNASSIGNED ('') for cards with nobody on them, else one person's id.
+// Like the labels, it is per board and resets when another board opens.
+const _assigneeFilter = ref<string | null>(null)
+// Compact cards: no snippet and no cover on a card. A browser preference, kept in localStorage, not per board.
+const _compactCards = ref(false)
+const boardFiltering = computed(() => isBoardFiltering({ labels: _activeTags.value, assigneeId: _assigneeFilter.value, search: _searchText.value }))
 
 // Whether the open board is drawing its trash. Off by default and per board:
 // opening another one starts clean, the same way the label filter does.
@@ -558,6 +565,7 @@ export function useProjects() {
     _githubBadges.value = {}
     _activeTags.value = []
     _searchText.value = ''
+    _assigneeFilter.value = null
     _showTrashed.value = false
     _trashedCount.value = 0
     _activeProjectId.value = null
@@ -688,6 +696,7 @@ export function useProjects() {
         if (_activeProjectId.value) cacheBoard(_activeProjectId.value)
         _activeTags.value = []
         _searchText.value = ''
+        _assigneeFilter.value = null
         // A board is opened with its trash closed, however the last one was left.
         _showTrashed.value = false
         // The board being left must not stay on screen while the next one loads:
@@ -773,15 +782,10 @@ export function useProjects() {
     return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
   })
 
-  // A task must carry every selected label, so stacking labels narrows down.
+  // A task must carry every selected label, so stacking labels narrows down. The assignee and the search narrow it further.
   function visibleColumnTasks(columnId: string) {
     const selected = _activeTags.value
-    const needle = _searchText.value.trim().toLowerCase()
-    const tasks = columnTasks(columnId)
-    const byLabel = selected.length === 0
-      ? tasks
-      : tasks.filter(t => selected.every(tag => t.tags.includes(tag)))
-    return needle ? byLabel.filter(t => t.title.toLowerCase().includes(needle)) : byLabel
+    return columnTasks(columnId).filter(t => matchesBoardFilter(t, { labels: selected, assigneeId: _assigneeFilter.value, search: _searchText.value }))
   }
 
   function setSearchText(text: string) {
@@ -796,6 +800,33 @@ export function useProjects() {
 
   function clearTagFilter() {
     _activeTags.value = []
+  }
+
+  // One assignee at a time: picking the person who is already picked clears the filter.
+  function toggleAssigneeFilter(assigneeId: string | null) {
+    _assigneeFilter.value = _assigneeFilter.value === assigneeId ? null : assigneeId
+  }
+
+  function clearAssigneeFilter() {
+    _assigneeFilter.value = null
+  }
+
+  function toggleCompactCards() {
+    _compactCards.value = !_compactCards.value
+    try {
+      localStorage.setItem('tm-compact-cards', _compactCards.value ? '1' : '0')
+    } catch {
+      // A browser that refuses storage keeps the switch for this visit only.
+    }
+  }
+
+  // Read once on the client, when the board page opens. A browser that refuses storage starts with cards at full size.
+  function restoreCompactCards() {
+    try {
+      _compactCards.value = localStorage.getItem('tm-compact-cards') === '1'
+    } catch {
+      _compactCards.value = false
+    }
   }
 
   async function addColumn(projectId: string, name: string) {
@@ -1236,6 +1267,13 @@ export function useProjects() {
     boardTagCounts,
     toggleTagFilter,
     clearTagFilter,
+    assigneeFilter: _assigneeFilter,
+    boardFiltering,
+    toggleAssigneeFilter,
+    clearAssigneeFilter,
+    compactCards: _compactCards,
+    toggleCompactCards,
+    restoreCompactCards,
     labelColors,
     labelColor,
     setLabelColor,

@@ -46,7 +46,7 @@ tabs, in this order: **Board**, **List**, **Calendar**, **Timeline** and **Dashb
 **Time**, **Files** and, on a crew's board, **Office**. Click it to open the list; on a phone, tap it. With the keyboard, Tab to it and press Enter to
 open the list, then Enter on a view to choose it. Escape closes the list without a choice.
 
-At the right end of the row, on the Board view, there are three things. **Filter** narrows the cards by label; its list shows each label on the board with a count, and **Show deleted** puts the trash on the board. **Search this board** narrows the cards by title, and an empty result says so. **New task** opens the composer in the first column. On a phone the tabs scroll sideways; Filter, search and New task stay in view.
+At the right end of the row, on the Board view, there are three things. **Filter** narrows the cards by label, by one assignee (or **Unassigned**); its list shows each label on the board with a count, and **Show deleted** puts the trash on the board. **Compact cards** in the same list hides each card's snippet and cover, so more cards fit a column; it is kept in this browser, for every board. **Search this board** narrows the cards by title, and an empty result says so. **New task** opens the composer in the first column. On a phone the tabs scroll sideways; Filter, search and New task stay in view.
 
 The top bar shows the board's team and name (**Team › Project**; click the project name to rename it), the board's
 health (**On track**, **At risk** or **Off track**, when it has one, set on **Overview**), and the people on the board
