@@ -33,6 +33,34 @@ test('each tester template uses the URL the start prints, not the dev copy of th
   }
 })
 
+test('a failed test goes back to the worker: a violation subtask, the commit from the READY line, the card to To do', () => {
+  for (const [key, file] of Object.entries(TESTERS)) {
+    const text = read(file)
+    assert.match(text, /A failed test goes back to the worker/, `${file} says it`)
+    assert.match(text, /the commit from the READY line/, `${file} names the tested commit`)
+    assert.match(text, /goes back to \*\*To do\*\*/, `${file} moves the card back to To do`)
+    assert.match(text, /violation/, `${file} posts a violation subtask (tagged for its gate)`)
+  }
+})
+
+test('the worker section says a violation names the tested commit, and that the card in hand is finished first', () => {
+  const prompts = read('PROMPTS.md.tmpl')
+  const worker = prompts.slice(prompts.indexOf('## Worker (key'), prompts.indexOf('\n## ', prompts.indexOf('## Worker (key') + 5))
+  assert.match(worker, /violation names the commit that was tested/, 'the worker knows which commit was tested')
+  assert.match(worker, /finish the card in hand first/, 'the card in hand comes first')
+})
+
+test('PROJECT-RULES says testers have their own copy, the ports come from crew.json, and a worker never serves one', () => {
+  const rules = read('PROJECT-RULES.md.tmpl')
+  assert.match(rules, /\*\*Testers have their own copy of the card's branch\.\*\*/, 'the bullet is there')
+  assert.match(rules, /\{\{node_kit\}\}\/tester-copy\.sh start <key> <branch>/, 'it names the start command')
+  assert.match(rules, /\{\{node_kit\}\}\/tester-copy\.sh stop <key>/, 'it names the stop command')
+  assert.match(rules, /devServers/, 'the ports come from crew.json devServers')
+  assert.doesNotMatch(rules, /31\d\d/, 'no tester port is written in the rules')
+  assert.doesNotMatch(rules, /is served by its worker's dev copy/, 'the old worker-serves-the-tester model is gone')
+  assert.match(rules, /A worker never serves a copy for a tester/, 'the rule is stated')
+})
+
 test('each tester template says a tester never asks a worker to serve a copy', () => {
   for (const file of Object.values(TESTERS)) {
     assert.match(read(file), /never asks? a worker to (serve|start) a copy/, `${file} says it`)

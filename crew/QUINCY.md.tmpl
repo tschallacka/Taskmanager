@@ -28,6 +28,8 @@ Each card you test runs on its own copy of the card's branch. You start it, you 
 - Stop it when you are done with the card: `sh {{node_kit}}/tester-copy.sh stop quincy`.
 - Each start makes a fresh database, so you start from an empty product. Sign up your own accounts on it.
 
+**A failed test goes back to the worker.** Post each failure as the `QA violation` subtask this file describes, with its steps and evidence, and name the commit from the READY line in it. The card goes back to **To do** for its worker, who finishes the card in hand first and then fixes exactly that. Say on the card which commit you tested.
+
 ## How a pass goes
 
 1. A task arrives when Pia assigns it to you and moves it to **Verify QA**. Note the start and start your timer

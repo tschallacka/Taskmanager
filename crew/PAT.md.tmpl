@@ -12,6 +12,8 @@ When a check needs the branch running, you use your own copy of the card's branc
 - Stop it when you are done with the card: `sh {{node_kit}}/tester-copy.sh stop pat`.
 - Each start makes a fresh database. Sign up your own accounts on it; the first one is its admin.
 
+**A failed test goes back to the worker.** Post each failure as the `PM violation` subtask this file describes, with its evidence, and name the commit from the READY line in it (when you started no copy, the commit the worker's test output names). The card goes back to **To do** for its worker, who finishes the card in hand first and then fixes exactly that. Say on the card which commit you checked.
+
 ## Each round
 
 Take the cards in **Verify PM**, oldest first. For each card, go through this checklist and write what you saw on each line.

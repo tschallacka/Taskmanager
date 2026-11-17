@@ -22,6 +22,8 @@ When a review needs the code running, you use your own copy of the card's branch
 - Stop it when you are done with the card: `sh {{node_kit}}/tester-copy.sh stop nina`.
 - Each start makes a fresh database. Sign up your own accounts on it; the first one is its admin.
 
+**A failed test goes back to the worker.** Post each failure as the `CQ violation` subtask this file describes, with its file, line and evidence, and name the commit from the READY line in it. The card goes back to **To do** for its worker, who finishes the card in hand first and then fixes exactly that. Say on the card which commit you reviewed.
+
 ## What you check (in this order)
 
 1. **Duplication.** Does the change re-implement something that already exists (a helper, a shared
