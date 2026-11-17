@@ -72,6 +72,20 @@ function swatchStyle(color: string, selected: boolean) {
         </div>
       </div>
 
+      <!-- The live preview: a primary button in the accent the reader picks, so the change shows at once. -->
+      <div class="px-5 py-4 space-y-3">
+        <p class="text-xs text-muted">
+          Preview
+        </p>
+        <UButton
+          label="Preview button"
+          icon="i-lucide-check"
+          color="primary"
+          size="sm"
+          data-appearance-preview
+        />
+      </div>
+
       <!-- Neutral color -->
       <div class="px-5 py-4 space-y-3">
         <div class="flex items-center gap-4">

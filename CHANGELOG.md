@@ -8,6 +8,8 @@ All notable changes to Arnotes are documented in this file.
 
 - **The instance admin's pages have a left list.** Instance settings and Crews sit in one list, each on its own address (`/admin/settings`, `/admin/crews`). The Accounts list stays a button on Instance settings.
 
+- **The accent colour shows a live preview.** The Appearance section has a primary button under the swatches; it takes the accent you pick at once. The accent and neutral swatches also show their names and a keyboard focus ring.
+
 ## 0.31.0 - 2026-11-14
 
 - Crew: the stale dev-copy report now checks each live copy's own card, not one page of the Done column, so a copy of a finished card is no longer missed.
