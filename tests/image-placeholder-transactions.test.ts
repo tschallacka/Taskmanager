@@ -132,3 +132,53 @@ test('a destroyed editor is not written to', () => {
   settleWithImage(asEditor(stand), 'a', 'https://files.example/a.png')
   assert.deepEqual(stand.state.doc.toJSON(), before)
 })
+
+// Acceptance point 5: the person types on both sides of a pending placeholder, and the placeholder still updates and settles.
+function typeAround(stand: Stand, id: string) {
+  const before = placeholderRange(asEditor(stand), id)
+  assert.ok(before)
+  stand.view.dispatch(stand.state.tr.insertText('before ', before.from))
+  const after = placeholderRange(asEditor(stand), id)
+  assert.ok(after)
+  stand.view.dispatch(stand.state.tr.insertText(' after', after.to))
+}
+
+test('typing before and after a pending placeholder keeps the placeholder and the typed text', () => {
+  const stand = makeEditor('Hello ')
+  insertPlaceholders(asEditor(stand), 7, ['a'])
+  typeAround(stand, 'a')
+  assert.equal(paragraphText(stand), 'Hello before Uploading image… after')
+  assert.equal(markedText(stand, 'a'), 'Uploading image…')
+  assert.equal(markAttr(stand, 'a', 'state'), 'pending')
+  assert.ok(placeholderRange(asEditor(stand), 'a'))
+})
+
+test('typed text around a placeholder survives its progress update', () => {
+  const stand = makeEditor('Hello ')
+  insertPlaceholders(asEditor(stand), 7, ['a'])
+  typeAround(stand, 'a')
+  updatePlaceholder(asEditor(stand), { id: 'a', state: 'pending', progress: 0.4 })
+  assert.equal(paragraphText(stand), 'Hello before Uploading image… after')
+  assert.equal(markAttr(stand, 'a', 'progress'), 0.4)
+  assert.equal(markedText(stand, 'a'), 'Uploading image…')
+})
+
+test('typed text around a placeholder survives the image settling into place', () => {
+  const stand = makeEditor('Hello ')
+  insertPlaceholders(asEditor(stand), 7, ['a'])
+  typeAround(stand, 'a')
+  settleWithImage(asEditor(stand), 'a', 'https://files.example/a.png')
+  assert.deepEqual(images(stand), ['https://files.example/a.png'])
+  assert.equal(placeholderRange(asEditor(stand), 'a'), null)
+  assert.equal(paragraphText(stand), 'Hello before  after')
+})
+
+test('typed text around a placeholder survives the failure line replacing it', () => {
+  const stand = makeEditor('Hello ')
+  insertPlaceholders(asEditor(stand), 7, ['a'])
+  typeAround(stand, 'a')
+  settleWithError(asEditor(stand), 'a', 'too large')
+  assert.equal(paragraphText(stand), 'Hello before Image failed to upload: too large after')
+  assert.equal(placeholderRange(asEditor(stand), 'a'), null)
+  assert.deepEqual(images(stand), [])
+})
