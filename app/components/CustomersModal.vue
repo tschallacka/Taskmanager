@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { CustomerContact, CustomerInvitation } from '~/composables/useCustomers'
 import { emptyCustomerWarning, inviteEmailError } from '#shared/utils/inviteEmail'
-import { pendingInvitedEmails, showNobodyLine } from '~/utils/contactsPanel'
+import { pendingInvitations, pendingInvitedEmails, showNobodyLine } from '~/utils/contactsPanel'
 
 const open = defineModel<boolean>('open', { default: false })
 
@@ -374,12 +374,12 @@ function confirmRevoke(customerId: string, invitation: CustomerInvitation) {
                       Nobody logs in for {{ c.name }} yet.
                     </p>
                     <div
-                      v-for="email in pendingInvitedEmails(invitations)"
-                      :key="`pending-${email}`"
+                      v-for="invitation in pendingInvitations(invitations)"
+                      :key="`pending-${invitation.id}`"
                       class="flex items-center justify-between gap-2"
                     >
                       <p class="min-w-0 break-words text-xs text-muted">
-                        Invited, not accepted yet: {{ email }}
+                        Invited, not accepted yet: {{ invitation.email }}
                       </p>
                       <UButton
                         label="Revoke"
@@ -387,7 +387,7 @@ function confirmRevoke(customerId: string, invitation: CustomerInvitation) {
                         size="xs"
                         color="error"
                         variant="ghost"
-                        @click="confirmRevoke(c.id, invitations.find(invitation => invitation.email === email)!)"
+                        @click="confirmRevoke(c.id, invitation)"
                       />
                     </div>
                     <div

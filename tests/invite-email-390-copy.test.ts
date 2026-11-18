@@ -33,7 +33,7 @@ test('a pending team invite address wraps at 390 px instead of being cut, and on
 })
 
 test('a pending customer contact row wraps its address at 390 px, at word breaks', () => {
-  const tag = openingTagBefore(customers, 'Invited, not accepted yet: {{ email }}')
+  const tag = openingTagBefore(customers, 'Invited, not accepted yet: {{ invitation.email }}')
   assert.equal(/\btruncate\b/.test(tag), false, 'no truncate')
   assert.match(tag, /\bbreak-words\b/)
   assert.equal(/\bbreak-all\b/.test(tag), false, 'no break-all: it splits words')
