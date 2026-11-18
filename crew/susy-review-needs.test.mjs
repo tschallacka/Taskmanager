@@ -4,6 +4,16 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { reviewNeeds, reviewLine, reviewKey, reviewRound, reviewMailToSend, afterReviewMail } from './susy-review-needs.mjs'
 
+// The board reader gives updatedAt as a number (Date.parse of the board's text), as readBoardCards does. A numeric time must
+// give the real wait, not 0m for every card.
+test('a card whose updatedAt is a number (as the board reader gives it) shows its real wait', () => {
+  const NOW_ = Date.parse('2026-11-16T12:00:00.000Z')
+  const card = { id: 'a', title: 'card a', column: 'Verify', tags: [], updatedAt: NOW_ - 90 * 60000 }
+  assert.equal(reviewLine(reviewNeeds([card], NOW_)), 'Waiting for a human. Boss: 1 (a 1h).')
+  const old = { ...card, id: 'b', updatedAt: NOW_ - 20 * 60000 }
+  assert.equal(reviewLine(reviewNeeds([old], NOW_)), 'Waiting for a human. Boss: 1 (b 20m).')
+})
+
 test('a queued review mail is sent again with its own id and text, before any new round', () => {
   const NOW_ = Date.parse('2026-11-16T12:00:00.000Z')
   const r = reviewRound({ cards: [{ id: 'a', title: 'card a', column: 'Verify', tags: [], updatedAt: new Date(NOW_ - 3600000).toISOString() }], now: NOW_, previous: '', live: true, enabled: true })

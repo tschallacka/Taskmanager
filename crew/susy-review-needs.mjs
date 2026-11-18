@@ -3,9 +3,9 @@
 // Pure functions: the daemon logs the line, and mails Boss when it changes (susy-daemon.mjs).
 const HUMAN_DONE = ['Done', 'Ready for live']
 
-/** How long a card has waited, in hours, since its last change. */
+/** How long a card has waited, in hours, since its last change. updatedAt is a time in ms (the board reader's form) or a text. */
 function hoursSince(card, now) {
-  const at = Date.parse(card.updatedAt)
+  const at = typeof card.updatedAt === 'number' ? card.updatedAt : Date.parse(card.updatedAt)
   return Number.isFinite(at) ? (now - at) / 3600000 : 0
 }
 
