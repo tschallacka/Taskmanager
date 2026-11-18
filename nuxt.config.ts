@@ -116,6 +116,16 @@ export default defineNuxtConfig({
     }
   },
 
+  // Icons come from our own server only. The two collections the app uses are bundled on the server, the icons it
+  // uses are bundled into the client, and a missing icon is not looked up at the public Iconify API (no visitor's IP
+  // goes to a third party). Card mwjfpwrmy51vqimyvsj.
+  icon: {
+    provider: 'server',
+    fallbackToApi: false,
+    serverBundle: { collections: ['lucide', 'simple-icons'] },
+    clientBundle: { scan: true }
+  },
+
   pwa: {
     registerType: 'autoUpdate',
     manifest: {

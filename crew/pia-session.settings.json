@@ -1,5 +1,6 @@
 {
   "outputStyle": "concise",
+  "remoteControlAtStartup": false,
   "hooks": {
     "Stop": [
       {

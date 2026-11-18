@@ -12,7 +12,7 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { crewHome } from './home.mjs'
+import { crewHome, crewSlugOf, sessionNameFor } from './home.mjs'
 import { longRunEnv, settingsPath, writeSettingsFile } from './session-settings.mjs'
 import { notTrustedReason, readWorktreeBase, recordedFolders, trustForStart } from './claude-trust.mjs'
 import { resolveStartRole, writeRoleFile } from './role-file.mjs'
@@ -80,12 +80,37 @@ export function mcpConfigPath(home, key) {
   return join(home, 'sessions', `${checkKey(key)}.mcp.json`)
 }
 
-/** The argv of `claude --bg` for one person (not run here). The role goes in as the system prompt, from the file. */
-export function startArgs({ key, folder, home, kit, role, model = MODEL }) {
+/**
+ * The crew's slug, read from crew.json (or the older crew.config.json), as home.mjs crewSlugOf gives it. '' when the home has
+ * no readable crew file.
+ */
+export function crewSlug(home) {
+  const file = [join(home, 'crew.json'), join(home, 'crew.config.json')].find(f => existsSync(f))
+  if (!file) return ''
+  try {
+    return crewSlugOf(JSON.parse(readFileSync(file, 'utf8')))
+  } catch {
+    return ''
+  }
+}
+
+/** A person's session name (home.mjs sessionNameFor), after the key is checked. */
+export function sessionName({ slug, key }) {
+  checkKey(key)
+  return sessionNameFor(slug, key)
+}
+
+/**
+ * The argv of `claude --bg` for one person (not run here). The role goes in as the system prompt, from the file. With a
+ * `resume` session id, the argv continues that session under the same id (`claude --bg --resume <id>`).
+ */
+export function startArgs({ key, folder, home, kit, role, model = MODEL, name = checkKey(key), resume = '' }) {
+  // The id is typed into the argv of a process, so it must be a session id (see SESSION_ID).
+  if (resume && !validSessionId(resume)) throw new Error(`not a session id: ${resume}`)
   return {
     cwd: folder,
     args: [
-      '--bg', '-n', checkKey(key), '--model', model,
+      '--bg', ...(resume ? ['--resume', resume] : []), '-n', name, '--model', model,
       '--setting-sources', 'user', '--settings', settingsPath(home, key),
       '--strict-mcp-config', '--mcp-config', mcpConfigPath(home, key),
       '--permission-mode', 'auto',
@@ -136,9 +161,10 @@ export function listAgents(opts = {}) {
 }
 
 /**
- * Starts the person's session, unless the recorded one is live. Records the id of the new session. Before the start, the crew's
- * own folders are trusted in Claude Code's config (`trust`, claude-trust.mjs); a folder the crew did not make is refused with a
- * sentence that says what crew update does.
+ * Starts the person's session, unless the recorded one is live. A recorded session that is not live is resumed first (the same
+ * id, the same transcript); when claude refuses the resume, a fresh start follows and the new id is recorded. Before the start,
+ * the crew's own folders are trusted in Claude Code's config (`trust`, claude-trust.mjs); a folder the crew did not make is
+ * refused with a sentence that says what crew update does.
  */
 export function startSession({ home, kit, key, folder, role, bin, now = Date.now, trust = trustForStart }) {
   checkKey(key)
@@ -148,24 +174,35 @@ export function startSession({ home, kit, key, folder, role, bin, now = Date.now
   if (list && liveById(list, record?.id)) return { ok: true, id: record.id, started: false, note: 'already running' }
   const trusted = trust({ home, kit, folder, folders: recordedFolders(home) })
   if (!trusted.ok) return { ok: false, reason: trusted.reason }
-  const { cwd, args } = startArgs({ key, folder, home, kit, role })
+  const name = sessionName({ slug: crewSlug(home), key })
   // The session's own mcp config, written before the start, so the strict flag always has a file to read.
   mkdirSync(join(home, 'sessions'), { recursive: true })
   writeFileSync(mcpConfigPath(home, key), `${JSON.stringify(mcpConfig({ key, home, kit }), null, 2)}\n`, { mode: 0o600 })
   // The person's own settings file (deny rules, own CREW_HOME, remote control off), written before the start: the start
   // passes that one file as its --settings. The long-run profile's env is merged in, so the session keeps the owner's timeouts.
   writeSettingsFile(home, key, { profileEnv: longRunEnv(kit) })
-  const run = runClaude(args, { bin, cwd })
+  // The resume first (when there is a recorded id), then a fresh start if claude refuses it. A folder claude does not trust
+  // is not retried: the same refusal would come back.
+  const resumeId = validSessionId(record?.id) ? record.id : ''
+  let run
+  let resumed = false
+  for (const resume of resumeId ? [resumeId, ''] : ['']) {
+    const { cwd, args } = startArgs({ key, folder, home, kit, role, name, resume })
+    run = runClaude(args, { bin, cwd })
+    resumed = Boolean(resume) && run.ok
+    if (run.ok || /not trusted/i.test(run.stderr)) break
+  }
   // Claude refuses a folder it does not trust with 'not trusted' on stderr: the reason names the folder and says what crew update does.
   if (!run.ok && /not trusted/i.test(run.stderr)) return { ok: false, reason: notTrustedReason(folder, readWorktreeBase(home)) }
   if (!run.ok) return { ok: false, reason: `claude did not start the session: ${run.stderr || `exit ${run.status}`}` }
   const after = listAgents({ bin }) ?? []
-  // The new session is the newest one with this key's name. The name is used once, here, to learn the id; after that
-  // the id is the only handle.
-  const fresh = after.filter(a => a.name === key && a.state !== 'ended' && a.status !== 'stopped').sort((a, b) => b.startedAt - a.startedAt)[0]
-  if (!fresh) return { ok: false, reason: 'claude started, but no live session with this key shows in claude agents' }
+  // A resumed session keeps its id. A fresh one is the newest session with this person's name: the name is used once, here,
+  // to learn the id; after that the id is the only handle.
+  const resumedLive = resumed ? liveById(after, resumeId) : null
+  const fresh = resumedLive ?? after.filter(a => a.name === name && a.state !== 'ended' && a.status !== 'stopped').sort((a, b) => b.startedAt - a.startedAt)[0]
+  if (!fresh) return { ok: false, reason: `claude started, but no live session named ${name} shows in claude agents` }
   writeRecord(home, key, { id: fresh.id, name: key, folder, startedAt: fresh.startedAt || now(), recordedAt: new Date(now()).toISOString() })
-  return { ok: true, id: fresh.id, started: true }
+  return { ok: true, id: fresh.id, started: true, resumed: Boolean(resumedLive) }
 }
 
 export function sessionStatus({ home, key, bin }) {
