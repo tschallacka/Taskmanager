@@ -2,12 +2,69 @@
 // Run: node --test crew/susy-daemon.test.mjs
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { tick, pendingKey, postBody, postFresh, runOnce, statusLines, heartbeatAgeMinutes, heartbeatFresh, daemonCommand, shellQuote, SESSION, upPart, isDaemonPid, lockState, takeLock, releaseLock, LOCK_NAME } from './susy-daemon.mjs'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { createServer } from 'node:http'
+
+// A live run against a fake board and a fake mail endpoint on localhost: the endpoint is down at first, so the review mail
+// is queued in the outbox. A queued mail is not sent: the state keeps it owed, with its id, and the next run sends that
+// same id once. Card mwm5dba5vuw52e2t51g.
+test('live run: a queued review mail is not marked sent; the next run sends the same mail id', async () => {
+  const home = mkdtempSync(join(tmpdir(), 'susy-live-'))
+  mkdirSync(join(home, '.listen'), { recursive: true })
+  const board = { columns: [{ name: 'Verify', tasks: [{ id: 'v1', title: 'Review me', assignee: 'Wade Worker', labels: [], completed: false, updatedAt: new Date(T0 - 60 * MIN).toISOString(), blocked: false, blockedBy: [], updates: 0 }] }] }
+  const posts = []
+  let mailUp = false
+  const server = createServer((req, res) => {
+    let body = ''
+    req.on('data', (chunk) => {
+      body += chunk
+    })
+    req.on('end', () => {
+      if (req.url.startsWith('/api/crew-mail/')) {
+        posts.push(JSON.parse(body))
+        if (!mailUp) return void res.writeHead(503).end('down')
+        return void res.writeHead(200, { 'content-type': 'application/json' }).end('{}')
+      }
+      const call = JSON.parse(body)
+      const answer = call.params.name === 'get_board' ? board : {}
+      res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ jsonrpc: '2.0', id: call.id, result: { content: [{ type: 'text', text: JSON.stringify(answer) }] } }))
+    })
+  })
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+  try {
+    const base = `http://127.0.0.1:${server.address().port}`
+    writeFileSync(join(home, 'creds.json'), JSON.stringify({ base, people: { susy: { apiKey: 'k' } }, board: { id: 'b' }, crew: { slug: 's' } }))
+    writeFileSync(join(home, 'crew.json'), JSON.stringify({ people: {}, susy: { dispatch: { reviewNeeds: true } } }))
+    const stateOf = () => JSON.parse(readFileSync(join(home, '.listen', 'susy-daemon.json'), 'utf8')).state
+    const logOf = () => readFileSync(join(home, '.listen', 'susy-daemon-dryrun.log'), 'utf8')
+
+    await runOnce(home, T0, { live: true })
+    assert.equal(posts.length, 1)
+    const id = posts[0].id
+    assert.match(id, /^[0-9a-f]{32}$/)
+    assert.ok(existsSync(join(home, 'mailbox', 'outbox', `${id}.json`)), 'the queued mail is in the outbox')
+    assert.match(logOf(), /queued for boss, not sent yet: review needs/)
+    assert.doesNotMatch(logOf(), /mailed boss: review needs/)
+    assert.equal(stateOf().reviewKey, undefined, 'a queued line is not stored as mailed')
+    assert.equal(stateOf().reviewQueued.id, id)
+
+    mailUp = true
+    await runOnce(home, T0 + MIN, { live: true })
+    assert.equal(posts.length, 2)
+    assert.equal(posts[1].id, id, 'the retry is the same mail row')
+    assert.equal(posts[1].text, posts[0].text)
+    assert.match(logOf(), /mailed boss: review needs/)
+    assert.equal(stateOf().reviewKey, 'boss:v1|owner:')
+    assert.equal(stateOf().reviewQueued, undefined)
+  } finally {
+    server.close()
+  }
+})
 
 const MIN = 60000
 const T0 = Date.parse('2026-11-12T10:00:00.000Z')
