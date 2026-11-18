@@ -1,1 +1,0 @@
-- **Share dialog guest email on a phone.** The "Add a guest by email…" field takes a full row below 640 px, so the placeholder and a typed address show in full at 390 px (it was about 90 px wide). Files: `app/components/BoardShare.vue`, `tests/share-guest-email-phone.test.ts`.

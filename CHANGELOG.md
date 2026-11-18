@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.49.1 - 2026-11-18
+
+- **Share dialog guest email on a phone.** The "Add a guest by email…" field takes a full row below 640 px, so the placeholder and a typed address show in full at 390 px (it was about 90 px wide). Files: `app/components/BoardShare.vue`, `tests/share-guest-email-phone.test.ts`.
+
 ## 0.49.0 - 2026-11-18
 
 - **Settings redesign (8/9): one left list of sections, one address per section.** The project settings view is a shell with a left list (General, Members, Customer, GitHub, Rules, Secrets, Import, Archive, Trash), each section at its own address, and the account, appearance, AI, API keys and admin settings pages use the same shell. Team settings follows as its own card.
