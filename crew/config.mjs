@@ -6,7 +6,7 @@
 // to the kit folder. crew.json (written by `crew setup`, or by hand) holds the product,
 // URLs, people and chat settings; creds.json holds the accounts and keys the board made.
 import { readFileSync, existsSync, readdirSync } from 'node:fs'
-import { crewHome, kitDir, shellWord } from './home.mjs'
+import { crewHome, kitDir, sessionNameFor, shellWord, slugify } from './home.mjs'
 import { CAST, EXTRA_CAST, forkMemberPlan, forkRole } from './cast.mjs'
 import { migrateCrewHome, renameKeys } from './keys.mjs'
 
@@ -114,8 +114,6 @@ export function loadCreds() {
   return creds
 }
 
-const slugify = text => String(text).toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
-
 export { CAST, EXTRA_CAST, forkMemberPlan, forkRole }
 
 // The model each person runs on is the Owner's choice, set per person in crew.json under "models" (README, "Models").
@@ -180,7 +178,7 @@ export const agentNames = Object.fromEntries(CAST.filter(key => !EXTRA_CAST.incl
  * Each member's background session name (session.mjs sessionName): the crew slug and the key, such as taskmanager-maintenance-pia.
  * `claude --resume <name>` finds the session by it. Pia's start line names her session with this.
  */
-export const sessionNames = Object.fromEntries(CAST.filter(key => !EXTRA_CAST.includes(key)).map(key => [key, `${slugify(config.crew.slug || config.team)}-${key}`]))
+export const sessionNames = Object.fromEntries(CAST.filter(key => !EXTRA_CAST.includes(key)).map(key => [key, sessionNameFor(slugify(config.crew.slug || config.team), key)]))
 
 // shellWord comes from home.mjs (one rule for the kit); config re-exports it for the scripts that import it from here.
 export { shellWord }

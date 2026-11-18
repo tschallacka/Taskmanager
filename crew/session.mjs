@@ -12,7 +12,7 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { crewHome } from './home.mjs'
+import { crewHome, crewSlugOf, sessionNameFor } from './home.mjs'
 import { longRunEnv, settingsPath, writeSettingsFile } from './session-settings.mjs'
 import { notTrustedReason, readWorktreeBase, recordedFolders, trustForStart } from './claude-trust.mjs'
 import { resolveStartRole, writeRoleFile } from './role-file.mjs'
@@ -80,27 +80,24 @@ export function mcpConfigPath(home, key) {
   return join(home, 'sessions', `${checkKey(key)}.mcp.json`)
 }
 
-const slugify = text => String(text).toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
-
 /**
- * The crew's slug, read from crew.json (or the older crew.config.json): the crew slug when it has one, else the team name,
- * slugged the way config.mjs slugs the agent names. '' when the home has no readable crew file.
+ * The crew's slug, read from crew.json (or the older crew.config.json), as home.mjs crewSlugOf gives it. '' when the home has
+ * no readable crew file.
  */
 export function crewSlug(home) {
   const file = [join(home, 'crew.json'), join(home, 'crew.config.json')].find(f => existsSync(f))
   if (!file) return ''
   try {
-    const raw = JSON.parse(readFileSync(file, 'utf8'))
-    return slugify(raw.crew?.slug || raw.team || '')
+    return crewSlugOf(JSON.parse(readFileSync(file, 'utf8')))
   } catch {
     return ''
   }
 }
 
-/** A person's session name: the crew slug and the key, such as taskmanager-maintenance-wren. No slug gives the key alone. */
+/** A person's session name (home.mjs sessionNameFor), after the key is checked. */
 export function sessionName({ slug, key }) {
   checkKey(key)
-  return slug ? `${slug}-${key}` : key
+  return sessionNameFor(slug, key)
 }
 
 /**
