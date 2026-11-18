@@ -9,7 +9,7 @@
 // broken link, or a text file that names the build root is never skipped and never stored, and the reason is printed.
 // Every run prints one line: build-if-changed: skipped|built|failed, hash <12>, wall Ns, cpu Ns, peak MB.
 import { spawnSync } from 'node:child_process'
-import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -35,7 +35,7 @@ export function copyOutput(from, to, scope = null) {
       copyOutput(join(from, name), join(to, name), { root: here.root, ancestors: [...here.ancestors, real] })
     }
   } else {
-    cpSync(from, to, { dereference: true })
+    copyFileSync(from, to) // follows a file link: the target's bytes, never the link (cpSync on a file link fails on Node 22.23)
   }
 }
 

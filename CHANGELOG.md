@@ -2,6 +2,11 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.49.0 - 2026-11-18
+
+- **Settings redesign (8/9): one left list of sections, one address per section.** The project settings view is a shell with a left list (General, Members, Customer, GitHub, Rules, Secrets, Import, Archive, Trash), each section at its own address, and the account, appearance, AI, API keys and admin settings pages use the same shell. Team settings follows as its own card.
+- **Build cache: a build whose output holds a file link is stored again.** `copyOutput` copies a file link with `copyFileSync`; `cpSync` on a file link failed on Node 22.23 and the store was refused.
+
 ## 0.48.1 - 2026-11-17
 
 - **The production build is skipped when nothing it reads has changed.** `bun run build` hashes the build inputs (the app, the server, the shared code, the public folder, the docs, the configs, the tool versions and the build-time environment values) and copies the last good output from `data/.build-cache/` when the hash matches; `BUILD_FORCE=1` forces a full build, and `bun run build:full` is the full build. The app's version is read at run time from the release, so a copied build reports its own version. Files: `scripts/build-if-changed.mjs`, `scripts/build-inputs.mjs`, `server/utils/appVersionFile.ts`, `server/utils/appVersion.ts`, `package.json`, `CONTRIBUTING.md`.
