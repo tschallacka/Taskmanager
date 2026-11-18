@@ -89,6 +89,8 @@ const customerLink = ref('')
 // The address the link was made for: the form clears the email field, so the link box keeps it.
 const customerLinkFor = ref('')
 const customerSending = ref(false)
+// The picker's options: the team's customers by id. The picker is AppSelect, the app's select (no native selects).
+const customerOptions = computed(() => customers.value.map(customer => ({ label: customer.name, value: customer.id })))
 
 async function inviteCustomer() {
   const problem = customerChoiceError({ customerId: customerChoice.value, customerName: customerNewName.value, email: customerEmail.value })
@@ -419,23 +421,14 @@ watch(open, (isOpen) => {
               class="space-y-2"
               @submit.prevent="inviteCustomer"
             >
-              <select
+              <AppSelect
                 v-model="customerChoice"
-                class="w-full rounded-md border border-default bg-transparent px-2 py-1.5 text-sm text-default outline-none focus:border-primary"
+                :options="customerOptions"
+                placeholder="Choose the customer"
+                class="w-full"
                 aria-label="The customer"
                 data-share-customer-choice
-              >
-                <option value="">
-                  Choose the customer
-                </option>
-                <option
-                  v-for="customer in customers"
-                  :key="customer.id"
-                  :value="customer.id"
-                >
-                  {{ customer.name }}
-                </option>
-              </select>
+              />
               <UInput
                 v-model="customerNewName"
                 placeholder="…or type a new customer's name"
