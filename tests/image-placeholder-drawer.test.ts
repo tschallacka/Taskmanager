@@ -6,17 +6,19 @@ import { readFileSync } from 'node:fs'
 
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8')
 
-test('the description is saved without the pending placeholders', () => {
+test('the description is saved without the pending placeholders, and the saved copy is remembered as our own', () => {
   const drawer = read('app/components/kanban/TaskDrawer.vue')
-  assert.match(drawer, /description: stripPendingPlaceholders\(editorContent\.value\)/)
+  assert.match(drawer, /const html = stripPendingPlaceholders\(editorContent\.value\)/)
+  assert.match(drawer, /ownSaves\.push\(html\)/)
+  assert.match(drawer, /updateTask\(taskId, \{ description: html \}\)/)
 })
 
-test('a save echo from the server does not reset the editor over a pending placeholder', () => {
+test('a server copy goes through shouldAdoptServerDescription, so a late answer or a pending upload does not reset the editor', () => {
   const drawer = read('app/components/kanban/TaskDrawer.vue')
-  assert.match(drawer, /if \(description === stripPendingPlaceholders\(editorContent\.value\)\) return/)
+  assert.match(drawer, /if \(!shouldAdoptServerDescription\(description, editorContent\.value, ownSaves\)\) return/)
 })
 
 test('the drawer uses the placeholder helpers from the editor folder', () => {
   const drawer = read('app/components/kanban/TaskDrawer.vue')
-  assert.match(drawer, /import \{ stripPendingPlaceholders \} from '~\/utils\/editor\/imagePlaceholders'/)
+  assert.match(drawer, /import \{ shouldAdoptServerDescription, stripPendingPlaceholders \} from '~\/utils\/editor\/imagePlaceholders'/)
 })
