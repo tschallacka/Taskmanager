@@ -114,10 +114,17 @@ test('the export holds nothing of another person: their comment, their email, th
   assert.equal(text.includes('Written by the other person'), false)
 })
 
-test('a section over the row limit says so, and holds only the limit', async () => {
-  const data = await exportAccount(leaver, { rowLimit: 0 })
-  assert.ok(data.truncated.includes('authored.tasks'), 'the tasks section is marked truncated')
-  assert.deepEqual(data.authored.tasks, [])
+test('a section over the row limit says so with its total count, and holds only the limit', async () => {
   const normal = await exportAccount(leaver)
-  assert.deepEqual(normal.truncated, [])
+  assert.equal(normal.truncated, false)
+  assert.deepEqual(normal.truncated_sections, [])
+
+  const data = await exportAccount(leaver, { rowLimit: 0 })
+  assert.equal(data.truncated, true, 'the top-level flag is set')
+  assert.deepEqual(data.authored.tasks, [])
+  const cut = data.truncated_sections.find(entry => entry.section === 'authored.tasks')
+  assert.ok(cut, 'the tasks section is listed as cut')
+  assert.equal(cut.limit, 0)
+  assert.equal(cut.total, normal.authored.tasks.length, 'the count is the full number of rows, not the limit')
+  assert.ok(cut.total > 0, 'the fixture has tasks to count')
 })

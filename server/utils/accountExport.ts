@@ -2,7 +2,7 @@
 // else: the listed fields of each table, for the rows whose owner column is the person. Each section holds at most
 // EXPORT_ROW_LIMIT rows; a section past the limit says so in `truncated` and holds the first rows only. Names of teams and
 // boards are joined for the membership rows, so the person sees what the membership is in.
-import { eq, inArray } from 'drizzle-orm'
+import { count, eq, inArray } from 'drizzle-orm'
 import { getTableConfig } from 'drizzle-orm/pg-core'
 import { db } from '../db'
 import * as schema from '../db/schema'
@@ -32,8 +32,15 @@ function tableNamed(name: string): { table: AnyTable, config: ReturnType<typeof 
   throw new Error(`no table named ${name}`)
 }
 
+/** A section the row limit cut: its name, the limit and the full number of rows the person has in it. */
+export interface TruncatedSection {
+  section: string
+  limit: number
+  total: number
+}
+
 // The rows of one table whose owner column is `ownerId`, with only the listed fields (the database's names).
-async function pick(name: string, by: string, fields: string[], ownerId: string, section: string, limit: number, truncated: string[]): Promise<Row[]> {
+async function pick(name: string, by: string, fields: string[], ownerId: string, section: string, limit: number, truncated: TruncatedSection[]): Promise<Row[]> {
   const { table, config } = tableNamed(name)
   const owner = config.columns.find(column => column.name === by)
   if (!owner) throw new Error(`${name}.${by} is not a column`)
@@ -44,7 +51,11 @@ async function pick(name: string, by: string, fields: string[], ownerId: string,
     selection[field] = column
   }
   const found = await db.select(selection as never).from(table as never).where(eq(owner as never, ownerId)).limit(limit + 1)
-  if (found.length > limit) truncated.push(section)
+  if (found.length > limit) {
+    // The page is one row past the limit, so the full count is asked for on its own, to tell the person how much was cut.
+    const [counted] = await db.select({ total: count() }).from(table as never).where(eq(owner as never, ownerId)) as Row[]
+    truncated.push({ section, limit, total: Number(counted?.total ?? found.length) })
+  }
   return (found as Row[]).slice(0, limit)
 }
 
@@ -77,14 +88,16 @@ export interface AccountExport {
   memberships: { teams: Row[], boards: Row[], guest_boards: Row[] }
   owned_boards: Row[]
   authored: { tasks: Row[], comments: Row[], time_entries: Row[], status_updates: Row[] }
-  /** The sections that were cut at the row limit. */
-  truncated: string[]
+  /** True when at least one section was cut at the row limit. */
+  truncated: boolean
+  /** The sections that were cut, with the limit and the full row count of each. */
+  truncated_sections: TruncatedSection[]
 }
 
 /** The person's download: what they own, what they are a member of, and what they wrote. */
 export async function exportAccount(userId: string, options: ExportOptions = {}): Promise<AccountExport> {
   const limit = options.rowLimit ?? EXPORT_ROW_LIMIT
-  const truncated: string[] = []
+  const truncated: TruncatedSection[] = []
   const take = (name: string, section: string): Promise<Row[]> => {
     const { by, fields } = rule(name)
     return pick(name, by, fields, userId, section, limit, truncated)
@@ -126,6 +139,7 @@ export async function exportAccount(userId: string, options: ExportOptions = {})
     },
     owned_boards: owned,
     authored: { tasks, comments, time_entries: timeEntries, status_updates: statusUpdates },
-    truncated
+    truncated: truncated.length > 0,
+    truncated_sections: truncated
   }
 }
