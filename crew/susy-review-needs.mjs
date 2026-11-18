@@ -36,15 +36,28 @@ export function reviewLine({ boss, owner }) {
 }
 
 /**
- * One round of the line. The line is logged (dry-run) or mailed to Boss (live, switch on) only when it changes from the
- * previous round. Live with the switch off logs that. A board that was not read keeps the previous line. The caller
- * stores `line` as the previous line only after a mail went out, so a failed mail is tried again on the next round.
+ * The set of cards waiting, by id, sorted: '' when nothing waits. Only this changes the line's meaning. The times in the
+ * line move every minute, so comparing the line would report a change every tick.
+ */
+export function reviewKey({ boss, owner }) {
+  if (!boss.length && !owner.length) return ''
+  const ids = list => list.map(c => c.id).sort().join(',')
+  return `boss:${ids(boss)}|owner:${ids(owner)}`
+}
+
+/**
+ * One round of the line. The line is logged (dry-run) or mailed to Boss (live, switch on) only when the set of waiting
+ * cards (`key`) changes from the previous round. Live with the switch off logs that. A board that was not read keeps the
+ * previous key. The caller stores `key` as the previous key only after a mail went out (or when nothing was mailed), so a
+ * failed mail is tried again on the next round.
  */
 export function reviewRound({ cards, now, previous = '', live = false, enabled = false }) {
-  if (!cards) return { line: previous, mail: null, lines: [] }
-  const line = reviewLine(reviewNeeds(cards, now))
-  if (line === previous || line === '') return { line, mail: null, lines: [] }
-  if (!live) return { line, mail: null, lines: [line] }
-  if (!enabled) return { line, mail: null, lines: [`review needs off (susy.dispatch.reviewNeeds is not true): ${line}`] }
-  return { line, mail: line, lines: [] }
+  if (!cards) return { key: previous, line: previous, mail: null, lines: [] }
+  const needs = reviewNeeds(cards, now)
+  const key = reviewKey(needs)
+  const line = reviewLine(needs)
+  if (key === previous || key === '') return { key, line, mail: null, lines: [] }
+  if (!live) return { key, line, mail: null, lines: [line] }
+  if (!enabled) return { key, line, mail: null, lines: [`review needs off (susy.dispatch.reviewNeeds is not true): ${line}`] }
+  return { key, line, mail: line, lines: [] }
 }

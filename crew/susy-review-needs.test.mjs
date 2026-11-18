@@ -2,7 +2,7 @@
 // Run: node --test crew/susy-review-needs.test.mjs
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { reviewNeeds, reviewLine, reviewRound } from './susy-review-needs.mjs'
+import { reviewNeeds, reviewLine, reviewKey, reviewRound } from './susy-review-needs.mjs'
 
 const NOW = Date.parse('2026-11-16T12:00:00.000Z')
 const HOUR = 3600000
@@ -59,6 +59,7 @@ test('dry-run logs a changed line and mails nothing', () => {
   assert.equal(out.mail, null)
   assert.deepEqual(out.lines, ['Waiting for a human. Boss: 1 (a 1h).'])
   assert.equal(out.line, 'Waiting for a human. Boss: 1 (a 1h).')
+  assert.equal(out.key, 'boss:a|owner:')
 })
 
 test('live with the switch on mails Boss the changed line once', () => {
@@ -69,9 +70,39 @@ test('live with the switch on mails Boss the changed line once', () => {
 test('the same line again is not logged or mailed', () => {
   const cards = [card('a', 'Verify', 1)]
   const first = reviewRound({ cards, now: NOW, previous: '', live: true, enabled: true })
-  const again = reviewRound({ cards, now: NOW, previous: first.line, live: true, enabled: true })
+  const again = reviewRound({ cards, now: NOW, previous: first.key, live: true, enabled: true })
   assert.equal(again.mail, null)
   assert.deepEqual(again.lines, [])
+})
+
+test('the same cards a minute later are not logged or mailed again, though the times in the line moved', () => {
+  const cards = [card('a', 'Verify', 0.5), card('c', 'In progress', 5, { tags: ['owner'] })]
+  const first = reviewRound({ cards, now: NOW, previous: '', live: true, enabled: true })
+  const later = reviewRound({ cards, now: NOW + 60000, previous: first.key, live: true, enabled: true })
+  assert.notEqual(later.line, first.line)
+  assert.equal(later.mail, null)
+  assert.deepEqual(later.lines, [])
+  assert.equal(later.key, first.key)
+})
+
+test('the same cards a minute later are not logged in dry-run either', () => {
+  const cards = [card('a', 'Verify', 1)]
+  const first = reviewRound({ cards, now: NOW, previous: '', live: false, enabled: true })
+  const later = reviewRound({ cards, now: NOW + 60000, previous: first.key, live: false, enabled: true })
+  assert.deepEqual(later.lines, [])
+})
+
+test('a card joining the waiting set is a change; the order of the cards does not matter', () => {
+  const first = reviewRound({ cards: [card('a', 'Verify', 1)], now: NOW, previous: '', live: true, enabled: true })
+  const joined = reviewRound({ cards: [card('a', 'Verify', 1), card('b', 'Verify', 2)], now: NOW, previous: first.key, live: true, enabled: true })
+  assert.match(joined.mail, /Boss: 2 \(b 2h, a 1h\)/)
+  const reordered = reviewRound({ cards: [card('b', 'Verify', 2), card('a', 'Verify', 1)], now: NOW, previous: joined.key, live: true, enabled: true })
+  assert.equal(reordered.mail, null)
+})
+
+test('the key is empty when nothing waits, and names only the ids of each group', () => {
+  assert.equal(reviewKey(reviewNeeds([card('a', 'To do', 1)], NOW)), '')
+  assert.equal(reviewKey(reviewNeeds([card('b', 'Verify', 1), card('a', 'In progress', 5, { tags: ['owner'] })], NOW)), 'boss:b|owner:a')
 })
 
 test('live with the switch off logs the line and mails nothing', () => {

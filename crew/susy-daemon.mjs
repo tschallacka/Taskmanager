@@ -182,14 +182,14 @@ export async function runOnce(home, now = Date.now(), { live = false } = {}) {
     result.state.offerLines = offer.lines
   }
   // Phase 4, the review-needs line (card mwf201blsqvx3jczev): the cards that wait for Boss or the owner, as one line. It is
-  // logged, or mailed to Boss in live mode with crew.json susy.dispatch.reviewNeeds true, only when it changes. A mail that
-  // fails keeps the previous line, so it is tried again on the next tick.
+  // logged, or mailed to Boss in live mode with crew.json susy.dispatch.reviewNeeds true, only when the set of waiting cards
+  // changes. A mail that fails keeps the previous key, so it is tried again on the next tick.
   const review = result.ok
-    ? reviewRound({ cards: result.cards, now, previous: result.state.reviewLine ?? '', live, enabled: crew?.susy?.dispatch?.reviewNeeds === true })
+    ? reviewRound({ cards: result.cards, now, previous: result.state.reviewKey ?? '', live, enabled: crew?.susy?.dispatch?.reviewNeeds === true })
     : null
   if (review) {
     lines.push(...review.lines)
-    if (!review.mail) result.state.reviewLine = review.line
+    if (!review.mail) result.state.reviewKey = review.key
   }
   if (live) {
     for (const item of errors.pending) {
@@ -220,7 +220,7 @@ export async function runOnce(home, now = Date.now(), { live = false } = {}) {
       try {
         const { sendMail } = await import('./mail-client.mjs')
         await sendMail({ base: creds.base, slug: creds.crew?.slug, key, to: 'boss', text: review.mail, mailboxDir: `${home}/mailbox`, makeId: () => crypto.randomUUID().replaceAll('-', '') })
-        result.state.reviewLine = review.line
+        result.state.reviewKey = review.key
         lines.push('mailed boss: review needs')
       } catch (error) {
         lines.push(`could not mail boss the review line, tried again next tick: ${error.message}`)
