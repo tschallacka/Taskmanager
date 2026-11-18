@@ -86,6 +86,7 @@ test('the export holds the person\'s own rows: account, settings, boards, what t
   assert.equal(data.account.name, 'Leaving person')
   assert.equal(data.account.email, `${leaver}@staff.test`)
   assert.ok(data.account.addresses.some((row: { email: string }) => row.email.endsWith('@example.test')))
+  for (const row of data.account.addresses) assert.deepEqual(Object.keys(row).sort(), ['email', 'verified_at'])
   assert.equal(data.settings.colours[0].primary_color, 'teal')
   assert.ok(data.owned_boards.some((row: { name: string }) => row.name === 'Own board'))
   assert.ok(data.authored.tasks.some((row: { title: string }) => row.title === 'Written by the leaver'))

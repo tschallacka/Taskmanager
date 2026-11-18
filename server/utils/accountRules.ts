@@ -100,7 +100,7 @@ export const EXPORT_SECRET_COLUMN = /hash|token|secret|password|passkey|key|pref
 
 export const EXPORT_RULES: Record<string, ExportRule> = {
   // The person's own rows.
-  user_email: { kind: 'export', by: 'user_id', fields: ['email', 'verified_at', 'created_at'], why: 'extra addresses the person added' },
+  user_email: { kind: 'export', by: 'user_id', fields: ['email', 'verified_at'], why: 'extra addresses the person added' },
   user_settings: { kind: 'export', by: 'user_id', fields: ['primary_color', 'neutral_color'], why: 'personal colours; AI keys and model choices are not exported' },
   notification_preferences: { kind: 'export', by: 'user_id', fields: ['email', 'browser'], why: 'the person\'s notification choices' },
   // Memberships: the person's own membership rows, nothing about other members.
