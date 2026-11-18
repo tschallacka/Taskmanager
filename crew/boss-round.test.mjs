@@ -40,7 +40,7 @@ test('SKILL starts the round with CronCreate, durable, at 7 and 37 past the hour
   assert.doesNotMatch(skill, /BOSS-ROUND\.md\.tmpl/, 'the raw .tmpl is never named as the prompt (its placeholders are not filled in)')
 })
 
-test("Pia's own CronCreate runs every 15 minutes and re-creates Susy when she is silent", () => {
+test('Pia\'s own CronCreate runs every 15 minutes and re-creates Susy when she is silent', () => {
   const prompts = read('PROMPTS.md.tmpl')
   assert.match(prompts, /CronCreate/, 'Pia has a cron')
   assert.match(prompts, /every 15 minutes/, 'every 15 minutes')
@@ -48,7 +48,7 @@ test("Pia's own CronCreate runs every 15 minutes and re-creates Susy when she is
   assert.match(prompts, /did not fire for 20 minutes/, 'the 20-minute rule')
 })
 
-test("Boss's round prompt is named as the rendered file, so its placeholders are filled in (card mwc5y4ccau9en3m3m7b, QA violation)", () => {
+test('Boss\'s round prompt is named as the rendered file, so its placeholders are filled in (card mwc5y4ccau9en3m3m7b, QA violation)', () => {
   const prompts = read('PROMPTS.md.tmpl')
   assert.match(prompts, /\{\{crew_dir\}\}\/BOSS-ROUND\.md`/, 'PROMPTS names the rendered file in the crew folder')
   assert.doesNotMatch(prompts, /BOSS-ROUND\.md\.tmpl/, 'PROMPTS does not name the raw template')
