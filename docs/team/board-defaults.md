@@ -20,7 +20,7 @@ Out of the box the columns are **Backlog**, **To do**, **Verify** and **Done**. 
 
 ## See the current defaults
 
-Open **Team** (from the workspace menu), then **Board defaults**. The list shows the columns a new board would
+Open **Team** (from the workspace menu), then **Projects**. The list shows the columns a new board would
 start with, in order. If the team has not chosen its own, it says "Using the built-in columns." Every member of
 the team can read this list.
 
@@ -29,12 +29,12 @@ If you are a plain member, the page ends with "Only team owners and admins chang
 <!-- requires: team-admin -->
 ## Change the defaults
 
-1. Open **Team**, then **Board defaults**.
+1. Open **Team**, then **Projects**.
 2. Change the list:
    - **Add** a column: type a name under **New column name** and click **Add**.
    - **Reorder**: use the up and down arrows (**Move up**, **Move down**) on a row.
    - **Remove** a column: click the cross (**Remove column**) on its row.
-3. Click **Save**. A message confirms "Board defaults saved".
+3. Click **Save**. A message confirms "Board defaults saved". The section is called **Projects** in the list, and the page keeps this address.
 
 Nothing is stored until you click **Save**. **Save** stays greyed out until the list differs from what is saved,
 and also while the list is empty.

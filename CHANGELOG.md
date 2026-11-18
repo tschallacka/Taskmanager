@@ -2,6 +2,18 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.54.0 - 2026-11-18
+
+- **The accent colour shows a live preview.** The Appearance section has a primary button under the swatches; it takes the accent you pick at once. The accent and neutral swatches also show their names and a keyboard focus ring. Files: `app/components/settings/Appearance.vue`, `app/pages/settings/appearance.vue`.
+
+- **Each account settings section has its own address.** Your stats, Account, Appearance, API keys and MCP, and AI open at `/settings`, `/settings/account`, `/settings/appearance`, `/settings/api-keys` and `/settings/ai`, and the left list links to them. An old link to a section on the settings page (`/settings#account` and the others) goes to that section's address. The extra email addresses link from a confirmation mail goes to Account. Nothing is removed or moved in the data. Files: `app/components/settings/Shell.vue`, `app/components/settings/Account.vue`, `app/pages/settings/index.vue`, `app/pages/settings/account.vue`, `app/pages/settings/api-keys.vue`, `app/pages/settings/ai.vue`.
+
+- **The instance admin's pages have a left list.** Instance settings and Crews sit in one list, each on its own address (`/admin/settings`, `/admin/crews`). The Accounts list stays a button on Instance settings. Files: `app/components/settings/Shell.vue`, `app/pages/admin/settings.vue`, `app/pages/admin/crews`.
+
+- **Project settings: a left list, one address per section.** Each section of a board's Settings (General, Members, Customer access, GitHub, Rules, Secrets, Custom fields, Import, Trash, Archive) opens on its own address, so a link lands on it; old links still open the right section. Import and Trash are their own sections; Archive and Delete sit last in one box. Nothing is removed. Files: `app/components/settings/ProjectShell.vue`, `app/components/project-settings/` (ProjectImportSettings, ProjectTrashSettings, ProjectArchiveSettings, ProjectCustomerSettings, and the moved General, GitHub, Rules, Members and Secrets panels), `app/components/kanban/ProjectSettingsView.vue`, `app/utils/projectSettingsSections.ts`, `docs/basics/create-and-manage-a-board.md`, `tests/project-settings-components.test.ts`, `tests/project-settings-redirect.test.ts`, `tests/project-settings-scope.test.ts`, `tests/project-settings-sections.test.ts`, `tests/project-settings-shell.test.ts`.
+
+- **Security, Email, Invitations and Accounts have their own sections.** Your Security (passkeys and two-factor) and Email (who may see your address) open at `/settings/security` and `/settings/email`. On a team, Invitations is its own section, for owners and admins, and the section that sets the starting columns is named Projects. The instance admin's list has Accounts, at `/admin/accounts`; the Accounts modal on Instance settings still opens. Nothing is removed. Files: `app/components/settings/Security.vue`, `app/components/settings/Email.vue`, `app/pages/settings/security.vue`, `app/pages/settings/email.vue`, `app/pages/team.vue`, `app/components/AdminAccountsPanel.vue`, `app/pages/admin/accounts.vue`, `app/utils/adminSections.ts`.
+
 ## 0.53.0 - 2026-11-18
 
 - **Icons come from our own server.** The app no longer asks the public Iconify API (api.iconify.design) for icon files, so a visitor's IP address and the icon names are no longer sent to a third party. The icon sets the app uses (lucide, simple-icons) are bundled on the server and the icons the pages use into the client, and a missing icon is not looked up outside. Files: `nuxt.config.ts`, `tests/icons-local.test.ts`.

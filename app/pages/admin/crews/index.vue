@@ -286,340 +286,342 @@ function cancelPurge() {
 </script>
 
 <template>
-  <div class="h-full overflow-y-auto px-4 pb-10 pt-6 lg:px-6">
-    <div class="mx-auto max-w-4xl space-y-8">
-      <div class="flex items-center gap-3">
-        <div class="flex-1 min-w-0">
-          <h1 class="text-xl font-semibold text-default">
-            Crews
-          </h1>
-          <p class="text-sm text-muted">
-            Agent teams, made here or through the crew API. Only the instance admin sees this page.
-          </p>
-        </div>
-        <div
-          v-if="isInstanceAdmin"
-          class="flex flex-wrap items-center gap-2"
-        >
-          <UButton
-            label="Set up a crew"
-            icon="i-lucide-clipboard-copy"
-            size="sm"
-            variant="soft"
-            data-setup-crew
-            @click="setupOpen = !setupOpen"
-          />
-          <UButton
-            to="/admin/crews/new"
-            label="New crew"
-            icon="i-lucide-plus"
-            size="sm"
-          />
-        </div>
-      </div>
-
-      <form
-        v-if="isInstanceAdmin && setupOpen"
-        class="mb-4 space-y-3 rounded-xl border border-default p-4"
-        data-setup-crew-form
-        @submit.prevent="copySetupPrompt"
-      >
-        <p class="text-sm text-muted">
-          Pick the board. The prompt it copies sets up a crew for that board by an approval in the browser, with no token in it.
-          The board's name comes from the board itself.
-        </p>
-        <UFormField label="Board">
-          <USelectMenu
-            v-model="setupBoardId"
-            :items="setupBoardItems"
-            value-key="value"
-            placeholder="Choose a board"
-            class="w-full"
-            data-setup-board-id
-          />
-        </UFormField>
-        <p
-          v-if="setupProblem"
-          class="text-sm text-error"
-          data-setup-problem
-        >
-          {{ setupProblem }}
-        </p>
-        <UButton
-          type="submit"
-          label="Copy the setup prompt"
-          icon="i-lucide-clipboard-copy"
-          :loading="setupBusy"
-          :disabled="setupBusy"
-          data-setup-copy
-        />
-      </form>
-
-      <!-- Until the session is known, nothing of the admin's UI is drawn. -->
-      <div
-        v-if="sessionPending || !isInstanceAdmin"
-        class="rounded-lg border border-default p-6 text-sm text-muted"
-        data-admin-gate
-      >
-        {{ sessionPending ? 'Loading…' : 'This page is for the instance admin.' }}
-      </div>
-
-      <template v-else>
-        <!-- The instance level: whether crews may be made at all. Off disables every crew. -->
-        <section class="rounded-lg border border-default p-4 space-y-3">
-          <div class="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 class="text-sm font-semibold text-default">
-                Users may create crews
-              </h2>
-              <p class="text-xs text-muted">
-                Off (the default): nobody can make a crew, and the Connect window explains it. On: a user may make a crew for one board they run, if their team and that board allow it too.
-                Switching it off disables every crew until it is rotated.
-              </p>
-            </div>
-            <USwitch
-              :model-value="Boolean(permissionData?.crewsAllowed)"
-              :disabled="busy === 'permission'"
-              aria-label="Users may create crews"
-              @update:model-value="setCrewsAllowed"
+  <AdminShell>
+    <div class="h-full overflow-y-auto px-4 pb-10 pt-6 lg:px-6">
+      <div class="mx-auto max-w-4xl space-y-8">
+        <div class="flex items-center gap-3">
+          <div class="flex-1 min-w-0">
+            <h1 class="text-xl font-semibold text-default">
+              Crews
+            </h1>
+            <p class="text-sm text-muted">
+              Agent teams, made here or through the crew API. Only the instance admin sees this page.
+            </p>
+          </div>
+          <div
+            v-if="isInstanceAdmin"
+            class="flex flex-wrap items-center gap-2"
+          >
+            <UButton
+              label="Set up a crew"
+              icon="i-lucide-clipboard-copy"
+              size="sm"
+              variant="soft"
+              data-setup-crew
+              @click="setupOpen = !setupOpen"
+            />
+            <UButton
+              to="/admin/crews/new"
+              label="New crew"
+              icon="i-lucide-plus"
+              size="sm"
             />
           </div>
-        </section>
+        </div>
 
-        <RateLimitFields
-          url="/api/settings/rate-limits"
-          title="Rate limits for the whole instance"
-          hint="At most this many of each in the window. A team or a board can add a stricter limit of its own."
-        />
+        <form
+          v-if="isInstanceAdmin && setupOpen"
+          class="mb-4 space-y-3 rounded-xl border border-default p-4"
+          data-setup-crew-form
+          @submit.prevent="copySetupPrompt"
+        >
+          <p class="text-sm text-muted">
+            Pick the board. The prompt it copies sets up a crew for that board by an approval in the browser, with no token in it.
+            The board's name comes from the board itself.
+          </p>
+          <UFormField label="Board">
+            <USelectMenu
+              v-model="setupBoardId"
+              :items="setupBoardItems"
+              value-key="value"
+              placeholder="Choose a board"
+              class="w-full"
+              data-setup-board-id
+            />
+          </UFormField>
+          <p
+            v-if="setupProblem"
+            class="text-sm text-error"
+            data-setup-problem
+          >
+            {{ setupProblem }}
+          </p>
+          <UButton
+            type="submit"
+            label="Copy the setup prompt"
+            icon="i-lucide-clipboard-copy"
+            :loading="setupBusy"
+            :disabled="setupBusy"
+            data-setup-copy
+          />
+        </form>
 
-        <!-- The window: remote callers may use the crew API for 10 minutes -->
-        <section class="rounded-lg border border-default p-4 space-y-3">
-          <div class="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 class="text-sm font-semibold text-default">
-                Crew API window
-              </h2>
-              <p class="text-sm text-muted">
-                <template v-if="windowOpen">
-                  Open for {{ minutesLeft }} more minute{{ minutesLeft === 1 ? '' : 's' }}, until {{ when(windowData?.openUntil) }}.
-                </template>
-                <template v-else>
-                  {{ closedLine }}
-                </template>
-              </p>
-              <p class="mt-1 text-xs text-dimmed">
-                Opening it shows a temporary key for this window only. Your crews:manage key is separate.
-              </p>
-            </div>
-            <div class="flex gap-2">
-              <UButton
-                v-if="!windowOpen"
-                id="window-action"
-                label="Open for 10 minutes"
-                icon="i-lucide-door-open"
-                size="sm"
-                class="min-h-9 sm:min-h-0"
-                :loading="busy === 'window'"
-                @click="openWindow"
+        <!-- Until the session is known, nothing of the admin's UI is drawn. -->
+        <div
+          v-if="sessionPending || !isInstanceAdmin"
+          class="rounded-lg border border-default p-6 text-sm text-muted"
+          data-admin-gate
+        >
+          {{ sessionPending ? 'Loading…' : 'This page is for the instance admin.' }}
+        </div>
+
+        <template v-else>
+          <!-- The instance level: whether crews may be made at all. Off disables every crew. -->
+          <section class="rounded-lg border border-default p-4 space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 class="text-sm font-semibold text-default">
+                  Users may create crews
+                </h2>
+                <p class="text-xs text-muted">
+                  Off (the default): nobody can make a crew, and the Connect window explains it. On: a user may make a crew for one board they run, if their team and that board allow it too.
+                  Switching it off disables every crew until it is rotated.
+                </p>
+              </div>
+              <USwitch
+                :model-value="Boolean(permissionData?.crewsAllowed)"
+                :disabled="busy === 'permission'"
+                aria-label="Users may create crews"
+                @update:model-value="setCrewsAllowed"
               />
+            </div>
+          </section>
+
+          <RateLimitFields
+            url="/api/settings/rate-limits"
+            title="Rate limits for the whole instance"
+            hint="At most this many of each in the window. A team or a board can add a stricter limit of its own."
+          />
+
+          <!-- The window: remote callers may use the crew API for 10 minutes -->
+          <section class="rounded-lg border border-default p-4 space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 class="text-sm font-semibold text-default">
+                  Crew API window
+                </h2>
+                <p class="text-sm text-muted">
+                  <template v-if="windowOpen">
+                    Open for {{ minutesLeft }} more minute{{ minutesLeft === 1 ? '' : 's' }}, until {{ when(windowData?.openUntil) }}.
+                  </template>
+                  <template v-else>
+                    {{ closedLine }}
+                  </template>
+                </p>
+                <p class="mt-1 text-xs text-dimmed">
+                  Opening it shows a temporary key for this window only. Your crews:manage key is separate.
+                </p>
+              </div>
+              <div class="flex gap-2">
+                <UButton
+                  v-if="!windowOpen"
+                  id="window-action"
+                  label="Open for 10 minutes"
+                  icon="i-lucide-door-open"
+                  size="sm"
+                  class="min-h-9 sm:min-h-0"
+                  :loading="busy === 'window'"
+                  @click="openWindow"
+                />
+                <UButton
+                  v-else
+                  id="window-action"
+                  label="Close now"
+                  icon="i-lucide-door-closed"
+                  size="sm"
+                  color="neutral"
+                  variant="outline"
+                  class="min-h-9 sm:min-h-0"
+                  :loading="busy === 'window'"
+                  @click="closeWindow"
+                />
+              </div>
+            </div>
+          </section>
+
+          <!-- A key for the crew API: the one thing an agent host needs to make crews -->
+          <section class="rounded-lg border border-default p-4 space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 class="text-sm font-semibold text-default">
+                  Crew key
+                </h2>
+                <p class="text-sm text-muted">
+                  A key that may only manage crews. The agent API lists no tools for it, so it reaches no board. Shown once.
+                </p>
+              </div>
               <UButton
-                v-else
-                id="window-action"
-                label="Close now"
-                icon="i-lucide-door-closed"
+                label="Create a crews:manage key"
+                icon="i-lucide-key-round"
                 size="sm"
                 color="neutral"
                 variant="outline"
                 class="min-h-9 sm:min-h-0"
-                :loading="busy === 'window'"
-                @click="closeWindow"
+                :loading="busy === 'key'"
+                @click="createKey"
               />
             </div>
-          </div>
-        </section>
+          </section>
 
-        <!-- A key for the crew API: the one thing an agent host needs to make crews -->
-        <section class="rounded-lg border border-default p-4 space-y-3">
-          <div class="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 class="text-sm font-semibold text-default">
-                Crew key
-              </h2>
-              <p class="text-sm text-muted">
-                A key that may only manage crews. The agent API lists no tools for it, so it reaches no board. Shown once.
+          <!-- The shown-once secret -->
+          <section
+            v-if="shownSecret"
+            class="rounded-lg border border-warning/50 bg-warning/10 p-4 space-y-2"
+            data-shown-secret
+          >
+            <p class="text-sm font-medium text-default">
+              {{ shownSecret.title }}
+            </p>
+            <code class="block break-all rounded bg-elevated p-2 text-xs text-default">{{ shownSecret.value }}</code>
+            <div class="flex gap-2">
+              <UButton
+                label="Copy"
+                icon="i-lucide-copy"
+                size="xs"
+                class="min-h-9 sm:min-h-0"
+                @click="copy(shownSecret.value)"
+              />
+              <UButton
+                label="Dismiss"
+                size="xs"
+                color="neutral"
+                variant="ghost"
+                class="min-h-9 sm:min-h-0"
+                @click="shownSecret = null"
+              />
+            </div>
+          </section>
+
+          <!-- The crews -->
+          <section class="space-y-3">
+            <h2
+              id="crews-heading"
+              tabindex="-1"
+              class="text-sm font-semibold text-default focus:outline-none"
+            >
+              Crews on this instance
+            </h2>
+            <p
+              v-if="crewStatus === 'pending' && !crewData"
+              class="text-sm text-muted"
+            >
+              Loading crews…
+            </p>
+            <div
+              v-else-if="!crews.length"
+              class="rounded-lg border border-default p-4 text-sm text-muted space-y-2"
+            >
+              <p>No crews yet.</p>
+              <p>
+                <NuxtLink
+                  to="/admin/crews/new"
+                  class="text-primary hover:underline"
+                >New crew</NuxtLink> makes one and walks whoever sets up the agents' machine through the rest. An agent host
+                can also call <code class="text-default">POST /api/crews</code> with a crews:manage key (create one above).
+                Each crew appears here, with its board link.
               </p>
             </div>
-            <UButton
-              label="Create a crews:manage key"
-              icon="i-lucide-key-round"
-              size="sm"
-              color="neutral"
-              variant="outline"
-              class="min-h-9 sm:min-h-0"
-              :loading="busy === 'key'"
-              @click="createKey"
-            />
-          </div>
-        </section>
-
-        <!-- The shown-once secret -->
-        <section
-          v-if="shownSecret"
-          class="rounded-lg border border-warning/50 bg-warning/10 p-4 space-y-2"
-          data-shown-secret
-        >
-          <p class="text-sm font-medium text-default">
-            {{ shownSecret.title }}
-          </p>
-          <code class="block break-all rounded bg-elevated p-2 text-xs text-default">{{ shownSecret.value }}</code>
-          <div class="flex gap-2">
-            <UButton
-              label="Copy"
-              icon="i-lucide-copy"
-              size="xs"
-              class="min-h-9 sm:min-h-0"
-              @click="copy(shownSecret.value)"
-            />
-            <UButton
-              label="Dismiss"
-              size="xs"
-              color="neutral"
-              variant="ghost"
-              class="min-h-9 sm:min-h-0"
-              @click="shownSecret = null"
-            />
-          </div>
-        </section>
-
-        <!-- The crews -->
-        <section class="space-y-3">
-          <h2
-            id="crews-heading"
-            tabindex="-1"
-            class="text-sm font-semibold text-default focus:outline-none"
-          >
-            Crews on this instance
-          </h2>
-          <p
-            v-if="crewStatus === 'pending' && !crewData"
-            class="text-sm text-muted"
-          >
-            Loading crews…
-          </p>
-          <div
-            v-else-if="!crews.length"
-            class="rounded-lg border border-default p-4 text-sm text-muted space-y-2"
-          >
-            <p>No crews yet.</p>
-            <p>
-              <NuxtLink
-                to="/admin/crews/new"
-                class="text-primary hover:underline"
-              >New crew</NuxtLink> makes one and walks whoever sets up the agents' machine through the rest. An agent host
-              can also call <code class="text-default">POST /api/crews</code> with a crews:manage key (create one above).
-              Each crew appears here, with its board link.
-            </p>
-          </div>
-          <ul
-            v-else
-            class="divide-y divide-default rounded-lg border border-default"
-          >
-            <li
-              v-for="crew in crews"
-              :key="crew.id"
-              class="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between"
-              :data-crew="crew.slug"
+            <ul
+              v-else
+              class="divide-y divide-default rounded-lg border border-default"
             >
-              <div class="min-w-0 space-y-0.5">
-                <div class="flex flex-wrap items-center gap-2">
-                  <span class="font-medium text-default break-words">{{ crew.name }}</span>
-                  <UBadge
-                    :label="crew.disabledAt ? 'Disabled' : 'Live'"
-                    :color="crew.disabledAt ? 'warning' : 'success'"
-                    variant="soft"
-                    size="sm"
+              <li
+                v-for="crew in crews"
+                :key="crew.id"
+                class="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between"
+                :data-crew="crew.slug"
+              >
+                <div class="min-w-0 space-y-0.5">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span class="font-medium text-default break-words">{{ crew.name }}</span>
+                    <UBadge
+                      :label="crew.disabledAt ? 'Disabled' : 'Live'"
+                      :color="crew.disabledAt ? 'warning' : 'success'"
+                      variant="soft"
+                      size="sm"
+                    />
+                  </div>
+                  <p class="text-xs text-muted break-words">
+                    {{ crew.slug }}<template v-if="crew.teamName">
+                      · team {{ crew.teamName }}
+                    </template> · {{ crew.people }} people · made {{ when(crew.createdAt) }} · key last used {{ when(crew.keyLastUsed) }}
+                  </p>
+                  <a
+                    v-if="crew.boardUrl"
+                    :href="crew.boardUrl"
+                    class="text-xs text-primary hover:underline"
+                  >Open the board</a>
+                </div>
+                <div class="flex shrink-0 flex-wrap gap-2">
+                  <UButton
+                    :id="`toggle-${crew.slug}`"
+                    :label="crew.disabledAt ? 'Re-enable' : 'Disable'"
+                    :aria-label="`${crew.disabledAt ? 'Re-enable' : 'Disable'} ${crew.name}`"
+                    :icon="crew.disabledAt ? 'i-lucide-circle-check' : 'i-lucide-circle-slash'"
+                    size="xs"
+                    color="neutral"
+                    variant="outline"
+                    class="min-h-9 sm:min-h-0"
+                    :loading="busy === crew.slug"
+                    @click="toggleCrew(crew)"
+                  />
+                  <UButton
+                    :id="`purge-${crew.slug}`"
+                    label="Purge"
+                    :aria-label="`Purge ${crew.name}`"
+                    icon="i-lucide-trash-2"
+                    size="xs"
+                    color="error"
+                    variant="ghost"
+                    class="min-h-9 sm:min-h-0"
+                    :disabled="busy === crew.slug"
+                    @click="openPurge(crew)"
                   />
                 </div>
-                <p class="text-xs text-muted break-words">
-                  {{ crew.slug }}<template v-if="crew.teamName">
-                    · team {{ crew.teamName }}
-                  </template> · {{ crew.people }} people · made {{ when(crew.createdAt) }} · key last used {{ when(crew.keyLastUsed) }}
-                </p>
-                <a
-                  v-if="crew.boardUrl"
-                  :href="crew.boardUrl"
-                  class="text-xs text-primary hover:underline"
-                >Open the board</a>
-              </div>
-              <div class="flex shrink-0 flex-wrap gap-2">
-                <UButton
-                  :id="`toggle-${crew.slug}`"
-                  :label="crew.disabledAt ? 'Re-enable' : 'Disable'"
-                  :aria-label="`${crew.disabledAt ? 'Re-enable' : 'Disable'} ${crew.name}`"
-                  :icon="crew.disabledAt ? 'i-lucide-circle-check' : 'i-lucide-circle-slash'"
-                  size="xs"
-                  color="neutral"
-                  variant="outline"
-                  class="min-h-9 sm:min-h-0"
-                  :loading="busy === crew.slug"
-                  @click="toggleCrew(crew)"
-                />
-                <UButton
-                  :id="`purge-${crew.slug}`"
-                  label="Purge"
-                  :aria-label="`Purge ${crew.name}`"
-                  icon="i-lucide-trash-2"
-                  size="xs"
-                  color="error"
-                  variant="ghost"
-                  class="min-h-9 sm:min-h-0"
-                  :disabled="busy === crew.slug"
-                  @click="openPurge(crew)"
-                />
-              </div>
-            </li>
-          </ul>
-        </section>
-      </template>
-    </div>
+              </li>
+            </ul>
+          </section>
+        </template>
+      </div>
 
-    <UModal
-      :open="purging !== null"
-      :title="purging ? `Delete ${purging.name} for good?` : ''"
-      :description="purging ? `Its accounts, team, customer and board are deleted. Its history goes with them. This cannot be undone.` : ''"
-      :ui="{ footer: 'justify-end' }"
-      @update:open="(v: boolean) => { if (!v) cancelPurge() }"
-      @after:enter="focusPurgeInput"
-    >
-      <template #body>
-        <p class="text-sm text-muted">
-          Type <code class="text-default">{{ purging?.slug }}</code> to confirm.
-        </p>
-        <div
-          id="purge-confirm"
-          class="mt-3"
-        >
-          <UInput
-            v-model="purgeTyped"
-            :placeholder="purging?.slug"
-            class="w-full"
+      <UModal
+        :open="purging !== null"
+        :title="purging ? `Delete ${purging.name} for good?` : ''"
+        :description="purging ? `Its accounts, team, customer and board are deleted. Its history goes with them. This cannot be undone.` : ''"
+        :ui="{ footer: 'justify-end' }"
+        @update:open="(v: boolean) => { if (!v) cancelPurge() }"
+        @after:enter="focusPurgeInput"
+      >
+        <template #body>
+          <p class="text-sm text-muted">
+            Type <code class="text-default">{{ purging?.slug }}</code> to confirm.
+          </p>
+          <div
+            id="purge-confirm"
+            class="mt-3"
+          >
+            <UInput
+              v-model="purgeTyped"
+              :placeholder="purging?.slug"
+              class="w-full"
+            />
+          </div>
+        </template>
+        <template #footer>
+          <UButton
+            label="Cancel"
+            color="neutral"
+            variant="ghost"
+            @click="cancelPurge"
           />
-        </div>
-      </template>
-      <template #footer>
-        <UButton
-          label="Cancel"
-          color="neutral"
-          variant="ghost"
-          @click="cancelPurge"
-        />
-        <UButton
-          label="Delete permanently"
-          color="error"
-          :disabled="!purgeReady"
-          @click="confirmPurge"
-        />
-      </template>
-    </UModal>
-  </div>
+          <UButton
+            label="Delete permanently"
+            color="error"
+            :disabled="!purgeReady"
+            @click="confirmPurge"
+          />
+        </template>
+      </UModal>
+    </div>
+  </AdminShell>
 </template>
