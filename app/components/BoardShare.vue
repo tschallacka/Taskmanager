@@ -72,6 +72,10 @@ async function loadListing() {
   } finally {
     loadingList.value = false
   }
+  // The customer the project is filed under: the picker starts on it, so a filed customer shows selected, not the placeholder.
+  const project = await untypedFetch<{ customerId?: string | null }>(base.value).catch(() => null)
+  filedCustomerId.value = project?.customerId ?? ''
+  if (!customerChoice.value) customerChoice.value = filedCustomerId.value
   if (!props.outsideReader && listing.value?.me.kind === 'admin') {
     staff.value = (await untypedFetch<{ people: StaffPerson[] }>(`${base.value}/members`).catch(() => ({ people: [] as StaffPerson[] }))).people
   }
@@ -82,6 +86,8 @@ async function loadListing() {
 // server/api/projects/[id]/customer-invite.post.ts). The input rule is tested in tests/project-customer-invite.test.ts.
 const { customers, refresh: refreshCustomers } = useCustomers()
 const customerChoice = ref('')
+// The customer the project is filed under (its first one). The picker starts on it and returns to it after a link.
+const filedCustomerId = ref('')
 const customerNewName = ref('')
 const customerEmail = ref('')
 const customerError = ref('')
@@ -110,7 +116,7 @@ async function inviteCustomer() {
     customerLinkFor.value = customerEmail.value.trim()
     customerEmail.value = ''
     customerNewName.value = ''
-    customerChoice.value = ''
+    customerChoice.value = filedCustomerId.value
     await refreshCustomers()
   } catch (e) {
     customerError.value = errorMessage(e, 'Could not invite that person')

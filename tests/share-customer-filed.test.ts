@@ -29,9 +29,9 @@ test('the picker starts on the filed customer when nothing is chosen yet', () =>
 test('the reset after a link is made keeps the filed customer, not the placeholder', () => {
   const body = functionBody('inviteCustomer')
   assert.match(body, /customerChoice\.value = filedCustomerId\.value/)
-  assert.equal(body.includes("customerChoice.value = ''"), false)
+  assert.equal(body.includes(`customerChoice.value = ''`), false)
 })
 
 test('nothing in the dialog clears the picker to the placeholder while a customer is filed', () => {
-  assert.equal(source.includes("customerChoice.value = ''"), false)
+  assert.equal(source.includes(`customerChoice.value = ''`), false)
 })
