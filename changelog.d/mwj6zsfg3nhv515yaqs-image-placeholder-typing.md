@@ -1,0 +1,1 @@
+- **Pasted images are not dropped when you type at a pending placeholder.** A late answer to an earlier save no longer puts back the text from before the typing and takes the placeholders out, so the upload lands (or shows its error line). Files: `app/utils/editor/imagePlaceholders.ts`, `app/components/kanban/TaskDrawer.vue`.

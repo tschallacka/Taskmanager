@@ -7,7 +7,7 @@ import { dueDayToMs, isOverdueDay } from '~/utils/dueDate'
 import { absoluteUrl, copyTaskLink } from '~/utils/copyTaskLink'
 import { activityStartsOpen, taskPanelPath } from '~/utils/taskPanelUrl'
 import { taskLink } from '~/utils/taskLink'
-import { stripPendingPlaceholders } from '~/utils/editor/imagePlaceholders'
+import { shouldAdoptServerDescription, stripPendingPlaceholders } from '~/utils/editor/imagePlaceholders'
 
 interface Task {
   id: string
@@ -212,6 +212,8 @@ const editorContent = ref('')
 let descTimer: ReturnType<typeof setTimeout> | null = null
 let descDirty = false
 let suppressSave = false
+// What we have sent for this task. The server answers each save, and an answer can arrive after a newer edit: it is ours, not news.
+const ownSaves: string[] = []
 
 function flushDescription(taskId = props.task?.id) {
   if (descTimer) {
@@ -221,7 +223,10 @@ function flushDescription(taskId = props.task?.id) {
   if (!descDirty) return
   descDirty = false
   // An image still uploading is not content yet: it is left out of what is saved, and comes in when it finishes.
-  if (taskId) updateTask(taskId, { description: stripPendingPlaceholders(editorContent.value) })
+  const html = stripPendingPlaceholders(editorContent.value)
+  ownSaves.push(html)
+  if (ownSaves.length > 20) ownSaves.shift()
+  if (taskId) updateTask(taskId, { description: html })
 }
 
 watch(editorContent, () => {
@@ -238,6 +243,7 @@ watch(editorContent, () => {
 watch(() => props.task?.id, (id, previousId) => {
   flushTitle(previousId)
   flushDescription(previousId)
+  ownSaves.length = 0
   if (!id) return
 
   titleDraft.value = props.task?.title ?? ''
@@ -262,8 +268,8 @@ watch(() => props.task?.title, (title) => {
 
 watch(() => props.task?.description, (description) => {
   if (description === undefined || descDirty || descTimer) return
-  // The server's copy has no pending placeholder in it, so compare without them: an echo must not wipe an upload in progress.
-  if (description === stripPendingPlaceholders(editorContent.value)) return
+  // An answer to our own save, or a copy taken while an upload is pending, must not replace the editor (see shouldAdoptServerDescription).
+  if (!shouldAdoptServerDescription(description, editorContent.value, ownSaves)) return
   suppressSave = true
   editorContent.value = description
   nextTick(() => {

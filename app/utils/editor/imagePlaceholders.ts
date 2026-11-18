@@ -34,3 +34,16 @@ export function placeholderBarStyle(state: PlaceholderState, progress: number | 
 export function stripPendingPlaceholders(html: string): string {
   return html.replace(/<span[^>]*data-image-placeholder="[^"]*"[^>]*data-state="pending"[^>]*>[\s\S]*?<\/span>/g, '')
 }
+
+/**
+ * Whether the server's copy of a description should replace what the editor shows. It should not when the editor already
+ * matches it, when the answer is to one of our own saves (a late answer would put back the text from before the person typed),
+ * or while an upload is pending: the placeholder is local state that the saved copy leaves out, so taking the server copy
+ * would remove it and the upload would land nowhere.
+ */
+export function shouldAdoptServerDescription(serverHtml: string, editorHtml: string, ownSaves: readonly string[]): boolean {
+  if (serverHtml === stripPendingPlaceholders(editorHtml)) return false
+  if (ownSaves.includes(serverHtml)) return false
+  if (/data-state="pending"/.test(editorHtml)) return false
+  return true
+}
