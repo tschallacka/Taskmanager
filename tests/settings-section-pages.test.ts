@@ -40,8 +40,9 @@ test('an old hash link (/settings#account) moves to its own address', () => {
   assert.match(stats, /sectionPathForHash/)
 })
 
-test('the account section keeps the security and email panels with it', () => {
+test('the security and email panels are sections on their own addresses, not on the account page', () => {
+  // Quincy's QA (mwc4jn0gozwdfd89e3): Security and Email get their own addresses (see settings-account-subsections).
   const account = read('app/pages/settings/account.vue')
-  assert.match(account, /<SecurityPanel/)
-  assert.match(account, /<EmailPrivacyPanel/)
+  assert.equal(account.includes('<SecurityPanel'), false)
+  assert.equal(account.includes('<EmailPrivacyPanel'), false)
 })

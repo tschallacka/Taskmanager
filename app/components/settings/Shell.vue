@@ -9,6 +9,8 @@ const { isInstanceAdmin } = useAuth()
 const icons: Record<string, string> = {
   'stats': 'i-lucide-chart-column',
   'account': 'i-lucide-user-round',
+  'security': 'i-lucide-shield-check',
+  'email': 'i-lucide-mail',
   'appearance': 'i-lucide-sun-moon',
   'api-keys': 'i-lucide-key-round',
   'ai': 'i-lucide-sparkles'

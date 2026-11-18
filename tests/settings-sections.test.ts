@@ -13,7 +13,7 @@ test('every section has its own address, and no two share one', () => {
 test('the sections keep the order and labels of the account page', () => {
   assert.deepEqual(
     ACCOUNT_SECTIONS.map(section => section.label),
-    ['Your stats', 'Account', 'Appearance', 'API keys and MCP', 'AI']
+    ['Your stats', 'Account', 'Security', 'Email', 'Appearance', 'API keys and MCP', 'AI']
   )
 })
 
