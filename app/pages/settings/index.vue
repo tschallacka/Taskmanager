@@ -287,6 +287,25 @@ function swatchStyle(color: string, selected: boolean) {
                 :image="session?.user?.image ?? null"
                 @changed="refreshSession()"
               />
+              <div class="p-5 border-t border-default space-y-2">
+                <p class="text-sm font-semibold text-default">
+                  Download my data
+                </p>
+                <p class="text-sm text-muted">
+                  A JSON file of your account, settings, memberships and what you wrote. It leaves out secrets and other people's data.
+                </p>
+                <a
+                  href="/api/account/export"
+                  download="taskmanager-account-export.json"
+                  class="inline-flex items-center gap-2 rounded-md border border-default px-3 py-1.5 text-sm font-medium text-default hover:bg-elevated"
+                >
+                  <UIcon
+                    name="i-lucide-download"
+                    class="size-4"
+                  />
+                  Download my data
+                </a>
+              </div>
               <DeleteAccountPanel />
             </div>
 

@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.52.0 - 2026-11-18
+
+- **Download my data: one decision for every table that holds a person's id.** The account deletion's table walk now also decides what the download takes from each table: the person's own rows as an allow-list of fields, or nothing, with the reason written down. A test fails when a table that holds a person's id has no decision, and when an exported field looks like a secret (a hash, a token, a key, a password, a code). The download itself follows in later commits. Files: `server/utils/accountRules.ts`, `tests/account-deletion-coverage.test.ts`.
+
 ## 0.51.0 - 2026-11-18
 
 - **Crew kit: Susy dispatches work.** The Susy daemon wakes Pia when a card enters Verify PM (gate wakes), offers the next ready card to an idle worker by mail (next card), and mails Pia and Boss when the board has ready work nobody has touched for 30 minutes (review needs), once per event. Each of the three has a switch, a dry-run and tests; the heavy-job slot grants a browser or test run to one asker at a time.
