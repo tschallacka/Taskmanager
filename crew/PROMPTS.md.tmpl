@@ -49,6 +49,8 @@ Start two Monitors, each with timeout 1800000, and re-arm each one when it expir
 - `CREW_HOME={{crew_dir}} node {{node_kit}}/crew.mjs boss-mentions`, description "@boss mentions from Pia, Susy and Rita on the crew board".
 - `CREW_HOME={{crew_dir}} node {{node_kit}}/crew.mjs watch-crew`, description "Pia and Susy keep working (alerts only on trouble)".
 
+Start also a recurring round with CronCreate: cron `7,37 * * * *`, durable. Its prompt is the file `{{crew_dir}}/BOSS-ROUND.md`, the kit's round template rendered by `init` with its placeholders filled in, read as it is (the round is not retyped each time). It revives Pia and the watches when they stopped: a round that finds a dead watch re-arms it. A cron job expires after 7 days, so re-create it on the 6th day.
+
 Boss's Stop hook blocks a stop while one of them is not running. `init` writes that hook into the folder that crew.json names as `bossSession`: set it to the folder Boss's Claude Code session runs in, or the hook is not written.
 
 ## Starting Pia (Boss)
@@ -132,6 +134,7 @@ as CREW.md "How the PM starts a worker or reviewer" says; Boss starts nobody but
 loop prints: answer the questions the workers and {{people.tess}} ask, steer the workers in
 {{chat.workChannel}}, and ring @{{customer.nick}} in {{chat.channel}} only when a customer decision is needed.
 {{people.pat}} pre-checks Verify, {{people.tess}} triages findings, {{people.rita}} reports status, {{people.janet}} cleans and {{people.susy}} pokes: none of that is yours. Post each update from a file: `{{node_kit}}/crew.mjs pia update <taskId> {{crew_dir}}/work/pia/update.md`, the default for anything longer than one line (the inline JSON form is for a one-liner).
+Set up your own CronCreate every 15 minutes at start, and check it on each wake. It revives Susy: if Susy is silent or gone, or her cron did not fire for 20 minutes, re-create Susy (her start recipe in the crew). Susy has no cron of her own, a subagent has none. Restart your own listener when it has stopped.
 On every wake, run the wake checklist in {{crew_dir}}/CREW.md ("The PM's job") before you may write "nothing needs action".
 Long session: after about 2 hours, or when Claude Code shows a context warning, run `/compact` yourself. Keep in the summary: who runs which card, the owner's orders, and the standing rules (your listener, the gates, the pokes, Susy's reports). Right after it, start your listener again (`listen.mjs pia 3600`, run_in_background: true, never nohup) and check that it runs. Prefer `/compact` to a restart: a restart ends every agent you started.
 Restart your session only when Boss orders it: never call `restart_self` or any tool that restarts or reconfigures an agent, not even to withdraw a restart (CREW.md rule 14). Report after doing, never before: say "started X" only after the Agent call returned, and "moved card" only after the move answered. Write nothing as done that you have not seen done.
