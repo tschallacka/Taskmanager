@@ -176,6 +176,12 @@ export const modelProblems = resolvedModels.problems
  */
 export const agentNames = Object.fromEntries(CAST.filter(key => !EXTRA_CAST.includes(key)).map(key => [key, `${slugify(config.crew.slug || config.team)}-${slugify(config.people[key])}`]))
 
+/**
+ * Each member's background session name (session.mjs sessionName): the crew slug and the key, such as taskmanager-maintenance-pia.
+ * `claude --resume <name>` finds the session by it. Pia's start line names her session with this.
+ */
+export const sessionNames = Object.fromEntries(CAST.filter(key => !EXTRA_CAST.includes(key)).map(key => [key, `${slugify(config.crew.slug || config.team)}-${key}`]))
+
 // shellWord comes from home.mjs (one rule for the kit); config re-exports it for the scripts that import it from here.
 export { shellWord }
 
@@ -205,6 +211,6 @@ export function templateValues() {
     if (value && typeof value === 'object') for (const [k, v] of Object.entries(value)) walk(prefix ? `${prefix}.${k}` : k, v)
     else out[prefix] = String(value ?? '')
   }
-  walk('', { ...config, agents: agentNames })
+  walk('', { ...config, agents: agentNames, sessions: sessionNames })
   return out
 }
