@@ -11,8 +11,8 @@ const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.ur
 
 test('the admin sections have their own addresses', () => {
   const paths = ADMIN_SECTIONS.map(section => section.path)
-  assert.deepEqual(paths, ['/admin/settings', '/admin/crews'])
-  assert.deepEqual(ADMIN_SECTIONS.map(section => section.label), ['Instance settings', 'Crews'])
+  assert.deepEqual(paths, ['/admin/accounts', '/admin/crews', '/admin/settings'])
+  assert.deepEqual(ADMIN_SECTIONS.map(section => section.label), ['Accounts', 'Crews', 'Instance settings'])
 })
 
 test('the admin shell builds its left list from the admin section table', () => {
