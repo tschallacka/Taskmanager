@@ -120,7 +120,10 @@ export function startArgs({ key, folder, home, kit, role, model = MODEL, name = 
   }
 }
 
-/** The sessions `claude agents --json` lists, as { id, name, state, status, startedAt }. Anything else is dropped. */
+/**
+ * The sessions `claude agents --json` lists, as { id, shortId, name, state, status, startedAt }. A background session has a short
+ * `id` (8 characters) and a full `sessionId`; the id here is the full one, because `claude --resume` needs it. Anything else is dropped.
+ */
 export function parseAgents(json) {
   let list
   try {
@@ -130,14 +133,18 @@ export function parseAgents(json) {
   }
   if (!Array.isArray(list)) return null
   return list
-    .filter(a => a && validSessionId(a.id))
-    .map(a => ({ id: a.id, name: a.name ?? '', state: a.state ?? '', status: a.status ?? '', startedAt: Number(a.startedAt) || 0 }))
+    .filter(a => a && (validSessionId(a.sessionId) || validSessionId(a.id)))
+    .map(a => ({
+      id: validSessionId(a.sessionId) ? a.sessionId : a.id,
+      shortId: validSessionId(a.id) ? a.id : '',
+      name: a.name ?? '', state: a.state ?? '', status: a.status ?? '', startedAt: Number(a.startedAt) || 0
+    }))
 }
 
-/** The live entry for a recorded id, or null. Matched by id only; the name is never used to find a live session here. */
+/** The live entry for a recorded id, or null. Matched by id (full or short) only; the name is never used to find a live session here. */
 export function liveById(list, id) {
   if (!Array.isArray(list) || !validSessionId(id)) return null
-  const hit = list.find(a => a.id === id)
+  const hit = list.find(a => a.id === id || (a.shortId && a.shortId === id))
   if (!hit || hit.state === 'ended' || hit.status === 'stopped') return null
   return hit
 }
@@ -183,13 +190,16 @@ export function startSession({ home, kit, key, folder, role, bin, now = Date.now
   writeSettingsFile(home, key, { profileEnv: longRunEnv(kit) })
   // The resume first (when there is a recorded id), then a fresh start if claude refuses it. A folder claude does not trust
   // is not retried: the same refusal would come back.
-  const resumeId = validSessionId(record?.id) ? record.id : ''
+  // A record written before the full id was kept holds the short id: the full one is looked up in what agents lists.
+  const resumeId = validSessionId(record?.id) ? fullIdOf(list, record.id) : ''
   let run
   let resumed = false
+  let refused = ''
   for (const resume of resumeId ? [resumeId, ''] : ['']) {
     const { cwd, args } = startArgs({ key, folder, home, kit, role, name, resume })
     run = runClaude(args, { bin, cwd })
     resumed = Boolean(resume) && run.ok
+    if (resume && !run.ok) refused = run.stderr || `exit ${run.status}`
     if (run.ok || /not trusted/i.test(run.stderr)) break
   }
   // Claude refuses a folder it does not trust with 'not trusted' on stderr: the reason names the folder and says what crew update does.
@@ -202,7 +212,13 @@ export function startSession({ home, kit, key, folder, role, bin, now = Date.now
   const fresh = resumedLive ?? after.filter(a => a.name === name && a.state !== 'ended' && a.status !== 'stopped').sort((a, b) => b.startedAt - a.startedAt)[0]
   if (!fresh) return { ok: false, reason: `claude started, but no live session named ${name} shows in claude agents` }
   writeRecord(home, key, { id: fresh.id, name: key, folder, startedAt: fresh.startedAt || now(), recordedAt: new Date(now()).toISOString() })
-  return { ok: true, id: fresh.id, started: true, resumed: Boolean(resumedLive) }
+  return { ok: true, id: fresh.id, started: true, resumed: Boolean(resumedLive), resumeRefused: refused || undefined }
+}
+
+/** The full sessionId for a recorded id: the id itself when agents lists it, else the entry whose short id it is, else the id as given. */
+export function fullIdOf(list, id) {
+  const hit = Array.isArray(list) ? list.find(a => a.id === id || a.shortId === id) : null
+  return hit ? hit.id : id
 }
 
 export function sessionStatus({ home, key, bin }) {
@@ -251,6 +267,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       if (resolved.write) writeRoleFile(home, key, resolved.role)
       out = startSession({ home, kit, key, folder: folder ?? process.cwd(), role: resolved.role, bin })
     }
+    // A refused resume is never silent: the start went on as a fresh session, and the output says why.
+    if (out.ok && out.resumeRefused) console.log(`${key}: resume refused: ${out.resumeRefused}, started fresh`)
     console.log(out.ok ? `${key}: session ${out.id} ${out.started ? 'started' : out.note}` : out.reason)
     process.exit(out.ok ? 0 : 1)
   }
