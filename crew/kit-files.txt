@@ -86,6 +86,9 @@ stale-copies.mjs
 susy-activity.mjs
 susy-collector.mjs
 susy-daemon.mjs
+susy-gate-wakes.mjs
+susy-next-card.mjs
+susy-review-needs.mjs
 susy-workers.mjs
 susy.mjs
 tm.mjs
