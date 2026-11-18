@@ -1,6 +1,7 @@
 // The Share dialog's customer picker shows the customer the project is filed under, selected (Pat's FAIL, 84fcb16; Boss's
-// ruling: the placeholder shows only when no customer is filed). The picker starts on the filed customer, and the reset
-// after a link is made goes back to it, not to the placeholder. Reads the component's source.
+// ruling: the placeholder shows only when no customer is filed). The filed customer is taken only when the picker holds it
+// (CQ violation 5: a project of another team has no option for it). The picker starts on it, and the reset after a link is
+// made goes back to it, not to the placeholder. Reads the component's source.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -22,13 +23,17 @@ test('the project is read with the listing, and its customer becomes the filed o
   assert.match(source, /filedCustomerId\.value = project\?\.customerId \?\? ''/)
 })
 
-test('the picker starts on the filed customer when nothing is chosen yet', () => {
-  assert.match(source, /if \(!customerChoice\.value\) customerChoice\.value = filedCustomerId\.value/)
+test('the filed customer counts only when the picker holds it (CQ 5)', () => {
+  assert.match(source, /const filedChoice = computed\(\(\) => customers\.value\.some\(customer => customer\.id === filedCustomerId\.value\) \? filedCustomerId\.value : ''\)/)
+})
+
+test('the picker takes the filed customer when nothing is chosen yet', () => {
+  assert.match(source, /watch\(filedChoice, \(id\) => \{\s*if \(!customerChoice\.value\) customerChoice\.value = id\s*\}\)/)
 })
 
 test('the reset after a link is made keeps the filed customer, not the placeholder', () => {
   const body = functionBody('inviteCustomer')
-  assert.match(body, /customerChoice\.value = filedCustomerId\.value/)
+  assert.match(body, /customerChoice\.value = filedChoice\.value/)
   assert.equal(body.includes(`customerChoice.value = ''`), false)
 })
 
