@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.51.0 - 2026-11-18
+
+- **Crew kit: Susy dispatches work.** The Susy daemon wakes Pia when a card enters Verify PM (gate wakes), offers the next ready card to an idle worker by mail (next card), and mails Pia and Boss when the board has ready work nobody has touched for 30 minutes (review needs), once per event. Each of the three has a switch, a dry-run and tests; the heavy-job slot grants a browser or test run to one asker at a time.
+
 ## 0.50.0 - 2026-11-18
 
 - **Crew kit: Boss runs a 30-minute round, and Susy watches Pia.** The kit tells Boss to start a recurring round with CronCreate (7 and 37 past the hour) next to the monitors, with the rendered `BOSS-ROUND.md` in the crew folder as its prompt, and Susy escalates to Boss when Pia is unresponsive or not putting people to work.

@@ -1,0 +1,156 @@
+// Susy daemon, phase 4 (card mwf201blsqvx3jczev): one status line of the cards that wait for a human. Fake boards only.
+// Run: node --test crew/susy-review-needs.test.mjs
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import { reviewNeeds, reviewLine, reviewKey, reviewRound, reviewMailToSend, afterReviewMail } from './susy-review-needs.mjs'
+
+// The board reader gives updatedAt as a number (Date.parse of the board's text), as readBoardCards does. A numeric time must
+// give the real wait, not 0m for every card.
+test('a card whose updatedAt is a number (as the board reader gives it) shows its real wait', () => {
+  const NOW_ = Date.parse('2026-11-16T12:00:00.000Z')
+  const card = { id: 'a', title: 'card a', column: 'Verify', tags: [], updatedAt: NOW_ - 90 * 60000 }
+  assert.equal(reviewLine(reviewNeeds([card], NOW_)), 'Waiting for a human. Boss: 1 (a 1h).')
+  const old = { ...card, id: 'b', updatedAt: NOW_ - 20 * 60000 }
+  assert.equal(reviewLine(reviewNeeds([old], NOW_)), 'Waiting for a human. Boss: 1 (b 20m).')
+})
+
+test('a queued review mail is sent again with its own id and text, before any new round', () => {
+  const NOW_ = Date.parse('2026-11-16T12:00:00.000Z')
+  const r = reviewRound({ cards: [{ id: 'a', title: 'card a', column: 'Verify', tags: [], updatedAt: new Date(NOW_ - 3600000).toISOString() }], now: NOW_, previous: '', live: true, enabled: true })
+  const first = reviewMailToSend({}, r)
+  assert.deepEqual(first, { id: undefined, text: 'Waiting for a human. Boss: 1 (a 1h).', key: 'boss:a|owner:' })
+  const queued = afterReviewMail({}, first, { sent: false, id: 'c'.repeat(32) })
+  assert.equal(queued.reviewKey, undefined)
+  assert.deepEqual(queued.reviewQueued, { id: 'c'.repeat(32), text: first.text, key: first.key })
+  const later = reviewRound({ cards: [{ id: 'a', title: 'card a', column: 'Verify', tags: [], updatedAt: new Date(NOW_ - 7200000).toISOString() }], now: NOW_, previous: '', live: true, enabled: true })
+  assert.deepEqual(reviewMailToSend(queued, later), queued.reviewQueued)
+})
+
+test('a sent review mail sets the previous key and clears the queue', () => {
+  const NOW_ = Date.parse('2026-11-16T12:00:00.000Z')
+  const state = { reviewQueued: { id: 'd'.repeat(32), text: 'old', key: 'boss:a|owner:' } }
+  const r = reviewRound({ cards: [{ id: 'a', title: 'card a', column: 'Verify', tags: [], updatedAt: new Date(NOW_ - 3600000).toISOString() }], now: NOW_, previous: '', live: true, enabled: true })
+  const done = afterReviewMail(state, reviewMailToSend(state, r), { sent: true, id: 'd'.repeat(32) })
+  assert.equal(done.reviewKey, 'boss:a|owner:')
+  assert.equal(done.reviewQueued, undefined)
+})
+
+const NOW = Date.parse('2026-11-16T12:00:00.000Z')
+const HOUR = 3600000
+const card = (id, column, hoursAgo, extra = {}) => ({
+  id,
+  title: `card ${id}`,
+  column,
+  tags: [],
+  updatedAt: new Date(NOW - hoursAgo * HOUR).toISOString(),
+  ...extra
+})
+
+test('a card in Verify waits for Boss, with how long it has waited', () => {
+  const out = reviewNeeds([card('a', 'Verify', 2)], NOW)
+  assert.deepEqual(out.boss.map(c => [c.id, c.hours]), [['a', 2]])
+  assert.deepEqual(out.owner, [])
+})
+
+test('an open card labelled owner waits for the owner', () => {
+  const out = reviewNeeds([card('b', 'In progress', 5, { tags: ['owner'] })], NOW)
+  assert.deepEqual(out.owner.map(c => [c.id, c.hours]), [['b', 5]])
+  assert.deepEqual(out.boss, [])
+})
+
+test('Done and Ready for live cards are not waiting', () => {
+  const out = reviewNeeds([card('c', 'Done', 9, { tags: ['owner'] }), card('d', 'Ready for live', 9, { tags: ['owner'] })], NOW)
+  assert.deepEqual(out.owner, [])
+  assert.deepEqual(out.boss, [])
+})
+
+test('the longest wait comes first', () => {
+  const out = reviewNeeds([card('a', 'Verify', 1), card('b', 'Verify', 7), card('c', 'Verify', 3)], NOW)
+  assert.deepEqual(out.boss.map(c => c.id), ['b', 'c', 'a'])
+})
+
+test('nothing waiting gives an empty line', () => {
+  assert.equal(reviewLine(reviewNeeds([card('a', 'To do', 1)], NOW)), '')
+})
+
+test('the line names each group with its cards and how long they wait', () => {
+  const line = reviewLine(reviewNeeds([card('a', 'Verify', 2), card('b', 'Verify', 0.5), card('c', 'In progress', 5, { tags: ['owner'] })], NOW))
+  assert.equal(line, 'Waiting for a human. Boss: 2 (a 2h, b 30m). Owner: 1 (c 5h).')
+})
+
+test('a line with only Boss\'s cards names only Boss', () => {
+  const line = reviewLine(reviewNeeds([card('a', 'Verify', 1)], NOW))
+  assert.equal(line, 'Waiting for a human. Boss: 1 (a 1h).')
+})
+
+// ---- the round: the line is logged or mailed only when it changes ----
+
+test('dry-run logs a changed line and mails nothing', () => {
+  const out = reviewRound({ cards: [card('a', 'Verify', 1)], now: NOW, previous: '', live: false, enabled: true })
+  assert.equal(out.mail, null)
+  assert.deepEqual(out.lines, ['Waiting for a human. Boss: 1 (a 1h).'])
+  assert.equal(out.line, 'Waiting for a human. Boss: 1 (a 1h).')
+  assert.equal(out.key, 'boss:a|owner:')
+})
+
+test('live with the switch on mails Boss the changed line once', () => {
+  const out = reviewRound({ cards: [card('a', 'Verify', 1)], now: NOW, previous: '', live: true, enabled: true })
+  assert.equal(out.mail, 'Waiting for a human. Boss: 1 (a 1h).')
+})
+
+test('the same line again is not logged or mailed', () => {
+  const cards = [card('a', 'Verify', 1)]
+  const first = reviewRound({ cards, now: NOW, previous: '', live: true, enabled: true })
+  const again = reviewRound({ cards, now: NOW, previous: first.key, live: true, enabled: true })
+  assert.equal(again.mail, null)
+  assert.deepEqual(again.lines, [])
+})
+
+test('the same cards a minute later are not logged or mailed again, though the times in the line moved', () => {
+  const cards = [card('a', 'Verify', 0.5), card('c', 'In progress', 5, { tags: ['owner'] })]
+  const first = reviewRound({ cards, now: NOW, previous: '', live: true, enabled: true })
+  const later = reviewRound({ cards, now: NOW + 60000, previous: first.key, live: true, enabled: true })
+  assert.notEqual(later.line, first.line)
+  assert.equal(later.mail, null)
+  assert.deepEqual(later.lines, [])
+  assert.equal(later.key, first.key)
+})
+
+test('the same cards a minute later are not logged in dry-run either', () => {
+  const cards = [card('a', 'Verify', 1)]
+  const first = reviewRound({ cards, now: NOW, previous: '', live: false, enabled: true })
+  const later = reviewRound({ cards, now: NOW + 60000, previous: first.key, live: false, enabled: true })
+  assert.deepEqual(later.lines, [])
+})
+
+test('a card joining the waiting set is a change; the order of the cards does not matter', () => {
+  const first = reviewRound({ cards: [card('a', 'Verify', 1)], now: NOW, previous: '', live: true, enabled: true })
+  const joined = reviewRound({ cards: [card('a', 'Verify', 1), card('b', 'Verify', 2)], now: NOW, previous: first.key, live: true, enabled: true })
+  assert.match(joined.mail, /Boss: 2 \(b 2h, a 1h\)/)
+  const reordered = reviewRound({ cards: [card('b', 'Verify', 2), card('a', 'Verify', 1)], now: NOW, previous: joined.key, live: true, enabled: true })
+  assert.equal(reordered.mail, null)
+})
+
+test('the key is empty when nothing waits, and names only the ids of each group', () => {
+  assert.equal(reviewKey(reviewNeeds([card('a', 'To do', 1)], NOW)), '')
+  assert.equal(reviewKey(reviewNeeds([card('b', 'Verify', 1), card('a', 'In progress', 5, { tags: ['owner'] })], NOW)), 'boss:b|owner:a')
+})
+
+test('live with the switch off logs the line and mails nothing', () => {
+  const out = reviewRound({ cards: [card('a', 'Verify', 1)], now: NOW, previous: '', live: true, enabled: false })
+  assert.equal(out.mail, null)
+  assert.match(out.lines[0], /^review needs off \(susy\.dispatch\.reviewNeeds is not true\): /)
+})
+
+test('nothing waiting: no line, no mail, and the previous line is cleared', () => {
+  const out = reviewRound({ cards: [card('a', 'To do', 1)], now: NOW, previous: 'Waiting for a human. Boss: 1 (a 1h).', live: true, enabled: true })
+  assert.equal(out.line, '')
+  assert.equal(out.mail, null)
+})
+
+test('no board read (no cards): the previous line is kept, nothing is logged', () => {
+  const out = reviewRound({ cards: undefined, now: NOW, previous: 'old', live: true, enabled: true })
+  assert.equal(out.line, 'old')
+  assert.equal(out.mail, null)
+  assert.deepEqual(out.lines, [])
+})

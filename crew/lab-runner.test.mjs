@@ -245,7 +245,17 @@ test('fix 4: the grant is refreshed while the run goes on, and not after it ends
     slot,
     now: () => NOW,
     beatMs: 5,
-    runJob: () => new Promise(resolve => setTimeout(() => resolve({ stdout: 'RESULT: pass stage=done pass=1 fail=0\n', timedOut: false }), 60))
+    // The run ends once two refreshes have been seen, not after a fixed 60 ms: under CPU load from the other test
+    // files the 5 ms beat can fire late. The fallback ends the run anyway, so a missing refresh still fails the assertion.
+    runJob: () => new Promise((resolve) => {
+      const started = Date.now()
+      const finish = () => resolve({ stdout: 'RESULT: pass stage=done pass=1 fail=0\n', timedOut: false })
+      const check = () => {
+        if (refreshes >= 2 || Date.now() - started > 5000) return finish()
+        setTimeout(check, 1)
+      }
+      check()
+    })
   })
   assert.ok(refreshes >= 2, `refreshed ${refreshes} times while the run went on`)
   const atEnd = refreshes
