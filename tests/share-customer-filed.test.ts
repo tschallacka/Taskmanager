@@ -24,7 +24,7 @@ test('the project is read with the listing, and its customer becomes the filed o
 })
 
 test('the filed customer counts only when the picker holds it (CQ 5)', () => {
-  assert.match(source, /const filedChoice = computed\(\(\) => customers\.value\.some\(customer => customer\.id === filedCustomerId\.value\) \? filedCustomerId\.value : ''\)/)
+  assert.match(source, /const filedChoice = computed\(\(\) => \(?customers\.value\.some\(customer => customer\.id === filedCustomerId\.value\) \? filedCustomerId\.value : ''\)?\)/)
 })
 
 test('the picker takes the filed customer when nothing is chosen yet', () => {

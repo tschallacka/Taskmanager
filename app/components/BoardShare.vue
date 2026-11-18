@@ -75,7 +75,6 @@ async function loadListing() {
   // The customer the project is filed under: the picker starts on it, so a filed customer shows selected, not the placeholder.
   const project = await untypedFetch<{ customerId?: string | null }>(base.value).catch(() => null)
   filedCustomerId.value = project?.customerId ?? ''
-  if (!customerChoice.value) customerChoice.value = filedCustomerId.value
   if (!props.outsideReader && listing.value?.me.kind === 'admin') {
     staff.value = (await untypedFetch<{ people: StaffPerson[] }>(`${base.value}/members`).catch(() => ({ people: [] as StaffPerson[] }))).people
   }
@@ -88,6 +87,12 @@ const { customers, refresh: refreshCustomers } = useCustomers()
 const customerChoice = ref('')
 // The customer the project is filed under (its first one). The picker starts on it and returns to it after a link.
 const filedCustomerId = ref('')
+// The filed customer, only when the picker holds it: a project of another team has no option for it, so it is not taken.
+const filedChoice = computed(() => (customers.value.some(customer => customer.id === filedCustomerId.value) ? filedCustomerId.value : ''))
+// The picker takes the filed customer when nothing is chosen yet (the project is read, or the team's list arrives).
+watch(filedChoice, (id) => {
+  if (!customerChoice.value) customerChoice.value = id
+})
 const customerNewName = ref('')
 const customerEmail = ref('')
 const customerError = ref('')
@@ -116,7 +121,7 @@ async function inviteCustomer() {
     customerLinkFor.value = customerEmail.value.trim()
     customerEmail.value = ''
     customerNewName.value = ''
-    customerChoice.value = filedCustomerId.value
+    customerChoice.value = filedChoice.value
     await refreshCustomers()
   } catch (e) {
     customerError.value = errorMessage(e, 'Could not invite that person')
