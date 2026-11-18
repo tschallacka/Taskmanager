@@ -12,12 +12,21 @@ test('team: Withdraw asks for confirmation before it withdraws', () => {
   assert.match(team, /@click="askWithdraw\(invitation\)"/)
   assert.doesNotMatch(team, /@click="withdraw\(invitation\)"/)
   assert.match(team, /function askWithdraw\(invitation: OpenInvitation\)/)
-  assert.match(team, /Withdraw this invitation\?/)
+  assert.match(team, /<WithdrawConfirm/)
 })
 
 test('board: Withdraw asks for confirmation before it withdraws', () => {
   assert.match(share, /@click="askWithdraw\(invitation\)"/)
   assert.doesNotMatch(share, /@click="withdraw\(invitation\)"/)
   assert.match(share, /function askWithdraw\(invitation: Invitation\)/)
-  assert.match(share, /Withdraw this invitation\?/)
+  assert.match(share, /<WithdrawConfirm/)
+})
+
+test('one confirm for both: the question, its copy and its button live in WithdrawConfirm.vue', () => {
+  const confirm = readFileSync(new URL('../app/components/WithdrawConfirm.vue', import.meta.url), 'utf8')
+  assert.match(confirm, /title="Withdraw this invitation\?"/)
+  assert.match(confirm, /The link stops working for that address\. You can invite the person again later\./)
+  assert.match(confirm, /data-invite-withdraw-confirm/)
+  assert.equal(team.includes('<UModal'), false)
+  assert.equal(share.includes('data-invite-withdraw-confirm'), false)
 })

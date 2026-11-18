@@ -827,29 +827,11 @@ watch(open, (isOpen) => {
                     @click="askWithdraw(invitation)"
                   />
                   <!-- Withdraw takes the link back at once, so it asks first. -->
-                  <UModal
+                  <WithdrawConfirm
                     :open="pendingWithdraw?.id === invitation.id"
-                    title="Withdraw this invitation?"
-                    description="The link stops working for that address. You can invite the person again later."
                     @update:open="(open: boolean) => { if (!open) pendingWithdraw = null }"
-                  >
-                    <template #body>
-                      <div class="flex justify-end gap-2">
-                        <UButton
-                          label="Keep it"
-                          color="neutral"
-                          variant="ghost"
-                          @click="pendingWithdraw = null"
-                        />
-                        <UButton
-                          label="Withdraw"
-                          color="error"
-                          data-invite-withdraw-confirm
-                          @click="confirmWithdraw"
-                        />
-                      </div>
-                    </template>
-                  </UModal>
+                    @confirm="confirmWithdraw"
+                  />
                 </div>
                 <p
                   v-if="invitation.reason && invitation.status === 'awaiting_approval'"
