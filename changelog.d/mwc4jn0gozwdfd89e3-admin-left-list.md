@@ -1,1 +1,0 @@
-- **The instance admin's pages have a left list.** Instance settings and Crews sit in one list, each on its own address (`/admin/settings`, `/admin/crews`). The Accounts list stays a button on Instance settings. Files: `app/components/settings/Shell.vue`, `app/pages/admin/settings.vue`, `app/pages/admin/crews`.
