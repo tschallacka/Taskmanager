@@ -456,7 +456,7 @@ watch(open, (isOpen) => {
                 v-model="email"
                 type="email"
                 placeholder="Add a guest by email…"
-                class="min-w-0 flex-1"
+                class="min-w-0 basis-full sm:flex-1"
                 data-share-email
               />
               <AppSelect
