@@ -6,12 +6,15 @@ import { readFileSync } from 'node:fs'
 
 const source = readFileSync(new URL('../app/components/CustomersModal.vue', import.meta.url), 'utf8')
 
+const PENDING_ROW = 'v-for="invitation in pendingInvitations(invitations)"'
+
 test('the pending contact row has a labelled Revoke button', () => {
-  const row = source.slice(source.indexOf('v-for="email in pendingInvitedEmails(invitations)"'), source.indexOf('v-for="email in pendingInvitedEmails(invitations)"') + 900)
+  const row = source.slice(source.indexOf(PENDING_ROW), source.indexOf(PENDING_ROW) + 900)
   assert.match(row, /label="Revoke"/)
 })
 
-test('the pending row revokes its own invitation, through the same confirmation as the link row', () => {
-  const row = source.slice(source.indexOf('v-for="email in pendingInvitedEmails(invitations)"'), source.indexOf('v-for="email in pendingInvitedEmails(invitations)"') + 900)
-  assert.match(row, /confirmRevoke\(c\.id, invitations\.find\(invitation => invitation\.email === email\)!\)/)
+test('the pending row revokes the invitation it is drawn from, through the same confirmation as the link row', () => {
+  const row = source.slice(source.indexOf(PENDING_ROW), source.indexOf(PENDING_ROW) + 900)
+  assert.match(row, /confirmRevoke\(c\.id, invitation\)/)
+  assert.equal(source.includes('invitations.find('), false)
 })

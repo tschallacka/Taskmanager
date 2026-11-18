@@ -27,3 +27,14 @@ test('the AppSelect lists every customer of the team by id and name', () => {
 test('the USelect item list is gone from the script', () => {
   assert.equal(source.includes('customerItems'), false)
 })
+
+// The changelog bullet describes the code (CQ violation 4). A phone tap on the AppSelect picker has no 390 px pass yet,
+// so the bullet makes no tap claim.
+test('the changelog bullet names AppSelect, not a native select, and claims no phone tap yet', () => {
+  const fragment = readFileSync(new URL('../changelog.d/mwjfx58bi6p4dqqeo8-invite-by-email-part-2.md', import.meta.url), 'utf8')
+  const bullet = fragment.split('\n').find(line => line.includes('customer picker')) ?? ''
+  assert.ok(bullet.length > 0, 'the bullet about the customer picker is in the fragment')
+  assert.match(bullet, /AppSelect|the app's own select/)
+  assert.doesNotMatch(bullet, /native select/)
+  assert.doesNotMatch(bullet, /takes a tap on a phone/)
+})
