@@ -212,6 +212,7 @@ function reviewText(state: string): string {
         size="sm"
         class="w-28"
         :items="visibilityItems"
+        :ui="{ content: 'z-[80] min-w-fit max-w-[calc(100vw-2rem)]' }"
         data-github-visibility
       />
       <UButton

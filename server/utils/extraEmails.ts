@@ -8,6 +8,7 @@ import { mailEnabled, sendMail } from '../lib/mailer'
 import { hashInvitationToken, newInvitationToken } from './customers'
 import { isInvalidDomain } from './crewAccounts'
 import { genId } from './projects'
+import { primaryAddressOf } from './verifiedAddress'
 
 /** How long a confirmation link stays usable. */
 export const CONFIRM_TTL_MS = 24 * 60 * 60 * 1000
@@ -25,10 +26,11 @@ export function cleanAddress(input: unknown): string | null {
 
 /** Lowercase main and verified extra addresses of an account. */
 export async function addressesOfUser(userId: string): Promise<string[]> {
-  const [me] = await db.select({ email: user.email }).from(user).where(eq(user.id, userId))
+  const [me] = await db.select({ email: user.email, verified: user.emailVerified }).from(user).where(eq(user.id, userId))
   const extras = await db.select({ email: userEmail.email }).from(userEmail)
     .where(and(eq(userEmail.userId, userId), isNotNull(userEmail.verifiedAt)))
-  return [me?.email, ...extras.map(row => row.email)]
+  // An unverified primary address is anyone's to type: it does not count as the account's (see verifiedAddress).
+  return [...primaryAddressOf(me?.email, me?.verified === true), ...extras.map(row => row.email)]
     .filter((email): email is string => Boolean(email))
     .map(email => email.toLowerCase())
 }

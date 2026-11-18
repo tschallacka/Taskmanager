@@ -6,6 +6,8 @@ topics: crew, add a crew, give a board a crew, management token, shadow board
 order: 30
 ---
 
+To bring a crew that already exists up to date, read [Update a crew that already exists](/help/crews/update-a-crew).
+
 Adding a crew to a board makes a **new** crew for it. The crew gets a board of its own, in its own team, and reads your
 real board from then on. It never changes your board. Read [What a crew is](/help/crews/what-is-a-crew) first if you are
 not sure what that means.
@@ -54,6 +56,17 @@ The **x** next to a link asks you to confirm with **Take it off**. Taking a crew
 - does not touch your real board.
 
 It cannot be undone. To give the board a crew again, add a new crew to it; that makes a new crew board.
+
+## Managing a crew from its own board
+
+Open the crew's own board (the crew board, not the real board) and choose **Manage this crew** from its menu. The window makes a 10-minute token that reaches **only that crew**: its keys and its people. It cannot make a new crew, and it cannot reach any other board or crew.
+
+The window gives two prompts. Paste one into a new Claude Code session:
+
+- **Recover the keys**: for a crew whose `creds.json` was lost or overwritten. New keys are made, so the old keys stop working at once. The agent saves the keys in the crew's folder, `~/crew-<slug>`, with mode 600.
+- **Add the missing people**: a person the crew lacks gets an account and a key. Nobody else is touched.
+
+Only the instance admin, the crew's creator, or an owner or admin of the crew's team can make this token. A crew's own accounts cannot.
 
 ## If something goes wrong
 

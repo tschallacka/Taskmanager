@@ -14,6 +14,8 @@ import { join, dirname } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { crewHome } from './home.mjs'
 import { longRunEnv, settingsPath, writeSettingsFile } from './session-settings.mjs'
+import { notTrustedReason, readWorktreeBase, recordedFolders, trustForStart } from './claude-trust.mjs'
+import { resolveStartRole, writeRoleFile } from './role-file.mjs'
 
 export const MODEL = 'claude-haiku-5-5'
 export const NO_REMOTE_SETTINGS = JSON.stringify({ remoteControlAtStartup: false })
@@ -133,13 +135,19 @@ export function listAgents(opts = {}) {
   return run.ok ? parseAgents(run.stdout) : null
 }
 
-/** Starts the person's session, unless the recorded one is live. Records the id of the new session. */
-export function startSession({ home, kit, key, folder, role, bin, now = Date.now }) {
+/**
+ * Starts the person's session, unless the recorded one is live. Records the id of the new session. Before the start, the crew's
+ * own folders are trusted in Claude Code's config (`trust`, claude-trust.mjs); a folder the crew did not make is refused with a
+ * sentence that says what crew update does.
+ */
+export function startSession({ home, kit, key, folder, role, bin, now = Date.now, trust = trustForStart }) {
   checkKey(key)
   if (!folder || !existsSync(folder)) return { ok: false, reason: `the folder for ${key} does not exist: ${folder ?? '(none)'}` }
   const list = listAgents({ bin })
   const record = readRecord(home, key)
   if (list && liveById(list, record?.id)) return { ok: true, id: record.id, started: false, note: 'already running' }
+  const trusted = trust({ home, kit, folder, folders: recordedFolders(home) })
+  if (!trusted.ok) return { ok: false, reason: trusted.reason }
   const { cwd, args } = startArgs({ key, folder, home, kit, role })
   // The session's own mcp config, written before the start, so the strict flag always has a file to read.
   mkdirSync(join(home, 'sessions'), { recursive: true })
@@ -148,6 +156,8 @@ export function startSession({ home, kit, key, folder, role, bin, now = Date.now
   // passes that one file as its --settings. The long-run profile's env is merged in, so the session keeps the owner's timeouts.
   writeSettingsFile(home, key, { profileEnv: longRunEnv(kit) })
   const run = runClaude(args, { bin, cwd })
+  // Claude refuses a folder it does not trust with 'not trusted' on stderr: the reason names the folder and says what crew update does.
+  if (!run.ok && /not trusted/i.test(run.stderr)) return { ok: false, reason: notTrustedReason(folder, readWorktreeBase(home)) }
   if (!run.ok) return { ok: false, reason: `claude did not start the session: ${run.stderr || `exit ${run.status}`}` }
   const after = listAgents({ bin }) ?? []
   // The new session is the newest one with this key's name. The name is used once, here, to learn the id; after that
@@ -188,12 +198,22 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const kit = dirname(fileURLToPath(import.meta.url))
   const [command, key, folder] = process.argv.slice(2)
   const bin = process.env.CREW_CLAUDE_BIN || 'claude'
-  const roleFile = process.env.CREW_ROLE_FILE
-  const role = roleFile && existsSync(roleFile) ? readFileSync(roleFile, 'utf8') : ''
   let out
   if (command === 'start') {
-    if (!role) out = { ok: false, reason: 'no role: set CREW_ROLE_FILE to the person section of PROMPTS.md' }
-    else out = startSession({ home, kit, key, folder: folder ?? process.cwd(), role, bin })
+    // The role is resolved here, only for a start: status and list never write a role file (role-file.mjs has the order).
+    const promptsPath = join(home, 'PROMPTS.md')
+    const crewPath = join(home, 'CREW.md')
+    const resolved = resolveStartRole({
+      home,
+      key,
+      promptsText: existsSync(promptsPath) ? readFileSync(promptsPath, 'utf8') : '',
+      crewText: existsSync(crewPath) ? readFileSync(crewPath, 'utf8') : ''
+    })
+    if (!resolved.role) out = { ok: false, reason: resolved.reason || `no role for ${key}` }
+    else {
+      if (resolved.write) writeRoleFile(home, key, resolved.role)
+      out = startSession({ home, kit, key, folder: folder ?? process.cwd(), role: resolved.role, bin })
+    }
     console.log(out.ok ? `${key}: session ${out.id} ${out.started ? 'started' : out.note}` : out.reason)
     process.exit(out.ok ? 0 : 1)
   }

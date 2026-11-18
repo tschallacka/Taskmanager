@@ -7,6 +7,12 @@ const { activeProject, archiveProject, unarchiveProject, deleteProject, board } 
 
 const error = ref('')
 
+// The server's message when it sent one, else the fallback. Same rule as the other project settings panels.
+function messageOf(e: unknown, fallback: string) {
+  const data = (e as { data?: { message?: unknown } })?.data
+  return typeof data?.message === 'string' ? data.message : fallback
+}
+
 // ─── Archive ───────────────────────────────────────────────
 
 const archiving = ref(false)

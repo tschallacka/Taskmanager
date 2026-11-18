@@ -1,0 +1,1 @@
+- **The accent colour shows a live preview.** The Appearance section has a primary button under the swatches; it takes the accent you pick at once. The accent and neutral swatches also show their names and a keyboard focus ring.

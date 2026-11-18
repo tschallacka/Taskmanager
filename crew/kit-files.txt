@@ -4,6 +4,7 @@
 # profiles, logs, rendered documents, work folders) stays in the working copy.
 # One file name per line; lines starting with # are comments. Keep it sorted.
 
+BOSS-ROUND.md.tmpl
 BRIEF.md.tmpl
 CHANGELOG.md
 CREW.md.tmpl
@@ -34,6 +35,7 @@ cast.mjs
 channel.mjs
 claude-long-run.comments.md
 claude-long-run.json
+claude-trust.mjs
 claude.mjs
 config.mjs
 crew-defaults.mjs
@@ -42,11 +44,13 @@ crew.mjs
 detach.sh
 dev-copies.mjs
 devadmin.mjs
+doctor.mjs
 down.mjs
 fonts.conf.tmpl
 guard.sh
 heavy-slot.mjs
 home.mjs
+idle-ready.mjs
 init.mjs
 janet.mjs
 keys.mjs
@@ -72,6 +76,7 @@ prepare-worktree-cli.mjs
 prepare-worktree.mjs
 publish.mjs
 restart-brief.mjs
+role-file.mjs
 serve.mjs
 session-errors.mjs
 session-health.mjs
@@ -85,6 +90,9 @@ stale-copies.mjs
 susy-activity.mjs
 susy-collector.mjs
 susy-daemon.mjs
+susy-gate-wakes.mjs
+susy-next-card.mjs
+susy-review-needs.mjs
 susy-workers.mjs
 susy.mjs
 tm.mjs

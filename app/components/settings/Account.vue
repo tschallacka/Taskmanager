@@ -49,5 +49,6 @@ const memberSince = computed(() => {
       :image="session?.user?.image ?? null"
       @changed="refreshSession()"
     />
+    <DeleteAccountPanel />
   </div>
 </template>

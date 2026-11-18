@@ -16,10 +16,20 @@ export default defineNuxtConfig({
     enabled: process.env.NODE_ENV !== 'production'
   },
 
+  // The page is served without server rendering, so this viewport is the one in the first HTML. viewport-fit=cover lets
+  // env(safe-area-inset-*) reach the page on a notched phone (the tab bar keeps clear of the home indicator).
+  app: {
+    head: {
+      meta: [
+        { name: 'viewport', content: 'width=device-width, initial-scale=1, viewport-fit=cover' }
+      ]
+    }
+  },
+
   css: ['~/assets/css/main.css'],
 
-  // Dark is the default; someone who chose light or system keeps that choice in their browser.
-  colorMode: { preference: 'dark' },
+  // System is the default, so a new visitor follows their device; someone who chose dark or light keeps that choice in their browser.
+  colorMode: { preference: 'system' },
   runtimeConfig: {
     public: {
       discordEnabled: false,

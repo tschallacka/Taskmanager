@@ -1,7 +1,8 @@
 // `crew session` with a fake claude (no real session is started). Run: node --test crew/session.test.mjs
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -10,6 +11,20 @@ import {
   readRecord, MODEL, mcpConfig, mcpConfigPath, withRules, WORKTREE_RULE
 } from './session.mjs'
 import { settingsPath } from './session-settings.mjs'
+
+// These tests cover the start itself. The trust check before a start has its own tests (claude-trust-session.test.mjs), so here
+// the folder is trusted by a stub: the real config file is never touched.
+const NO_TRUST = () => ({ ok: true })
+
+// A crew folder for the CLI tests: under a temp base that the home's crew.json names, with a temp Claude config. The CLI start trusts
+// that folder there, and nothing real is written.
+function crewCli(home) {
+  const base = mkdtempSync(join(tmpdir(), 'session-cli-base-'))
+  const folder = join(base, 'taskmanager-test-x')
+  mkdirSync(folder)
+  writeFileSync(join(home, 'crew.json'), `${JSON.stringify({ worktreeBase: base })}\n`)
+  return { folder, env: { CLAUDE_CONFIG_DIR: mkdtempSync(join(tmpdir(), 'session-cli-cfg-')) } }
+}
 
 test('a session starts with strict mcp config, and that config holds only the crew taskmanager entry', () => {
   const home = mkdtempSync(join(tmpdir(), 'session-mcp-'))
@@ -36,7 +51,7 @@ test('the worktree rule is the last line of the role the session gets, and the r
 test('a start writes the session mcp config file before it runs claude', () => {
   const fake = fakeClaude()
   const home = mkdtempSync(join(tmpdir(), 'session-home-'))
-  const out = startSession({ home, kit: HERE, key: 'wren', folder: '/tmp', role: 'r', bin: fake.bin })
+  const out = startSession({ home, kit: HERE, key: 'wren', folder: '/tmp', role: 'r', bin: fake.bin, trust: NO_TRUST })
   assert.equal(out.ok, true)
   assert.ok(existsSync(mcpConfigPath(home, 'wren')))
   const cfg = JSON.parse(readFileSync(mcpConfigPath(home, 'wren'), 'utf8'))
@@ -131,7 +146,7 @@ test('start records the new session id, and a second start while it is live does
   const fake = fakeClaude()
   const home = mkdtempSync(join(tmpdir(), 'session-home-'))
   const kit = HERE
-  const first = startSession({ home, kit, key: 'wren', folder: '/tmp', role: 'role text', bin: fake.bin })
+  const first = startSession({ home, kit, key: 'wren', folder: '/tmp', role: 'role text', bin: fake.bin, trust: NO_TRUST })
   assert.equal(first.ok, true)
   assert.equal(first.started, true)
   assert.equal(readRecord(home, 'wren').id, first.id)
@@ -140,7 +155,7 @@ test('start records the new session id, and a second start while it is live does
   const file = JSON.parse(readFileSync(settingsPath(home, 'wren'), 'utf8'))
   assert.equal(file.remoteControlAtStartup, false, 'remote control is off in the file the start passes')
 
-  const second = startSession({ home, kit, key: 'wren', folder: '/tmp', role: 'role text', bin: fake.bin })
+  const second = startSession({ home, kit, key: 'wren', folder: '/tmp', role: 'role text', bin: fake.bin, trust: NO_TRUST })
   assert.equal(second.started, false)
   assert.equal(second.note, 'already running')
   assert.equal(calls(fake).filter(args => args.includes('--bg')).length, 1, 'no second session was started')
@@ -149,7 +164,7 @@ test('start records the new session id, and a second start while it is live does
 test('status and list read the recorded id, and report a session that was stopped as not live', () => {
   const fake = fakeClaude()
   const home = mkdtempSync(join(tmpdir(), 'session-home-'))
-  const started = startSession({ home, kit: HERE, key: 'wick', folder: '/tmp', role: 'r', bin: fake.bin })
+  const started = startSession({ home, kit: HERE, key: 'wick', folder: '/tmp', role: 'r', bin: fake.bin, trust: NO_TRUST })
   assert.equal(sessionStatus({ home, key: 'wick', bin: fake.bin }).live, true)
   assert.equal(sessionStatus({ home, key: 'wren', bin: fake.bin }).recorded, false)
   assert.equal(sessionList({ home, bin: fake.bin }).length, 1)
@@ -168,8 +183,70 @@ test('a start that claude refuses is reported with its reason, and nothing is re
   const broken = join(fake.dir, 'broken')
   writeFileSync(broken, '#!/bin/sh\necho refused >&2\nexit 3\n')
   chmodSync(broken, 0o755)
-  const out = startSession({ home, kit: HERE, key: 'wynn', folder: '/tmp', role: 'r', bin: broken })
+  const out = startSession({ home, kit: HERE, key: 'wynn', folder: '/tmp', role: 'r', bin: broken, trust: NO_TRUST })
   assert.equal(out.ok, false)
   assert.match(out.reason, /refused/)
   assert.equal(readRecord(home, 'wynn'), null)
+})
+
+// `crew session start <key>` with no CREW_ROLE_FILE: the start reads sessions/<key>.role.md, so a person without a worker
+// section in PROMPTS.md (Nina, Pat, Quincy) starts with the file's text.
+test('crew session start reads the role file of the key when CREW_ROLE_FILE is not set', () => {
+  const fake = fakeClaude()
+  const home = mkdtempSync(join(tmpdir(), 'session-cli-home-'))
+  mkdirSync(join(home, 'sessions'), { recursive: true })
+  writeFileSync(join(home, 'sessions', 'nina.role.md'), 'NINA CLI ROLE MARKER\n')
+  const env = { ...process.env, CREW_HOME: home, CREW_CLAUDE_BIN: fake.bin }
+  delete env.CREW_ROLE_FILE
+  const crew = crewCli(home)
+  const run = spawnSync(process.execPath, [join(HERE, 'session.mjs'), 'start', 'nina', crew.folder], { encoding: 'utf8', env: { ...env, ...crew.env } })
+  assert.equal(run.status, 0, run.stderr || run.stdout)
+  const start = calls(fake).find(args => args.includes('--bg'))
+  assert.ok(start, 'claude --bg was run')
+  assert.match(start[start.indexOf('--append-system-prompt') + 1], /NINA CLI ROLE MARKER/)
+})
+
+// The same rule as `crew up`: a worker's start rebuilds the role from PROMPTS.md, so a stale role file cannot win.
+test('crew session start rebuilds a worker role from PROMPTS.md over a stale role file', () => {
+  const fake = fakeClaude()
+  const home = mkdtempSync(join(tmpdir(), 'session-cli-worker-'))
+  mkdirSync(join(home, 'sessions'), { recursive: true })
+  writeFileSync(join(home, 'PROMPTS.md'), '## Worker (key `W`, chat nick `NICK`)\n\n```\nFRESH PROMPT MARKER for W\n```\n')
+  writeFileSync(join(home, 'sessions', 'wynn.role.md'), 'STALE ROLE MARKER\n')
+  const env = { ...process.env, CREW_HOME: home, CREW_CLAUDE_BIN: fake.bin }
+  delete env.CREW_ROLE_FILE
+  const crew = crewCli(home)
+  const run = spawnSync(process.execPath, [join(HERE, 'session.mjs'), 'start', 'wynn', crew.folder], { encoding: 'utf8', env: { ...env, ...crew.env } })
+  assert.equal(run.status, 0, run.stderr || run.stdout)
+  const start = calls(fake).find(args => args.includes('--bg'))
+  const role = start[start.indexOf('--append-system-prompt') + 1]
+  assert.match(role, /FRESH PROMPT MARKER for wynn/)
+  assert.doesNotMatch(role, /STALE ROLE MARKER/)
+  assert.match(readFileSync(join(home, 'sessions', 'wynn.role.md'), 'utf8'), /FRESH PROMPT MARKER for wynn/, 'the role file is rebuilt')
+})
+
+// A key that is not a plain name names no file: refused before any claude call, so no path is read or sent to claude.
+test('crew session start refuses a key that is not a plain name, and runs nothing', () => {
+  const fake = fakeClaude()
+  const home = mkdtempSync(join(tmpdir(), 'session-cli-bad-'))
+  mkdirSync(join(home, 'sessions'), { recursive: true })
+  writeFileSync(join(home, 'sessions', 'x.role.md'), 'TRAVERSAL MARKER\n')
+  const env = { ...process.env, CREW_HOME: home, CREW_CLAUDE_BIN: fake.bin }
+  delete env.CREW_ROLE_FILE
+  const run = spawnSync(process.execPath, [join(HERE, 'session.mjs'), 'start', '../x', '/tmp'], { encoding: 'utf8', env })
+  assert.equal(run.status, 1)
+  assert.match(run.stdout, /no such person key|no role/)
+  assert.equal(existsSync(fake.log) ? calls(fake).length : 0, 0, 'claude was not run')
+})
+
+// `status` and `list` only read: a worker with no role file gets none written by a status call.
+test('crew session status writes no role file', () => {
+  const fake = fakeClaude()
+  const home = mkdtempSync(join(tmpdir(), 'session-cli-status-'))
+  mkdirSync(join(home, 'sessions'), { recursive: true })
+  writeFileSync(join(home, 'PROMPTS.md'), '## Worker (key `W`, chat nick `NICK`)\n\n```\nSTATUS PROMPT for W\n```\n')
+  const env = { ...process.env, CREW_HOME: home, CREW_CLAUDE_BIN: fake.bin }
+  delete env.CREW_ROLE_FILE
+  spawnSync(process.execPath, [join(HERE, 'session.mjs'), 'status', 'wynn'], { encoding: 'utf8', env })
+  assert.equal(existsSync(join(home, 'sessions', 'wynn.role.md')), false, 'no role file from a status call')
 })

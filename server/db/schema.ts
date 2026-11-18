@@ -249,6 +249,8 @@ export const customerInvitations = pgTable(
     tokenHash: text('token_hash').notNull().unique(),
     // Who the link was meant for, as a label for the list of open invitations.
     label: text('label'),
+    // The address the link is tied to (an email invite); null for an anonymous link.
+    email: text('email'),
     createdBy: text('created_by').references(() => user.id, { onDelete: 'set null' }),
     createdAt: bigint('created_at', { mode: 'number' }).notNull(),
     expiresAt: bigint('expires_at', { mode: 'number' }).notNull(),
@@ -840,7 +842,10 @@ export const apiKeys = pgTable(
     // The key name's slug (lower case, letters and digits, dashes), stored with the suffix. NULL only for keys made before it
     // was stored. The unique index below is on the person, the slug and the suffix; NULLs are distinct, so legacy keys
     // with no stored values cannot conflict. Additive and nullable.
-    nameSlug: text('name_slug')
+    nameSlug: text('name_slug'),
+    // A crew-scoped management token (card mwdd9d2vtgqhfr6izq): the id of the one crew it reaches, for its keys and people
+    // routes only. NULL for every other key, which then behaves as before. Plain text, no reference, no index (additive).
+    crewId: text('crew_id')
   },
   table => [
     index('api_keys_user_idx').on(table.userId),

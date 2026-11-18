@@ -9,6 +9,7 @@ import { and, eq } from 'drizzle-orm'
 import { audienceOf } from './mcpAccess'
 import type { Audience } from './auth-helpers'
 import { findTask } from './mcpBoardTools'
+import { openableTaskId, taskShareUrl, updateShareUrl } from './shareLinks'
 import { McpToolError, asToolErrorAsync, newId, optionalString, requireString } from './mcpToolKit'
 import type { McpToolDefinition } from './mcpToolKit'
 import { notificationExcerpt } from './notifications'
@@ -122,6 +123,8 @@ export const MCP_UPDATE_TOOLS: McpToolDefinition[] = [
         task: { id: task.id, title: task.title },
         update: {
           id: updated!.id,
+          // The link to share with a person, at this update: staff only, as post_task_update's is.
+          ...(audienceOf(context, board) === 'staff' ? { url: updateShareUrl(board.id, openableTaskId(task), updated!.id) } : {}),
           visibility: updated!.visibility,
           length: body.length,
           editedAt: updated!.editedAt,
@@ -162,7 +165,12 @@ export const MCP_UPDATE_TOOLS: McpToolDefinition[] = [
         deleted: true,
         byOwner,
         board: { id: board.id, name: board.name },
-        task: { id: task.id, title: task.title },
+        // The update is gone, so its link would open nothing: the task it was on is the link to share.
+        task: {
+          id: task.id,
+          title: task.title,
+          ...(audienceOf(context, board) === 'staff' ? { url: taskShareUrl(board.id, openableTaskId(task)) } : {})
+        },
         update: { id: comment.id, visibility: comment.visibility, length: comment.body.length }
       }
     }
@@ -217,7 +225,14 @@ export const MCP_UPDATE_TOOLS: McpToolDefinition[] = [
         posted: true,
         // At the top level so the open browsers are told which board changed.
         board: { id: board.id, name: board.name },
-        update: { id: comment!.id, visibility, excerpt: notificationExcerpt(body), replyTo: replyTo ?? null }
+        // The link to share with a person, at this update: staff only, as the task links are.
+        update: {
+          id: comment!.id,
+          ...(audienceOf(context, board) === 'staff' ? { url: updateShareUrl(board.id, openableTaskId(task), comment!.id) } : {}),
+          visibility,
+          excerpt: notificationExcerpt(body),
+          replyTo: replyTo ?? null
+        }
       }
     }
   }

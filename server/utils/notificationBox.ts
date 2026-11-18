@@ -37,11 +37,14 @@ export async function emptyReadBox(
   return { deleted: deleted.length }
 }
 
-/** Archives the given notifications (or every one still in the inbox with `all`): read too, out of the inbox. */
+/**
+ * Archives the given notifications, or every one still in the inbox with `all`: read too, out of the inbox. With
+ * `unreadOnly` (Archive all under the Unread filter) only the unread ones go; the read ones stay where they are.
+ */
 export async function archiveNotifications(
   database: NotificationsDb,
   userId: string,
-  options: { ids: string[], all: boolean },
+  options: { ids: string[], all: boolean, unreadOnly?: boolean },
   now: number = Date.now()
 ): Promise<{ archived: number }> {
   const updated = await database.update(notifications)
@@ -50,7 +53,8 @@ export async function archiveNotifications(
     .where(and(
       eq(notifications.userId, userId),
       isNull(notifications.archivedAt),
-      options.all ? undefined : inArray(notifications.id, options.ids)
+      options.all ? undefined : inArray(notifications.id, options.ids),
+      options.unreadOnly ? isNull(notifications.readAt) : undefined
     ))
     .returning({ id: notifications.id })
   return { archived: updated.length }

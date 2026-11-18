@@ -2,13 +2,154 @@
 
 All notable changes to Arnotes are documented in this file.
 
-## Unreleased
+## 0.51.0 - 2026-11-18
 
-- **Each account settings section has its own address.** Your stats, Account, Appearance, API keys and MCP, and AI open at `/settings`, `/settings/account`, `/settings/appearance`, `/settings/api-keys` and `/settings/ai`, and the left list links to them. An old link to a section on the settings page (`/settings#account` and the others) goes to that section's address. The extra email addresses link from a confirmation mail goes to Account. Nothing is removed or moved in the data.
+- **Crew kit: Susy dispatches work.** The Susy daemon wakes Pia when a card enters Verify PM (gate wakes), offers the next ready card to an idle worker by mail (next card), and mails Pia and Boss when the board has ready work nobody has touched for 30 minutes (review needs), once per event. Each of the three has a switch, a dry-run and tests; the heavy-job slot grants a browser or test run to one asker at a time.
 
-- **The instance admin's pages have a left list.** Instance settings and Crews sit in one list, each on its own address (`/admin/settings`, `/admin/crews`). The Accounts list stays a button on Instance settings.
+## 0.50.0 - 2026-11-18
 
-- **The accent colour shows a live preview.** The Appearance section has a primary button under the swatches; it takes the accent you pick at once. The accent and neutral swatches also show their names and a keyboard focus ring.
+- **Crew kit: Boss runs a 30-minute round, and Susy watches Pia.** The kit tells Boss to start a recurring round with CronCreate (7 and 37 past the hour) next to the monitors, with the rendered `BOSS-ROUND.md` in the crew folder as its prompt, and Susy escalates to Boss when Pia is unresponsive or not putting people to work.
+
+## 0.49.1 - 2026-11-18
+
+- **Share dialog guest email on a phone.** The "Add a guest by email…" field takes a full row below 640 px, so the placeholder and a typed address show in full at 390 px (it was about 90 px wide). Files: `app/components/BoardShare.vue`, `tests/share-guest-email-phone.test.ts`.
+
+## 0.49.0 - 2026-11-18
+
+- **Settings redesign (8/9): one left list of sections, one address per section.** The project settings view is a shell with a left list (General, Members, Customer, GitHub, Rules, Secrets, Import, Archive, Trash), each section at its own address, and the account, appearance, AI, API keys and admin settings pages use the same shell. Team settings follows as its own card.
+- **Build cache: a build whose output holds a file link is stored again.** `copyOutput` copies a file link with `copyFileSync`; `cpSync` on a file link failed on Node 22.23 and the store was refused.
+
+## 0.48.1 - 2026-11-17
+
+- **The production build is skipped when nothing it reads has changed.** `bun run build` hashes the build inputs (the app, the server, the shared code, the public folder, the docs, the configs, the tool versions and the build-time environment values) and copies the last good output from `data/.build-cache/` when the hash matches; `BUILD_FORCE=1` forces a full build, and `bun run build:full` is the full build. The app's version is read at run time from the release, so a copied build reports its own version. Files: `scripts/build-if-changed.mjs`, `scripts/build-inputs.mjs`, `server/utils/appVersionFile.ts`, `server/utils/appVersion.ts`, `package.json`, `CONTRIBUTING.md`.
+
+## 0.48.0 - 2026-11-17
+
+- **Custom select.** Every native select in the app is now the app's own select (`AppSelect`, built on Nuxt UI), so its open list follows light and dark mode: the team invite role select, the board and project pickers, the rule builder, the members, secrets, GitHub and field pickers, and the timesheet task picker. Admin, and every other option, reads in dark mode. Files: `app/components/AppSelect.vue` and the pickers that use it.
+
+## 0.47.1 - 2026-11-17
+
+- **The build cache copy no longer breaks the app after a skipped build.** Nitro's build output holds symlinks with absolute targets into the release that built it; the cached copy kept them, and when the deploy pruned that release the app failed to start (502). The cache and the restored output are now copied with their symlinks resolved, a restored copy that still holds a symlink is not trusted (the real build runs), and the cache format is part of the hash, so the next deploy builds in full and replaces the old cache. Files: `scripts/build-if-changed.mjs`, `scripts/build-inputs.mjs`, `tests/build-cache-symlinks.test.ts`.
+
+## 0.47.0 - 2026-11-17
+
+- **The crew's own folders are trusted by the kit.** `crew update` and `crew session start` mark the crew home, the kit folder and each session's folder as trusted in Claude Code's config file (one backup, never overwritten; nothing else in the file changes), so a session no longer fails with "folder not trusted" (`crew/claude-trust.mjs`, `crew/kit-files.txt`).
+
+## 0.46.0 - 2026-11-17
+
+- **Crew kit: a notice when the board has ready work and the crew is idle.** When cards wait in To do or in a Verify column and nothing has happened for 30 minutes, Pia and Boss get one mail, and another only when the set of ready cards changes. Done and blocked cards are not named. Files: `crew/idle-ready.mjs`, `crew/idle-ready.test.mjs`.
+
+## 0.45.0 - 2026-11-17
+
+- **The production build is skipped when nothing it reads has changed.** `bun run build` hashes the build inputs (the app, the server, the shared code, the public folder, the docs, the configs, the tool versions and the build-time environment values) and copies the last good output from `data/.build-cache/` when the hash matches; `BUILD_FORCE=1` forces a full build, and `bun run build:full` is the full build. The app's version is read at run time from the release, so a copied build reports its own version. Files: `scripts/build-if-changed.mjs`, `scripts/build-inputs.mjs`, `server/utils/appVersionFile.ts`, `server/utils/appVersion.ts`, `package.json`, `CONTRIBUTING.md`.
+
+## 0.44.0 - 2026-11-17
+
+- **Archive all under the Unread filter archives only the unread notifications it shows.** The read ones stay in the inbox, where that filter does not show them, so the button no longer takes out rows the person cannot see. Archive all under All still takes every inbox row. Files: `server/utils/notificationBox.ts`, `server/api/notifications/archive.post.ts`, `app/composables/useNotifications.ts`, `app/pages/projects/inbox.vue`, `tests/notifications-archive-db.test.ts`, `changelog.d/mw9rojl3i47djllurn-notifications-archive.md`.
+
+## 0.43.0 - 2026-11-17
+
+- **Board Filter: assignee and Compact cards.** The Filter now narrows the board by one assignee (or Unassigned), next to the labels and the search, and its Compact cards switch hides each card's snippet and cover; the switch is kept in the browser. Files: `app/utils/boardFilter.ts`, `app/composables/useProjects.ts`, `app/pages/projects/[id].vue`, `app/components/kanban/KanbanBoard.vue`, `app/components/kanban/KanbanCard.vue`, `docs/basics/boards-and-columns.md`.
+
+## 0.42.1 - 2026-11-17
+
+- **Crew kit: the worktree folder from crew.json is read, and the serve hint says "for example".** `init` no longer warns that a set worktreeBase is missing, and `crew <who> prepare worktree` takes the folder from the loaded config. The serve hint for a non-Nuxt product no longer reads as the required command. Files: `crew/config.mjs`, `crew/prepare-worktree-cli.mjs`, `crew/init.mjs`, `crew/worktree-base-config.test.mjs`.
+
+## 0.42.0 - 2026-11-17
+
+- **Invite by email, and a later sign-in shows what was invited.** A customer invitation can be tied to an email address: the form asks for it, the team's projects the person may see are ticked and filed under the customer, and a link made for an address shows as "Invited, not accepted yet". The address is prefilled and locked on the sign-in and sign-up forms. A customer link tied to an address is accepted by the account itself, and a person who signs in later with an invitation they never accepted sees it on /pending-invitations, with Accept invitation. Schema change: a new nullable `email` column on customer invitations (`customer_invitations.email`), to be applied by the owner. Files: app/components/CustomersModal.vue, app/pages/invite/[token].vue, app/pages/login.vue, app/pages/pending-invitations.vue, app/pages/projects/index.vue, app/utils/lockedEmail.ts, app/utils/pendingInvitationEntry.ts, shared/utils/inviteEmail.ts, server/api/pending-invitations.get.ts, server/api/pending-invitations.post.ts, server/api/customers/[id]/invitations.post.ts, server/api/customers/[id]/contacts.ts, server/api/invitations/[token]/index.get.ts, server/utils/customerInviteRules.ts, server/utils/pendingInvites.ts, server/db/schema.ts, docs/team/invite-a-contact.md, changelog.d/mwj64qza593kf3pdo5i-invite-by-email.md.
+
+## 0.41.1 - 2026-11-17
+
+- **Time: a time logged from a task row is dated on your own day.** A time logged from the list row carried no day, so the server dated it by UTC: a Sunday evening in New York landed on Monday, a week later. The row now sends your local day, as the timesheet and the timer already do. Files: `app/components/kanban/ListRowMeta.vue`, `tests/time-log-day.test.ts`, `tests/time-view-weeks.test.ts`.
+
+## 0.41.0 - 2026-11-17
+
+- **Crews on a new board: `POST /api/crews` with `newBoard`.** A crew call can make its board in the same request: `newBoard: { name }` with `teamId` (instead of `projectId`) makes a board in that team with the team's default columns, owned by the key's owner, and binds the crew to it as `projectId` does. The key's owner must be a member of the team, as the UI requires to make a board (403 otherwise); a management token gets 403. A refused crew leaves no board behind. `GET /api/crews/targets` lists the owner's teams as before, plus a team where the owner is only a member while it has no boards (`userboards: []`), with `canCreateBoard`. The audit row for a made board carries its id. Files: `server/api/crews/index.post.ts`, `server/utils/crewBoards.ts`, `server/utils/crewProvisioning.ts`, `tests/crew-newboard.test.ts`, `docs/admin/crews-on-your-instance.md`, `crew/README.md`.
+
+## 0.40.0 - 2026-11-16
+
+- **Delete my account: the rules for every column that holds a person's user id.** Each such column is decided in one rule table (delete, keep as "Deleted user", or clear), and a test fails when a new user column has no rule. The deletion itself removes a personal board with no other member, with its tasks and attachment files, keeps a team's work under "Deleted user", and clears the columns the person filled in. It refuses while the person owns a team (the teams are named), for the last instance admin, and for a crew account. Settings > Account has "Delete my account": it lists what happens, and deletes only after the person types their own address. Files: `server/api/account/delete.post.ts`, `server/utils/accountRules.ts`, `server/utils/accountDeletion.ts`, `app/components/DeleteAccountPanel.vue`, `app/pages/settings/index.vue`, `shared/utils/deleteAccountText.ts`, `tests/delete-account-ui.test.ts`, `tests/account-deletion-coverage.test.ts`, `tests/account-deletion.test.ts`, `tests/changelog-fragment-files.test.ts`.
+
+## 0.39.5 - 2026-11-16
+
+- **Sidebar: the task count and the read-only marker stay whole.** On a narrow sidebar the line under a project name was cut off, so "read-only" and the task count were lost. The customer and the time now give way first; the crew name still truncates first, and the count and the marker never truncate. Files: `app/components/ProjectsListPanel.vue`.
+
+- **Sidebar: the arrow keeps every project name in line, and a crew reads as the child of its project.** Every project row reserves the arrow's width, so a project with a crew is no longer indented. A crew under its project is indented with a left rule, a smaller muted name and the label "crew: <name>". Files: `app/components/ProjectsListPanel.vue`, `app/utils/crewTreeRows.ts`, `tests/sidebar-crew-label.test.ts`.
+
+## 0.39.4 - 2026-11-16
+
+- **The Customers popup's confirmation opens on top.** "Remove customer?" (and remove contact, revoke link) opened behind the Customers popup, so a customer could not be deleted. The confirmation now uses the app's modal layer like every other modal and is declared after the popup. Files: `app/components/CustomersModal.vue`, `tests/customers-confirm-layer.test.ts`.
+
+## 0.39.3 - 2026-11-16
+
+- **The first paint says what is loading.** Before the app's code has run, the browser shows a spinner with "Opening your projects…" (app/spa-loading-template.html), so a person who signs in and waits does not see a blank page.
+
+- **Projects load with a visible wait.** On /projects a line reads "Opening your projects…" while the list loads, a failed first load retries instead of showing "No projects yet", and the sidebar's "No projects yet" waits while a person's team is being opened (a person who signs in again in a new browser no longer sees an empty list flash). Files: app/pages/projects/index.vue, app/plugins/init-projects.client.ts, app/components/ProjectsListPanel.vue.
+
+## 0.39.2 - 2026-11-16
+
+- **Invite follow-ups: System by default, and no "Personal Workspace" while the team loads.** A visitor with no stored choice gets System, not a fixed dark theme; a stored choice is kept. The workspace switcher shows "Loading workspace" while the active team loads, so a team member who lands in the team sees a label that agrees with the team's boards. The invitation page uses the theme colours, so a new visitor on a light system sees it light. Files: `nuxt.config.ts`, `app/components/TeamSwitcher.vue`, `app/utils/workspaceLabel.ts`, `app/pages/invite/[token].vue`, `tests/color-mode-default.test.ts`, `tests/team-switcher-label.test.ts`, `tests/invite-page-theme.test.ts`.
+
+## 0.39.1 - 2026-11-16
+
+- Invited people land on their shared work: a customer whose board was shared to their email now opens that board (or the shared list) after accepting the customer invitation, the sidebar lists each shared project once, and a person who cannot create projects no longer sees "No projects yet. Create one" or a New project button.
+
+## 0.39.0 - 2026-11-16
+
+- **Agents get the public link of a customer-visible task.** When a board is shared (its public link is on and not expired), get_task answers a customer-visible task with `publicUrl`: the board's public page, for a key whose owner may share the board (a project admin or a manager guest). The public page shows the board's cards, not one task, so the link opens the board. Staff keys only. Files: `server/utils/mcpBoardTools.ts`, `server/utils/shareLinks.ts`, `tests/mcp-share-links.test.ts`.
+
+- **Agents get a link to share.** The MCP tools that answer with a task, board or update now return `url`: the link that opens it in the app, on this instance (staff keys only; a customer's key gets none). Covers get_task, create_task, update_task, move_task, search_tasks, my_tasks, get_board, list_boards, the update tools, list_notifications, delete_task, restore_task and get_task_github. The tool descriptions and the Tools help page say so. A subtask's link, and the e-mail and push about a subtask, now open its parent's panel, as its Inbox link does (a subtask has no panel of its own). Files: `server/utils/shareLinks.ts`, `server/utils/notifications.ts`, `server/utils/mcpBoardTools.ts`, `server/utils/mcpUpdateTools.ts`, `server/utils/mcpMeTools.ts`, `server/utils/mcpGithubTools.ts`, `server/utils/mcpRegistry.ts`, `docs/agents/tools-overview.md`.
+
+- **An invited person lands where the invitation says.** A customer contact with one board shared lands on that board, with several or none on **Shared with you** (which lists the boards, or says nothing is shared yet). A team member who signs in again in a new browser opens their team, and a customer contact with no team goes to the shared list rather than the first-project form. The invite page's registration form is the default, with a plain **Already have an account? Sign in** link. Files: app/pages/invite/[token].vue, app/pages/projects/index.vue, app/pages/shared-with-me.vue, app/components/AppSidebar.vue, app/utils/inviteLanding.ts, app/utils/projectsEntry.ts, app/utils/teamEntry.ts, app/utils/loginMode.ts, app/utils/inviteLinks.ts, shared/utils/sharedGroups.ts, server/api/shared-with-me.get.ts, server/api/invitations/[token]/accept.post.ts, server/api/invitations/[token]/index.get.ts, server/utils/protectedApi.ts, server/utils/sharedProjectIds.ts, server/middleware/requireAuth.ts, docs/team/invite-a-contact.md, changelog.d/mwidpx1zhcb8izzzqw-invite-landing.md.
+
+## 0.38.1 - 2026-11-15
+
+- Legal documents: the privacy policy and the Impressum 1.0.0 as drafts in legal/, with the version and archive procedure (legal/README.md). The hosting data center (Lauterbourg, France) is filled in from the Contabo data processing agreement.
+
+## 0.38.0 - 2026-11-15
+
+- **Phone: a long-press on a card opens its sheet, and the help page describes the column picker and the swipe.** At phone width a long-press on a card opens the same bottom sheet as its ⋯ button, not the desktop popover; the desktop right-click menu is unchanged. The boards help page now covers the column picker, the swipe between columns and the Add column chip. Files: `app/components/kanban/KanbanCard.vue`, `docs/basics/boards-and-columns.md`, `tests/phone-qa-violations.test.ts`.
+
+- **Phone: the card sheet title stops at the close button, and Add column moves into the column picker.** A long card title on the phone sheet now ends in an ellipsis before the X. The board's Add column no longer peeks in at the right edge on a phone: it is the last chip of the column picker, and its name field shows under the picker. The desktop board is unchanged. Files: `app/components/PhoneCardSheet.vue`, `app/components/PhoneColumnPicker.vue`, `app/components/kanban/KanbanBoard.vue`, `tests/phone-add-column.test.ts`.
+
+- **Phone: a tab bar, one column at a time, and a card sheet.** On a phone the app has a bottom tab bar (Home, Inbox with its unread count, My tasks, Projects, Search) and a floating New. A board shows one column at a time with a column picker, and each card's ⋯ opens a sheet with Mark done, Move to, Assign to, Set due date and Delete. The project page's own bottom bar is gone. Files: `app/components/BottomTabBar.vue`, `app/components/PhoneColumnPicker.vue`, `app/components/PhoneCardSheet.vue`, `app/components/kanban/KanbanBoard.vue`, `app/components/kanban/KanbanCard.vue`, `app/components/kanban/TaskDrawer.vue`, `app/components/kanban/TaskComments.vue`, `app/layouts/app.vue`, `app/pages/projects/home.vue`, `app/pages/projects/[id].vue`, `docs/basics/boards-and-columns.md`.
+
+- **Phone: swipe between columns.** On a phone the board shows one column at a time; a sideways swipe on the board moves to the next or previous column, and a caption under the column picker says "swipe for other columns". The desktop is unchanged. Files: `app/components/kanban/KanbanBoard.vue`, `tests/phone-swipe.test.ts`.
+
+- **Phone: the bottom tab bar keeps clear of the home indicator.** The app asks for `viewport-fit=cover`, so the safe-area insets (the notch and the home indicator) reach the page on a phone. Without it every inset read 0 and the tab bar sat under the home indicator. Files: `app/app.vue`, `tests/app-viewport.test.ts`.
+
+## 0.37.0 - 2026-11-15
+
+- **A comment opened from the Inbox stays in the address.** The card jumps to the reply and the address still names the comment, so a reload or a shared copy of the link scrolls to it again. `app/components/kanban/TaskComments.vue`, `tests/inbox-comment-url.test.ts`.
+
+- **Open on board from the Inbox keeps the comment, and a phone no longer shows it.** The card panel opened from an Inbox comment links to the card at that comment, and on a phone the control is hidden (the back arrow is the way back to the Inbox). `app/components/kanban/TaskDrawer.vue`, `tests/inbox-phone-open.test.ts`, `tests/inbox-comment-link.test.ts`.
+
+## 0.36.0 - 2026-11-15
+
+- **The calendar, the timeline and the More pages get keyboard and tap paths.** A task on the calendar moves with the arrow keys or with its Move control and a tap on a day, undated tasks included; a timeline bar moves with the arrow keys (Shift for its end, Alt for its start; Alt+Left and Alt+Right stay on the bar and do not go Back or Forward in the browser) and with its row's Move-the-bar menu; Overview, Messages, Time and Files sit under a More menu in the board's view row (master's row, which also holds Office). The pointer drags are unchanged. `app/components/kanban/ProjectCalendarView.vue`, `app/components/kanban/ProjectTimelineView.vue`, `app/pages/projects/[id].vue`, `app/utils/calendarKeys.ts`, `app/utils/calendarTap.ts`, `app/utils/timelineKeys.ts`, `app/utils/timelineTap.ts`, `app/utils/dateNudge.ts`.
+
+## 0.35.0 - 2026-11-15
+
+- **Crew up and crew session start take a role file for keys with no worker section.** A session for Nina, Pat or Quincy starts from its own sessions/<key>.role.md; before, crew up reported "no worker role for this key" and `crew session start` needed CREW_ROLE_FILE. Both commands now resolve the role in one order, and CREW_ROLE_FILE, when set, overrides both. The four workers still get their role rebuilt from PROMPTS.md on every start, so a prompt change reaches them. One module, crew/role-file.mjs, holds the role file path and its key check for both commands. Files: crew/role-file.mjs, crew/sessions-up.mjs, crew/session.mjs, crew/kit-files.txt, and their tests.
+
+## 0.34.0 - 2026-11-15
+
+- **The add-a-crew action has a plain name: "Put an AI crew to work on this board".** The board's menu item, the Crews page button, the dialog's title and its button ("Get the prompt") and the help page's title are renamed; the dialog's text names the board and says the token works only on it. The prompt an agent receives now says it puts an AI crew to work on the board in its first line, and uses the plain words "Set up the AI crew for this board" and "Remove the AI crew from this board" for its two actions; the rest of the prompt is unchanged. The help page keeps its address. `app/components/ProjectsListPanel.vue`, `app/components/TeamCrewsPanel.vue`, `app/components/ManagementTokenDialog.vue`, `app/utils/managementPrompt.ts`, `docs/crews/give-a-board-a-crew.md`.
+
+- **Manage an existing crew from its own board: "Manage this crew".** On a crew's own board the board's menu offers **Manage this crew**. It makes a 10-minute token that reaches only that crew: its keys and its people. The window gives two prompts, one to recover the keys (the old keys stop working) and one to add the missing people; each works in the crew's own folder, `~/crew-<slug>`. Only the instance admin, the crew's creator, or an owner or admin of its team can make it; a crew's own accounts cannot. A token made before this change works as before. `server/utils/managementToken.ts`, `server/utils/crewKeyScope.ts`, `server/middleware/crewKeyScope.ts`, `server/db/schema.ts` (an additive, nullable `crew_id` on the key table), `server/api/settings/api-keys/management.post.ts`, `app/components/ManagementTokenDialog.vue`, `app/utils/crewManagePrompt.ts`, `app/components/ProjectsListPanel.vue`.
+
+## 0.33.0 - 2026-11-15
+
+- **The board's top bar and view row follow the redesign.** The top bar shows the Team › Project crumb, the project's health chip (from Overview) and the board's people as avatars, four and then a count. The view row shows Board, List, Calendar, Timeline and Dashboard as tabs, with Overview, Messages, Time, Files and Office under More, and New task at its right end on the Board view. A search box filters the cards by title, the Filter button holds the labels and Show deleted, and a visit opens the view last chosen on that board. Nothing is removed. Files: `app/pages/projects/[id].vue`, `app/components/kanban/KanbanBoard.vue`, `app/composables/useProjects.ts`, `docs/basics/boards-and-columns.md`, `tests/board-page-crumb.test.ts`.
+
+## 0.32.1 - 2026-11-15
+
+- **Help: a page on updating a crew that already exists.** `docs/crews/update-a-crew.md` explains the one-line update, `crew update --check`, what an update replaces and keeps, and `crew people add` for roles a crew is missing. It is linked from the help index and from the page on adding a crew. Docs only.
+
+## 0.32.0 - 2026-11-14
+
+- **The task card is one summary (redesign 4/9).** The whole card opens the panel; the hover-only chevron and the empty assignee slot are gone, and an assignee's picture shows only once someone is set. The chips row is in a fixed order: the first two labels then "+N", the select fields, then the state chips (Overdue, Due soon within two days, Waits for N, Team only, Shared with customer), each shown only with a reason, and none on a finished task. Right-click (long press on a touchscreen) opens the menu: Open, Mark done, Assign to..., Move to column..., Set due date..., Copy link, Delete. Space ticks a focused card done. The trash's button reads "Delete now". Deviations from the card: no Undo toast, no hint strip, no compact cards, no drag tilt yet; a waiting card does not name its blockers on hover. `app/components/kanban/KanbanCard.vue`, `app/components/kanban/KanbanBoard.vue`, `app/utils/cardChips.ts`, `app/utils/dueDate.ts`, `app/utils/taskBlockers.ts`, `tests/card-chips.test.ts`, `tests/task-blockers-ui.test.ts`, `docs/basics/tasks.md`.
 
 ## 0.31.0 - 2026-11-14
 

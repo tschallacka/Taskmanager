@@ -2,10 +2,11 @@
 //   node --test crew/sessions-up.test.mjs
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { downSessions, recordedKeys, roleFileText, upSessions, workerRole, writeRoleFile, RESTART_WAKE } from './sessions-up.mjs'
+import { resolveStartRole } from './role-file.mjs'
 
 // The standing rules a person reads on every start: CREW.md. A marker line stands in for the whole file here.
 const CREW_MD = '# The crew: how we work\n\nSTANDING RULE MARKER: post on the card, never by file.\n'
@@ -99,7 +100,56 @@ test('crew up reports a key with no worker role as failed, and does not start it
     return { ok: true }
   }, wake: async () => ({ ok: true }) })
   assert.equal(started, 0)
-  assert.equal(out.lines[0], 'pia: failed: no worker role for this key; not started')
+  assert.equal(out.lines[0], 'pia: failed: no role for pia: no worker section in PROMPTS.md and no sessions/pia.role.md; not started')
+  assert.equal(out.ok, false)
+})
+
+test('resolving a start role does not write the role file: the caller writes a rebuilt worker role', () => {
+  const home = mkdtempSync(join(tmpdir(), 'crew-role-'))
+  mkdirSync(join(home, 'sessions'), { recursive: true })
+  const resolved = resolveStartRole({ home, key: 'wynn', promptsText: PROMPTS, crewText: CREW_MD, env: {} })
+  assert.equal(resolved.source, 'PROMPTS.md')
+  assert.match(resolved.role, /STANDING RULE MARKER/)
+  assert.equal(existsSync(join(home, 'sessions', 'wynn.role.md')), false, 'resolving alone leaves no file behind')
+  assert.equal(resolved.write, true, 'the result says the file is to be written, so the caller writes it')
+})
+
+test('crew up honours CREW_ROLE_FILE for every key, as crew session start does', async () => {
+  const home = homeWith({ wynn: { id: DEAD_ID, folder: '/work/wynn' } })
+  const override = join(home, 'override.role.md')
+  writeFileSync(override, 'OVERRIDE ROLE\n', { mode: 0o600 })
+  const started = []
+  const out = await upSessions(home, {
+    promptsText: PROMPTS,
+    crewText: CREW_MD,
+    env: { CREW_ROLE_FILE: override },
+    listAgents: () => [],
+    start: (opts) => {
+      started.push(opts)
+      return { ok: true, id: 'cc000006' }
+    },
+    wake: async () => ({ ok: true })
+  })
+  assert.equal(started[0].role, 'OVERRIDE ROLE\n', 'the override file is the role, not the PROMPTS.md section')
+  assert.deepEqual(out.lines, ['wynn: started (cc000006), woke once'])
+})
+
+test('crew up with CREW_ROLE_FILE set to a missing file fails the key and starts nothing', async () => {
+  const home = homeWith({ wynn: { id: DEAD_ID, folder: '/work/wynn' } })
+  let started = 0
+  const out = await upSessions(home, {
+    promptsText: PROMPTS,
+    crewText: CREW_MD,
+    env: { CREW_ROLE_FILE: join(home, 'nope.role.md') },
+    listAgents: () => [],
+    start: () => {
+      started += 1
+      return { ok: true }
+    },
+    wake: async () => ({ ok: true })
+  })
+  assert.equal(started, 0)
+  assert.match(out.lines[0], /^wynn: failed: CREW_ROLE_FILE does not exist: .*; not started$/)
   assert.equal(out.ok, false)
 })
 
@@ -181,5 +231,59 @@ test('crew up starts a session with the role file, which holds both the section 
   })
   assert.match(role, /chat nick `Wynn Worker`/)
   assert.match(role, /STANDING RULE MARKER/)
+  assert.equal(readFileSync(join(home, 'sessions', 'wynn.role.md'), 'utf8'), roleFileText(PROMPTS, CREW_MD, 'wynn'))
+})
+
+// A role file a person's session already has (Nina, Pat, Quincy: no worker section in PROMPTS.md). Written by hand or by an
+// earlier run; crew up reads it first.
+const NINA_FILE = 'NINA ROLE FILE MARKER: review the diff, post CQ on the card.\n'
+
+test('crew up starts a session from its own role file when PROMPTS.md has no worker section for the key', async () => {
+  const home = homeWith({ nina: { id: DEAD_ID, folder: '/work/nina' } })
+  writeFileSync(join(home, 'sessions', 'nina.role.md'), NINA_FILE, { mode: 0o600 })
+  const started = []
+  const out = await upSessions(home, {
+    promptsText: PROMPTS,
+    crewText: CREW_MD,
+    listAgents: () => [],
+    start: ({ key, role }) => {
+      started.push({ key, role })
+      return { ok: true, id: 'cc000005' }
+    },
+    wake: async () => ({ ok: true, reason: 'woke' })
+  })
+  assert.deepEqual(out.lines, ['nina: started (cc000005), woke once'])
+  assert.equal(out.ok, true)
+  assert.equal(started[0].role, NINA_FILE, 'the start is given the file text, not a guessed role')
+  assert.equal(readFileSync(join(home, 'sessions', 'nina.role.md'), 'utf8'), NINA_FILE, 'an existing role file is not rewritten')
+})
+
+test('crew up still fails a key that has neither a worker section nor a role file', async () => {
+  const home = homeWith({ quincy: { id: DEAD_ID, folder: '/work/quincy' } })
+  let started = 0
+  const out = await upSessions(home, { promptsText: PROMPTS, crewText: CREW_MD, listAgents: () => [], start: () => {
+    started += 1
+    return { ok: true }
+  }, wake: async () => ({ ok: true }) })
+  assert.equal(started, 0)
+  assert.equal(out.lines[0], 'quincy: failed: no role for quincy: no worker section in PROMPTS.md and no sessions/quincy.role.md; not started')
+  assert.equal(out.ok, false)
+})
+
+test('a worker with a role file is regenerated from PROMPTS.md, so a prompt change reaches it on crew up', async () => {
+  const home = homeWith({ wynn: { id: DEAD_ID, folder: '/work/wynn' } })
+  writeFileSync(join(home, 'sessions', 'wynn.role.md'), NINA_FILE, { mode: 0o600 })
+  const started = []
+  await upSessions(home, {
+    promptsText: PROMPTS,
+    crewText: CREW_MD,
+    listAgents: () => [],
+    start: ({ role }) => {
+      started.push(role)
+      return { ok: true, id: 'cc000006' }
+    },
+    wake: async () => ({ ok: true, reason: 'woke' })
+  })
+  assert.equal(started[0], roleFileText(PROMPTS, CREW_MD, 'wynn'))
   assert.equal(readFileSync(join(home, 'sessions', 'wynn.role.md'), 'utf8'), roleFileText(PROMPTS, CREW_MD, 'wynn'))
 })

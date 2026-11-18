@@ -2,12 +2,12 @@
 // slice 4). Pure functions, no browser. Run: node --import tsx --test tests/task-blockers-ui.test.ts
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { blockedChipLabel, blockedSummary, blockerCandidates, blockerStateWords } from '../app/utils/taskBlockers'
+import { blockedSummary, blockerCandidates, blockerStateWords, waitsChipLabel } from '../app/utils/taskBlockers'
 
 test('the card chip counts open blockers when the count is known', () => {
-  assert.equal(blockedChipLabel(2), 'Blocked by 2')
-  assert.equal(blockedChipLabel(null), 'Blocked')
-  assert.equal(blockedChipLabel(0), 'Blocked')
+  assert.equal(waitsChipLabel(2), 'Waits for 2')
+  assert.equal(waitsChipLabel(null), 'Waits')
+  assert.equal(waitsChipLabel(0), 'Waits')
 })
 
 test('the summary reads in plain words for one and for many', () => {

@@ -51,7 +51,7 @@ async function commitTime() {
     return
   }
   try {
-    await $fetch(`/api/tasks/${props.task.id}/time`, { method: 'POST', headers: realtimeHeaders(), body: { minutes } })
+    await $fetch(`/api/tasks/${props.task.id}/time`, { method: 'POST', headers: realtimeHeaders(), body: { minutes, day: todayIso() } })
     emit('logged', props.task.id, minutes)
   } catch (e) {
     toast.add({ title: errorMessage(e, 'Could not log the time'), icon: 'i-lucide-alert-triangle', color: 'error' })

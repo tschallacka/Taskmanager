@@ -48,6 +48,13 @@ export function tagChipAttrs(tag: string, pinned?: string | null) {
     : { class: TAG_CHIP_CLASSES[tagColor(tag)], style: undefined }
 }
 
+// The one rule for "this column is Done": the name is exactly Done, in any case. The board's empty
+// Done column uses it to show the drop slot. (The colour keywords below are looser, on purpose:
+// they only pick a dot colour.)
+export function isDoneColumnName(name: string): boolean {
+  return /^done$/i.test(name.trim())
+}
+
 // ─── Column accents ───────────────────────────────────────────────────────────
 
 // A kanban column reads faster with a colored dot than with text alone. The

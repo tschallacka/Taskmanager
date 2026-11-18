@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { realtimeHeaders } from '~/composables/useRealtime'
 import { errorMessage, untypedFetch } from '~/utils/untypedFetch'
+import { customerChoiceError } from '#shared/utils/inviteEmail'
 
 // The Share control in a board's header: an avatar stack and a Share button that opens the dialog
 // where people are let onto the board. A project admin invites guests (editor or manager guest, and
@@ -75,6 +76,46 @@ async function loadListing() {
     staff.value = (await untypedFetch<{ people: StaffPerson[] }>(`${base.value}/members`).catch(() => ({ people: [] as StaffPerson[] }))).people
   }
 }
+
+// ─── Invite as a customer contact ──────────────────────────
+// The project is filed under a customer and an email invitation is made in one step (see
+// server/api/projects/[id]/customer-invite.post.ts). The input rule is tested in tests/project-customer-invite.test.ts.
+const { customers, refresh: refreshCustomers } = useCustomers()
+const customerChoice = ref('')
+const customerNewName = ref('')
+const customerEmail = ref('')
+const customerError = ref('')
+const customerLink = ref('')
+const customerSending = ref(false)
+const customerItems = computed(() => (customers.value ?? []).map(customer => ({ label: customer.name, value: customer.id })))
+
+async function inviteCustomer() {
+  const problem = customerChoiceError({ customerId: customerChoice.value, customerName: customerNewName.value, email: customerEmail.value })
+  if (problem) {
+    customerError.value = problem
+    return
+  }
+  customerSending.value = true
+  customerError.value = ''
+  try {
+    const answer = await untypedFetch<{ url: string }>(`${base.value}/customer-invite`, {
+      method: 'POST',
+      headers: realtimeHeaders(),
+      body: { customerId: customerChoice.value, customerName: customerNewName.value.trim(), email: customerEmail.value.trim() }
+    })
+    customerLink.value = answer.url
+    customerEmail.value = ''
+    customerNewName.value = ''
+    customerChoice.value = ''
+    await refreshCustomers()
+  } catch (e) {
+    customerError.value = errorMessage(e, 'Could not invite that person')
+  } finally {
+    customerSending.value = false
+  }
+}
+
+refreshCustomers().catch(() => {})
 
 // ─── Invite ────────────────────────────────────────────────
 
@@ -166,9 +207,17 @@ async function act(key: string, run: () => Promise<unknown>, failure: string) {
 }
 
 const GUEST_LABEL: Record<GuestRole, string> = { editor: 'Editor', manager: 'Manager guest' }
+const guestRoleOptions: { label: string, value: string }[] = [
+  { label: GUEST_LABEL.editor, value: 'editor' },
+  { label: GUEST_LABEL.manager, value: 'manager' }
+]
+// The pickers hand over a string; only the two guest roles are ever set.
+function asGuestRole(value: string | null | undefined): GuestRole | null {
+  return value === 'editor' || value === 'manager' ? value : null
+}
 
-function changeGuestRole(guest: Guest, next: GuestRole) {
-  if (guest.role === next) return
+function changeGuestRole(guest: Guest, next: GuestRole | null) {
+  if (!next || guest.role === next) return
   // A manager guest keeps their domain when switched back later; the server drops it for an editor.
   return act(`g:${guest.userId}`, () => untypedFetch(`${base.value}/guests/${guest.userId}`, {
     method: 'PUT', headers: realtimeHeaders(), body: { role: next, allowedDomain: next === 'manager' ? (guest.allowedDomain ?? suggestedDomain(guest.email)) : null }
@@ -338,6 +387,60 @@ watch(open, (isOpen) => {
           class="space-y-6"
           data-share-dialog
         >
+          <section
+            class="space-y-2"
+            data-share-customer
+          >
+            <h3 class="text-sm font-semibold text-default">
+              Invite as a customer contact
+            </h3>
+            <p class="text-xs text-muted">
+              The project is filed under the customer, and the invitation is tied to the email. Nothing is sent: copy the link.
+            </p>
+            <form
+              class="space-y-2"
+              @submit.prevent="inviteCustomer"
+            >
+              <USelect
+                v-model="customerChoice"
+                :items="customerItems"
+                placeholder="Choose the customer"
+                class="w-full"
+              />
+              <UInput
+                v-model="customerNewName"
+                placeholder="…or type a new customer's name"
+                class="w-full"
+              />
+              <UInput
+                v-model="customerEmail"
+                type="email"
+                placeholder="Email address of the person"
+                class="w-full"
+              />
+              <p
+                v-if="customerError"
+                class="text-xs text-error"
+              >
+                {{ customerError }}
+              </p>
+              <div
+                v-if="customerLink"
+                class="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 p-2"
+              >
+                <code class="min-w-0 flex-1 truncate text-[11px]">{{ customerLink }}</code>
+              </div>
+              <UButton
+                type="submit"
+                size="sm"
+                variant="soft"
+                :loading="customerSending"
+              >
+                File and create link
+              </UButton>
+            </form>
+          </section>
+
           <section class="space-y-2">
             <h3 class="flex items-center gap-1.5 text-sm font-semibold text-default">
               Invite with email
@@ -353,23 +456,18 @@ watch(open, (isOpen) => {
                 v-model="email"
                 type="email"
                 placeholder="Add a guest by email…"
-                class="min-w-0 flex-1"
+                class="min-w-0 basis-full sm:flex-1"
                 data-share-email
               />
-              <select
+              <AppSelect
                 v-if="authority === 'admin'"
-                v-model="role"
-                class="rounded-md border border-default bg-transparent px-2 py-1.5 text-sm text-default outline-none focus:border-primary"
+                :model-value="role"
+                :options="guestRoleOptions"
+                class="w-40"
                 aria-label="Guest role"
                 data-share-role
-              >
-                <option value="editor">
-                  Editor
-                </option>
-                <option value="manager">
-                  Manager guest
-                </option>
-              </select>
+                @update:model-value="role = asGuestRole($event) ?? role"
+              />
               <UButton
                 type="submit"
                 :label="asking ? 'Ask' : 'Invite'"
@@ -582,21 +680,16 @@ watch(open, (isOpen) => {
                       {{ guest.email }}
                     </p>
                   </div>
-                  <select
+                  <AppSelect
                     v-if="authority === 'admin'"
-                    :value="guest.role"
-                    class="shrink-0 rounded-md border border-default bg-transparent px-1.5 py-1 text-xs text-default outline-none focus:border-primary"
+                    :model-value="guest.role"
+                    :options="guestRoleOptions"
+                    size="sm"
+                    class="w-36 shrink-0"
                     :disabled="busy === `g:${guest.userId}`"
                     :aria-label="`Role of ${guest.name}`"
-                    @change="changeGuestRole(guest, ($event.target as HTMLSelectElement).value as GuestRole)"
-                  >
-                    <option value="editor">
-                      Editor
-                    </option>
-                    <option value="manager">
-                      Manager guest
-                    </option>
-                  </select>
+                    @update:model-value="(value) => changeGuestRole(guest, asGuestRole(value))"
+                  />
                   <span
                     v-else
                     class="shrink-0 text-xs text-muted"

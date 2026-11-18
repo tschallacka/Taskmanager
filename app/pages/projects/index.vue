@@ -1,8 +1,83 @@
 <script setup lang="ts">
+import { entryFor, firstRedirect, mayShowFirstProjectForm, redirectPending, sharedDecided } from '~/utils/projectsEntry'
+import { selectTeamOrStay, teamRedirectAllowed, teamToOpenFor } from '~/utils/teamEntry'
+import { pendingInviteEntry } from '~/utils/pendingInviteEntry'
+import { autoClaimDue, pendingInvitationEntry } from '~/utils/pendingInvitationEntry'
+
 definePageMeta({ layout: 'app' })
 
 const { ready, projects, createProject } = useProjects()
+const { teams, activeTeamId, setActiveTeam, isPending: teamsPending } = useTeams()
 const route = useRoute()
+
+// A customer contact or guest with no team and no board goes to the shared list, not to the first-project form.
+const { data: sharedData, status: sharedStatus } = useFetch<{ contact: boolean, inviteToken: string | null }>('/api/shared-with-me', { key: 'shared-with-me', server: false, lazy: true })
+const contactOnlyEntry = computed(() => !teamsPending.value && ready.value && sharedData.value
+  ? entryFor({ asksNew: route.query.new === '1', hasProjects: projects.value.length > 0, teamCount: teams.value.length, contact: sharedData.value.contact })
+  : null)
+// Someone who signed up from an invitation link and never pressed Accept goes back to that invitation.
+const inviteEntry = computed(() => !teamsPending.value && ready.value && sharedData.value
+  ? pendingInviteEntry({ asksNew: route.query.new === '1', hasProjects: projects.value.length > 0, teamCount: teams.value.length, inviteToken: sharedData.value.inviteToken })
+  : null)
+
+// Invitations sent to this account's address that it has not accepted: a later sign-in shows them, with Accept invitation.
+const { data: pendingData } = useFetch<{ invitations: unknown[] }>('/api/pending-invitations', { key: 'pending-invitations', server: false, lazy: true })
+// The owner's rule: an invitation tied to the signed-in verified address is accepted by itself, once, here. Until that is
+// done, nothing is sent to the pending page, so the Accept button does not show for a tied invitation.
+const autoClaiming = ref(false)
+const autoClaimed = ref(false)
+watch(() => autoClaimDue({
+  ready: ready.value,
+  teamsPending: teamsPending.value,
+  pendingCount: pendingData.value?.invitations.length ?? 0,
+  done: autoClaimed.value || autoClaiming.value
+}), async (due) => {
+  if (!due) return
+  autoClaiming.value = true
+  try {
+    await $fetch('/api/pending-invitations/claim', { method: 'POST' })
+  } catch {
+    // Nothing to show here: whatever is left stays on the pending page.
+  }
+  autoClaimed.value = true
+  autoClaiming.value = false
+  await Promise.all([refreshNuxtData('pending-invitations'), refreshNuxtData('shared-with-me')])
+}, { immediate: true })
+
+const pendingEntry = computed(() => autoClaimed.value && !teamsPending.value && ready.value && pendingData.value
+  ? pendingInvitationEntry({ asksNew: route.query.new === '1', hasProjects: projects.value.length > 0, teamCount: teams.value.length, pendingCount: pendingData.value.invitations.length })
+  : null)
+
+// One navigation at a time (see firstRedirect): a link from the address first, then the pending list, then the shared list.
+watch(() => firstRedirect(contactOnlyEntry.value, inviteEntry.value ?? pendingEntry.value), (path) => {
+  if (path) navigateTo(path, { replace: true })
+}, { immediate: true })
+
+// A team member who signs in again in a new browser starts in the personal workspace, which is empty: open their team.
+const teamEntry = computed(() => !teamsPending.value && ready.value && teamRedirectAllowed({
+  contactTarget: contactOnlyEntry.value ?? pendingEntry.value,
+  inviteTarget: inviteEntry.value
+})
+  ? teamToOpenFor({
+      asksNew: route.query.new === '1',
+      hasProjects: projects.value.length > 0,
+      activeTeamId: activeTeamId.value,
+      teamIds: teams.value.map(team => team.id)
+    })
+  : null)
+// Set when selecting the team failed: the person then stays in the personal workspace, and the form may show.
+const teamSelectFailed = ref(false)
+watch(teamEntry, async (teamId) => {
+  if (!teamId) return
+  // If the team cannot be selected, the person stays in the personal workspace; nothing is thrown.
+  const selected = await selectTeamOrStay(setActiveTeam, teamId)
+  if (!selected) {
+    teamSelectFailed.value = true
+    return
+  }
+  // A full load, so the projects store picks up the team's boards.
+  await navigateTo('/projects', { replace: true, external: true })
+}, { immediate: true })
 
 // Land on the most recently updated board.
 // ?new=1 (the sidebar's new-project button) keeps you here to name one.
@@ -16,7 +91,13 @@ watch([ready, wantsNew], ([isReady]) => {
 
 // A frame of this page while a redirect is pending reads as a flash of "no
 // projects", so nothing paints until we know there is nothing to open.
-const showEmptyState = computed(() => ready.value && (projects.value.length === 0 || wantsNew.value))
+// The form waits until the page has decided it stays here (see mayShowFirstProjectForm), so it never flashes first.
+const showEmptyState = computed(() => mayShowFirstProjectForm({
+  ready: ready.value,
+  teamsPending: teamsPending.value,
+  sharedLoaded: sharedDecided(sharedStatus.value),
+  redirecting: redirectPending(contactOnlyEntry.value, false) || redirectPending(inviteEntry.value, false) || redirectPending(pendingEntry.value, false) || redirectPending(teamEntry.value, teamSelectFailed.value)
+}) && (projects.value.length === 0 || wantsNew.value))
 
 const name = ref('')
 const creating = ref(false)
@@ -59,12 +140,15 @@ function cancel() {
 
     <div
       v-if="!showEmptyState"
-      class="flex min-h-0 flex-1 items-center justify-center"
+      class="flex min-h-0 flex-1 flex-col items-center justify-center gap-3"
     >
       <UIcon
         name="i-lucide-loader-circle"
         class="size-5 animate-spin text-muted"
       />
+      <p class="text-sm text-muted">
+        Opening your projects…
+      </p>
     </div>
 
     <div

@@ -1,13 +1,16 @@
 import { db } from '../../../db'
-import { customerInvitations, customerMembers, member, projectGuestInvitations, projectGuests, projects, teamInvitations } from '../../../db/schema'
+import { customerInvitations, customerMembers, member, projectGuestInvitations, projects, teamInvitations } from '../../../db/schema'
 import { and, eq, gt, isNull } from 'drizzle-orm'
 import { auth } from '../../../lib/auth'
 import { genId } from '../../../utils/projects'
 import { isCrewUser } from '../../../utils/crewAccounts'
 import { hashInvitationToken, INVITATION_COOKIE } from '../../../utils/customers'
 import { lookupAddressedInvitation } from '../../../utils/invitations'
-import { publish, workspaceTopic } from '../../../utils/realtime'
 import { addressesOfUser } from '../../../utils/extraEmails'
+import { invitedAddressIsMine } from '../../../utils/customerInviteRules'
+import { guestProjectIdsOf } from '../../../utils/guests'
+import { sharedProjectIds } from '../../../utils/sharedProjectIds'
+import { acceptBoardGuest, claimPendingBoardInvites, claimTiedCustomerInvites } from '../../../utils/pendingInvites'
 
 // Turns the signed-in account into a member of the invitation's team, a guest of its board, or a
 // contact of its customer. A link is spent by the first account that accepts it; a team or board
@@ -31,8 +34,14 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 410, message: 'This invitation is no longer valid' })
   }
   if (addressed !== 'missing') {
-    // Any verified address of the account counts: its main one or an extra one that was confirmed.
-    if (!(await addressesOfUser(session.user.id)).includes(addressed.email)) {
+    // Any verified address of the account counts: its main one or an extra one that was confirmed. The account's own
+    // address counts too when it is the invited one: the account was made through this link (invitedAddressIsMine).
+    const allowed = invitedAddressIsMine({
+      invitedEmail: addressed.email,
+      verifiedAddresses: await addressesOfUser(session.user.id),
+      signedInEmail: session.user.email ?? null
+    })
+    if (!allowed) {
       // The address is not repeated here: the person who was invited knows it.
       throw createError({
         statusCode: 403,
@@ -84,26 +93,7 @@ export default defineEventHandler(async (event) => {
       })
     if (!claimed) throw createError({ statusCode: 410, message: 'This invitation is no longer valid' })
 
-    const [board] = await db.select({ userId: projects.userId, teamId: projects.teamId }).from(projects).where(eq(projects.id, claimed.projectId))
-    // Someone already on the board's team has all the access a guest would get.
-    const [onTeam] = board?.teamId
-      ? await db.select({ id: member.id }).from(member)
-          .where(and(eq(member.organizationId, board.teamId), eq(member.userId, session.user.id)))
-      : []
-    if (!onTeam && board && board.userId !== session.user.id) {
-      await db.insert(projectGuests).values({
-        id: genId(),
-        projectId: claimed.projectId,
-        userId: session.user.id,
-        role: claimed.role,
-        allowedDomain: claimed.role === 'manager' ? claimed.allowedDomain : null,
-        addedBy: claimed.invitedBy,
-        createdAt: now
-      }).onConflictDoNothing()
-    }
-    if (board) {
-      await publish(workspaceTopic(board.userId, board.teamId), { type: 'board', projectId: claimed.projectId }).catch(() => {})
-    }
+    await acceptBoardGuest(claimed, session.user.id, now)
     deleteCookie(event, INVITATION_COOKIE, { path: '/' })
     return { ok: true, kind: 'board' as const, projectId: claimed.projectId }
   }
@@ -127,6 +117,16 @@ export default defineEventHandler(async (event) => {
     .values({ id: genId(), customerId: claimed.customerId, userId: session.user.id, createdAt: now })
     .onConflictDoNothing()
 
+  // The owner's rule: a board invitation already sent to this account's address is accepted by itself now.
+  await claimPendingBoardInvites(session.user.id, await addressesOfUser(session.user.id), now)
+  // The same for a customer link tied to one of the account's addresses (the owner's rule).
+  await claimTiedCustomerInvites(session.user.id, await addressesOfUser(session.user.id), now)
+
+  // The projects shared with this person as a customer contact: the customer's own projects and the boards they
+  // hold as a guest. The landing opens the one or lists the several (see utils/inviteLanding).
+  const customerShared = await db.select({ id: projects.id }).from(projects).where(eq(projects.customerId, claimed.customerId))
+  const guestShared = await guestProjectIdsOf(session.user.id)
+
   deleteCookie(event, INVITATION_COOKIE, { path: '/' })
-  return { ok: true, kind: 'customer' as const }
+  return { ok: true, kind: 'customer' as const, sharedProjectIds: sharedProjectIds(customerShared.map(project => project.id), guestShared) }
 })

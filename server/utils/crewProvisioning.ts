@@ -106,6 +106,8 @@ export interface CrewCaller {
   boardId?: string | null
   // Set for a remote crews:manage key of a person who created a live crew: it reaches only that person's own crews.
   crewOwner?: boolean
+  // Set for a crew-scoped management token (card mwdd9d2vtgqhfr6izq): the one crew it reaches. Null for every other caller.
+  crewId?: string | null
 }
 
 type Minted = Map<string, { password: string, apiKey: string }>
@@ -498,11 +500,11 @@ export async function requireCrewManager(event: H3Event): Promise<CrewCaller> {
   const boardId = boardOfCrewKey(key, ownerIsAdmin)
   const refusal = await crewPermissionRefusal(key.userId, boardId)
   if (refusal) throw createError({ statusCode: 403, message: refusal })
-  return { userId: key.userId, keyId: key.keyId, keyName: key.keyName, boardId }
+  return { userId: key.userId, keyId: key.keyId, keyName: key.keyName, boardId, crewId: key.crewId ?? null }
 }
 
 /** One agent audit row per crew call, read by the key's owner in the Inbox. Never throws. */
-async function recordCrewCall(caller: CrewCaller, action: string, slug: string, summary: string) {
+async function recordCrewCall(caller: CrewCaller, action: string, slug: string, summary: string, projectId: string | null) {
   try {
     await db.insert(agentAudit).values({
       id: genId(),
@@ -511,6 +513,7 @@ async function recordCrewCall(caller: CrewCaller, action: string, slug: string, 
       keyName: caller.keyName,
       tool: `crew_${action}`,
       toolTitle: 'Crew API',
+      projectId,
       summary: `${summary} (${slug})`.slice(0, 200),
       createdAt: Date.now()
     })
@@ -527,15 +530,15 @@ export async function audited<T>(
   caller: CrewCaller,
   action: string,
   slug: string,
-  run: () => Promise<{ result: T, summary: string }>
+  run: () => Promise<{ result: T, summary: string, projectId?: string | null }>
 ): Promise<T> {
   try {
-    const { result, summary } = await run()
-    await recordCrewCall(caller, action, slug, summary)
+    const { result, summary, projectId } = await run()
+    await recordCrewCall(caller, action, slug, summary, projectId ?? null)
     return result
   } catch (error) {
     const message = (error as { statusMessage?: string }).statusMessage ?? 'failed'
-    await recordCrewCall(caller, action, slug, `refused: ${message}`)
+    await recordCrewCall(caller, action, slug, `refused: ${message}`, null)
     throw error
   }
 }

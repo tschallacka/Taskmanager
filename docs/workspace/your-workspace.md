@@ -42,7 +42,7 @@ Home is the page to land on to see what is yours today.
 - **My tasks**: your open tasks, in three groups by due date: **Overdue**, **Today**, then **Later** (tasks with no
   date are in Later). Click the circle to mark a task complete, or click the row to open the task on its board.
   **View all** opens [My tasks](/help/workspace/my-tasks).
-- **Inbox**: how many items are unread, and the latest three. Click one to open it. **View all** opens the inbox.
+- **Inbox**: how many items are unread, and the latest three. Click one to open it. **View all** opens the inbox. In the inbox, **Archive** moves a notification to the **Read** box, and the Read box can be emptied in full or by age (30 days, 2 months, 6 months, 1 year). Emptying deletes for you only.
 - **Projects**: your six most recently changed projects. Each shows its health (on track, at risk or off track, when
   the project has one), a progress bar of its done tasks, how many are done, and when it last changed. The member
   avatars of a project card come in a later change (card mwd39fc3xrw3et97ubg). **All projects** opens

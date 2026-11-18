@@ -95,6 +95,7 @@ async function setStatus(key: (typeof STATUSES)[number]['key']) {
 interface Person { id: string, name: string, email: string, kind: 'staff' | 'customer' }
 const people = ref<Person[]>([])
 const staff = computed(() => people.value.filter(p => p.kind === 'staff'))
+const ownerOptions = computed(() => staff.value.map(person => ({ label: person.name || person.email, value: person.id })))
 // Only the owner may hand the project to someone else; the server checks this too.
 const { session } = useAuth()
 const isOwner = computed(() => session.value?.user?.id === activeProject.value?.userId)
@@ -105,8 +106,7 @@ onMounted(() => {
     .catch(() => {})
 })
 
-async function changeOwner(event: Event) {
-  const next = (event.target as HTMLSelectElement).value
+async function changeOwner(next: string | null | undefined) {
   if (!next || next === activeProject.value?.userId) return
   error.value = ''
   try {
@@ -215,22 +215,15 @@ async function setBoardCrews(allowed: boolean) {
       <p class="mt-1 text-xs text-muted">
         The team member this project is recorded under. Who can see the project does not change.
       </p>
-      <select
+      <AppSelect
         id="project-settings-owner"
-        class="mt-2 w-full rounded-lg border border-default bg-default px-3 py-2 text-sm text-default outline-none focus:border-primary disabled:opacity-60"
+        :model-value="activeProject?.userId ?? null"
+        :options="ownerOptions"
+        class="mt-2"
         data-owner-select
-        :value="activeProject?.userId ?? ''"
         :disabled="staff.length < 2 || !isOwner"
-        @change="changeOwner"
-      >
-        <option
-          v-for="person in staff"
-          :key="person.id"
-          :value="person.id"
-        >
-          {{ person.name || person.email }}
-        </option>
-      </select>
+        @update:model-value="changeOwner"
+      />
       <p
         v-if="!isOwner"
         class="mt-1 text-xs text-muted"
