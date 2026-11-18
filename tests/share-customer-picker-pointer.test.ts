@@ -1,7 +1,7 @@
 // The Share dialog's customer picker takes a tap at 390 px. The Nuxt UI select (USelect) inside the dialog did not
 // take a pointer pick (the list closed, the picker still said "Choose the customer"), while the keyboard worked
-// (Usher's bug mwkuacvx99p269hf7za). The picker is a native select, as the other pickers in this dialog are.
-// Reads the component's source.
+// (Usher's bug mwkuacvx99p269hf7za). The picker is AppSelect, the app's select on top of Nuxt UI, as every other
+// select in the app is since 0.48.0 (no native selects). Reads the component's source.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -9,17 +9,19 @@ import { readFileSync } from 'node:fs'
 const source = readFileSync(new URL('../app/components/BoardShare.vue', import.meta.url), 'utf8')
 const section = source.slice(source.indexOf('data-share-customer'), source.indexOf('data-share-customer') + 2500)
 
-test('the customer picker is a native select, not USelect', () => {
-  assert.match(section, /<select[\s\S]*?v-model="customerChoice"/)
+test('the customer picker is AppSelect, not a native select and not USelect', () => {
+  assert.match(section, /<AppSelect[\s\S]*?v-model="customerChoice"/)
+  assert.equal(section.includes('<select'), false)
   assert.equal(section.includes('<USelect'), false)
 })
 
-test('the native select starts on the placeholder option "Choose the customer"', () => {
-  assert.match(section, /<option value="">\s*Choose the customer\s*<\/option>/)
+test('the AppSelect shows the placeholder "Choose the customer"', () => {
+  assert.match(section, /<AppSelect[\s\S]*?placeholder="Choose the customer"/)
 })
 
-test('the native select lists every customer of the team by id', () => {
-  assert.match(section, /<option\s+v-for="customer in customers"\s+:key="customer\.id"\s+:value="customer\.id"\s*>\s*\{\{ customer\.name \}\}/)
+test('the AppSelect lists every customer of the team by id and name', () => {
+  assert.match(section, /<AppSelect[\s\S]*?:options="customerOptions"/)
+  assert.match(source, /const customerOptions = computed\(\(\) => customers\.value\.map\(customer => \(\{ label: customer\.name, value: customer\.id \}\)\)\)/)
 })
 
 test('the USelect item list is gone from the script', () => {
