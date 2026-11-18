@@ -70,6 +70,14 @@ const showNewValue = ref(false)
 
 const addForm = reactive({ name: '', value: '', description: '', access: 'managers' as SecretAccess })
 const editForm = reactive({ value: '', description: '', access: 'managers' as SecretAccess })
+const accessOptions = [{ label: 'Managers only', value: 'managers' }, { label: 'All members', value: 'members' }]
+// The pickers hand over a string; only the two access choices are ever set.
+function setAddAccess(value: string | null | undefined) {
+  if (value === 'managers' || value === 'members') addForm.access = value
+}
+function setEditAccess(value: string | null | undefined) {
+  if (value === 'managers' || value === 'members') editForm.access = value
+}
 const importText = ref('')
 
 let hideTimer: ReturnType<typeof setTimeout> | undefined
@@ -522,19 +530,14 @@ function eventText(event: SecretEvent): string {
             </label>
             <label class="block text-sm">
               <span class="text-muted">Who can see it</span>
-              <select
-                v-model="addForm.access"
+              <AppSelect
+                :model-value="addForm.access"
+                :options="accessOptions"
                 :disabled="busy === 'add'"
-                class="mt-1 w-full rounded-lg border border-default bg-default px-3 py-2 text-sm text-default outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                class="mt-1"
                 data-secret-access-input
-              >
-                <option value="managers">
-                  Managers only
-                </option>
-                <option value="members">
-                  All members
-                </option>
-              </select>
+                @update:model-value="setAddAccess"
+              />
             </label>
             <div class="flex justify-end gap-2 sm:col-span-2">
               <p
@@ -769,19 +772,14 @@ function eventText(event: SecretEvent): string {
                 </label>
                 <label class="block text-sm">
                   <span class="text-muted">Who can see it</span>
-                  <select
-                    v-model="editForm.access"
+                  <AppSelect
+                    :model-value="editForm.access"
+                    :options="accessOptions"
                     :disabled="busy === row.name"
-                    class="mt-1 w-full rounded-lg border border-default bg-default px-3 py-2 text-sm text-default outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    class="mt-1"
                     data-secret-edit-access
-                  >
-                    <option value="managers">
-                      Managers only
-                    </option>
-                    <option value="members">
-                      All members
-                    </option>
-                  </select>
+                    @update:model-value="setEditAccess"
+                  />
                 </label>
                 <div class="flex justify-end gap-2 sm:col-span-2">
                   <button

@@ -673,6 +673,7 @@ const menuItems = computed(() => [[
             size="xs"
             aria-label="Who sees this task"
             class="shrink-0 w-44"
+            :ui="{ content: 'z-[80] min-w-fit max-w-[calc(100vw-2rem)]' }"
             @update:model-value="(v: string) => setTaskVisibility(v as Visibility)"
           />
 

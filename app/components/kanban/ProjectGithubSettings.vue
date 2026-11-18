@@ -67,6 +67,39 @@ const confirmingId = ref('')
 // The sync form per repository: what is typed, what the server last held, and the
 // server's words when a save was refused.
 const drafts = reactive<Record<string, Draft>>({})
+// The pickers hand over strings: each setter takes only the listed values.
+const VISIBILITY_OPTIONS = [{ label: 'Team only', value: 'internal' }, { label: 'Shared with customer', value: 'customer' }]
+const DEFAULT_VISIBILITY_OPTIONS = [
+  { label: 'Team only: customers do not see it', value: 'internal' },
+  { label: 'Shared with customer', value: 'customer' }
+]
+function asVisibility(value: string | null | undefined): Visibility | null {
+  return value === 'internal' || value === 'customer' ? value : null
+}
+// The board's columns, plus the draft's column when it is not one of them (so it can still be shown and changed).
+function columnOptions(row: LinkedRepo) {
+  const draft = drafts[row.id]
+  const options = columns.value.map(name => ({ label: name, value: name }))
+  if (draft && !columns.value.includes(draft.column)) options.push({ label: `${draft.column} (not on the board)`, value: draft.column })
+  return options
+}
+function setDraftColumn(id: string, value: string | null | undefined) {
+  if (drafts[id] && value) drafts[id].column = value
+}
+function setDraftVisibility(id: string, value: string | null | undefined) {
+  const visibility = asVisibility(value)
+  if (drafts[id] && visibility) drafts[id].visibility = visibility
+}
+function setNewVisibility(value: string | null | undefined) {
+  const visibility = asVisibility(value)
+  if (visibility) newVisibility.value = visibility
+}
+function setDefaultVisibility(value: string | null | undefined) {
+  const visibility = asVisibility(value)
+  if (!visibility) return
+  defaultVisibility.value = visibility
+  saveDefaultVisibility()
+}
 // The logins note of every row, worked out once per change rather than on every render.
 const loginsNotes = computed(() => Object.fromEntries(Object.entries(drafts).map(([id, draft]) => [id, loginsSaveNote(draft.logins)])))
 const stored = reactive<Record<string, Draft>>({})
@@ -323,9 +356,9 @@ async function saveDefaultVisibility() {
   }
 }
 
-async function changeVisibility(row: LinkedRepo, event: Event) {
-  const select = event.target as HTMLSelectElement
-  const visibility = select.value as Visibility
+async function changeVisibility(row: LinkedRepo, value: string | null | undefined) {
+  const visibility = asVisibility(value)
+  if (!visibility) return
   busyId.value = row.id
   error.value = ''
   notice.value = ''
@@ -335,8 +368,7 @@ async function changeVisibility(row: LinkedRepo, event: Event) {
     flashSaved()
   } catch (e) {
     error.value = messageOf(e, 'Could not change the visibility')
-    // Put the select back on what the server holds.
-    select.value = row.visibility
+    // The picker shows the row's stored visibility, so a reload puts it back on what the server holds.
     await load(true)
   } finally {
     busyId.value = ''
@@ -453,21 +485,16 @@ async function catchUp(row: LinkedRepo) {
             class="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary"
             data-github-repo-default
           >Default</span>
-          <select
-            :value="row.visibility"
+          <AppSelect
+            :model-value="row.visibility"
+            :options="VISIBILITY_OPTIONS"
+            size="sm"
+            class="w-44"
             :disabled="busyId === row.id"
             aria-label="Visibility of this repository's links"
-            class="rounded-lg border border-default bg-default px-2 py-1 text-xs text-default outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
             data-github-repo-visibility-change
-            @change="changeVisibility(row, $event)"
-          >
-            <option value="internal">
-              Team only
-            </option>
-            <option value="customer">
-              Shared with customer
-            </option>
-          </select>
+            @update:model-value="(value) => changeVisibility(row, value)"
+          />
 
           <span class="ml-auto flex flex-wrap items-center gap-2">
             <template v-if="confirmingId === row.id">
@@ -557,29 +584,17 @@ async function catchUp(row: LinkedRepo) {
                     class="block text-sm text-muted"
                     :for="fieldId(row, 'column')"
                   >New cards go to</label>
-                  <select
+                  <AppSelect
                     :id="fieldId(row, 'column')"
-                    v-model="drafts[row.id]!.column"
-                    class="mt-1 w-full rounded-lg border border-default bg-default px-3 py-2 text-sm text-default outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
+                    :model-value="drafts[row.id]!.column"
+                    :options="columnOptions(row)"
+                    class="mt-1"
                     :disabled="!canManage || busyId === row.id"
                     :aria-invalid="problemOf(row, 'column') ? 'true' : undefined"
                     :aria-describedby="problemOf(row, 'column') ? fieldId(row, 'column-error') : undefined"
                     data-github-sync-column
-                  >
-                    <option
-                      v-for="name in columns"
-                      :key="name"
-                      :value="name"
-                    >
-                      {{ name }}
-                    </option>
-                    <option
-                      v-if="!columns.includes(drafts[row.id]!.column)"
-                      :value="drafts[row.id]!.column"
-                    >
-                      {{ drafts[row.id]!.column }} (not on the board)
-                    </option>
-                  </select>
+                    @update:model-value="(value) => setDraftColumn(row.id, value)"
+                  />
                   <p
                     v-if="problemOf(row, 'column')"
                     :id="fieldId(row, 'column-error')"
@@ -594,20 +609,15 @@ async function catchUp(row: LinkedRepo) {
                     class="block text-sm text-muted"
                     :for="fieldId(row, 'visibility')"
                   >Visibility of new cards</label>
-                  <select
+                  <AppSelect
                     :id="fieldId(row, 'visibility')"
-                    v-model="drafts[row.id]!.visibility"
-                    class="mt-1 w-full rounded-lg border border-default bg-default px-3 py-2 text-sm text-default outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
+                    :model-value="drafts[row.id]!.visibility"
+                    :options="VISIBILITY_OPTIONS"
+                    class="mt-1"
                     :disabled="!canManage || busyId === row.id"
                     data-github-sync-visibility
-                  >
-                    <option value="internal">
-                      Team only
-                    </option>
-                    <option value="customer">
-                      Shared with customer
-                    </option>
-                  </select>
+                    @update:model-value="(value) => setDraftVisibility(row.id, value)"
+                  />
                   <p
                     v-if="drafts[row.id]!.visibility === 'customer'"
                     class="mt-1 text-xs text-warning"
@@ -840,19 +850,14 @@ async function catchUp(row: LinkedRepo) {
         </label>
         <label class="block text-sm">
           <span class="text-muted">Visibility of its links</span>
-          <select
-            v-model="newVisibility"
+          <AppSelect
+            :model-value="newVisibility"
+            :options="VISIBILITY_OPTIONS"
             :disabled="adding"
-            class="mt-1 w-full rounded-lg border border-default bg-default px-3 py-2 text-sm text-default outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+            class="mt-1"
             data-github-repo-visibility
-          >
-            <option value="internal">
-              Team only
-            </option>
-            <option value="customer">
-              Shared with customer
-            </option>
-          </select>
+            @update:model-value="setNewVisibility"
+          />
         </label>
         <button
           type="submit"
@@ -873,19 +878,13 @@ async function catchUp(row: LinkedRepo) {
 
       <label class="mt-6 block max-w-xs text-sm">
         <span class="text-muted">Default visibility for new links</span>
-        <select
-          v-model="defaultVisibility"
-          class="mt-1 w-full rounded-lg border border-default bg-default px-3 py-2 text-sm text-default outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+        <AppSelect
+          :model-value="defaultVisibility"
+          :options="DEFAULT_VISIBILITY_OPTIONS"
+          class="mt-1"
           data-github-default-visibility
-          @change="saveDefaultVisibility"
-        >
-          <option value="internal">
-            Team only: customers do not see it
-          </option>
-          <option value="customer">
-            Shared with customer
-          </option>
-        </select>
+          @update:model-value="setDefaultVisibility"
+        />
       </label>
 
       <section

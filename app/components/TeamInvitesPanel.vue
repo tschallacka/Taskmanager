@@ -12,7 +12,12 @@ interface Issued { id: string, email: string, role: string, url: string, emailed
 
 const toast = useToast()
 const email = ref('')
-const role = ref<'member' | 'admin'>('member')
+const role = ref('member')
+// Only an owner may invite an admin, so the Admin choice is listed for owners alone.
+const roleOptions = computed(() => [
+  { label: 'Member', value: 'member' },
+  ...(props.isOwner ? [{ label: 'Admin', value: 'admin' }] : [])
+])
 const sending = ref(false)
 const error = ref('')
 const issued = ref<Issued | null>(null)
@@ -115,22 +120,13 @@ async function copy(text: string) {
         class="min-w-0 w-full sm:w-auto sm:flex-1"
         data-invite-email
       />
-      <select
+      <AppSelect
         v-model="role"
-        class="rounded-md border border-default bg-transparent px-2 py-1.5 text-sm text-default outline-none focus:border-primary"
+        :options="roleOptions"
+        class="w-36"
         aria-label="Role"
         data-invite-role
-      >
-        <option value="member">
-          Member
-        </option>
-        <option
-          v-if="isOwner"
-          value="admin"
-        >
-          Admin
-        </option>
-      </select>
+      />
       <UButton
         type="submit"
         label="Invite"

@@ -209,9 +209,17 @@ async function act(key: string, run: () => Promise<unknown>, failure: string) {
 }
 
 const GUEST_LABEL: Record<GuestRole, string> = { editor: 'Editor', manager: 'Manager guest' }
+const guestRoleOptions: { label: string, value: string }[] = [
+  { label: GUEST_LABEL.editor, value: 'editor' },
+  { label: GUEST_LABEL.manager, value: 'manager' }
+]
+// The pickers hand over a string; only the two guest roles are ever set.
+function asGuestRole(value: string | null | undefined): GuestRole | null {
+  return value === 'editor' || value === 'manager' ? value : null
+}
 
-function changeGuestRole(guest: Guest, next: GuestRole) {
-  if (guest.role === next) return
+function changeGuestRole(guest: Guest, next: GuestRole | null) {
+  if (!next || guest.role === next) return
   // A manager guest keeps their domain when switched back later; the server drops it for an editor.
   return act(`g:${guest.userId}`, () => untypedFetch(`${base.value}/guests/${guest.userId}`, {
     method: 'PUT', headers: realtimeHeaders(), body: { role: next, allowedDomain: next === 'manager' ? (guest.allowedDomain ?? suggestedDomain(guest.email)) : null }
@@ -494,20 +502,15 @@ watch(open, (isOpen) => {
                 class="min-w-0 flex-1"
                 data-share-email
               />
-              <select
+              <AppSelect
                 v-if="authority === 'admin'"
-                v-model="role"
-                class="rounded-md border border-default bg-transparent px-2 py-1.5 text-sm text-default outline-none focus:border-primary"
+                :model-value="role"
+                :options="guestRoleOptions"
+                class="w-40"
                 aria-label="Guest role"
                 data-share-role
-              >
-                <option value="editor">
-                  Editor
-                </option>
-                <option value="manager">
-                  Manager guest
-                </option>
-              </select>
+                @update:model-value="role = asGuestRole($event) ?? role"
+              />
               <UButton
                 type="submit"
                 :label="asking ? 'Ask' : 'Invite'"
@@ -720,21 +723,16 @@ watch(open, (isOpen) => {
                       {{ guest.email }}
                     </p>
                   </div>
-                  <select
+                  <AppSelect
                     v-if="authority === 'admin'"
-                    :value="guest.role"
-                    class="shrink-0 rounded-md border border-default bg-transparent px-1.5 py-1 text-xs text-default outline-none focus:border-primary"
+                    :model-value="guest.role"
+                    :options="guestRoleOptions"
+                    size="sm"
+                    class="w-36 shrink-0"
                     :disabled="busy === `g:${guest.userId}`"
                     :aria-label="`Role of ${guest.name}`"
-                    @change="changeGuestRole(guest, ($event.target as HTMLSelectElement).value as GuestRole)"
-                  >
-                    <option value="editor">
-                      Editor
-                    </option>
-                    <option value="manager">
-                      Manager guest
-                    </option>
-                  </select>
+                    @update:model-value="(value) => changeGuestRole(guest, asGuestRole(value))"
+                  />
                   <span
                     v-else
                     class="shrink-0 text-xs text-muted"

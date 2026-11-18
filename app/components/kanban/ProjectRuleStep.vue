@@ -24,25 +24,38 @@ function setKind(kind: string) {
 function setValue(value: string) {
   row.value = { ...row.value, value }
 }
+
+// The pickers hand over strings. An item cannot have an empty value, so "Nobody" and "Anyone" use a sentinel that
+// stands for the empty value the rule stores.
+const NONE = '__none__'
+const kindOptions = computed(() => props.kinds.map(kind => ({ label: kind.label, value: kind.value, disabled: kind.disabled })))
+const columnOptions = computed(() => props.columns.map(column => ({ label: column.name, value: column.id })))
+const personOptions = computed(() => {
+  const leading = field.value === 'personOrNobody'
+    ? [{ label: 'Nobody', value: NONE }]
+    : field.value === 'personOrAnyone' ? [{ label: 'Anyone', value: NONE }] : []
+  return [...leading, ...props.people.map(person => ({ label: person.name, value: person.id }))]
+})
+const personPicked = computed(() => row.value.value || (field.value === 'person' ? null : NONE))
+const VISIBILITY_OPTIONS = [{ label: 'Team only', value: 'internal' }, { label: 'Shared with customer', value: 'customer' }]
+const YES_NO_OPTIONS = [{ label: 'Yes', value: 'yes' }, { label: 'No', value: 'no' }]
+function setPicked(value: string | null | undefined) {
+  setValue(value ?? '')
+}
+function setPerson(value: string | null | undefined) {
+  setValue(!value || value === NONE ? '' : value)
+}
 </script>
 
 <template>
   <div class="flex flex-wrap items-center gap-2">
-    <select
-      :value="row.kind"
-      class="rounded-md border border-default bg-default px-2 py-1.5 text-sm text-default outline-none focus:border-primary"
+    <AppSelect
+      :model-value="row.kind"
+      :options="kindOptions"
+      class="max-w-full"
       data-step-kind
-      @change="setKind(($event.target as HTMLSelectElement).value)"
-    >
-      <option
-        v-for="kind in kinds"
-        :key="kind.value"
-        :value="kind.value"
-        :disabled="kind.disabled"
-      >
-        {{ kind.label }}
-      </option>
-    </select>
+      @update:model-value="(value) => setKind(value ?? '')"
+    />
 
     <input
       v-if="field === 'column' && columnAsText"
@@ -55,62 +68,25 @@ function setValue(value: string) {
       @input="setValue(($event.target as HTMLInputElement).value)"
     >
 
-    <select
+    <AppSelect
       v-else-if="field === 'column'"
-      :value="row.value"
-      class="min-w-0 rounded-md border border-default bg-default px-2 py-1.5 text-sm text-default outline-none focus:border-primary"
+      :model-value="row.value || null"
+      :options="columnOptions"
+      placeholder="Pick a column"
+      class="min-w-0"
       data-step-value
-      @change="setValue(($event.target as HTMLSelectElement).value)"
-    >
-      <option
-        value=""
-        disabled
-      >
-        Pick a column
-      </option>
-      <option
-        v-for="column in columns"
-        :key="column.id"
-        :value="column.id"
-      >
-        {{ column.name }}
-      </option>
-    </select>
+      @update:model-value="setPicked"
+    />
 
-    <select
+    <AppSelect
       v-else-if="field === 'person' || field === 'personOrNobody' || field === 'personOrAnyone'"
-      :value="row.value"
-      class="min-w-0 rounded-md border border-default bg-default px-2 py-1.5 text-sm text-default outline-none focus:border-primary"
+      :model-value="personPicked"
+      :options="personOptions"
+      placeholder="Pick someone"
+      class="min-w-0"
       data-step-value
-      @change="setValue(($event.target as HTMLSelectElement).value)"
-    >
-      <option
-        v-if="field === 'person'"
-        value=""
-        disabled
-      >
-        Pick someone
-      </option>
-      <option
-        v-if="field === 'personOrNobody'"
-        value=""
-      >
-        Nobody
-      </option>
-      <option
-        v-if="field === 'personOrAnyone'"
-        value=""
-      >
-        Anyone
-      </option>
-      <option
-        v-for="person in people"
-        :key="person.id"
-        :value="person.id"
-      >
-        {{ person.name }}
-      </option>
-    </select>
+      @update:model-value="setPerson"
+    />
 
     <template v-else-if="field === 'label'">
       <input
@@ -155,46 +131,22 @@ function setValue(value: string) {
       @input="setValue(($event.target as HTMLInputElement).value)"
     >
 
-    <select
+    <AppSelect
       v-else-if="field === 'visibility'"
-      :value="row.value"
-      class="rounded-md border border-default bg-default px-2 py-1.5 text-sm text-default outline-none focus:border-primary"
+      :model-value="row.value || null"
+      :options="VISIBILITY_OPTIONS"
+      placeholder="Pick one"
       data-step-value
-      @change="setValue(($event.target as HTMLSelectElement).value)"
-    >
-      <option
-        value=""
-        disabled
-      >
-        Pick one
-      </option>
-      <option value="internal">
-        Team only
-      </option>
-      <option value="customer">
-        Shared with customer
-      </option>
-    </select>
+      @update:model-value="setPicked"
+    />
 
-    <select
+    <AppSelect
       v-else-if="field === 'yesNo'"
-      :value="row.value"
-      class="rounded-md border border-default bg-default px-2 py-1.5 text-sm text-default outline-none focus:border-primary"
+      :model-value="row.value || null"
+      :options="YES_NO_OPTIONS"
+      placeholder="Pick one"
       data-step-value
-      @change="setValue(($event.target as HTMLSelectElement).value)"
-    >
-      <option
-        value=""
-        disabled
-      >
-        Pick one
-      </option>
-      <option value="yes">
-        Yes
-      </option>
-      <option value="no">
-        No
-      </option>
-    </select>
+      @update:model-value="setPicked"
+    />
   </div>
 </template>

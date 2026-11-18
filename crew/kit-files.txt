@@ -34,6 +34,7 @@ cast.mjs
 channel.mjs
 claude-long-run.comments.md
 claude-long-run.json
+claude-trust.mjs
 claude.mjs
 config.mjs
 crew-defaults.mjs
@@ -42,11 +43,13 @@ crew.mjs
 detach.sh
 dev-copies.mjs
 devadmin.mjs
+doctor.mjs
 down.mjs
 fonts.conf.tmpl
 guard.sh
 heavy-slot.mjs
 home.mjs
+idle-ready.mjs
 init.mjs
 janet.mjs
 keys.mjs
