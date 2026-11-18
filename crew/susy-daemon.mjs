@@ -19,10 +19,10 @@ import { crewHome } from './home.mjs'
 import { DEFAULT_CLEANER, findPokes, keyOfName, makeCall, readBoardCards } from './susy.mjs'
 import { collectActivity, listenerRunning, newActivityLines, readLoad } from './susy-collector.mjs'
 import { projectsRoot, readWorkerRows, workerStates } from './susy-workers.mjs'
-import { markMailed, sessionErrorReport } from './session-errors.mjs'
-import { planGateRound, settleGateMail } from './susy-gate-wakes.mjs'
+import { markMailed, noteQueuedMail, sessionErrorReport } from './session-errors.mjs'
+import { noteQueuedGateMail, planGateRound, settleGateMail } from './susy-gate-wakes.mjs'
 import { offerRound } from './susy-next-card.mjs'
-import { reviewRound } from './susy-review-needs.mjs'
+import { afterReviewMail, reviewMailToSend, reviewRound } from './susy-review-needs.mjs'
 
 export const TICK_SECONDS = 60
 
@@ -189,16 +189,24 @@ export async function runOnce(home, now = Date.now(), { live = false } = {}) {
     : null
   if (review) {
     lines.push(...review.lines)
-    if (!review.mail) result.state.reviewKey = review.key
+    if (!review.mail && !result.state.reviewQueued) result.state.reviewKey = review.key
   }
   if (live) {
     for (const item of errors.pending) {
       try {
         const { sendMail } = await import('./mail-client.mjs')
-        await sendMail({ base: creds.base, slug: creds.crew?.slug, key, to: 'boss', text: item.text, mailboxDir: `${home}/mailbox`, makeId: () => crypto.randomUUID().replaceAll('-', '') })
-        // Marked seen only now, after the send succeeded, so a failed send is tried again on the next live tick.
-        result.state.sessionErrors = markMailed(result.state.sessionErrors, item.key, item.error)
-        lines.push('mailed boss: api error')
+        // A queued mail (in the outbox, not sent) reuses its id, so the retry is the same row.
+        const queued = result.state.sessionErrors?.[item.key]?.queued
+        const id = queued?.error === item.error ? queued.id : undefined
+        const sent = await sendMail({ base: creds.base, slug: creds.crew?.slug, key, to: 'boss', text: item.text, id, mailboxDir: `${home}/mailbox`, makeId: () => crypto.randomUUID().replaceAll('-', '') })
+        if (sent.sent) {
+          // Marked seen only now, after the send succeeded, so a failed send is tried again on the next live tick.
+          result.state.sessionErrors = markMailed(result.state.sessionErrors, item.key, item.error)
+          lines.push('mailed boss: api error')
+        } else {
+          result.state.sessionErrors = noteQueuedMail(result.state.sessionErrors, item.key, item.error, sent.id)
+          lines.push('queued for boss, not sent yet: api error')
+        }
       } catch (error) {
         lines.push(`could not mail boss about an api error: ${error.message}`)
       }
@@ -208,20 +216,28 @@ export async function runOnce(home, now = Date.now(), { live = false } = {}) {
     for (const mail of gate?.mails ?? []) {
       try {
         const { sendMail } = await import('./mail-client.mjs')
-        await sendMail({ base: creds.base, slug: creds.crew?.slug, key, to: mail.to, text: mail.text, mailboxDir: `${home}/mailbox`, makeId: () => crypto.randomUUID().replaceAll('-', '') })
-        result.state = settleGateMail(result.state, mail.key)
-        lines.push(`mailed ${mail.to}: gate wake for ${mail.cardId}`)
+        // Settled only when sent. A queued mail stays owed and keeps its id, so the next try is the same row.
+        const sent = await sendMail({ base: creds.base, slug: creds.crew?.slug, key, to: mail.to, text: mail.text, id: mail.mailId, mailboxDir: `${home}/mailbox`, makeId: () => crypto.randomUUID().replaceAll('-', '') })
+        if (sent.sent) {
+          result.state = settleGateMail(result.state, mail.key)
+          lines.push(`mailed ${mail.to}: gate wake for ${mail.cardId}`)
+        } else {
+          result.state = noteQueuedGateMail(result.state, mail.key, sent.id)
+          lines.push(`queued for ${mail.to}, not sent yet: gate wake for ${mail.cardId}`)
+        }
       } catch (error) {
         lines.push(`could not mail ${mail.to} about ${mail.cardId}, tried again next tick: ${error.message}`)
       }
     }
     // The review-needs line goes to Boss; the stored line is updated only when the mail went out.
-    if (review?.mail) {
+    // A queued review mail is sent again first, with its own id and text (see reviewMailToSend).
+    const send = reviewMailToSend(result.state, review)
+    if (send) {
       try {
         const { sendMail } = await import('./mail-client.mjs')
-        await sendMail({ base: creds.base, slug: creds.crew?.slug, key, to: 'boss', text: review.mail, mailboxDir: `${home}/mailbox`, makeId: () => crypto.randomUUID().replaceAll('-', '') })
-        result.state.reviewKey = review.key
-        lines.push('mailed boss: review needs')
+        const sent = await sendMail({ base: creds.base, slug: creds.crew?.slug, key, to: 'boss', text: send.text, id: send.id, mailboxDir: `${home}/mailbox`, makeId: () => crypto.randomUUID().replaceAll('-', '') })
+        result.state = afterReviewMail(result.state, send, sent)
+        lines.push(sent.sent ? 'mailed boss: review needs' : 'queued for boss, not sent yet: review needs')
       } catch (error) {
         lines.push(`could not mail boss the review line, tried again next tick: ${error.message}`)
       }
@@ -237,8 +253,8 @@ export async function runOnce(home, now = Date.now(), { live = false } = {}) {
       }
       try {
         const { sendMail } = await import('./mail-client.mjs')
-        await sendMail({ base: creds.base, slug: creds.crew?.slug, key, to: o.to, text: o.text, mailboxDir: `${home}/mailbox`, makeId: () => crypto.randomUUID().replaceAll('-', '') })
-        lines.push(`offered ${o.to}: card ${o.cardId}`)
+        const sent = await sendMail({ base: creds.base, slug: creds.crew?.slug, key, to: o.to, text: o.text, mailboxDir: `${home}/mailbox`, makeId: () => crypto.randomUUID().replaceAll('-', '') })
+        lines.push(sent.sent ? `offered ${o.to}: card ${o.cardId}` : `marked ${o.cardId} for ${o.to}; the mail is queued, not sent yet (not retried)`)
       } catch (error) {
         lines.push(`marked ${o.cardId} for ${o.to}, but the mail failed (not retried): ${error.message}`)
       }
@@ -247,8 +263,8 @@ export async function runOnce(home, now = Date.now(), { live = false } = {}) {
       try {
         // The mail client ships with the kit once the mailer branch is merged; loaded here so dry-run never needs it.
         const { sendMail } = await import('./mail-client.mjs')
-        await sendMail({ base: creds.base, slug: creds.crew.slug, key, to: 'boss', text: result.mailBoss, mailboxDir: `${home}/mailbox`, makeId: () => crypto.randomUUID().replaceAll('-', '') })
-        lines.push('mailed boss through the app')
+        const sent = await sendMail({ base: creds.base, slug: creds.crew.slug, key, to: 'boss', text: result.mailBoss, mailboxDir: `${home}/mailbox`, makeId: () => crypto.randomUUID().replaceAll('-', '') })
+        lines.push(sent.sent ? 'mailed boss through the app' : 'queued for boss through the app, not sent yet')
       } catch (error) {
         lines.push(`could not mail boss through the app: ${error.message}`)
       }

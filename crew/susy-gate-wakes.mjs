@@ -75,10 +75,18 @@ export function planGateRound({ cards, state = {}, live = false, enabled = false
   for (const wake of wakes) {
     if (!owed.some(item => item.key === wake.key)) owed.push({ key: wake.key, cardId: wake.cardId, column: wake.column, to: wake.to, text: wake.text })
   }
-  return { columns, owed, mails: owed.map(item => ({ key: item.key, to: item.to, text: item.text, cardId: item.cardId })), lines }
+  return { columns, owed, mails: owed.map(item => ({ key: item.key, to: item.to, text: item.text, cardId: item.cardId, mailId: item.mailId })), lines }
 }
 
 /** The state with one owed wake removed, once its mail has gone out. */
 export function settleGateMail(state, key) {
   return { ...state, owed: (state.owed ?? []).filter(item => item.key !== key) }
+}
+
+/**
+ * The state with one owed wake marked as queued: the mail is in the outbox, not sent, so the wake stays owed. The mail id is
+ * kept, so the next try sends the same row and the endpoint does not take a second copy.
+ */
+export function noteQueuedGateMail(state, key, mailId) {
+  return { ...state, owed: (state.owed ?? []).map(item => (item.key === key ? { ...item, mailId } : item)) }
 }

@@ -61,3 +61,23 @@ export function reviewRound({ cards, now, previous = '', live = false, enabled =
   if (!enabled) return { key, line, mail: null, lines: [`review needs off (susy.dispatch.reviewNeeds is not true): ${line}`] }
   return { key, line, mail: line, lines: [] }
 }
+
+/**
+ * The review mail to send this tick: a queued one first (same id and text, so the endpoint does not take a second copy),
+ * else the round's new line. Null when there is nothing to send.
+ */
+export function reviewMailToSend(state, review) {
+  if (state.reviewQueued) return state.reviewQueued
+  if (!review?.mail) return null
+  return { id: undefined, text: review.mail, key: review.key }
+}
+
+/**
+ * The state after one review send. Sent: the key is stored as the previous key and the queue is cleared. Queued (in the
+ * outbox, not sent): the mail is kept for the next tick, and the key is not stored.
+ */
+export function afterReviewMail(state, send, result) {
+  if (!send) return state
+  if (result.sent) return { ...state, reviewKey: send.key, reviewQueued: undefined }
+  return { ...state, reviewQueued: { id: result.id, text: send.text, key: send.key } }
+}

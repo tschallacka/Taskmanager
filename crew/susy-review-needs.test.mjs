@@ -2,7 +2,28 @@
 // Run: node --test crew/susy-review-needs.test.mjs
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { reviewNeeds, reviewLine, reviewKey, reviewRound } from './susy-review-needs.mjs'
+import { reviewNeeds, reviewLine, reviewKey, reviewRound, reviewMailToSend, afterReviewMail } from './susy-review-needs.mjs'
+
+test('a queued review mail is sent again with its own id and text, before any new round', () => {
+  const NOW_ = Date.parse('2026-11-16T12:00:00.000Z')
+  const r = reviewRound({ cards: [{ id: 'a', title: 'card a', column: 'Verify', tags: [], updatedAt: new Date(NOW_ - 3600000).toISOString() }], now: NOW_, previous: '', live: true, enabled: true })
+  const first = reviewMailToSend({}, r)
+  assert.deepEqual(first, { id: undefined, text: 'Waiting for a human. Boss: 1 (a 1h).', key: 'boss:a|owner:' })
+  const queued = afterReviewMail({}, first, { sent: false, id: 'c'.repeat(32) })
+  assert.equal(queued.reviewKey, undefined)
+  assert.deepEqual(queued.reviewQueued, { id: 'c'.repeat(32), text: first.text, key: first.key })
+  const later = reviewRound({ cards: [{ id: 'a', title: 'card a', column: 'Verify', tags: [], updatedAt: new Date(NOW_ - 7200000).toISOString() }], now: NOW_, previous: '', live: true, enabled: true })
+  assert.deepEqual(reviewMailToSend(queued, later), queued.reviewQueued)
+})
+
+test('a sent review mail sets the previous key and clears the queue', () => {
+  const NOW_ = Date.parse('2026-11-16T12:00:00.000Z')
+  const state = { reviewQueued: { id: 'd'.repeat(32), text: 'old', key: 'boss:a|owner:' } }
+  const r = reviewRound({ cards: [{ id: 'a', title: 'card a', column: 'Verify', tags: [], updatedAt: new Date(NOW_ - 3600000).toISOString() }], now: NOW_, previous: '', live: true, enabled: true })
+  const done = afterReviewMail(state, reviewMailToSend(state, r), { sent: true, id: 'd'.repeat(32) })
+  assert.equal(done.reviewKey, 'boss:a|owner:')
+  assert.equal(done.reviewQueued, undefined)
+})
 
 const NOW = Date.parse('2026-11-16T12:00:00.000Z')
 const HOUR = 3600000

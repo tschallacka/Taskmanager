@@ -2,7 +2,20 @@
 // Fake boards only: no network, no mail. Run: node --test crew/susy-gate-wakes.test.mjs
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { gateWakes, headOf, GATE_TAGS, planGateRound, settleGateMail } from './susy-gate-wakes.mjs'
+import { gateWakes, headOf, GATE_TAGS, planGateRound, settleGateMail, noteQueuedGateMail } from './susy-gate-wakes.mjs'
+
+test('a queued gate mail (in the outbox, not sent) stays owed with its mail id, and the next round sends that same id', () => {
+  const card = (id, column) => ({ id, title: `card ${id}`, column, assignee: 'Wade Worker', tags: [], updates: [], updatedAt: '2026-11-16T10:00:00.000Z' })
+  const r1 = planGateRound({ cards: [card('a', 'In progress')], state: {}, live: true, enabled: true })
+  const r2 = planGateRound({ cards: [card('a', 'Verify CQ')], state: { columns: r1.columns }, live: true, enabled: true })
+  const id = 'b'.repeat(32)
+  const queued = noteQueuedGateMail({ columns: r2.columns, owed: r2.owed }, r2.mails[0].key, id)
+  assert.equal(queued.owed.length, 1)
+  const r3 = planGateRound({ cards: [card('a', 'Verify CQ')], state: queued, live: true, enabled: true })
+  assert.equal(r3.mails.length, 1)
+  assert.equal(r3.mails[0].mailId, id)
+  assert.deepEqual(settleGateMail(queued, r2.mails[0].key).owed, [])
+})
 
 const card = (id, column, extra = {}) => ({
   id,

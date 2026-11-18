@@ -4,7 +4,15 @@ import assert from 'node:assert/strict'
 import { mkdirSync, mkdtempSync, writeFileSync, appendFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { sessionErrorReport, lastLineOf, transcriptOf, markMailed } from './session-errors.mjs'
+import { sessionErrorReport, lastLineOf, transcriptOf, markMailed, noteQueuedMail } from './session-errors.mjs'
+
+test('a queued error mail is remembered with its id, and a sent one clears it', () => {
+  const id = 'e'.repeat(32)
+  const queued = noteQueuedMail({}, 'wade', 'API Error 403', id)
+  assert.deepEqual(queued.wade, { seen: [], queued: { error: 'API Error 403', id } })
+  const sent = markMailed(queued, 'wade', 'API Error 403')
+  assert.deepEqual(sent.wade, { seen: ['API Error 403'] })
+})
 
 const ID = 'fbd05fc0'
 const FIXTURE = 'Please run /login · API Error: 403 Attention Required! | Cloudflare'
