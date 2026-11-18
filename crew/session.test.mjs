@@ -8,7 +8,7 @@ import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   startArgs, parseAgents, liveById, planWake, checkKey, startSession, sessionStatus, sessionList, stopSession,
-  readRecord, MODEL, mcpConfig, mcpConfigPath, withRules, WORKTREE_RULE
+  readRecord, MODEL, mcpConfig, mcpConfigPath, withRules, WORKTREE_RULE, sessionName, crewSlug
 } from './session.mjs'
 import { settingsPath } from './session-settings.mjs'
 
@@ -74,6 +74,14 @@ const args = process.argv.slice(2)
 fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify(args) + '\\n')
 const list = JSON.parse(fs.readFileSync(${JSON.stringify(state)}, 'utf8'))
 if (args[0] === 'agents' && args[1] === '--json') { process.stdout.write(JSON.stringify(list)); process.exit(0) }
+if (args.includes('--bg') && args.includes('--resume')) {
+  // claude --bg --resume <id>: the same session, running again under the same id, or refused when there is none.
+  const hit = list.find(a => a.id === args[args.indexOf('--resume') + 1])
+  if (!hit) { process.stderr.write('no such session to resume'); process.exit(1) }
+  hit.state = 'idle'; hit.status = 'running'
+  fs.writeFileSync(${JSON.stringify(state)}, JSON.stringify(list))
+  process.stdout.write(hit.id + '\\n'); process.exit(0)
+}
 if (args.includes('--bg')) {
   const name = args[args.indexOf('-n') + 1]
   const id = (0xa0000001 + list.length).toString(16)
@@ -249,4 +257,74 @@ test('crew session status writes no role file', () => {
   delete env.CREW_ROLE_FILE
   spawnSync(process.execPath, [join(HERE, 'session.mjs'), 'status', 'wynn'], { encoding: 'utf8', env })
   assert.equal(existsSync(join(home, 'sessions', 'wynn.role.md')), false, 'no role file from a status call')
+})
+
+// Named sessions (card mwmh94f2959efe5zi9v): every person's session is named <crew slug>-<key>, so `claude --resume <name>` works.
+test('sessionName is the crew slug and the key, joined with a dash; no slug gives the key alone', () => {
+  assert.equal(sessionName({ slug: 'taskmanager-maintenance', key: 'wren' }), 'taskmanager-maintenance-wren')
+  assert.equal(sessionName({ slug: '', key: 'wren' }), 'wren')
+  assert.throws(() => sessionName({ slug: 'acme', key: '../x' }), /no such person key/)
+})
+
+test('crewSlug reads the crew slug from crew.json, else the team name slugged, else nothing', () => {
+  const home = mkdtempSync(join(tmpdir(), 'session-slug-'))
+  assert.equal(crewSlug(home), '', 'no crew.json, no slug')
+  writeFileSync(join(home, 'crew.json'), `${JSON.stringify({ team: 'Taskmanager Maintenance' })}\n`)
+  assert.equal(crewSlug(home), 'taskmanager-maintenance', 'the team name, slugged')
+  writeFileSync(join(home, 'crew.json'), `${JSON.stringify({ team: 'Taskmanager Maintenance', crew: { slug: 'acme-crew' } })}\n`)
+  assert.equal(crewSlug(home), 'acme-crew', 'the crew slug wins over the team name')
+})
+
+test('the start argv names the session with the name it is given, and resumes a recorded id only when one is given', () => {
+  const named = startArgs({ key: 'wren', folder: '/tmp', home: '/h', kit: '/k', role: 'r', name: 'acme-wren' })
+  assert.deepEqual(named.args.slice(named.args.indexOf('-n'), named.args.indexOf('-n') + 2), ['-n', 'acme-wren'])
+  assert.equal(named.args.includes('--resume'), false, 'no resume without a recorded id')
+  const resumed = startArgs({ key: 'wren', folder: '/tmp', home: '/h', kit: '/k', role: 'r', name: 'acme-wren', resume: 'a1b2c3d4' })
+  assert.equal(resumed.args[0], '--bg')
+  assert.deepEqual(resumed.args.slice(resumed.args.indexOf('--resume'), resumed.args.indexOf('--resume') + 2), ['--resume', 'a1b2c3d4'])
+  assert.throws(() => startArgs({ key: 'wren', folder: '/tmp', home: '/h', kit: '/k', role: 'r', resume: 'x; rm -rf /' }), /session id/)
+})
+
+test('a start names the session <crew slug>-<key> and finds the new session by that name', () => {
+  const fake = fakeClaude()
+  const home = mkdtempSync(join(tmpdir(), 'session-named-'))
+  writeFileSync(join(home, 'crew.json'), `${JSON.stringify({ team: 'Acme Team' })}\n`)
+  const out = startSession({ home, kit: HERE, key: 'wren', folder: '/tmp', role: 'r', bin: fake.bin, trust: NO_TRUST })
+  assert.equal(out.ok, true)
+  const bg = calls(fake).find(args => args.includes('--bg'))
+  assert.deepEqual(bg.slice(bg.indexOf('-n'), bg.indexOf('-n') + 2), ['-n', 'acme-team-wren'])
+  assert.equal(readRecord(home, 'wren').id, out.id, 'the id of the session with that name is recorded')
+})
+
+test('crew up resumes a stopped session by its recorded id: same id, resumed, and no new session', () => {
+  const fake = fakeClaude()
+  const home = mkdtempSync(join(tmpdir(), 'session-resume-'))
+  const first = startSession({ home, kit: HERE, key: 'wick', folder: '/tmp', role: 'r', bin: fake.bin, trust: NO_TRUST })
+  stopSession({ home, key: 'wick', bin: fake.bin })
+  assert.equal(sessionStatus({ home, key: 'wick', bin: fake.bin }).live, false)
+  const again = startSession({ home, kit: HERE, key: 'wick', folder: '/tmp', role: 'r', bin: fake.bin, trust: NO_TRUST })
+  assert.equal(again.ok, true)
+  assert.equal(again.started, true)
+  assert.equal(again.resumed, true)
+  assert.equal(again.id, first.id, 'the same session id, so the transcript comes back with it')
+  const last = calls(fake).filter(args => args.includes('--bg')).at(-1)
+  assert.deepEqual(last.slice(last.indexOf('--resume'), last.indexOf('--resume') + 2), ['--resume', first.id])
+  assert.equal(readRecord(home, 'wick').id, first.id)
+  assert.equal(sessionStatus({ home, key: 'wick', bin: fake.bin }).live, true)
+})
+
+test('a resume that claude refuses falls back to a fresh start, which records the new id', () => {
+  const fake = fakeClaude()
+  const home = mkdtempSync(join(tmpdir(), 'session-fallback-'))
+  mkdirSync(join(home, 'sessions'), { recursive: true })
+  writeFileSync(join(home, 'sessions', 'wynn.json'), `${JSON.stringify({ id: 'a0b0c0d0', name: 'wynn', folder: '/tmp' })}\n`)
+  const out = startSession({ home, kit: HERE, key: 'wynn', folder: '/tmp', role: 'r', bin: fake.bin, trust: NO_TRUST })
+  assert.equal(out.ok, true)
+  assert.equal(out.resumed, false)
+  assert.notEqual(out.id, 'a0b0c0d0')
+  const bgCalls = calls(fake).filter(args => args.includes('--bg'))
+  assert.equal(bgCalls.length, 2, 'one resume attempt, then one fresh start')
+  assert.ok(bgCalls[0].includes('--resume'))
+  assert.equal(bgCalls[1].includes('--resume'), false, 'the fresh start has no resume')
+  assert.equal(readRecord(home, 'wynn').id, out.id)
 })
