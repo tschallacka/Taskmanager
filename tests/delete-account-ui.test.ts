@@ -47,7 +47,8 @@ test('the route deletes the signed-in person only, after the typed confirmation'
 })
 
 test('the settings account section shows the button, and the button opens a confirm dialog', () => {
-  assert.match(read('app/pages/settings/index.vue'), /<DeleteAccountPanel \/>/)
+  // The account section moved to its own component in the 8/9 shell (settings/Account.vue).
+  assert.match(read('app/components/settings/Account.vue'), /<DeleteAccountPanel \/>/)
   // At the top of app/components, so the tag is <DeleteAccountPanel> (a folder would prefix the name).
   const panel = read('app/components/DeleteAccountPanel.vue')
   assert.match(panel, /deletionLines\(\)/)

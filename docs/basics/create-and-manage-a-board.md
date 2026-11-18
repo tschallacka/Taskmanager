@@ -1,6 +1,6 @@
 ---
 title: Create and manage a board
-summary: Make a board, rename it, describe it, set its health status, archive it and delete it
+summary: Make a board, rename it, describe it, set its health status, archive it, delete it, and what each settings section holds
 requires: staff
 topics: create board, new project, rename board, description, status, health, on track, at risk, archive, delete board, owner
 order: 20
@@ -54,7 +54,7 @@ the tasks you share. See [Who sees a task](/help/basics/task-visibility).
 
 Archiving is the gentle way to put a board away.
 
-1. Open **Settings**, **General**.
+1. Open **Settings**, then **Archive** in the left list.
 2. Under **Archive**, click **Archive project**.
 
 An archived board is hidden from the project lists and from the search results for boards, and its rules stop running.
@@ -67,9 +67,25 @@ To find an archived board later, open **All projects**: it has an **Archived** l
 Deleting is permanent. It removes every column, task and comment of the board, and the images in its tasks. **There is
 no trash for a whole board**, and nothing can bring it back.
 
-1. Open **Settings**, **General**, then **Delete project** under **Delete**.
+1. Open **Settings**, then **Archive** in the left list, and click **Delete project** under **Delete**.
 2. Type the board's name exactly as shown to confirm, and click **Delete project**.
 
 The sidebar's **...** menu also has **Delete project**; there you only confirm in a window. Any team member can delete
 a board, so consider **Archive project** first. Tasks and columns you delete one at a time do go to a trash; see
 [Columns and the trash](/help/basics/columns-and-trash).
+
+## The settings sections
+
+**Settings** opens a left list of sections. Each one has its own address, so a link can open it directly (for example
+`/projects/<id>/settings/archive`).
+
+- **General**: the name, the description and the status, and who owns the board.
+- **Members**: who is on the board.
+- **Customer access**: the customer the board is filed under, or *Team only*. Change it with **Share** on the board.
+- **GitHub**: the repositories whose issues and pull requests link to this board.
+- **Rules**: the rules that run on the board.
+- **Secrets**: the board's secrets.
+- **Custom fields**: the fields every task on the board can have.
+- **Import**: restore a board from a backup file.
+- **Trash**: what the board's trash holds. **Show trashed on the board** brings it into view, to restore a card.
+- **Archive**: archive or unarchive the board, and delete it. These two danger actions sit last, in one box.

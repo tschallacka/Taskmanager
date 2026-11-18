@@ -23,7 +23,8 @@ test('the download route sends an attachment, never cached', () => {
 })
 
 test('settings offers "Download my data" as a link to the route, with the download attribute', () => {
-  const settings = read('app/pages/settings/index.vue')
+  // The account section is its own component since redesign 8/9 (app/components/settings/Account.vue).
+  const settings = read('app/components/settings/Account.vue')
   assert.match(settings, /Download my data/)
   assert.match(settings, /href="\/api\/account\/export"/)
   assert.match(settings, /<a[^>]*href="\/api\/account\/export"[^>]*download/)
