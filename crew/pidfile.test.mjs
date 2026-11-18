@@ -20,6 +20,11 @@ test('a running listener is found by its pid file, while it runs, and not after 
   try {
     mkdirSync(join(dir, '.listen'))
     writeFileSync(pidFile(dir, 'pia'), `${child.pid}\n`)
+    // Wait for the child's command line to show up: under CPU load from the other test files it can be read late.
+    const deadline = Date.now() + 5000
+    while (!(commandLine(child.pid) ?? '').includes('listen.mjs pia') && Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, 5))
+    }
     assert.equal(livePid(dir, 'pia', 'listen.mjs pia'), child.pid)
     assert.match(commandLine(child.pid) ?? '', /listen\.mjs pia 3600/)
     assert.equal(livePid(dir, 'pia', 'crew.mjs watch-crew'), null, 'a pid of another command is not a match')

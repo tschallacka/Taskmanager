@@ -2,12 +2,195 @@
 // Run: node --test crew/susy-daemon.test.mjs
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { tick, pendingKey, postBody, postFresh, runOnce, statusLines, heartbeatAgeMinutes, heartbeatFresh, daemonCommand, shellQuote, SESSION, upPart, isDaemonPid, lockState, takeLock, releaseLock, LOCK_NAME } from './susy-daemon.mjs'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { createServer } from 'node:http'
+
+// The live sites, one test each: a queued mail (the endpoint is down) is never marked sent, and the retry, once the endpoint
+// is up, is the same mail id. A fake board and a fake mail endpoint on localhost; `fake` gives the board's answers and the
+// endpoint's state, and `mails` records each post.
+function liveHome({ cards = [], crew = {}, board = 'ok', sessions = null, projects = null }) {
+  const home = mkdtempSync(join(tmpdir(), 'susy-live-'))
+  mkdirSync(join(home, '.listen'), { recursive: true })
+  const fake = { mailUp: false, boardUp: board === 'ok' }
+  const mails = []
+  const server = createServer((req, res) => {
+    let body = ''
+    req.on('data', (chunk) => {
+      body += chunk
+    })
+    req.on('end', () => {
+      if (req.url.startsWith('/api/crew-mail/')) {
+        mails.push(JSON.parse(body))
+        if (!fake.mailUp) return void res.writeHead(503).end('down')
+        return void res.writeHead(200, { 'content-type': 'application/json' }).end('{}')
+      }
+      const call = JSON.parse(body)
+      if (call.params.name === 'get_board' && !fake.boardUp) return void res.writeHead(500).end('board down')
+      const answer = call.params.name === 'get_board' ? { columns: boardColumns(cards) } : {}
+      res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ jsonrpc: '2.0', id: call.id, result: { content: [{ type: 'text', text: JSON.stringify(answer) }] } }))
+    })
+  })
+  return { home, fake, mails, server, cards, crew, sessions, projects }
+}
+
+// The board's columns from a flat card list: each card is { id, title, column, assignee, labels, updatedAt }.
+function boardColumns(cards) {
+  const byColumn = {}
+  for (const card of cards) (byColumn[card.column] ??= []).push({ ...card, completed: false, blocked: false, blockedBy: [], updates: 0 })
+  return Object.entries(byColumn).map(([name, tasks]) => ({ name, tasks }))
+}
+
+async function startLive(fx) {
+  await new Promise(resolve => fx.server.listen(0, '127.0.0.1', resolve))
+  const base = `http://127.0.0.1:${fx.server.address().port}`
+  writeFileSync(join(fx.home, 'creds.json'), JSON.stringify({ base, people: { susy: { apiKey: 'k' } }, board: { id: 'b' }, crew: { slug: 's' } }))
+  writeFileSync(join(fx.home, 'crew.json'), JSON.stringify({ people: {}, susy: fx.crew, activity: fx.projects ? { projects: fx.projects } : undefined }))
+  if (fx.sessions) {
+    mkdirSync(join(fx.home, 'sessions'), { recursive: true })
+    for (const [key, record] of Object.entries(fx.sessions)) writeFileSync(join(fx.home, 'sessions', `${key}.json`), JSON.stringify(record))
+  }
+  return fx
+}
+
+const stateOfHome = home => JSON.parse(readFileSync(join(home, '.listen', 'susy-daemon.json'), 'utf8')).state
+const logOfHome = home => readFileSync(join(home, '.listen', 'susy-daemon-dryrun.log'), 'utf8')
+
+test('live site: the API-error mail, queued, is not marked seen; the retry sends the same id and then marks it', async () => {
+  const ID_ = 'fbd05fc0'
+  const projects = mkdtempSync(join(tmpdir(), 'errs-root-'))
+  const folder = join(projects, '-srv-agents-wren')
+  mkdirSync(folder, { recursive: true })
+  const blocked = 'Please run /login · API Error: 403 Attention Required! | Cloudflare'
+  writeFileSync(join(folder, `${ID_}-20e1-4968-a501-19719be32608.jsonl`), `${JSON.stringify({ type: 'assistant', message: { role: 'assistant', content: blocked } })}\n`)
+  const fx = await startLive(liveHome({ sessions: { wren: { id: ID_, name: 'wren', cardId: 'c9' } }, projects }))
+  try {
+    await runOnce(fx.home, T0, { live: true })
+    assert.equal(fx.mails.length, 1)
+    const id = fx.mails[0].id
+    assert.match(logOfHome(fx.home), /queued for boss, not sent yet: api error/)
+    assert.doesNotMatch(logOfHome(fx.home), /mailed boss: api error/)
+    assert.equal(stateOfHome(fx.home).sessionErrors.wren.seen.length, 0, 'a queued error is not marked seen')
+    assert.equal(stateOfHome(fx.home).sessionErrors.wren.queued.id, id)
+    fx.fake.mailUp = true
+    await runOnce(fx.home, T0 + MIN, { live: true })
+    assert.equal(fx.mails[1].id, id, 'the retry is the same mail row')
+    assert.match(logOfHome(fx.home), /mailed boss: api error/)
+    assert.equal(stateOfHome(fx.home).sessionErrors.wren.seen.length, 1)
+  } finally {
+    fx.server.close()
+  }
+})
+
+test('live site: a gate wake, queued, stays owed with its id; the retry sends that id and settles it', async () => {
+  const card = column => ({ id: 'g1', title: 'Gate card', column, assignee: 'Wade Worker', labels: [], updatedAt: new Date(T0 - 60 * MIN).toISOString() })
+  const fx = await startLive(liveHome({ cards: [card('In progress')], crew: { dispatch: { gateWakes: true } } }))
+  try {
+    await runOnce(fx.home, T0, { live: true })
+    fx.cards.splice(0, 1, card('Verify CQ'))
+    await runOnce(fx.home, T0 + MIN, { live: true })
+    assert.equal(fx.mails.length, 1)
+    const id = fx.mails[0].id
+    assert.match(logOfHome(fx.home), /queued for nina, not sent yet: gate wake for g1/)
+    assert.doesNotMatch(logOfHome(fx.home), /mailed nina: gate wake/)
+    assert.equal(stateOfHome(fx.home).owed.length, 1, 'a queued wake stays owed')
+    assert.equal(stateOfHome(fx.home).owed[0].mailId, id)
+    fx.fake.mailUp = true
+    await runOnce(fx.home, T0 + 2 * MIN, { live: true })
+    assert.equal(fx.mails[1].id, id, 'the retry is the same mail row')
+    assert.match(logOfHome(fx.home), /mailed nina: gate wake for g1/)
+    assert.deepEqual(stateOfHome(fx.home).owed, [])
+  } finally {
+    fx.server.close()
+  }
+})
+
+test('live site: an offer whose mail is queued is logged as queued, not as offered', async () => {
+  const todo = { id: 'q1', title: 'Queued card', column: 'To do', assignee: null, labels: [], updatedAt: new Date(T0 - 60 * MIN).toISOString() }
+  const busy = name => ({ id: `busy-${name}`, title: `busy ${name}`, column: 'In progress', assignee: `${name[0].toUpperCase()}${name.slice(1)} Worker`, labels: [], updatedAt: new Date(T0 - 60 * MIN).toISOString() })
+  const fx = await startLive(liveHome({ cards: [todo, busy('wren'), busy('wick'), busy('wynn')], crew: { dispatch: { nextCard: true } } }))
+  try {
+    await runOnce(fx.home, T0, { live: true })
+    const log = logOfHome(fx.home)
+    assert.equal(fx.mails.length, 1, 'one offer mail for the one idle worker')
+    assert.match(log, /marked q1 for wade; the mail is queued, not sent yet/)
+    assert.doesNotMatch(log, /offered wade: card q1/)
+  } finally {
+    fx.server.close()
+  }
+})
+
+test('live site: the app mail to Boss, queued, is logged as queued, not as sent', async () => {
+  const fx = await startLive(liveHome({ board: 'down' }))
+  try {
+    await runOnce(fx.home, T0, { live: true })
+    assert.equal(fx.mails.length, 1)
+    assert.match(logOfHome(fx.home), /queued for boss through the app, not sent yet/)
+    assert.doesNotMatch(logOfHome(fx.home), /mailed boss through the app/)
+  } finally {
+    fx.server.close()
+  }
+})
+
+// A live run against a fake board and a fake mail endpoint on localhost: the endpoint is down at first, so the review mail
+// is queued in the outbox. A queued mail is not sent: the state keeps it owed, with its id, and the next run sends that
+// same id once. Card mwm5dba5vuw52e2t51g.
+test('live run: a queued review mail is not marked sent; the next run sends the same mail id', async () => {
+  const home = mkdtempSync(join(tmpdir(), 'susy-live-'))
+  mkdirSync(join(home, '.listen'), { recursive: true })
+  const board = { columns: [{ name: 'Verify', tasks: [{ id: 'v1', title: 'Review me', assignee: 'Wade Worker', labels: [], completed: false, updatedAt: new Date(T0 - 60 * MIN).toISOString(), blocked: false, blockedBy: [], updates: 0 }] }] }
+  const posts = []
+  let mailUp = false
+  const server = createServer((req, res) => {
+    let body = ''
+    req.on('data', (chunk) => {
+      body += chunk
+    })
+    req.on('end', () => {
+      if (req.url.startsWith('/api/crew-mail/')) {
+        posts.push(JSON.parse(body))
+        if (!mailUp) return void res.writeHead(503).end('down')
+        return void res.writeHead(200, { 'content-type': 'application/json' }).end('{}')
+      }
+      const call = JSON.parse(body)
+      const answer = call.params.name === 'get_board' ? board : {}
+      res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ jsonrpc: '2.0', id: call.id, result: { content: [{ type: 'text', text: JSON.stringify(answer) }] } }))
+    })
+  })
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+  try {
+    const base = `http://127.0.0.1:${server.address().port}`
+    writeFileSync(join(home, 'creds.json'), JSON.stringify({ base, people: { susy: { apiKey: 'k' } }, board: { id: 'b' }, crew: { slug: 's' } }))
+    writeFileSync(join(home, 'crew.json'), JSON.stringify({ people: {}, susy: { dispatch: { reviewNeeds: true } } }))
+    const stateOf = () => JSON.parse(readFileSync(join(home, '.listen', 'susy-daemon.json'), 'utf8')).state
+    const logOf = () => readFileSync(join(home, '.listen', 'susy-daemon-dryrun.log'), 'utf8')
+
+    await runOnce(home, T0, { live: true })
+    assert.equal(posts.length, 1)
+    const id = posts[0].id
+    assert.match(id, /^[0-9a-f]{32}$/)
+    assert.ok(existsSync(join(home, 'mailbox', 'outbox', `${id}.json`)), 'the queued mail is in the outbox')
+    assert.match(logOf(), /queued for boss, not sent yet: review needs/)
+    assert.doesNotMatch(logOf(), /mailed boss: review needs/)
+    assert.equal(stateOf().reviewKey, undefined, 'a queued line is not stored as mailed')
+    assert.equal(stateOf().reviewQueued.id, id)
+
+    mailUp = true
+    await runOnce(home, T0 + MIN, { live: true })
+    assert.equal(posts.length, 2)
+    assert.equal(posts[1].id, id, 'the retry is the same mail row')
+    assert.equal(posts[1].text, posts[0].text)
+    assert.match(logOf(), /mailed boss: review needs/)
+    assert.equal(stateOf().reviewKey, 'boss:v1|owner:')
+    assert.equal(stateOf().reviewQueued, undefined)
+  } finally {
+    server.close()
+  }
+})
 
 const MIN = 60000
 const T0 = Date.parse('2026-11-12T10:00:00.000Z')
