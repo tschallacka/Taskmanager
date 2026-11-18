@@ -262,6 +262,9 @@ export function candidatesFor(card, th, ctx) {
   const ask = [...(card.updates ?? [])].reverse().find(update => AGENTS.includes(authorKey(update.author)) && authorKey(update.author) !== 'pia' && (/^QUESTION:/i.test(String(update.body).trim()) || /@pia\b/i.test(String(update.body))))
   const answered = ask ? postedBy(card, ['pia'], Date.parse(ask.at) - 1) : true
   add('unanswered question', 'pia', ask ? Date.parse(ask.at) : 0, th.questionMinutes, Boolean(ask) && !answered)
+  // Boss is the next rung only for a real QUESTION: update. A mention of Pia with no QUESTION: line is a question to Pia, and
+  // Susy never pokes Boss for it (card mwc5y4ccau9en3m3m7b, item 3).
+  if (ask && !/^QUESTION:/i.test(String(ask.body).trim())) out.at(-1).ladder = ['pia']
 
   // A worker's card in progress with no update since its last change.
   add('in progress, no update', key ?? 'pia', lastChanged, th.idleMinutes, card.column === 'In progress' && WORKERS.includes(key))
