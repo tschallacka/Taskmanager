@@ -2,6 +2,12 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.53.0 - 2026-11-18
+
+- **Icons come from our own server.** The app no longer asks the public Iconify API (api.iconify.design) for icon files, so a visitor's IP address and the icon names are no longer sent to a third party. The icon sets the app uses (lucide, simple-icons) are bundled on the server and the icons the pages use into the client, and a missing icon is not looked up outside. Files: `nuxt.config.ts`, `tests/icons-local.test.ts`.
+
+- **Named sessions; `crew up` resumes; remote control off for Pia.** Every person's background session is named `<crew slug>-<key>` (for example `taskmanager-maintenance-wren`), so `claude --resume <name>` finds it. A start with a recorded session id that is not live resumes that session (`claude --bg --resume <id>`): the same id and transcript come back. A resume that claude refuses falls back to a fresh start and records the new id. Pia's session file (`pia-session.settings.json`) turns `remoteControlAtStartup` off, and her start line names her session `<crew slug>-pia`. The slug and the session-name rule live once, in `crew/home.mjs` (`slugify`, `crewSlugOf`, `sessionNameFor`), and `config.mjs` and `session.mjs` use them; `crew/home.test.mjs` fails if either keeps a copy. Tests in `crew/session.test.mjs`, `crew/claude.test.mjs` and `crew/home.test.mjs`.
+
 ## 0.52.0 - 2026-11-18
 
 - **Download my data: one decision for every table that holds a person's id.** The account deletion's table walk now also decides what the download takes from each table: the person's own rows as an allow-list of fields, or nothing, with the reason written down. A test fails when a table that holds a person's id has no decision, and when an exported field looks like a secret (a hash, a token, a key, a password, a code). The download itself follows in later commits. Files: `server/utils/accountRules.ts`, `tests/account-deletion-coverage.test.ts`.
