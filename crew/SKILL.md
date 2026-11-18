@@ -91,7 +91,7 @@ Columns: Backlog, To do, In progress, **Verify PM**, **Verify UX**, **Verify CQ*
   expires, for as long as the crew runs. Start `crew watch-crew` as a second `Monitor` the same way: it checks Pia
   (her session, her transcript, her own listener) and Susy every 3 minutes and prints only on trouble, and once when
   it is fixed. Both are the Boss watches of the kit. On top of them, start the Boss round with CronCreate: cron
-  `7,37 * * * *`, durable, its prompt the kit file BOSS-ROUND.md.tmpl (lockups, questions to you, Verify, nudges through
+  `7,37 * * * *`, durable, its prompt the file `CREW_HOME/BOSS-ROUND.md` (the kit's round template, rendered by `init`; read the rendered file, never the template itself: its placeholders are only filled in there) (lockups, questions to you, Verify, nudges through
   Pia, the Monitors). A cron job expires after 7 days, so re-create it on the 6th day. A Stop hook in your session (`boss-stop-hook.sh`, written by
   `init` into the folder `bossSession` in crew.json) blocks you from ending a turn while one of them is not running,
   and names the Monitor call to make: it is the safety net, not the plan. `init` removes only Stop hooks whose command contains `boss-stop-hook.sh`; a crew's own trial entry (for example `bin/boss-watch-hook.sh`) stays until Boss removes it by hand, and until then two Stop hooks run. Answer a mention before anything else except

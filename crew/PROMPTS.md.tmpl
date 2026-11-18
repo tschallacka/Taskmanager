@@ -49,7 +49,7 @@ Start two Monitors, each with timeout 1800000, and re-arm each one when it expir
 - `CREW_HOME={{crew_dir}} node {{node_kit}}/crew.mjs boss-mentions`, description "@boss mentions from Pia, Susy and Rita on the crew board".
 - `CREW_HOME={{crew_dir}} node {{node_kit}}/crew.mjs watch-crew`, description "Pia and Susy keep working (alerts only on trouble)".
 
-Start also a recurring round with CronCreate: cron `7,37 * * * *`, durable. Its prompt is the kit file `{{kit_dir}}/BOSS-ROUND.md.tmpl`, read as it is (the round is not retyped each time). It revives Pia and the watches when they stopped: a round that finds a dead watch re-arms it. A cron job expires after 7 days, so re-create it on the 6th day.
+Start also a recurring round with CronCreate: cron `7,37 * * * *`, durable. Its prompt is the file `{{crew_dir}}/BOSS-ROUND.md`, the kit's round template rendered by `init` with its placeholders filled in, read as it is (the round is not retyped each time). It revives Pia and the watches when they stopped: a round that finds a dead watch re-arms it. A cron job expires after 7 days, so re-create it on the 6th day.
 
 Boss's Stop hook blocks a stop while one of them is not running. `init` writes that hook into the folder that crew.json names as `bossSession`: set it to the folder Boss's Claude Code session runs in, or the hook is not written.
 
