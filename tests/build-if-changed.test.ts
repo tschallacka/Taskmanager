@@ -2,7 +2,7 @@
 // that writes a fake .output and counts its calls: nothing real is built here.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { cacheDirFor, decide, formatLine, run } from '../scripts/build-if-changed.mjs'
@@ -141,6 +141,96 @@ test('CONTRIBUTING.md (Releases) says what the build cache is and how to force a
   assert.match(text, /data\/\.build-cache/)
 })
 
+// The copy hardening (card mwkf0nartlrd5n8lz2o, after the 502): a link in .output must not reach the cache or a skip as it is.
+test('a cache that holds an absolute link is not skipped: the run builds, and the reason is printed', () => {
+  const root = release()
+  const { build, counter } = fakeBuild(root)
+  run({ root, env: {}, build })
+  symlinkSync(join(root, 'nix', '..', 'package.json'), join(root, 'data', '.build-cache', 'output', 'server', 'abs-link.json'))
+  const lines: string[] = []
+  assert.equal(run({ root, env: {}, build, log: l => lines.push(l) }).action, 'built')
+  assert.equal(counter.calls, 2, 'the cache with an absolute link was not used')
+  assert.match(lines.join('\n'), /full build: .*absolute link/)
+})
+
+test('a cache with a link that leaves .output is not skipped, and the reason is printed', () => {
+  const root = release()
+  const { build, counter } = fakeBuild(root)
+  run({ root, env: {}, build })
+  symlinkSync('../../../../../../etc', join(root, 'data', '.build-cache', 'output', 'server', 'out-link'))
+  const lines: string[] = []
+  assert.equal(run({ root, env: {}, build, log: l => lines.push(l) }).action, 'built')
+  assert.equal(counter.calls, 2)
+  assert.match(lines.join('\n'), /full build: .*leaves \.output/)
+})
+
+test('a cache with a broken link is not skipped, and the reason is printed', () => {
+  const root = release()
+  const { build, counter } = fakeBuild(root)
+  run({ root, env: {}, build })
+  symlinkSync('missing.mjs', join(root, 'data', '.build-cache', 'output', 'server', 'broken-link.mjs'))
+  const lines: string[] = []
+  assert.equal(run({ root, env: {}, build, log: l => lines.push(l) }).action, 'built')
+  assert.equal(counter.calls, 2)
+  assert.match(lines.join('\n'), /full build: .*broken/)
+})
+
+test('the output is stored dereferenced: a link in the build does not reach the cache as a link', () => {
+  const root = release()
+  const linkingBuild = () => {
+    mkdirSync(join(root, '.output', 'server'), { recursive: true })
+    mkdirSync(join(root, '.output', 'public'), { recursive: true })
+    writeFileSync(join(root, '.output', 'server', 'index.mjs'), '// built')
+    writeFileSync(join(root, '.output', 'public', 'index.html'), '<html>')
+    symlinkSync(join(root, '.output', 'server', 'index.mjs'), join(root, '.output', 'server', 'alias.mjs'))
+    return { status: 0 }
+  }
+  run({ root, env: {}, build: linkingBuild })
+  assert.equal(lstatSync(join(root, 'data', '.build-cache', 'output', 'server', 'alias.mjs')).isSymbolicLink(), false, 'the cached copy is a file')
+  assert.equal(readFileSync(join(root, 'data', '.build-cache', 'output', 'server', 'alias.mjs'), 'utf8'), '// built')
+})
+
+test('a build whose output names the build root is not stored, the reason is printed, and the next run builds again', () => {
+  const root = release()
+  const baking = () => {
+    mkdirSync(join(root, '.output', 'server'), { recursive: true })
+    mkdirSync(join(root, '.output', 'public'), { recursive: true })
+    writeFileSync(join(root, '.output', 'server', 'index.mjs'), `// from ${root}`)
+    writeFileSync(join(root, '.output', 'public', 'index.html'), '<html>')
+    return { status: 0 }
+  }
+  const lines: string[] = []
+  assert.equal(run({ root, env: {}, build: baking, log: l => lines.push(l) }).action, 'built')
+  assert.match(lines.join('\n'), /not stored: .*build root/)
+  const { build, counter } = fakeBuild(root)
+  assert.equal(run({ root, env: {}, build }).action, 'built', 'nothing was stored, so nothing is skipped')
+  assert.equal(counter.calls, 1)
+})
+
+test('the full-build reason is printed before the build (no cache, a changed input, BUILD_FORCE)', () => {
+  const root = release()
+  const { build } = fakeBuild(root)
+  const lines: string[] = []
+  run({ root, env: {}, build, log: l => lines.push(l) })
+  assert.match(lines.join('\n'), /full build: no cache/)
+})
+
+// Nina's must (card mwkf0nartlrd5n8lz2o): the cache inside the release is removed with it on each deploy. The deploy keeps the cache
+// outside every release (BUILD_CACHE_DIR), so the next release with the same inputs skips.
+test('a cache outside the release (BUILD_CACHE_DIR) survives the deploy: the next release with the same inputs skips', () => {
+  const shared = mkdtempSync(join(tmpdir(), 'bic-shared-'))
+  const first = release()
+  const a = fakeBuild(first)
+  assert.equal(run({ root: first, env: { BUILD_CACHE_DIR: shared }, build: a.build }).action, 'built')
+  assert.equal(a.counter.calls, 1)
+  rmSync(first, { recursive: true, force: true }) // the deploy removes the old release
+  const second = release()
+  const b = fakeBuild(second)
+  assert.equal(run({ root: second, env: { BUILD_CACHE_DIR: shared }, build: b.build }).action, 'skipped')
+  assert.equal(b.counter.calls, 0, 'no build in the new release')
+  assert.ok(existsSync(join(second, '.output', 'server', 'index.mjs')), 'the output is in the new release')
+})
+
 test('the cache is in BUILD_CACHE_DIR when it is set, and in data/.build-cache of the release when it is not', () => {
   assert.equal(cacheDirFor('/rel/a', { BUILD_CACHE_DIR: '/var/lib/tm/build-cache' }), '/var/lib/tm/build-cache')
   assert.equal(cacheDirFor('/rel/a', {}), join('/rel/a', 'data', '.build-cache'))
@@ -156,6 +246,19 @@ test('a second release folder with the same inputs skips when the cache is in BU
   assert.equal(run({ root: second, env: { BUILD_CACHE_DIR: cache }, build }).action, 'skipped')
   assert.equal(counter.calls, 0, 'the new release copies the cached output and does not build')
   assert.ok(existsSync(join(second, '.output', 'server', 'index.mjs')))
+})
+
+// Nina's should (card mwkf0nartlrd5n8lz2o): copyOutput followed a directory link that points back into the tree, and recursed until the
+// copy failed with no reason. A cyclic link is refused by name, and the run is a full build with the reason printed.
+test('a cache with a cyclic directory link is not skipped: the run builds, and the reason names the cycle', () => {
+  const root = release()
+  const { build, counter } = fakeBuild(root)
+  run({ root, env: {}, build })
+  symlinkSync('..', join(root, 'data', '.build-cache', 'output', 'server', 'loop'))
+  const lines: string[] = []
+  assert.equal(run({ root, env: {}, build, log: l => lines.push(l) }).action, 'built')
+  assert.equal(counter.calls, 2, 'the cyclic cache was not used')
+  assert.match(lines.join('\n'), /full build: .*cyclic/)
 })
 
 test('a run that changes only nix/hashes.json skips', () => {

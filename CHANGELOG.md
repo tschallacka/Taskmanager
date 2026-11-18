@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.48.1 - 2026-11-17
+
+- **The production build is skipped when nothing it reads has changed.** `bun run build` hashes the build inputs (the app, the server, the shared code, the public folder, the docs, the configs, the tool versions and the build-time environment values) and copies the last good output from `data/.build-cache/` when the hash matches; `BUILD_FORCE=1` forces a full build, and `bun run build:full` is the full build. The app's version is read at run time from the release, so a copied build reports its own version. Files: `scripts/build-if-changed.mjs`, `scripts/build-inputs.mjs`, `server/utils/appVersionFile.ts`, `server/utils/appVersion.ts`, `package.json`, `CONTRIBUTING.md`.
+
 ## 0.48.0 - 2026-11-17
 
 - **Custom select.** Every native select in the app is now the app's own select (`AppSelect`, built on Nuxt UI), so its open list follows light and dark mode: the team invite role select, the board and project pickers, the rule builder, the members, secrets, GitHub and field pickers, and the timesheet task picker. Admin, and every other option, reads in dark mode. Files: `app/components/AppSelect.vue` and the pickers that use it.

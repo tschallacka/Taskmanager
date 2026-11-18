@@ -18,6 +18,9 @@ set +a
 # the crew kit (/crew/kit.tar.gz) is served from the release, not from the working directory
 CREW_KIT_DIR=$(readlink "$TM_HOME/current")/crew
 export CREW_KIT_DIR
+# the server runs from state/, so the release it runs is named here: its version and build id are read from it
+TASKMANAGER_RELEASE=$(readlink "$TM_HOME/current")
+export TASKMANAGER_RELEASE
 mkdir -p "$TM_HOME/state"
 cd "$TM_HOME/state"
 exec bun "$server"

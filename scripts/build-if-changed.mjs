@@ -5,11 +5,13 @@
 // output becomes the cache. Any doubt runs the real build. BUILD_FORCE=1 always runs it.
 // Cache: inputs.sha256 (the hash) and output (a copy of .output), in BUILD_CACHE_DIR. The deploy sets it to a folder outside the release
 // (each release is a new folder, so a cache inside one is gone on the next deploy). Unset, it is data/.build-cache of the release.
+// Links: a copy resolves symlinks (a link is stored as the file it points at). A tree with an absolute link, a link that leaves it, a
+// broken link, or a text file that names the build root is never skipped and never stored, and the reason is printed.
 // Every run prints one line: build-if-changed: skipped|built|failed, hash <12>, wall Ns, cpu Ns, peak MB.
 import { spawnSync } from 'node:child_process'
-import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { hashTree } from './build-inputs.mjs'
 
@@ -18,15 +20,28 @@ import { hashTree } from './build-inputs.mjs'
  * of the release that built it; a plain copy keeps them, so the copy points into the old release, and the deploy later prunes that
  * release (the app then fails to start). Resolving them makes the copy stand on its own.
  */
-export function copyOutput(from, to) {
-  // Not cpSync with dereference: Node keeps the link (with a resolved target) instead of copying what it points to.
-  const info = statSync(from)
-  if (info.isDirectory()) {
+export function copyOutput(from, to, scope = null) {
+  // `scope` is the real path of the output being copied and the real paths of the directories above `from`. A directory link that
+  // leads back to one of them is a cycle, and a link whose real path leaves the output is refused: both throw, with the reason, and
+  // the caller then runs the full build (or stores nothing). A file is copied with its link resolved (cpSync without `dereference`
+  // would copy a file link as a link, which points into the old release).
+  const here = scope ?? { root: realpathSync(from), ancestors: [] }
+  const real = realpathSync(from)
+  if (!inside(real, here.root)) throw new Error(`a link leaves the output: ${from}`)
+  if (statSync(from).isDirectory()) {
+    if (here.ancestors.includes(real)) throw new Error(`cyclic link at ${from}`)
     mkdirSync(to, { recursive: true })
-    for (const name of readdirSync(from)) copyOutput(join(from, name), join(to, name))
+    for (const name of readdirSync(from)) {
+      copyOutput(join(from, name), join(to, name), { root: here.root, ancestors: [...here.ancestors, real] })
+    }
   } else {
-    cpSync(from, to)
+    cpSync(from, to, { dereference: true })
   }
+}
+
+// True when `path` is `root` or inside it (both real paths).
+function inside(path, root) {
+  return path === root || path.startsWith(root + sep)
 }
 
 /** True when `dir` holds any symlink: a copy made by copyOutput holds none, so one means the copy cannot be trusted. */
@@ -44,6 +59,8 @@ export function hasBrokenLinks(dir) {
 
 const ENTRY = join('server', 'index.mjs')
 const VERSION = 'VERSION'
+// The text files a build writes: the build root must not be named in any of them (a copy made elsewhere would point back here).
+const TEXT_EXT = new Set(['.js', '.mjs', '.cjs', '.json', '.html', '.map', '.css', '.txt', '.md', '.ts'])
 
 /**
  * The decision, from the hash of the inputs now and the state of the cache. `cache` is null when there is no cache, else
@@ -56,6 +73,35 @@ export function decide({ force, hash, cache }) {
   if (cache.hash === null) return { action: 'build', reason: 'the cached hash is unreadable' }
   if (cache.hash !== hash) return { action: 'build', reason: 'the build inputs changed' }
   return { action: 'skip', reason: 'the build inputs did not change' }
+}
+
+/**
+ * What stops a tree from being copied and skipped with: null when it is safe, else one sentence. The tree is `outDir`; `root` is the
+ * build root it was made in. A link is refused when it is absolute, when it resolves outside `outDir`, or when it is broken.
+ */
+export function treeProblem(outDir, root) {
+  if (!existsSync(join(outDir, ENTRY))) return `the output has no ${ENTRY}`
+  if (!existsSync(join(outDir, VERSION))) return `the output has no ${VERSION} file`
+  let problem = null
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (problem) return
+      const full = join(dir, entry.name)
+      const rel = relative(outDir, full)
+      if (entry.isSymbolicLink()) {
+        const target = readlinkSync(full)
+        if (isAbsolute(target)) problem = `absolute link ${rel}`
+        else if (relative(outDir, resolve(dirname(full), target)).startsWith('..')) problem = `link ${rel} leaves .output`
+        else if (!existsSync(full)) problem = `broken link ${rel}`
+      } else if (entry.isDirectory()) {
+        walk(full)
+      } else if (entry.isFile() && TEXT_EXT.has(extname(entry.name)) && root && readFileSync(full, 'utf8').includes(root)) {
+        problem = `${rel} names the build root`
+      }
+    }
+  }
+  walk(outDir)
+  return problem
 }
 
 /** The one line the deploy log gets for every run. */
@@ -87,28 +133,49 @@ function writeVersion(root) {
 }
 
 // The cache is written only after a good build, in a temp folder first, then renamed into place: a half-written cache is never used.
-function storeCache(root, cacheDir, hash) {
+// The copy resolves links, and the copy is checked before it replaces the cache. A refused or failed copy leaves no cache for the old
+// inputs either, so nothing can be skipped against it. Returns true when the cache was stored.
+function storeCache(root, cacheDir, hash, log) {
   mkdirSync(cacheDir, { recursive: true })
   const tmp = mkdtempSync(join(cacheDir, '.tmp-'))
-  copyOutput(join(root, '.output'), join(tmp, 'output'))
-  rmSync(join(cacheDir, 'output'), { recursive: true, force: true })
-  renameSync(join(tmp, 'output'), join(cacheDir, 'output'))
-  rmSync(tmp, { recursive: true, force: true })
-  writeFileSync(join(cacheDir, 'inputs.sha256.tmp'), `${hash}\n`)
-  renameSync(join(cacheDir, 'inputs.sha256.tmp'), join(cacheDir, 'inputs.sha256'))
+  try {
+    copyOutput(join(root, '.output'), join(tmp, 'output'))
+    const bad = treeProblem(join(tmp, 'output'), root)
+    if (bad) {
+      log(`build-if-changed: not stored: ${bad}`)
+      rmSync(join(cacheDir, 'inputs.sha256'), { force: true })
+      return false
+    }
+    rmSync(join(cacheDir, 'output'), { recursive: true, force: true })
+    renameSync(join(tmp, 'output'), join(cacheDir, 'output'))
+    writeFileSync(join(cacheDir, 'inputs.sha256.tmp'), `${hash}\n`)
+    renameSync(join(cacheDir, 'inputs.sha256.tmp'), join(cacheDir, 'inputs.sha256'))
+    return true
+  } catch (error) {
+    log(`build-if-changed: not stored: the copy failed: ${error.message}`)
+    rmSync(join(cacheDir, 'inputs.sha256'), { force: true })
+    return false
+  } finally {
+    rmSync(tmp, { recursive: true, force: true })
+  }
 }
 
 /**
  * Runs the wrapper for the app at `root`. `build(root)` runs the real build and returns { status, cpuS, peakMB }. Returns
- * { action, status, hash }. Logs one line through `log`.
+ * { action, status, hash }. Logs one line through `log`, and a line with the reason for every full build.
  */
 export function run({ root, env = {}, build, bunVersion = '', nodeVersion = '', log = console.log }) {
   const start = Date.now()
   const hash = hashTree(root, { bun: bunVersion, node: nodeVersion, env })
   const cacheDir = cacheDirFor(root, env)
   const cache = cacheState(cacheDir)
-  const d = decide({ force: env.BUILD_FORCE === '1', hash, cache })
+  let d = decide({ force: env.BUILD_FORCE === '1', hash, cache })
   if (d.dropCache) rmSync(cacheDir, { recursive: true, force: true })
+  if (d.action === 'skip') {
+    // The cache is checked before it is trusted: a link in it (an absolute one, or one that leaves it) is a doubt.
+    const bad = treeProblem(join(cacheDir, 'output'), root)
+    if (bad) d = { action: 'build', reason: `the cached output: ${bad}` }
+  }
   const line = (action, cpuS = 0, peakMB = 0) => log(formatLine({ action, hash, wallS: (Date.now() - start) / 1000, cpuS, peakMB }))
   if (d.action === 'skip') {
     try {
@@ -116,13 +183,17 @@ export function run({ root, env = {}, build, bunVersion = '', nodeVersion = '', 
       copyOutput(join(cacheDir, 'output'), join(root, '.output'))
       if (hasBrokenLinks(join(root, '.output'))) throw new Error('the copied output holds symlinks')
       writeVersion(root)
+      const bad = treeProblem(join(root, '.output'), root)
+      if (bad) throw new Error(bad)
       line('skipped')
       return { action: 'skipped', status: 0, hash }
-    } catch {
-      // A copy that fails is a doubt: the real build runs below.
+    } catch (error) {
+      // A copy that fails, or a tree that is not safe, is a doubt: the real build runs below.
       rmSync(join(root, '.output'), { recursive: true, force: true })
+      d = { action: 'build', reason: `the copy was refused: ${error.message}` }
     }
   }
+  log(`build-if-changed: full build: ${d.reason}`)
   const res = build(root)
   if (res.status !== 0) {
     log(`build-if-changed: failed, hash ${hash.slice(0, 12)}, the build exited ${res.status}`)
@@ -133,7 +204,7 @@ export function run({ root, env = {}, build, bunVersion = '', nodeVersion = '', 
     return { action: 'failed', status: 1, hash }
   }
   writeVersion(root)
-  storeCache(root, cacheDir, hash)
+  storeCache(root, cacheDir, hash, log)
   line('built', res.cpuS ?? 0, res.peakMB ?? 0)
   return { action: 'built', status: 0, hash }
 }
