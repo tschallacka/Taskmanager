@@ -87,3 +87,70 @@ export const NAMED_PERSON_COLUMNS = [
   'api_key_secrets.actor_id',
   'github_delivery_failures.handled_by'
 ] as const
+
+// What the account download (Art. 20, card mwjfpr8phz5gi4bdjqa) takes from each table that holds a person's id. One
+// decision per table, under the same walk the deletion uses (tests/account-deletion-coverage.test.ts):
+//   export  the rows whose `by` column is the person; only the listed fields leave the server (an allow-list)
+//   not     nothing from this table: a secret, another person's data, or not part of the download, with the reason
+// A new table with a person id fails the coverage test until it has a decision here.
+export type ExportRule = { kind: 'export', by: string, fields: string[], why: string } | { kind: 'not', why: string }
+
+/** A column name that must never be exported (keys, hashes, tokens, passwords, codes, sessions). */
+export const EXPORT_SECRET_COLUMN = /hash|token|secret|password|passkey|key|prefix|salt|otp|code|session|credential/i
+
+export const EXPORT_RULES: Record<string, ExportRule> = {
+  // The person's own rows.
+  user_email: { kind: 'export', by: 'user_id', fields: ['email', 'verified_at'], why: 'extra addresses the person added' },
+  user_settings: { kind: 'export', by: 'user_id', fields: ['primary_color', 'neutral_color'], why: 'personal colours; AI keys and model choices are not exported' },
+  notification_preferences: { kind: 'export', by: 'user_id', fields: ['email', 'browser'], why: 'the person\'s notification choices' },
+  // Memberships: the person's own membership rows, nothing about other members.
+  member: { kind: 'export', by: 'user_id', fields: ['organization_id', 'role', 'created_at'], why: 'team memberships (the team name is joined in the export)' },
+  project_members: { kind: 'export', by: 'user_id', fields: ['project_id', 'role', 'created_at'], why: 'board memberships (the board name is joined in the export)' },
+  project_guests: { kind: 'export', by: 'user_id', fields: ['project_id', 'role', 'created_at'], why: 'guest access to boards (the board name is joined in the export)' },
+  projects: { kind: 'export', by: 'user_id', fields: ['id', 'name', 'created_at'], why: 'boards the person owns: name and date only' },
+  // What the person wrote.
+  project_tasks: { kind: 'export', by: 'created_by', fields: ['id', 'project_id', 'title', 'description', 'created_at', 'updated_at'], why: 'tasks the person created' },
+  task_comments: { kind: 'export', by: 'user_id', fields: ['id', 'task_id', 'body', 'created_at', 'edited_at'], why: 'comments the person wrote' },
+  time_entries: { kind: 'export', by: 'user_id', fields: ['id', 'task_id', 'project_id', 'minutes', 'day', 'note', 'created_at'], why: 'time the person logged' },
+  project_status_updates: { kind: 'export', by: 'user_id', fields: ['id', 'project_id', 'status', 'body', 'created_at'], why: 'status updates the person wrote' },
+  // Secrets: never exported.
+  account: { kind: 'not', why: 'sign-in accounts and their tokens: secret' },
+  session: { kind: 'not', why: 'sign-in sessions: secret' },
+  passkey: { kind: 'not', why: 'passkeys: secret' },
+  two_factor: { kind: 'not', why: 'two-factor secret and backup codes: secret' },
+  api_keys: { kind: 'not', why: 'API keys: secret (only the hash is stored)' },
+  api_key_secrets: { kind: 'not', why: 'API key secret history: secret' },
+  pairing_codes: { kind: 'not', why: 'pairing codes: secret' },
+  pairing_device_requests: { kind: 'not', why: 'device codes: secret' },
+  customer_invitations: { kind: 'not', why: 'invitation tokens: secret' },
+  team_invitations: { kind: 'not', why: 'invitation tokens: secret; invitations the person sent are not the person\'s data' },
+  project_guest_invitations: { kind: 'not', why: 'invitation tokens: secret' },
+  push_subscriptions: { kind: 'not', why: 'push endpoints and keys: secret' },
+  project_secrets: { kind: 'not', why: 'board secrets: secret' },
+  project_secret_events: { kind: 'not', why: 'board secret history: other people\'s actions on secrets' },
+  // Another person's data, or the system's.
+  invitation: { kind: 'not', why: 'invitations the person sent: another person\'s data' },
+  crews: { kind: 'not', why: 'crew infrastructure: not the person\'s data' },
+  crew_boards: { kind: 'not', why: 'crew infrastructure: not the person\'s data' },
+  crew_board_members: { kind: 'not', why: 'crew infrastructure: not the person\'s data' },
+  crew_api_gate: { kind: 'not', why: 'crew gate state: system' },
+  github_links: { kind: 'not', why: 'board links to GitHub: the board\'s data, not the person\'s' },
+  github_delivery_failures: { kind: 'not', why: 'webhook failures: system' },
+  project_github_audit: { kind: 'not', why: 'board GitHub audit: other people\'s actions' },
+  instance_settings: { kind: 'not', why: 'instance settings: the owner\'s, not the person\'s' },
+  customer_members: { kind: 'not', why: 'customer portal membership: not part of this download' },
+  goals: { kind: 'not', why: 'goals: not part of this download' },
+  portfolios: { kind: 'not', why: 'portfolios: not part of this download' },
+  project_messages: { kind: 'not', why: 'board chat messages: not part of this download' },
+  project_columns: { kind: 'not', why: 'board columns: the board\'s structure, not the person\'s' },
+  project_rules: { kind: 'not', why: 'board automation rules: the board\'s, not the person\'s' },
+  team_rules: { kind: 'not', why: 'team automation rules: the team\'s, not the person\'s' },
+  task_dependencies: { kind: 'not', why: 'links between tasks: not part of this download' },
+  task_activity: { kind: 'not', why: 'activity log: other people\'s actions too' },
+  notifications: { kind: 'not', why: 'the notification inbox: transient, not part of this download' },
+  board_pins: { kind: 'not', why: 'sidebar pins: a view setting, not part of this download' },
+  project_watchers: { kind: 'not', why: 'watch list: not part of this download' },
+  agent_audit: { kind: 'not', why: 'security audit of agent actions: kept for the audit, not exported' },
+  ai_usage_records: { kind: 'not', why: 'AI usage counts: not part of this download' },
+  time_timers: { kind: 'not', why: 'a running timer: not part of this download' }
+}
