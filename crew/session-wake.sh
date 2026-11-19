@@ -62,7 +62,9 @@ while :; do
   case "$look_out" in
     TERMINAL-ERROR:*) why=${look_out#TERMINAL-ERROR: } ;;
     *)
-      if printf '%s\n' "$look_out" | grep -Eq '(^|[^[:alnum:]])(❯|>) '; then
+      # Ready only at the input line between the input box's rules, or on a dialog (crew/prompt-line.mjs). A "> " or "❯"
+      # line of the transcript is not a prompt: it has no rules around it.
+      if printf '%s\n' "$look_out" | node "$(dirname "$0")/prompt-line.mjs" >/dev/null 2>&1; then
         screen=$look_out
         break
       fi
