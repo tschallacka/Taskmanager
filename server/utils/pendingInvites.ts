@@ -93,6 +93,21 @@ export async function pendingBoardProjectIdsFor(addresses: string[], now: number
 }
 
 /**
+ * How many open team and board invitations tied to these addresses the account has not accepted. The projects page
+ * runs the sign-in claim when there is any, so an account with only a team or a board invite gets them accepted too.
+ */
+export async function countPendingTeamAndBoardInvites(addresses: string[], now: number): Promise<number> {
+  if (!addresses.length) return 0
+  const lowered = addresses.map(address => address.toLowerCase())
+  const teams = await db
+    .select({ acceptedAt: teamInvitations.acceptedAt, revokedAt: teamInvitations.revokedAt })
+    .from(teamInvitations)
+    .where(and(gt(teamInvitations.expiresAt, now), inArray(sql`lower(${teamInvitations.email})`, lowered)))
+  const boards = invitesToClaim((await openInvitesTo(addresses, now)).map(row => ({ id: row.id, email: row.email, status: row.status, expiresAt: row.expiresAt })), addresses, now)
+  return teams.filter(row => row.acceptedAt === null && row.revokedAt === null).length + boards.length
+}
+
+/**
  * The team's rule for sign-in: an open team invitation to one of the account's addresses is accepted by itself, and the
  * account becomes a member of that team with the invited role. A revoked or used invitation is never claimed.
  */

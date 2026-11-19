@@ -2,12 +2,12 @@
 import { entryFor, firstRedirect, mayShowFirstProjectForm, redirectPending, sharedDecided } from '~/utils/projectsEntry'
 import { selectTeamOrStay, teamRedirectAllowed, teamToOpenFor } from '~/utils/teamEntry'
 import { pendingInviteEntry } from '~/utils/pendingInviteEntry'
-import { autoClaimDue, pendingInvitationEntry } from '~/utils/pendingInvitationEntry'
+import { autoClaimDue, claimableCount, pendingInvitationEntry } from '~/utils/pendingInvitationEntry'
 
 definePageMeta({ layout: 'app' })
 
 const { ready, projects, createProject } = useProjects()
-const { teams, activeTeamId, setActiveTeam, isPending: teamsPending } = useTeams()
+const { teams, activeTeamId, setActiveTeam, refreshTeamList, isPending: teamsPending } = useTeams()
 const route = useRoute()
 
 // A customer contact or guest with no team and no board goes to the shared list, not to the first-project form.
@@ -21,15 +21,16 @@ const inviteEntry = computed(() => !teamsPending.value && ready.value && sharedD
   : null)
 
 // Invitations sent to this account's address that it has not accepted: a later sign-in shows them, with Accept invitation.
-const { data: pendingData } = useFetch<{ invitations: unknown[] }>('/api/pending-invitations', { key: 'pending-invitations', server: false, lazy: true })
+const { data: pendingData } = useFetch<{ invitations: unknown[], claimable?: number }>('/api/pending-invitations', { key: 'pending-invitations', server: false, lazy: true })
 // The owner's rule: an invitation tied to the signed-in verified address is accepted by itself, once, here. Until that is
-// done, nothing is sent to the pending page, so the Accept button does not show for a tied invitation.
+// done, nothing is sent to the pending page, so the Accept button does not show for a tied invitation. That covers the
+// team and board invitations too (`claimable`), so an account with only one of those is claimed here as well.
 const autoClaiming = ref(false)
 const autoClaimed = ref(false)
 watch(() => autoClaimDue({
   ready: ready.value,
   teamsPending: teamsPending.value,
-  pendingCount: pendingData.value?.invitations.length ?? 0,
+  pendingCount: claimableCount(pendingData.value),
   done: autoClaimed.value || autoClaiming.value
 }), async (due) => {
   if (!due) return
@@ -41,7 +42,8 @@ watch(() => autoClaimDue({
   }
   autoClaimed.value = true
   autoClaiming.value = false
-  await Promise.all([refreshNuxtData('pending-invitations'), refreshNuxtData('shared-with-me')])
+  // A team accepted here must show in the team list at once, so the team entry below can open it.
+  await Promise.all([refreshNuxtData('pending-invitations'), refreshNuxtData('shared-with-me'), refreshTeamList()])
 }, { immediate: true })
 
 const pendingEntry = computed(() => autoClaimed.value && !teamsPending.value && ready.value && pendingData.value
