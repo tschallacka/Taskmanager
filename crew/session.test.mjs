@@ -285,6 +285,18 @@ test('the start argv names the session with the name it is given, and resumes a 
   assert.throws(() => startArgs({ key: 'wren', folder: '/tmp', home: '/h', kit: '/k', role: 'r', resume: 'x; rm -rf /' }), /session id/)
 })
 
+test('a start gives the session its first prompt as the first argument after --bg, so it takes one turn and idles', () => {
+  const fresh = startArgs({ key: 'wren', folder: '/tmp', home: '/h', kit: '/k', role: 'r' })
+  assert.equal(fresh.args[0], '--bg')
+  assert.equal(typeof fresh.args[1], 'string')
+  assert.ok(fresh.args[1].length > 0 && !fresh.args[1].startsWith('-'), 'the prompt is text, not a flag')
+  const given = startArgs({ key: 'wren', folder: '/tmp', home: '/h', kit: '/k', role: 'r', prompt: 'check your mail' })
+  assert.deepEqual(given.args.slice(0, 2), ['--bg', 'check your mail'])
+  const resumed = startArgs({ key: 'wren', folder: '/tmp', home: '/h', kit: '/k', role: 'r', resume: 'a1b2c3d4' })
+  assert.equal(resumed.args[1], fresh.args[1], 'a resume gets the same first prompt')
+  assert.equal(resumed.args[2], '--resume')
+})
+
 test('a start names the session <crew slug>-<key> and finds the new session by that name', () => {
   const fake = fakeClaude()
   const home = mkdtempSync(join(tmpdir(), 'session-named-'))
