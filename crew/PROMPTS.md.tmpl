@@ -53,11 +53,17 @@ Start also a recurring round with CronCreate: cron `7,37 * * * *`, durable. Its 
 
 Boss's Stop hook blocks a stop while one of them is not running. `init` writes that hook into the folder that crew.json names as `bossSession`: set it to the folder Boss's Claude Code session runs in, or the hook is not written.
 
-## Starting Pia (Boss)
+## Starting Pia (crew up pia)
 
-Pia needs her own Claude Code session, because she starts agents and a subagent cannot start other agents. Boss
-starts that session; it is the only crew member Boss starts. Use the `interactive-shell` skill: the session needs a
-real terminal, so never start it headless. In that terminal:
+Pia needs her own Claude Code session, because she starts agents and a subagent cannot start other agents. The kit
+starts it, so Boss never starts her by hand: `crew up pia` (`crew restart pia`, `crew stop pia`). Her session runs in the
+tmux session `pia` on the crew's own socket (`{{crew_dir}}/tmux.sock`), resumed with her recorded session id; with no
+recorded id she starts fresh, and the output says so. Then the kit checks that her screen shows no dialog, pastes a test
+mail and checks it shows on her screen, and reports her board listener. `pia-term.sh` (view, paste, key) reads and types
+into her terminal for the mailbox daemon and for Boss. A refused resume is reported and never followed by a fresh start.
+
+Fallback only, when `crew up pia` cannot start her (it says why): start her by hand in a terminal, with the same flags,
+and tell the Owner why the kit could not:
 
 ```
 export CREW_HOME={{crew_dir}}

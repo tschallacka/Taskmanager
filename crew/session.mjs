@@ -169,12 +169,15 @@ export function listAgents(opts = {}) {
  * the crew's own folders are trusted in Claude Code's config (`trust`, claude-trust.mjs); a folder the crew did not make is
  * refused with a sentence that says what crew update does.
  */
-export function startSession({ home, kit, key, folder, role, bin, now = Date.now, trust = trustForStart }) {
+export function startSession({ home, kit, key, folder, role, bin, now = Date.now, trust = trustForStart, resumeOnly = false }) {
   checkKey(key)
   if (!folder || !existsSync(folder)) return { ok: false, reason: `the folder for ${key} does not exist: ${folder ?? '(none)'}` }
   const list = listAgents({ bin })
   const record = readRecord(home, key)
   if (list && liveById(list, record?.id)) return { ok: true, id: record.id, started: false, note: 'already running' }
+  // resumeOnly (crew up, crew restart, card mwmzv2jt): the recorded session is the only one that may start. Without a recorded id
+  // there is nothing to resume, and a refused resume is reported, never followed by a fresh start.
+  if (resumeOnly && !validSessionId(record?.id)) return { ok: false, reason: `${key}: no recorded session id to resume; not started fresh` }
   const trusted = trust({ home, kit, folder, folders: recordedFolders(home) })
   if (!trusted.ok) return { ok: false, reason: trusted.reason }
   const name = sessionName({ slug: crewSlug(home), key })
@@ -189,12 +192,13 @@ export function startSession({ home, kit, key, folder, role, bin, now = Date.now
   const resumeId = validSessionId(record?.id) ? record.id : ''
   let run
   let resumed = false
-  for (const resume of resumeId ? [resumeId, ''] : ['']) {
+  for (const resume of resumeId ? (resumeOnly ? [resumeId] : [resumeId, '']) : ['']) {
     const { cwd, args } = startArgs({ key, folder, home, kit, role, name, resume })
     run = runClaude(args, { bin, cwd })
     resumed = Boolean(resume) && run.ok
     if (run.ok || /not trusted/i.test(run.stderr)) break
   }
+  if (!run.ok && resumeOnly) return { ok: false, reason: `resume of ${resumeId} failed: ${run.stderr || `exit ${run.status}`}; not started fresh` }
   // Claude refuses a folder it does not trust with 'not trusted' on stderr: the reason names the folder and says what crew update does.
   if (!run.ok && /not trusted/i.test(run.stderr)) return { ok: false, reason: notTrustedReason(folder, readWorktreeBase(home)) }
   if (!run.ok) return { ok: false, reason: `claude did not start the session: ${run.stderr || `exit ${run.status}`}` }
@@ -228,7 +232,7 @@ export function sessionList({ home, bin }) {
 export function stopSession({ home, key, bin }) {
   const record = readRecord(home, key)
   if (!record) return { ok: false, reason: `${key}: no recorded session to stop` }
-  // The stop verb is not in the verified list yet (see the card): it is called only after Boss's go for a real session.
+  // `claude stop <id>` is a verified verb: Boss used it on real sessions on 2026-11-19 (card mwmzv2jt).
   const run = runClaude(['stop', record.id], { bin })
   return run.ok ? { ok: true, id: record.id } : { ok: false, reason: `claude stop ${record.id} failed: ${run.stderr || `exit ${run.status}`}` }
 }

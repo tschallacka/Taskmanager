@@ -340,3 +340,38 @@ test('a resume that claude refuses falls back to a fresh start, which records th
   assert.equal(bgCalls[1].includes('--resume'), false, 'the fresh start has no resume')
   assert.equal(readRecord(home, 'wynn').id, out.id)
 })
+
+// `crew up` and `crew restart` resume only (card mwmzv2jt): a resume that claude refuses is reported, never followed by a fresh start.
+test('resumeOnly: a refused resume is reported with its reason, and no fresh session is started', () => {
+  const fake = fakeClaude()
+  const home = mkdtempSync(join(tmpdir(), 'session-resume-only-'))
+  mkdirSync(join(home, 'sessions'), { recursive: true })
+  writeFileSync(join(home, 'sessions', 'wynn.json'), `${JSON.stringify({ id: 'a0b0c0d0', name: 'wynn', folder: '/tmp' })}\n`)
+  const out = startSession({ home, kit: HERE, key: 'wynn', folder: '/tmp', role: 'r', bin: fake.bin, trust: NO_TRUST, resumeOnly: true })
+  assert.equal(out.ok, false)
+  assert.match(out.reason, /resume of a0b0c0d0 failed/)
+  assert.match(out.reason, /not started fresh/)
+  const bgCalls = calls(fake).filter(args => args.includes('--bg'))
+  assert.equal(bgCalls.length, 1, 'the resume was tried once, and nothing else was started')
+  assert.ok(bgCalls[0].includes('--resume'))
+  assert.equal(readRecord(home, 'wynn').id, 'a0b0c0d0', 'the recorded id is kept, not replaced')
+})
+
+test('resumeOnly: a person with no recorded session id is refused, not started fresh', () => {
+  const fake = fakeClaude()
+  const home = mkdtempSync(join(tmpdir(), 'session-resume-none-'))
+  const out = startSession({ home, kit: HERE, key: 'wren', folder: '/tmp', role: 'r', bin: fake.bin, trust: NO_TRUST, resumeOnly: true })
+  assert.equal(out.ok, false)
+  assert.match(out.reason, /no recorded session id to resume/)
+  assert.equal(calls(fake).filter(args => args.includes('--bg')).length, 0)
+})
+
+test('resumeOnly: a recorded id that is live is still "already running" and nothing is started', () => {
+  const fake = fakeClaude()
+  const home = mkdtempSync(join(tmpdir(), 'session-resume-live-'))
+  const first = startSession({ home, kit: HERE, key: 'wick', folder: '/tmp', role: 'r', bin: fake.bin, trust: NO_TRUST })
+  const again = startSession({ home, kit: HERE, key: 'wick', folder: '/tmp', role: 'r', bin: fake.bin, trust: NO_TRUST, resumeOnly: true })
+  assert.equal(again.ok, true)
+  assert.equal(again.started, false)
+  assert.equal(again.id, first.id)
+})
