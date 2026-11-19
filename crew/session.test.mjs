@@ -8,7 +8,7 @@ import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   startArgs, parseAgents, liveById, planWake, checkKey, startSession, sessionStatus, sessionList, stopSession,
-  readRecord, MODEL, mcpConfig, mcpConfigPath, withRules, WORKTREE_RULE, sessionName, crewSlug
+  readRecord, MODEL, mcpConfig, mcpConfigPath, withRules, WORKTREE_RULE, sessionName, crewSlug, confirmResume
 } from './session.mjs'
 import { settingsPath } from './session-settings.mjs'
 
@@ -74,32 +74,56 @@ const args = process.argv.slice(2)
 fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify(args) + '\\n')
 const list = JSON.parse(fs.readFileSync(${JSON.stringify(state)}, 'utf8'))
 if (args[0] === 'agents' && args[1] === '--json') { process.stdout.write(JSON.stringify(list)); process.exit(0) }
+// Job records, as claude keeps them in ~/.claude/jobs/<short id>/state.json (the short id is the job's folder name).
+const JOBS = ${JSON.stringify(join(dir, 'jobs'))}
+const writeJob = (short, job) => {
+  fs.mkdirSync(JOBS + '/' + short, { recursive: true })
+  fs.writeFileSync(JOBS + '/' + short + '/state.json', JSON.stringify(job))
+}
+const jobRecords = () => fs.existsSync(JOBS) ? fs.readdirSync(JOBS).flatMap(d => {
+  try { const j = JSON.parse(fs.readFileSync(JOBS + '/' + d + '/state.json', 'utf8')); return j.state === 'failed' ? [] : [j] } catch { return [] }
+}) : []
 if (args.includes('--bg') && args.includes('--resume')) {
-  // claude --bg --resume <id>: the same session, running again under the same id, or refused when there is none.
-  const hit = list.find(a => a.id === args[args.indexOf('--resume') + 1])
-  if (!hit) { process.stderr.write('no such session to resume'); process.exit(1) }
-  hit.state = 'idle'; hit.status = 'running'
+  // claude --bg --resume <id>, bare: the same session under the same id when claude knows the session (listed, or with a job
+  // record that is not failed; it keeps the session's name). An unknown id is not refused by claude: it leaves a failed job (exit 0).
+  const id = args[args.indexOf('--resume') + 1]
+  const short = id.slice(0, 8)
+  const job = list.find(a => a.sessionId === id) ? null : jobRecords().find(j => j.sessionId === id)
+  const hit = list.find(a => a.sessionId === id) ?? (job ? { id: short, sessionId: id, name: job.name, startedAt: Date.now() } : null)
+  if (!hit) {
+    writeJob(short, { state: 'failed', detail: 'source session ' + id + ' not found', sessionId: id })
+    list.push({ id: short, sessionId: id, name: short, state: 'blocked', status: 'blocked', startedAt: Date.now() })
+    fs.writeFileSync(${JSON.stringify(state)}, JSON.stringify(list))
+    process.stdout.write('backgrounded · ' + short + '\\n'); process.exit(0)
+  }
+  const entry = list.find(a => a.sessionId === id)
+  if (entry) { entry.state = 'working'; entry.status = 'busy' } else list.push({ id: hit.id, sessionId: id, name: hit.name, state: 'working', status: 'busy', startedAt: hit.startedAt })
+  writeJob(short, { state: 'working', detail: '', sessionId: id, name: hit.name })
   fs.writeFileSync(${JSON.stringify(state)}, JSON.stringify(list))
-  process.stdout.write(hit.id + '\\n'); process.exit(0)
+  process.stdout.write(id + '\\n'); process.exit(0)
 }
 if (args.includes('--bg')) {
   const name = args[args.indexOf('-n') + 1]
   const id = (0xa0000001 + list.length).toString(16)
-  list.push({ id, name, state: 'idle', status: 'running', startedAt: Date.now() + list.length })
+  const sessionId = id + '-1111-4222-8333-' + String(list.length).padStart(12, '0')
+  list.push({ id, sessionId, name, state: 'idle', status: 'running', startedAt: Date.now() + list.length })
+  writeJob(id, { state: 'working', detail: '', sessionId, name })
   fs.writeFileSync(${JSON.stringify(state)}, JSON.stringify(list))
-  process.stdout.write(id + '\\n'); process.exit(0)
+  process.stdout.write(sessionId + '\\n'); process.exit(0)
 }
 if (args[0] === 'stop') {
+  // Like claude: stop takes the short id that agents shows (id); the full sessionId is refused.
   const hit = list.find(a => a.id === args[1])
   if (!hit) { process.stderr.write('no such session'); process.exit(1) }
   hit.state = 'ended'
+  writeJob(hit.id, { state: 'stopped', detail: 'stopped', sessionId: hit.sessionId, name: hit.name })
   fs.writeFileSync(${JSON.stringify(state)}, JSON.stringify(list))
   process.exit(0)
 }
 process.exit(2)
 `)
   chmodSync(bin, 0o755)
-  return { bin, state, log, dir }
+  return { bin, state, log, dir, jobs: join(dir, 'jobs') }
 }
 
 function calls(fake) {
@@ -183,6 +207,16 @@ test('status and list read the recorded id, and report a session that was stoppe
   const after = sessionStatus({ home, key: 'wick', bin: fake.bin })
   assert.equal(after.live, false, 'after the stop the recorded id is not live')
   assert.match(after.line, /not live/)
+})
+
+test('stop passes claude the short id that agents shows, not the full session id (claude stop refuses the full one)', () => {
+  const fake = fakeClaude()
+  const home = mkdtempSync(join(tmpdir(), 'session-home-'))
+  const started = startSession({ home, kit: HERE, key: 'wick', folder: '/tmp', role: 'r', bin: fake.bin, trust: NO_TRUST })
+  const stopped = stopSession({ home, key: 'wick', bin: fake.bin })
+  assert.equal(stopped.ok, true, stopped.reason)
+  const stopCall = calls(fake).find(args => args[0] === 'stop')
+  assert.deepEqual(stopCall, ['stop', started.id.slice(0, 8)])
 })
 
 test('a start that claude refuses is reported with its reason, and nothing is recorded', () => {
@@ -292,9 +326,10 @@ test('a start gives the session its first prompt as the first argument after --b
   assert.ok(fresh.args[1].length > 0 && !fresh.args[1].startsWith('-'), 'the prompt is text, not a flag')
   const given = startArgs({ key: 'wren', folder: '/tmp', home: '/h', kit: '/k', role: 'r', prompt: 'check your mail' })
   assert.deepEqual(given.args.slice(0, 2), ['--bg', 'check your mail'])
+  // A resume passes no flags and no prompt: claude keeps the session's saved options, and any flag makes a copy under a new id
+  // (checked 2026-11-19: `claude --bg --resume <id> -n ...` started 7b34828e; the bare `claude --bg --resume <id>` woke 61c5977d).
   const resumed = startArgs({ key: 'wren', folder: '/tmp', home: '/h', kit: '/k', role: 'r', resume: 'a1b2c3d4' })
-  assert.equal(resumed.args[1], fresh.args[1], 'a resume gets the same first prompt')
-  assert.equal(resumed.args[2], '--resume')
+  assert.deepEqual(resumed.args, ['--bg', '--resume', 'a1b2c3d4'], 'a resume is the bare form, with no flags that would start a copy')
 })
 
 test('a start names the session <crew slug>-<key> and finds the new session by that name', () => {
@@ -325,20 +360,114 @@ test('crew up resumes a stopped session by its recorded id: same id, resumed, an
   assert.equal(sessionStatus({ home, key: 'wick', bin: fake.bin }).live, true)
 })
 
-test('a resume that claude refuses falls back to a fresh start, which records the new id', () => {
+// Claude does not refuse an unknown id: it leaves a failed job (exit 0). The kit reads that job, says so, and starts nothing.
+test('a resume that claude refuses (an unknown id: a failed job) is reported as refused, and nothing is started fresh', () => {
   const fake = fakeClaude()
   const home = mkdtempSync(join(tmpdir(), 'session-fallback-'))
   mkdirSync(join(home, 'sessions'), { recursive: true })
-  writeFileSync(join(home, 'sessions', 'wynn.json'), `${JSON.stringify({ id: 'a0b0c0d0', name: 'wynn', folder: '/tmp' })}\n`)
-  const out = startSession({ home, kit: HERE, key: 'wynn', folder: '/tmp', role: 'r', bin: fake.bin, trust: NO_TRUST })
-  assert.equal(out.ok, true)
-  assert.equal(out.resumed, false)
-  assert.notEqual(out.id, 'a0b0c0d0')
+  const gone = '0a1b2c3d-1111-4222-8333-444455556666'
+  writeFileSync(join(home, 'sessions', 'wynn.json'), `${JSON.stringify({ id: gone, name: 'wynn', folder: '/tmp' })}\n`)
+  const out = startSession({ home, kit: HERE, key: 'wynn', folder: '/tmp', role: 'r', bin: fake.bin, trust: NO_TRUST, jobs: fake.jobs, confirmMs: 0 })
+  assert.equal(out.ok, false)
+  assert.equal(out.reason, `resume refused: source session ${gone} not found`, 'the job detail is the reason')
+  assert.equal(out.started, undefined, 'never reported as started')
   const bgCalls = calls(fake).filter(args => args.includes('--bg'))
-  assert.equal(bgCalls.length, 2, 'one resume attempt, then one fresh start')
-  assert.ok(bgCalls[0].includes('--resume'))
-  assert.equal(bgCalls[1].includes('--resume'), false, 'the fresh start has no resume')
-  assert.equal(readRecord(home, 'wynn').id, out.id)
+  assert.equal(bgCalls.length, 1, 'the one resume was tried, and no fresh start followed')
+  assert.equal(readRecord(home, 'wynn').id, gone, 'the record keeps the id it had')
+})
+
+test('a short-id record of a stopped session resumes: agents does not list it, so the full id comes from its job record', () => {
+  const fake = fakeClaude()
+  const home = mkdtempSync(join(tmpdir(), 'session-short-stopped-'))
+  const first = startSession({ home, kit: HERE, key: 'wick', folder: '/tmp', role: 'r', bin: fake.bin, trust: NO_TRUST, jobs: fake.jobs })
+  stopSession({ home, key: 'wick', bin: fake.bin })
+  // Claude agents no longer lists the stopped session.
+  writeFileSync(fake.state, JSON.stringify(JSON.parse(readFileSync(fake.state, 'utf8')).filter(a => a.sessionId !== first.id)))
+  writeFileSync(join(home, 'sessions', 'wick.json'), `${JSON.stringify({ id: first.id.slice(0, 8), name: 'wick', folder: '/tmp' })}\n`)
+  const again = startSession({ home, kit: HERE, key: 'wick', folder: '/tmp', role: 'r', bin: fake.bin, trust: NO_TRUST, jobs: fake.jobs })
+  assert.equal(again.ok, true, again.reason)
+  assert.equal(again.resumed, true)
+  assert.equal(again.id, first.id, 'the full id, from the job record')
+  assert.deepEqual(calls(fake).filter(args => args.includes('--bg')).at(-1), ['--bg', '--resume', first.id], 'the bare resume, with the full id')
+  assert.equal(readRecord(home, 'wick').id, first.id, 'the record now holds the full id')
+})
+
+// Card mwmm84ij7xux7aaq7a3: `claude agents --json` gives a background session a short id (8 characters) and its full sessionId.
+// Resume needs the full sessionId; the record must hold that, or every resume falls back to a fresh start with a new id.
+test('a start records the full sessionId, and a resume uses it: same session, no new id', () => {
+  const fake = fakeClaude()
+  const home = mkdtempSync(join(tmpdir(), 'session-full-id-'))
+  const first = startSession({ home, kit: HERE, key: 'wade', folder: '/tmp', role: 'r', bin: fake.bin, trust: NO_TRUST })
+  assert.equal(first.ok, true)
+  assert.match(first.id, /^[0-9a-f]{8}-[0-9a-f-]+$/, 'the recorded id is the full sessionId, not the short one')
+  assert.equal(readRecord(home, 'wade').id, first.id)
+  stopSession({ home, key: 'wade', bin: fake.bin })
+  const again = startSession({ home, kit: HERE, key: 'wade', folder: '/tmp', role: 'r', bin: fake.bin, trust: NO_TRUST })
+  assert.equal(again.resumed, true, 'claude took the resume')
+  assert.equal(again.resumeRefused, undefined, 'no refusal to report')
+  assert.equal(again.id, first.id)
+  const last = calls(fake).filter(args => args.includes('--bg')).at(-1)
+  assert.equal(last[last.indexOf('--resume') + 1], first.id)
+})
+
+test('a record holding the short id (written before this fix) resumes the full sessionId that agents lists for it', () => {
+  const fake = fakeClaude()
+  const home = mkdtempSync(join(tmpdir(), 'session-old-record-'))
+  const first = startSession({ home, kit: HERE, key: 'wren', folder: '/tmp', role: 'r', bin: fake.bin, trust: NO_TRUST })
+  const short = first.id.slice(0, 8)
+  writeFileSync(join(home, 'sessions', 'wren.json'), `${JSON.stringify({ id: short, name: 'wren', folder: '/tmp' })}\n`)
+  stopSession({ home, key: 'wren', bin: fake.bin })
+  const again = startSession({ home, kit: HERE, key: 'wren', folder: '/tmp', role: 'r', bin: fake.bin, trust: NO_TRUST })
+  assert.equal(again.resumed, true)
+  assert.equal(again.id, first.id)
+  const last = calls(fake).filter(args => args.includes('--bg')).at(-1)
+  assert.equal(last[last.indexOf('--resume') + 1], first.id, 'resumed with the full id, not the short one')
+})
+
+// Real claude (checked 2026-11-19): an unknown id is listed as a working job named by its short id for about 20 s, then its job
+// fails. So a job that is not failed yet proves nothing: the resume counts only when the listed session keeps the person's name.
+test('confirmResume: a working entry named by its short id (an unknown id, not yet failed) is not a resume; the session name is', () => {
+  const fake = fakeClaude()
+  const id = 'a1b2c3d4-0000-4000-8000-00000000abcd'
+  writeFileSync(fake.state, JSON.stringify([{ id: id.slice(0, 8), sessionId: id, name: id.slice(0, 8), state: 'working', status: 'busy', startedAt: 1 }]))
+  const notYet = confirmResume({ bin: fake.bin, jobs: fake.jobs, resumeId: id, name: 'wick', confirmMs: 0, sleep: () => {} })
+  assert.equal(notYet.ok, false)
+  assert.match(notYet.detail, /did not come back as wick/)
+  writeFileSync(fake.state, JSON.stringify([{ id: id.slice(0, 8), sessionId: id, name: 'wick', state: 'working', status: 'busy', startedAt: 1 }]))
+  assert.equal(confirmResume({ bin: fake.bin, jobs: fake.jobs, resumeId: id, name: 'wick', confirmMs: 0, sleep: () => {} }).ok, true)
+})
+
+// The CLI's words: a resume says "resumed" (never "started"), and a refused resume exits 1 with the job's detail.
+test('crew session start says "resumed" for a resume, and a refused resume exits 1 with its reason', () => {
+  const fake = fakeClaude()
+  const home = mkdtempSync(join(tmpdir(), 'session-cli-resume-'))
+  mkdirSync(join(home, 'sessions'), { recursive: true })
+  writeFileSync(join(home, 'sessions', 'nina.role.md'), 'NINA CLI RESUME ROLE\n')
+  const crew = crewCli(home)
+  const env = { ...process.env, CREW_HOME: home, CREW_CLAUDE_BIN: fake.bin, CREW_JOBS_DIR: fake.jobs, ...crew.env }
+  delete env.CREW_ROLE_FILE
+  const run = (...argv) => spawnSync(process.execPath, [join(HERE, 'session.mjs'), ...argv], { encoding: 'utf8', env })
+  const first = run('start', 'nina', crew.folder)
+  assert.equal(first.status, 0, first.stdout + first.stderr)
+  assert.match(first.stdout, /nina: session \S+ started/)
+  assert.equal(run('stop', 'nina').status, 0)
+  const again = run('start', 'nina', crew.folder)
+  assert.equal(again.status, 0, again.stdout + again.stderr)
+  assert.match(again.stdout, /nina: session \S+ resumed/)
+  assert.doesNotMatch(again.stdout, /started/)
+  const gone = '0a1b2c3d-1111-4222-8333-444455556666'
+  writeFileSync(join(home, 'sessions', 'nina.json'), `${JSON.stringify({ id: gone, name: 'nina', folder: crew.folder })}\n`)
+  const refused = run('start', 'nina', crew.folder)
+  assert.equal(refused.status, 1)
+  assert.match(refused.stdout, new RegExp(`^resume refused: source session ${gone} not found$`, 'm'))
+  assert.doesNotMatch(refused.stdout, /started/)
+})
+
+test('parseAgents takes the full sessionId as the id and keeps the short one as shortId', () => {
+  const list = parseAgents(JSON.stringify([{ id: 'a1b2c3d4', sessionId: 'a1b2c3d4-0000-4000-8000-000000000001', name: 'wade', state: 'idle', status: 'running', startedAt: 5 }]))
+  assert.equal(list[0].id, 'a1b2c3d4-0000-4000-8000-000000000001')
+  assert.equal(list[0].shortId, 'a1b2c3d4')
+  assert.equal(liveById(list, 'a1b2c3d4').id, list[0].id, 'the short id still finds its live entry')
 })
 
 // `crew up` and `crew restart` resume only (card mwmzv2jt): a resume that claude refuses is reported, never followed by a fresh start.
@@ -346,15 +475,15 @@ test('resumeOnly: a refused resume is reported with its reason, and no fresh ses
   const fake = fakeClaude()
   const home = mkdtempSync(join(tmpdir(), 'session-resume-only-'))
   mkdirSync(join(home, 'sessions'), { recursive: true })
-  writeFileSync(join(home, 'sessions', 'wynn.json'), `${JSON.stringify({ id: 'a0b0c0d0', name: 'wynn', folder: '/tmp' })}\n`)
-  const out = startSession({ home, kit: HERE, key: 'wynn', folder: '/tmp', role: 'r', bin: fake.bin, trust: NO_TRUST, resumeOnly: true })
+  const gone = '0a1b2c3d-1111-4222-8333-444455556666'
+  writeFileSync(join(home, 'sessions', 'wynn.json'), `${JSON.stringify({ id: gone, name: 'wynn', folder: '/tmp' })}\n`)
+  const out = startSession({ home, kit: HERE, key: 'wynn', folder: '/tmp', role: 'r', bin: fake.bin, trust: NO_TRUST, resumeOnly: true, jobs: fake.jobs, confirmMs: 0 })
   assert.equal(out.ok, false)
-  assert.match(out.reason, /resume of a0b0c0d0 failed/)
-  assert.match(out.reason, /not started fresh/)
+  assert.equal(out.reason, `resume refused: source session ${gone} not found`)
   const bgCalls = calls(fake).filter(args => args.includes('--bg'))
   assert.equal(bgCalls.length, 1, 'the resume was tried once, and nothing else was started')
   assert.ok(bgCalls[0].includes('--resume'))
-  assert.equal(readRecord(home, 'wynn').id, 'a0b0c0d0', 'the recorded id is kept, not replaced')
+  assert.equal(readRecord(home, 'wynn').id, gone, 'the recorded id is kept, not replaced')
 })
 
 test('resumeOnly: a person with no recorded session id is refused, not started fresh', () => {

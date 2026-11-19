@@ -10,6 +10,7 @@
 // Tests use a fake claude (crew/session.test.mjs). No real session is started by the tests.
 import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { crewHome, crewSlugOf, sessionNameFor } from './home.mjs'
@@ -110,6 +111,8 @@ export function sessionName({ slug, key }) {
 export function startArgs({ key, folder, home, kit, role, model = MODEL, name = checkKey(key), resume = '', prompt = FIRST_PROMPT }) {
   // The id is typed into the argv of a process, so it must be a session id (see SESSION_ID).
   if (resume && !validSessionId(resume)) throw new Error(`not a session id: ${resume}`)
+  // A resume is the bare form: claude keeps the session's saved options, and any other flag starts a copy under a new id.
+  if (resume) return { cwd: folder, args: ['--bg', '--resume', resume] }
   return {
     cwd: folder,
     args: [
@@ -123,7 +126,10 @@ export function startArgs({ key, folder, home, kit, role, model = MODEL, name = 
   }
 }
 
-/** The sessions `claude agents --json` lists, as { id, name, state, status, startedAt }. Anything else is dropped. */
+/**
+ * The sessions `claude agents --json` lists, as { id, shortId, name, state, status, startedAt }. A background session has a short
+ * `id` (8 characters) and a full `sessionId`; the id here is the full one, because `claude --resume` needs it. Anything else is dropped.
+ */
 export function parseAgents(json) {
   let list
   try {
@@ -133,14 +139,18 @@ export function parseAgents(json) {
   }
   if (!Array.isArray(list)) return null
   return list
-    .filter(a => a && validSessionId(a.id))
-    .map(a => ({ id: a.id, name: a.name ?? '', state: a.state ?? '', status: a.status ?? '', startedAt: Number(a.startedAt) || 0 }))
+    .filter(a => a && (validSessionId(a.sessionId) || validSessionId(a.id)))
+    .map(a => ({
+      id: validSessionId(a.sessionId) ? a.sessionId : a.id,
+      shortId: validSessionId(a.id) ? a.id : '',
+      name: a.name ?? '', state: a.state ?? '', status: a.status ?? '', startedAt: Number(a.startedAt) || 0
+    }))
 }
 
-/** The live entry for a recorded id, or null. Matched by id only; the name is never used to find a live session here. */
+/** The live entry for a recorded id, or null. Matched by id (full or short) only; the name is never used to find a live session here. */
 export function liveById(list, id) {
   if (!Array.isArray(list) || !validSessionId(id)) return null
-  const hit = list.find(a => a.id === id)
+  const hit = list.find(a => a.id === id || (a.shortId && a.shortId === id))
   if (!hit || hit.state === 'ended' || hit.status === 'stopped') return null
   return hit
 }
@@ -164,12 +174,12 @@ export function listAgents(opts = {}) {
 }
 
 /**
- * Starts the person's session, unless the recorded one is live. A recorded session that is not live is resumed first (the same
- * id, the same transcript); when claude refuses the resume, a fresh start follows and the new id is recorded. Before the start,
- * the crew's own folders are trusted in Claude Code's config (`trust`, claude-trust.mjs); a folder the crew did not make is
- * refused with a sentence that says what crew update does.
+ * Starts the person's session, unless the recorded one is live. A recorded session that is not live is resumed (the same id, the
+ * same transcript), and a refused resume is an error: `resume refused: <detail>`, never a fresh start. A record with no id starts
+ * a fresh session and records its id. Before the start, the crew's own folders are trusted in Claude Code's config (`trust`,
+ * claude-trust.mjs); a folder the crew did not make is refused with a sentence that says what crew update does.
  */
-export function startSession({ home, kit, key, folder, role, bin, now = Date.now, trust = trustForStart, resumeOnly = false }) {
+export function startSession({ home, kit, key, folder, role, bin, now = Date.now, trust = trustForStart, resumeOnly = false, jobs, confirmMs = RESUME_CONFIRM_MS }) {
   checkKey(key)
   if (!folder || !existsSync(folder)) return { ok: false, reason: `the folder for ${key} does not exist: ${folder ?? '(none)'}` }
   const list = listAgents({ bin })
@@ -182,34 +192,112 @@ export function startSession({ home, kit, key, folder, role, bin, now = Date.now
   if (!trusted.ok) return { ok: false, reason: trusted.reason }
   const name = sessionName({ slug: crewSlug(home), key })
   // The session's own mcp config, written before the start, so the strict flag always has a file to read.
+  // Applies to a FRESH start only: a resume passes no flags, and claude keeps the mcp config saved when the session first
+  // started. A later change to this file does not reach a resumed session (a changed config needs a fresh start).
   mkdirSync(join(home, 'sessions'), { recursive: true })
   writeFileSync(mcpConfigPath(home, key), `${JSON.stringify(mcpConfig({ key, home, kit }), null, 2)}\n`, { mode: 0o600 })
   // The person's own settings file (deny rules, own CREW_HOME, remote control off), written before the start: the start
   // passes that one file as its --settings. The long-run profile's env is merged in, so the session keeps the owner's timeouts.
+  // Applies to a FRESH start only: a resume keeps the settings saved when the session first started (deny rules, profile env),
+  // so a later change to this file does not reach a resumed session.
   writeSettingsFile(home, key, { profileEnv: longRunEnv(kit) })
-  // The resume first (when there is a recorded id), then a fresh start if claude refuses it. A folder claude does not trust
-  // is not retried: the same refusal would come back.
-  const resumeId = validSessionId(record?.id) ? record.id : ''
-  let run
-  let resumed = false
-  for (const resume of resumeId ? (resumeOnly ? [resumeId] : [resumeId, '']) : ['']) {
-    const { cwd, args } = startArgs({ key, folder, home, kit, role, name, resume })
-    run = runClaude(args, { bin, cwd })
-    resumed = Boolean(resume) && run.ok
-    if (run.ok || /not trusted/i.test(run.stderr)) break
+  // A record with an id is resumed, and only resumed: claude does not refuse an unknown id, it leaves a failed job, so the job
+  // is checked (confirmResume) before the resume counts. A record written before the full id was kept holds the short id: the
+  // full one comes from agents, else from the job record. A folder claude does not trust is reported with its own sentence.
+  const resumeId = validSessionId(record?.id) ? fullIdOf(list, record.id, jobs) : ''
+  if (resumeId) {
+    const { cwd, args } = startArgs({ key, folder, home, kit, role, name, resume: resumeId })
+    const run = runClaude(args, { bin, cwd })
+    // Claude refuses a folder it does not trust with 'not trusted' on stderr: the reason names the folder and says what crew update does.
+    if (!run.ok && /not trusted/i.test(run.stderr)) return { ok: false, reason: notTrustedReason(folder, readWorktreeBase(home)) }
+    if (!run.ok) return { ok: false, reason: `resume refused: ${run.stderr || `exit ${run.status}`}` }
+    const verdict = confirmResume({ bin, jobs, resumeId, name, confirmMs })
+    if (!verdict.ok) return { ok: false, reason: `resume refused: ${verdict.detail}` }
+    writeRecord(home, key, { id: resumeId, name: key, folder, startedAt: now(), recordedAt: new Date(now()).toISOString() })
+    return { ok: true, id: resumeId, started: true, resumed: true }
   }
-  if (!run.ok && resumeOnly) return { ok: false, reason: `resume of ${resumeId} failed: ${run.stderr || `exit ${run.status}`}; not started fresh` }
+  const { cwd, args } = startArgs({ key, folder, home, kit, role, name })
+  const run = runClaude(args, { bin, cwd })
   // Claude refuses a folder it does not trust with 'not trusted' on stderr: the reason names the folder and says what crew update does.
   if (!run.ok && /not trusted/i.test(run.stderr)) return { ok: false, reason: notTrustedReason(folder, readWorktreeBase(home)) }
   if (!run.ok) return { ok: false, reason: `claude did not start the session: ${run.stderr || `exit ${run.status}`}` }
   const after = listAgents({ bin }) ?? []
-  // A resumed session keeps its id. A fresh one is the newest session with this person's name: the name is used once, here,
-  // to learn the id; after that the id is the only handle.
-  const resumedLive = resumed ? liveById(after, resumeId) : null
-  const fresh = resumedLive ?? after.filter(a => a.name === name && a.state !== 'ended' && a.status !== 'stopped').sort((a, b) => b.startedAt - a.startedAt)[0]
+  // A fresh one is the newest session with this person's name: the name is used once, here, to learn the id; after that the id is
+  // the only handle.
+  const fresh = after.filter(a => a.name === name && a.state !== 'ended' && a.status !== 'stopped').sort((a, b) => b.startedAt - a.startedAt)[0]
   if (!fresh) return { ok: false, reason: `claude started, but no live session named ${name} shows in claude agents` }
   writeRecord(home, key, { id: fresh.id, name: key, folder, startedAt: fresh.startedAt || now(), recordedAt: new Date(now()).toISOString() })
-  return { ok: true, id: fresh.id, started: true, resumed: Boolean(resumedLive) }
+  return { ok: true, id: fresh.id, started: true, resumed: false }
+}
+
+/**
+ * How long a resume may take before the kit refuses it. Claude lists a resumed session at once, under the person's name. An unknown
+ * id is listed as a working job named by its short id for about 20 s, then its job fails (checked 2026-11-19): the window is longer
+ * than that, so the failure arrives first.
+ */
+export const RESUME_CONFIRM_MS = 45000
+
+function sleepMs(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
+}
+
+/** The folder of claude's job records: `jobs` when given, else CREW_JOBS_DIR, else ~/.claude/jobs (each job's folder is its short id). */
+export function jobsDirOf(jobs) {
+  return jobs || process.env.CREW_JOBS_DIR || join(homedir(), '.claude', 'jobs')
+}
+
+/** One job's state.json as an object, or null when there is none. */
+export function readJob(jobs, short) {
+  const path = join(jobsDirOf(jobs), short, 'state.json')
+  if (!existsSync(path)) return null
+  try {
+    return JSON.parse(readFileSync(path, 'utf8'))
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Checks a resume after `claude --bg --resume <id>`. Claude does not refuse an unknown id: it leaves a job that fails after a while,
+ * and lists it under its short id. So: a failed job is refused at once, with its detail; the session counts as resumed only when
+ * agents lists this id live (not blocked) under the person's own session `name`. Otherwise the check waits up to `confirmMs`, then refuses.
+ */
+export function confirmResume({ bin, jobs, resumeId, name, confirmMs = RESUME_CONFIRM_MS, sleep = sleepMs, now = Date.now }) {
+  const deadline = now() + confirmMs
+  for (;;) {
+    const job = readJob(jobs, resumeId.slice(0, 8))
+    if (job?.state === 'failed') return { ok: false, detail: job.detail || 'the job failed' }
+    const hit = (listAgents({ bin }) ?? []).find(a => a.id === resumeId)
+    if (hit && hit.name === name && !['blocked', 'ended'].includes(hit.state) && !['blocked', 'stopped'].includes(hit.status)) return { ok: true }
+    if (now() >= deadline) return { ok: false, detail: `session ${resumeId} did not come back as ${name} within ${Math.round(confirmMs / 1000)} s` }
+    sleep(250)
+  }
+}
+
+/**
+ * The full sessionId for a recorded id: the id itself when agents lists it, else the entry whose short id it is; a short id agents
+ * does not list (a stopped session) takes the sessionId of its job record (`<short>*\/state.json`); else the id as given.
+ */
+export function fullIdOf(list, id, jobs) {
+  const hit = Array.isArray(list) ? list.find(a => a.id === id || a.shortId === id) : null
+  if (hit) return hit.id
+  if (/^[0-9a-fA-F]{8}$/.test(id)) {
+    const full = jobSessionIdOf(jobs, id)
+    if (full) return full
+  }
+  return id
+}
+
+/** The sessionId of the job record whose folder starts with this short id, or '' when there is none. */
+export function jobSessionIdOf(jobs, short) {
+  const dir = jobsDirOf(jobs)
+  if (!existsSync(dir)) return ''
+  for (const folder of readdirSync(dir)) {
+    if (!folder.startsWith(short)) continue
+    const sessionId = readJob(jobs, folder)?.sessionId
+    if (validSessionId(sessionId) && sessionId.startsWith(short)) return sessionId
+  }
+  return ''
 }
 
 export function sessionStatus({ home, key, bin }) {
@@ -232,8 +320,10 @@ export function sessionList({ home, bin }) {
 export function stopSession({ home, key, bin }) {
   const record = readRecord(home, key)
   if (!record) return { ok: false, reason: `${key}: no recorded session to stop` }
-  // `claude stop <id>` is a verified verb: Boss used it on real sessions on 2026-11-19 (card mwmzv2jt).
-  const run = runClaude(['stop', record.id], { bin })
+  // `claude stop` takes the short id that `claude agents` shows (the first 8 characters of the session id), not the full one:
+  // the full id gets "No session matching" (checked 2026-11-19 on a scratch session). Resume still takes the full id.
+  const short = validSessionId(record.id) ? record.id.slice(0, 8) : record.id
+  const run = runClaude(['stop', short], { bin })
   return run.ok ? { ok: true, id: record.id } : { ok: false, reason: `claude stop ${record.id} failed: ${run.stderr || `exit ${run.status}`}` }
 }
 
@@ -256,9 +346,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     if (!resolved.role) out = { ok: false, reason: resolved.reason || `no role for ${key}` }
     else {
       if (resolved.write) writeRoleFile(home, key, resolved.role)
-      out = startSession({ home, kit, key, folder: folder ?? process.cwd(), role: resolved.role, bin })
+      out = startSession({ home, kit, key, folder: folder ?? process.cwd(), role: resolved.role, bin, jobs: process.env.CREW_JOBS_DIR })
     }
-    console.log(out.ok ? `${key}: session ${out.id} ${out.started ? 'started' : out.note}` : out.reason)
+    // A resume says so, and a refused one is the reason alone (exit 1): nothing is started fresh.
+    const word = out.ok ? (out.resumed ? 'resumed' : out.started ? 'started' : out.note) : ''
+    console.log(out.ok ? `${key}: session ${out.id} ${word}` : out.reason)
     process.exit(out.ok ? 0 : 1)
   }
   if (command === 'status') {
