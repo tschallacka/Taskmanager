@@ -46,6 +46,14 @@ export async function deliverBossMail({ creds = {}, mailboxDir, text, makeId, fe
   }
 }
 
+/**
+ * The attach terminal's name for one person: sessionwake-<key>. Two wakes for different people then never kill each
+ * other's terminal (the old shared name did). Only letters, digits, dash and underscore reach the shell script.
+ */
+export function terminalName(key) {
+  return `sessionwake-${String(key ?? '').replace(/[^A-Za-z0-9_-]/g, '')}`
+}
+
 export const IDLE_WAIT_MS = 5 * 60_000
 export const POLL_MS = 15_000
 export const LOG_CUT = 80
@@ -118,7 +126,7 @@ export async function wakeOnce({ record, list, text, cardId, key, type, readList
   // Only a session that is gone counts here. Busy (a timeout while working) and unknown (claude agents silent) are waits.
   if (waited !== 'idle') return finish(false, `session ${record.id} was ${waited}, not idle; retry next tick`, record, { key, cardId }, waited === 'gone')
   try {
-    await type({ id: record.id, text })
+    await type({ id: record.id, text, key })
     return finish(true, `woke ${record.id} with "${logCut(text)}"`, record, { key, cardId })
   } catch (error) {
     // The hold reasons come through as they are (the caller reads them from stderr); anything else is a paste failure.
@@ -157,7 +165,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const out = await wakeOnce({
     record, list, text, cardId, key,
     type: ({ id, text: body }) => {
-      const run = spawnSync('sh', [join(kit, 'session-wake.sh'), id, body], { encoding: 'utf8', timeout: 120000 })
+      // The script waits up to 30 s for the prompt, then pastes: the timeout covers that and the tool calls around it.
+      const run = spawnSync('sh', [join(kit, 'session-wake.sh'), id, body, terminalName(key)], { encoding: 'utf8', timeout: 300000 })
       if (run.status !== 0) throw new Error(String(run.stderr || `exit ${run.status}`).trim().split('\n').pop())
     },
     readList: () => listAgents({ bin })
