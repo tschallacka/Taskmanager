@@ -136,7 +136,9 @@ export function activityRows({ root, hours = 6, now = Date.now(), cmdlines = [],
 
 /** Whether a command line is Pia's Claude Code process. */
 export function isPiaProcess(args) {
-  return PIA_PROCESS.every((word, i) => args[i] === word) && PIA_MODELS.includes(args[3])
+  // Pia's session is resumed by id now (`claude --resume <id> --model <model>`), so that form is hers as well.
+  const resumed = args[0] === 'claude' && args[1] === '--resume' && args[3] === '--model' && PIA_MODELS.includes(args[4])
+  return resumed || (PIA_PROCESS.every((word, i) => args[i] === word) && PIA_MODELS.includes(args[3]))
 }
 
 function main() {

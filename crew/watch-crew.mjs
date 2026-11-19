@@ -8,6 +8,7 @@
 // its runs, and a person can show "ended" for a moment between a reply and the next step).
 import { pathToFileURL } from 'node:url'
 import { activityRows, isPiaProcess, piaProjectsDir, readCmdlines } from './activity.mjs'
+import { isStopped } from './susy-detect.mjs'
 
 export const QUIET_MINUTES = 20
 export const CHECK_SECONDS = 180
@@ -15,9 +16,10 @@ export const CONFIRM_SECONDS = 30
 
 /**
  * The problems in one look at the rows: a string such as " pia-quiet-25min; susy-working-22min;", "" when all is well.
- * `rows` are activityRows() rows; `alive` says whether Pia's Claude process runs.
+ * `rows` are activityRows() rows; `alive` says whether Pia's Claude process runs. `susyStopped` is true while the stop marker
+ * of Susy's daemon is there (she was stopped on purpose): Susy is then not judged at all (card mwnzgxz5uschuba1y7).
  */
-export function problemsOf({ rows, alive }) {
+export function problemsOf({ rows, alive, susyStopped = false }) {
   const pia = rows.find(r => r.key === 'pia')
   const susy = rows.find(r => r.key === 'susy')
   const out = []
@@ -26,6 +28,7 @@ export function problemsOf({ rows, alive }) {
     if (pia.mins >= QUIET_MINUTES) out.push(`pia-quiet-${pia.mins}min`)
     if (/NO own listener/.test(pia.what)) out.push('pia-no-listener-in-her-session')
   }
+  if (susyStopped) return out.length ? ` ${out.join('; ')};` : ''
   if (!susy) out.push('susy-not-running')
   else if (['working', 'running', 'listening'].includes(susy.state)) {
     if (susy.mins >= QUIET_MINUTES) out.push(`susy-${susy.state}-${susy.mins}min`)
@@ -40,10 +43,10 @@ export function isTransient(problems) {
 }
 
 /** Reads the rows and Pia's process now. `root` is Pia's Claude folder; `readCmdlines` and `activityRows` are injectable. */
-export function look({ root, hours = 6, now = Date.now(), cmdlines = readCmdlines() } = {}) {
+export function look({ root, hours = 6, now = Date.now(), cmdlines = readCmdlines(), home = null } = {}) {
   const alive = cmdlines.some(isPiaProcess)
   const rows = activityRows({ root, hours, now, cmdlines, alive })
-  return problemsOf({ rows, alive })
+  return problemsOf({ rows, alive, susyStopped: home ? isStopped(home) : false })
 }
 
 /**
@@ -77,7 +80,7 @@ function main() {
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
   const root = piaProjectsDir(crewHome)
   return watchLoop({
-    check: () => look({ root }),
+    check: () => look({ root, home: crewHome }),
     print: text => console.log(text),
     wait: () => sleep(CHECK_SECONDS * 1000),
     confirmWait: () => sleep(CONFIRM_SECONDS * 1000)
