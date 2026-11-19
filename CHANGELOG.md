@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.54.1 - 2026-11-19
+
+- **Crew: a fresh session gets its first prompt.** `crew session start` passes the first prompt right after `--bg` (`FIRST_PROMPT` in `crew/session.mjs`), so a new session takes one turn and idles, ready for mail. Files: `crew/session.mjs`, `crew/session.test.mjs`.
+
 ## 0.54.0 - 2026-11-18
 
 - **The accent colour shows a live preview.** The Appearance section has a primary button under the swatches; it takes the accent you pick at once. The accent and neutral swatches also show their names and a keyboard focus ring. Files: `app/components/settings/Appearance.vue`, `app/pages/settings/appearance.vue`.

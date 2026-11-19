@@ -1,1 +1,0 @@
-- **Crew: a fresh session gets its first prompt.** `crew session start` passes the first prompt right after `--bg` (`FIRST_PROMPT` in `crew/session.mjs`), so a new session takes one turn and idles, ready for mail. Files: `crew/session.mjs`, `crew/session.test.mjs`.
