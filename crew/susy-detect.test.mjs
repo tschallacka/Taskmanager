@@ -183,7 +183,7 @@ test('a person whose recorded session is live, or who holds no card, is not repo
 test('a wake that failed three times in a row: the real tool error, not a cut sentence', () => {
   const problems = detectProblems({
     now: NOW,
-    sessions: [],
+    sessions: [session('taskmanager-maintenance-wick', 'x')],
     records: [{ key: 'wick', id: 'x', wake: { failures: 3, lastError: 'the screen shows a permission dialog: Allow this tool?' } }],
     cards: [card('c5', 'In progress', { assignee: 'Wick Worker' })],
     keyOf: () => 'wick'
