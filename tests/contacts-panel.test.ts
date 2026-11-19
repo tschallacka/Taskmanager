@@ -4,7 +4,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { pendingInvitedEmails, showNobodyLine } from '../app/utils/contactsPanel'
+import { pendingInvitations, pendingInvitedEmails, showNobodyLine } from '../app/utils/contactsPanel'
 
 test('a customer with a pending invitation to an address is not said to have nobody', () => {
   assert.equal(showNobodyLine(0, 1), false)
@@ -18,4 +18,12 @@ test('the pending addresses are the invitations that carry one; an anonymous lin
     { email: null, label: 'anyone' },
     { email: 'inv-ben@scratch.example.test', label: null }
   ]), ['inv-ana@scratch.example.test', 'inv-ben@scratch.example.test'])
+})
+
+test('the pending rows are the invitations themselves, so a row keeps its own invitation to revoke', () => {
+  const ana = { id: 'inv-1', email: 'inv-ana@scratch.example.test', label: null }
+  const link = { id: 'inv-2', email: null, label: 'anyone' }
+  const rows = pendingInvitations([ana, link])
+  assert.equal(rows.length, 1)
+  assert.equal(rows[0], ana)
 })

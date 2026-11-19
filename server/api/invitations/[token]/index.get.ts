@@ -1,5 +1,5 @@
 import { db } from '../../../db'
-import { customerInvitations, customers, organization, projects } from '../../../db/schema'
+import { customerInvitations, customers, organization } from '../../../db/schema'
 import { eq } from 'drizzle-orm'
 import { hashInvitationToken, INVITATION_COOKIE } from '../../../utils/customers'
 import { auth } from '../../../lib/auth'
@@ -8,6 +8,7 @@ import { addressesOfUser } from '../../../utils/extraEmails'
 import { guestProjectIdsOf } from '../../../utils/guests'
 import { sharedProjectIds } from '../../../utils/sharedProjectIds'
 import { pendingBoardProjectIdsFor } from '../../../utils/pendingInvites'
+import { projectsSharedWith } from '../../../utils/customerProjects'
 import { invitedAddressIsMine } from '../../../utils/customerInviteRules'
 
 // What an invitation link is for, readable before signing in: the invite page
@@ -30,6 +31,8 @@ export default defineEventHandler(async (event) => {
   if (addressed !== 'missing') {
     if (addressed === 'used') throw createError({ statusCode: 410, message: 'This invitation has already been used' })
     if (addressed === 'expired') throw createError({ statusCode: 410, message: 'This invitation has expired' })
+    if (addressed === 'revoked') throw createError({ statusCode: 410, message: 'This invitation was withdrawn or revoked.' })
+    if (addressed === 'withdrawn') throw createError({ statusCode: 410, message: 'This board invitation was withdrawn.' })
     rememberToken()
     // The address stays out of the answer: whoever holds the link has to know it, not read it here.
     // `forYou` only says whether the account signed in right now (if any) is the one invited.
@@ -53,6 +56,7 @@ export default defineEventHandler(async (event) => {
       expiresAt: customerInvitations.expiresAt,
       acceptedAt: customerInvitations.acceptedAt,
       acceptedBy: customerInvitations.acceptedBy,
+      revokedAt: customerInvitations.revokedAt,
       email: customerInvitations.email,
       customerId: customers.id,
       customerName: customers.name,
@@ -63,18 +67,19 @@ export default defineEventHandler(async (event) => {
     .innerJoin(organization, eq(organization.id, customers.organizationId))
     .where(eq(customerInvitations.tokenHash, hashInvitationToken(token)))
 
-  if (!row) throw createError({ statusCode: 404, message: 'This invitation does not exist' })
+  if (!row) throw createError({ statusCode: 404, message: 'This invitation link is not valid' })
   if (row.acceptedAt) {
     // The page sends the account that accepted the link to its projects (see app/utils/usedInvite.ts).
     const usedBy = await auth.api.getSession({ headers: event.headers }).catch(() => null)
     const acceptedByYou = usedBy !== null && usedBy.user.id === row.acceptedBy
     throw createError({ statusCode: 410, message: 'This invitation has already been used', data: { acceptedByYou } })
   }
+  if (row.revokedAt) throw createError({ statusCode: 410, message: 'This invitation was withdrawn or revoked.' })
   if (row.expiresAt <= Date.now()) throw createError({ statusCode: 410, message: 'This invitation has expired' })
 
   // How many projects are shared with this person as a customer contact: the customer's projects, and the boards
   // they hold as a guest when they are signed in. The page says before accepting that there are none yet.
-  const customerShared = await db.select({ id: projects.id }).from(projects).where(eq(projects.customerId, row.customerId))
+  const customerShared = await projectsSharedWith(row.customerId)
   const session = await auth.api.getSession({ headers: event.headers }).catch(() => null)
   const guestShared = session ? await guestProjectIdsOf(session.user.id) : []
   // Board invitations already sent to this account's address count too: accepting claims them (see utils/pendingInvites).

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { CustomerContact, CustomerInvitation } from '~/composables/useCustomers'
 import { emptyCustomerWarning, inviteEmailError } from '#shared/utils/inviteEmail'
-import { pendingInvitedEmails, showNobodyLine } from '~/utils/contactsPanel'
+import { pendingInvitations, pendingInvitedEmails, showNobodyLine } from '~/utils/contactsPanel'
 
 const open = defineModel<boolean>('open', { default: false })
 
@@ -92,8 +92,9 @@ const tickedProjectIds = ref<string[]>([])
 const inviting = ref(false)
 
 const teamProjects = computed(() => projects.value.filter(project => project.teamId === (activeTeam.value?.id ?? null)))
+// The server's count: a project shared through the join table counts for every customer it is shared with.
 function customerProjectCount(customerId: string) {
-  return projects.value.filter(project => project.customerId === customerId).length
+  return customers.value.find(customer => customer.id === customerId)?.projectCount ?? 0
 }
 function toggleProject(id: string) {
   tickedProjectIds.value = tickedProjectIds.value.includes(id)
@@ -142,7 +143,8 @@ async function handleInvite(customerId: string) {
     tickedProjectIds.value = []
     copied.value = false
     invitations.value = [res, ...invitations.value]
-    await refreshProjects()
+    // The counts (projects, contacts) and the customer's contacts reload, so the popup shows the change without a reload.
+    await Promise.all([refreshProjects(), refresh(), loadDetail(customerId)])
   } catch (e) {
     fail(e, 'Could not create an invitation link')
   } finally {
@@ -241,7 +243,7 @@ function confirmRevoke(customerId: string, invitation: CustomerInvitation) {
       v-model:open="open"
       :title="activeTeam ? `Customers of ${activeTeam.name}` : 'Customers'"
       description="Customers group projects and log in to follow them. They see only the tasks you share with them."
-      :ui="{ content: 'sm:max-w-2xl' }"
+      :ui="{ content: 'sm:max-w-2xl', title: 'pr-10 break-words' }"
     >
       <template #body>
         <div class="space-y-4 text-sm">
@@ -313,15 +315,15 @@ function confirmRevoke(customerId: string, invitation: CustomerInvitation) {
                 <template v-else>
                   <button
                     type="button"
-                    class="flex min-w-0 flex-1 items-center gap-2 text-left"
+                    class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5 text-left"
                     @click="toggle(c.id)"
                   >
                     <UIcon
                       :name="expandedId === c.id ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
                       class="size-4 shrink-0 text-muted"
                     />
-                    <span class="truncate font-medium text-default">{{ c.name }}</span>
-                    <span class="shrink-0 text-xs text-muted">
+                    <span class="min-w-0 break-words font-medium text-default">{{ c.name }}</span>
+                    <span class="text-xs text-muted">
                       {{ c.projectCount }} {{ c.projectCount === 1 ? 'project' : 'projects' }} ·
                       {{ c.contactCount }} {{ c.contactCount === 1 ? 'contact' : 'contacts' }}
                     </span>
@@ -371,13 +373,23 @@ function confirmRevoke(customerId: string, invitation: CustomerInvitation) {
                     >
                       Nobody logs in for {{ c.name }} yet.
                     </p>
-                    <p
-                      v-for="email in pendingInvitedEmails(invitations)"
-                      :key="`pending-${email}`"
-                      class="text-xs text-muted"
+                    <div
+                      v-for="invitation in pendingInvitations(invitations)"
+                      :key="`pending-${invitation.id}`"
+                      class="flex items-center justify-between gap-2"
                     >
-                      Invited, not accepted yet: {{ email }}
-                    </p>
+                      <p class="min-w-0 break-words text-xs text-muted">
+                        Invited, not accepted yet: {{ invitation.email }}
+                      </p>
+                      <UButton
+                        label="Revoke"
+                        icon="i-lucide-x"
+                        size="xs"
+                        color="error"
+                        variant="ghost"
+                        @click="confirmRevoke(c.id, invitation)"
+                      />
+                    </div>
                     <div
                       v-for="contact in contacts"
                       :key="contact.userId"
@@ -421,11 +433,15 @@ function confirmRevoke(customerId: string, invitation: CustomerInvitation) {
                     <div
                       v-for="inv in invitations"
                       :key="inv.id"
-                      class="flex items-center justify-between gap-2 text-xs"
+                      class="flex items-start justify-between gap-2 text-xs"
                     >
-                      <span class="truncate text-default">{{ inv.email ? `Invited, not accepted yet: ${inv.email}` : (inv.label || 'Unlabelled link') }}</span>
+                      <div class="min-w-0 flex-1">
+                        <p class="break-words text-default">
+                          {{ inv.email ? `Invited, not accepted yet: ${inv.email}` : (inv.label || 'Unlabelled link') }}
+                        </p>
+                        <span class="block text-muted">expires {{ formatDate(inv.expiresAt) }}</span>
+                      </div>
                       <div class="flex shrink-0 items-center gap-1">
-                        <span class="text-muted">expires {{ formatDate(inv.expiresAt) }}</span>
                         <UButton
                           icon="i-lucide-x"
                           size="xs"

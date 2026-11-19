@@ -14,6 +14,7 @@ import type { ApiKeyContext } from './api-keys'
 import { customerIdsOf, projectAccessFilter, sessionProjectFilter } from './auth-helpers'
 import type { Audience } from './auth-helpers'
 import { guestProjectIdsOf } from './guests'
+import { projectsOfCustomers } from './customerProjects'
 import { McpToolError } from './mcpToolKit'
 import { boardsGranting } from './connectTokenRules'
 
@@ -32,7 +33,7 @@ export async function openBoardScope(userId: string, memberTeamIds: string[]) {
   const open = or(
     memberTeamIds.length ? inArray(projects.teamId, memberTeamIds) : undefined,
     and(eq(projects.userId, userId), isNull(projects.teamId)),
-    customerIds.length ? inArray(projects.customerId, customerIds) : undefined,
+    customerIds.length ? projectsOfCustomers(customerIds) : undefined,
     guestIds.length ? inArray(projects.id, guestIds) : undefined
   )!
   return { open, customerIds, guestIds }
@@ -56,7 +57,7 @@ export async function boardFilter(context: ApiKeyContext) {
     reach.boardIds.length ? inArray(projects.id, reach.boardIds) : undefined
   ]
   const granted = or(...grants) ?? sql`false`
-  const narrowed = context.customerId ? and(granted, eq(projects.customerId, context.customerId)) : granted
+  const narrowed = context.customerId ? and(granted, projectsOfCustomers([context.customerId])) : granted
   // A token with per-board grants reaches only the boards that grant the permission of this call.
   const perBoard = boardsGranting(context.scopes, context.boardScopes, context.callScope)
   const onGrantedBoards = perBoard === null ? undefined : perBoard.length ? inArray(projects.id, perBoard) : sql`false`

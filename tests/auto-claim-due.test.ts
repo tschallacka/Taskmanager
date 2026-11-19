@@ -4,7 +4,14 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { autoClaimDue } from '../app/utils/pendingInvitationEntry'
+import { autoClaimDue, claimableCount } from '../app/utils/pendingInvitationEntry'
+
+test('the sign-in claim counts the customer invitations on the pending page and the team and board ones it accepts', () => {
+  assert.equal(claimableCount({ invitations: [], claimable: 1 }), 1)
+  assert.equal(claimableCount({ invitations: [{}], claimable: 2 }), 3)
+  assert.equal(claimableCount({ invitations: [] }), 0)
+  assert.equal(claimableCount(undefined), 0)
+})
 
 test('a tied invitation is accepted by itself once the page is ready and teams are loaded', () => {
   assert.equal(autoClaimDue({ ready: true, teamsPending: false, pendingCount: 1, done: false }), true)

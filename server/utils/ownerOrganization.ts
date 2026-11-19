@@ -82,13 +82,13 @@ export function invitationTokenFrom(headers: Headers | undefined): string | null
 export async function admitsSignUp(token: string | null, email: string, provider: { verified: boolean } | null): Promise<boolean> {
   if (!token) return false
   const [row] = await db
-    .select({ id: customerInvitations.id, acceptedAt: customerInvitations.acceptedAt })
+    .select({ id: customerInvitations.id, acceptedAt: customerInvitations.acceptedAt, revokedAt: customerInvitations.revokedAt })
     .from(customerInvitations)
     .where(and(
       eq(customerInvitations.tokenHash, hashInvitationToken(token)),
       gt(customerInvitations.expiresAt, Date.now())
     ))
-  if (row && !row.acceptedAt) return true
+  if (row && !row.acceptedAt && !row.revokedAt) return true
   // A team or a board invites one address; only an account made with that address is admitted.
   const addressed = await lookupAddressedInvitation(token)
   if (typeof addressed === 'string') return false

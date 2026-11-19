@@ -11,7 +11,9 @@ export type InvitationLookup
   = | { kind: 'team', id: string, email: string, role: string, organizationId: string, organizationName: string, inviterName: string | null }
     | { kind: 'board', id: string, email: string, role: 'editor' | 'manager', projectId: string, projectName: string, organizationName: string | null, inviterName: string | null }
 
-export type InvitationProblem = 'missing' | 'used' | 'expired'
+// 'revoked': the owner withdrew the link (a team invitation); 'withdrawn': the owner withdrew a board guest link (its row stays,
+// with status 'revoked'); 'missing' is a link that is not in the database at all.
+export type InvitationProblem = 'missing' | 'used' | 'expired' | 'revoked' | 'withdrawn'
 
 /** What a team or board invitation link is for, or why it is not usable. Customer links are read elsewhere. */
 export async function lookupAddressedInvitation(token: string): Promise<InvitationLookup | InvitationProblem> {
@@ -35,7 +37,8 @@ export async function lookupAddressedInvitation(token: string): Promise<Invitati
     .leftJoin(user, eq(user.id, teamInvitations.invitedBy))
     .where(eq(teamInvitations.tokenHash, tokenHash))
   if (team) {
-    if (team.acceptedAt || team.revokedAt) return 'used'
+    if (team.acceptedAt) return 'used'
+    if (team.revokedAt) return 'revoked'
     if (team.expiresAt <= now) return 'expired'
     return { kind: 'team', id: team.id, email: team.email, role: team.role, organizationId: team.organizationId, organizationName: team.organizationName, inviterName: team.inviterName }
   }
@@ -58,6 +61,8 @@ export async function lookupAddressedInvitation(token: string): Promise<Invitati
     .leftJoin(user, eq(user.id, projectGuestInvitations.invitedBy))
     .where(eq(projectGuestInvitations.tokenHash, tokenHash))
   if (board) {
+    // A board invitation the owner withdrew (or sent again to the address) is 'revoked', not spent: its own answer.
+    if (board.status === 'revoked') return 'withdrawn'
     if (board.status !== 'open') return 'used'
     if (board.expiresAt <= now) return 'expired'
     return { kind: 'board', id: board.id, email: board.email, role: board.role, projectId: board.projectId, projectName: board.projectName, organizationName: board.organizationName, inviterName: board.inviterName }
@@ -104,6 +109,11 @@ export function inviteUrl(event: H3Event, token: string): string {
 
 function escapeHtml(text: string): string {
   return text.replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' })[ch]!)
+}
+
+/** Whether this instance is set up to send mail at all (a failed send is a different case, see mailInvitation). */
+export function mailIsConfigured(): boolean {
+  return mailEnabled
 }
 
 /**

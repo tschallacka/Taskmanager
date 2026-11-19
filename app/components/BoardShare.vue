@@ -72,22 +72,40 @@ async function loadListing() {
   } finally {
     loadingList.value = false
   }
+  // The customer the project is filed under: the picker starts on it, so a filed customer shows selected, not the placeholder.
+  const project = await untypedFetch<{ customerId?: string | null }>(base.value).catch(() => null)
+  filedCustomerId.value = project?.customerId ?? ''
   if (!props.outsideReader && listing.value?.me.kind === 'admin') {
     staff.value = (await untypedFetch<{ people: StaffPerson[] }>(`${base.value}/members`).catch(() => ({ people: [] as StaffPerson[] }))).people
   }
 }
 
-// ─── Invite as a customer contact ──────────────────────────
+// ─── Invite by email (a customer contact) ──────────────────
 // The project is filed under a customer and an email invitation is made in one step (see
 // server/api/projects/[id]/customer-invite.post.ts). The input rule is tested in tests/project-customer-invite.test.ts.
 const { customers, refresh: refreshCustomers } = useCustomers()
 const customerChoice = ref('')
+// The customer the project is filed under (its first one). The picker starts on it and returns to it after a link.
+const filedCustomerId = ref('')
+// The filed customer, only when the picker holds it: a project of another team has no option for it, so it is not taken.
+const filedChoice = computed(() => (customers.value.some(customer => customer.id === filedCustomerId.value) ? filedCustomerId.value : ''))
+// The picker takes the filed customer when nothing is chosen yet (the project is read, or the team's list arrives).
+watch(filedChoice, (id) => {
+  if (!customerChoice.value) customerChoice.value = id
+})
 const customerNewName = ref('')
 const customerEmail = ref('')
 const customerError = ref('')
 const customerLink = ref('')
+// The address the link was made for: the form clears the email field, so the link box keeps it.
+const customerLinkFor = ref('')
 const customerSending = ref(false)
-const customerItems = computed(() => (customers.value ?? []).map(customer => ({ label: customer.name, value: customer.id })))
+// The picker's options: the team's customers by id. The picker is AppSelect, the app's select (no native selects).
+const customerOptions = computed(() => customers.value.map(customer => ({ label: customer.name, value: customer.id })))
+// A typed new name takes over from the picker: the picker and a typed name never both hold a customer.
+watch(customerNewName, (name) => {
+  if (name.trim()) customerChoice.value = ''
+})
 
 async function inviteCustomer() {
   const problem = customerChoiceError({ customerId: customerChoice.value, customerName: customerNewName.value, email: customerEmail.value })
@@ -98,16 +116,19 @@ async function inviteCustomer() {
   customerSending.value = true
   customerError.value = ''
   try {
-    const answer = await untypedFetch<{ url: string }>(`${base.value}/customer-invite`, {
+    const answer = await untypedFetch<{ url: string, customerId: string }>(`${base.value}/customer-invite`, {
       method: 'POST',
       headers: realtimeHeaders(),
       body: { customerId: customerChoice.value, customerName: customerNewName.value.trim(), email: customerEmail.value.trim() }
     })
     customerLink.value = answer.url
+    customerLinkFor.value = customerEmail.value.trim()
     customerEmail.value = ''
     customerNewName.value = ''
-    customerChoice.value = ''
     await refreshCustomers()
+    // The server files the project under this customer: the picker shows it, as the Share line does after a reopen.
+    filedCustomerId.value = answer.customerId
+    customerChoice.value = answer.customerId
   } catch (e) {
     customerError.value = errorMessage(e, 'Could not invite that person')
   } finally {
@@ -249,7 +270,22 @@ function removeGuest(guest: Guest) {
 }
 
 function withdraw(invitation: Invitation) {
-  return act(`i:${invitation.id}`, () => untypedFetch(`${base.value}/guests/invitations/${invitation.id}`, { method: 'DELETE', headers: realtimeHeaders() }), 'Could not withdraw that')
+  return act(`i:${invitation.id}`, async () => {
+    await untypedFetch(`${base.value}/guests/invitations/${invitation.id}`, { method: 'DELETE', headers: realtimeHeaders() })
+    // The link box shows the link of the invitation just made: once that invitation is withdrawn, the box goes too.
+    if (lastInvite.value?.id === invitation.id) lastInvite.value = null
+  }, 'Could not withdraw that')
+}
+
+// The guest invitation the owner is asked about before it is withdrawn (the confirm below does it).
+const pendingWithdraw = ref<Invitation | null>(null)
+function askWithdraw(invitation: Invitation) {
+  pendingWithdraw.value = invitation
+}
+function confirmWithdraw() {
+  const invitation = pendingWithdraw.value
+  pendingWithdraw.value = null
+  if (invitation) withdraw(invitation)
 }
 
 const approvedLink = ref<{ email: string, url: string, emailed: boolean } | null>(null)
@@ -392,20 +428,24 @@ watch(open, (isOpen) => {
             data-share-customer
           >
             <h3 class="text-sm font-semibold text-default">
-              Invite as a customer contact
+              Invite a customer contact
             </h3>
             <p class="text-xs text-muted">
               The project is filed under the customer, and the invitation is tied to the email. Nothing is sent: copy the link.
+              Only a project of a team can have a customer; a personal project cannot.
             </p>
             <form
               class="space-y-2"
               @submit.prevent="inviteCustomer"
             >
-              <USelect
+              <AppSelect
                 v-model="customerChoice"
-                :items="customerItems"
+                :options="customerOptions"
                 placeholder="Choose the customer"
                 class="w-full"
+                aria-label="The customer"
+                data-share-customer-choice
+                @update:model-value="customerNewName = ''"
               />
               <UInput
                 v-model="customerNewName"
@@ -429,7 +469,21 @@ watch(open, (isOpen) => {
                 class="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 p-2"
               >
                 <code class="min-w-0 flex-1 truncate text-[11px]">{{ customerLink }}</code>
+                <UButton
+                  label="Copy"
+                  icon="i-lucide-copy"
+                  size="xs"
+                  color="neutral"
+                  variant="soft"
+                  @click="copy(customerLink)"
+                />
               </div>
+              <p
+                v-if="customerLink"
+                class="text-xs text-muted break-words"
+              >
+                For {{ customerLinkFor }}. It works for that address only.
+              </p>
               <UButton
                 type="submit"
                 size="sm"
@@ -443,7 +497,7 @@ watch(open, (isOpen) => {
 
           <section class="space-y-2">
             <h3 class="flex items-center gap-1.5 text-sm font-semibold text-default">
-              Invite with email
+              Invite a guest to this board
               <HelpHint page="basics/share-with-guests">
                 A guest sees this board and the tasks that are not marked private. A manager guest can invite people at their own domain.
               </HelpHint>
@@ -788,7 +842,13 @@ watch(open, (isOpen) => {
                     color="neutral"
                     variant="ghost"
                     :disabled="busy === `i:${invitation.id}`"
-                    @click="withdraw(invitation)"
+                    @click="askWithdraw(invitation)"
+                  />
+                  <!-- Withdraw takes the link back at once, so it asks first. -->
+                  <WithdrawConfirm
+                    :open="pendingWithdraw?.id === invitation.id"
+                    @update:open="(open: boolean) => { if (!open) pendingWithdraw = null }"
+                    @confirm="confirmWithdraw"
                   />
                 </div>
                 <p

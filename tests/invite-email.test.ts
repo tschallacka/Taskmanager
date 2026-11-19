@@ -4,12 +4,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { emptyCustomerWarning, fileableProjectIds, inviteEmailError } from '../shared/utils/inviteEmail'
-
-test('only the team\'s own projects can be filed under a customer, each once', () => {
-  assert.deepEqual(fileableProjectIds(['p1', 'x9', 'p2', 'p1'], ['p1', 'p2', 'p3']), ['p1', 'p2'])
-  assert.deepEqual(fileableProjectIds([], ['p1']), [])
-})
+import { emptyCustomerWarning, inviteEmailError } from '../shared/utils/inviteEmail'
 
 test('an email invite takes a valid address, trimmed of spaces', () => {
   assert.equal(inviteEmailError('  ada@example.com ', true), null)

@@ -1,8 +1,9 @@
 import { db } from '../../db'
-import { customerMembers, customers, projects } from '../../db/schema'
+import { customerMembers, customers } from '../../db/schema'
 import { asc, count, eq, inArray } from 'drizzle-orm'
 import { genId } from '../../utils/projects'
 import { requireOrgStaff } from '../../utils/customers'
+import { projectCountsByCustomer } from '../../utils/customerProjects'
 import { publishFromEvent } from '../../utils/realtime'
 
 // The active organisation's customers. Any staff member can read them, since
@@ -19,18 +20,14 @@ export default defineEventHandler(async (event) => {
     if (!rows.length) return { canManage, customers: [] }
 
     const ids = rows.map(c => c.id)
-    const projectCounts = await db
-      .select({ customerId: projects.customerId, total: count() })
-      .from(projects)
-      .where(inArray(projects.customerId, ids))
-      .groupBy(projects.customerId)
+    // Counted through the join table as well as projects.customerId (a project may sit under several customers).
+    const projectsOf = await projectCountsByCustomer(ids)
     const contactCounts = await db
       .select({ customerId: customerMembers.customerId, total: count() })
       .from(customerMembers)
       .where(inArray(customerMembers.customerId, ids))
       .groupBy(customerMembers.customerId)
 
-    const projectsOf = new Map(projectCounts.map(r => [r.customerId, Number(r.total)]))
     const contactsOf = new Map(contactCounts.map(r => [r.customerId, Number(r.total)]))
     return {
       canManage,
