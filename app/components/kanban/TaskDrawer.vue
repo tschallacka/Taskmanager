@@ -7,6 +7,7 @@ import { dueDayToMs, isOverdueDay } from '~/utils/dueDate'
 import { absoluteUrl, copyTaskLink } from '~/utils/copyTaskLink'
 import { activityStartsOpen, taskPanelPath } from '~/utils/taskPanelUrl'
 import { taskLink } from '~/utils/taskLink'
+import { shouldAdoptServerDescription, stripPendingPlaceholders } from '~/utils/editor/imagePlaceholders'
 
 interface Task {
   id: string
@@ -211,6 +212,8 @@ const editorContent = ref('')
 let descTimer: ReturnType<typeof setTimeout> | null = null
 let descDirty = false
 let suppressSave = false
+// What we have sent for this task. The server answers each save, and an answer can arrive after a newer edit: it is ours, not news.
+const ownSaves: string[] = []
 
 function flushDescription(taskId = props.task?.id) {
   if (descTimer) {
@@ -219,7 +222,11 @@ function flushDescription(taskId = props.task?.id) {
   }
   if (!descDirty) return
   descDirty = false
-  if (taskId) updateTask(taskId, { description: editorContent.value })
+  // An image still uploading is not content yet: it is left out of what is saved, and comes in when it finishes.
+  const html = stripPendingPlaceholders(editorContent.value)
+  ownSaves.push(html)
+  if (ownSaves.length > 20) ownSaves.shift()
+  if (taskId) updateTask(taskId, { description: html })
 }
 
 watch(editorContent, () => {
@@ -236,6 +243,7 @@ watch(editorContent, () => {
 watch(() => props.task?.id, (id, previousId) => {
   flushTitle(previousId)
   flushDescription(previousId)
+  ownSaves.length = 0
   if (!id) return
 
   titleDraft.value = props.task?.title ?? ''
@@ -260,7 +268,8 @@ watch(() => props.task?.title, (title) => {
 
 watch(() => props.task?.description, (description) => {
   if (description === undefined || descDirty || descTimer) return
-  if (description === editorContent.value) return
+  // An answer to our own save, or a copy taken while an upload is pending, must not replace the editor (see shouldAdoptServerDescription).
+  if (!shouldAdoptServerDescription(description, editorContent.value, ownSaves)) return
   suppressSave = true
   editorContent.value = description
   nextTick(() => {
@@ -277,25 +286,31 @@ onBeforeUnmount(() => {
 
 // Pasted or dropped into the description. The file is stored with the task and
 // served from the task's own attachment route.
-async function uploadImage(file: File): Promise<string | null> {
+// A failure rejects with the server's reason; the editor puts that reason in the visible line where the image was.
+async function uploadImage(file: File, onProgress?: (progress: number | null) => void): Promise<string | null> {
   const id = props.task?.id
-  if (!id) return null
+  if (!id) throw new Error('Save the task first, then paste the image.')
   const form = new FormData()
   form.append('file', file)
-  try {
-    const res = await $fetch<{ url: string }>(`/api/tasks/${id}/attachments`, { method: 'POST', body: form })
-    return res.url
-  } catch (e) {
-    const err = e as { data?: { message?: string } }
-    toast.add({
-      title: 'Image upload failed',
-      description: err?.data?.message,
-      icon: 'i-lucide-image-off',
-      color: 'error',
-      duration: 3000
-    })
-    return null
-  }
+  // XMLHttpRequest, not $fetch: only it reports how much of the upload has gone out. Without a known length the bar is indeterminate.
+  return new Promise<string>((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', `/api/tasks/${id}/attachments`)
+    xhr.upload.onprogress = e => onProgress?.(e.lengthComputable ? e.loaded / e.total : null)
+    xhr.onload = () => {
+      let body: { url?: string, message?: string } = {}
+      try {
+        body = JSON.parse(xhr.responseText || '{}')
+      } catch {
+        body = {}
+      }
+      if (xhr.status >= 200 && xhr.status < 300 && body.url) resolve(body.url)
+      else reject(new Error(body.message || xhr.statusText || 'The upload failed'))
+    }
+    xhr.onerror = () => reject(new Error('The upload failed: no connection'))
+    onProgress?.(null)
+    xhr.send(form)
+  })
 }
 
 // ─── Labels ────────────────────────────────────────────────
