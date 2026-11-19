@@ -71,5 +71,9 @@ image is uploaded and shown in the description where you put it.
   anyone at all when the task is shared and the board has a public link. A Team only task's images are private.
 - An image you remove from the text is not removed from storage until the task goes. It still counts towards the 15.
 
-If an upload fails you get an *Image upload failed* message and the reason, such as an unsupported type or a file that
-is too big.
+When you paste or drop an image, a placeholder shows at the cursor at once: *Uploading image…* with a bar that fills as the
+upload goes. When the upload finishes, the placeholder is replaced by the image. You can keep typing while it uploads. A
+placeholder whose upload has not finished is not saved, so an upload still in progress is not kept in the saved text.
+
+If an upload fails, the placeholder becomes a line *Image failed to upload:* with the reason, such as an unsupported type or
+a file that is too big. The line stays where the image was until you delete it, and you can paste the image again.

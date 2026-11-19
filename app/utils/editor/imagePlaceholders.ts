@@ -40,6 +40,9 @@ export function stripPendingPlaceholders(html: string): string {
  * matches it, when the answer is to one of our own saves (a late answer would put back the text from before the person typed),
  * or while an upload is pending: the placeholder is local state that the saved copy leaves out, so taking the server copy
  * would remove it and the upload would land nowhere.
+ *
+ * Known trade-off: while an upload is pending, a change a teammate saved is not adopted here. The next save of this editor sends
+ * the editor's text and overwrites that change. The alternative (hold the save until the uploads settle, then merge) is not built.
  */
 export function shouldAdoptServerDescription(serverHtml: string, editorHtml: string, ownSaves: readonly string[]): boolean {
   if (serverHtml === stripPendingPlaceholders(editorHtml)) return false
