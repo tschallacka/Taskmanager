@@ -18,6 +18,8 @@ import { notTrustedReason, readWorktreeBase, recordedFolders, trustForStart } fr
 import { resolveStartRole, writeRoleFile } from './role-file.mjs'
 
 export const MODEL = 'claude-haiku-5-5'
+// The first prompt of every start: one turn, then the session idles and waits for mail (card mwmyu740mc2d4raspoj).
+export const FIRST_PROMPT = 'You are awake. Read your role and your card, then wait for mail.'
 export const NO_REMOTE_SETTINGS = JSON.stringify({ remoteControlAtStartup: false })
 const KEY = /^[a-z][a-z0-9-]{0,31}$/
 // A session id as claude gives it: hex, in one piece or in UUID groups. It is typed into a shell command (session-wake.sh
@@ -102,15 +104,16 @@ export function sessionName({ slug, key }) {
 
 /**
  * The argv of `claude --bg` for one person (not run here). The role goes in as the system prompt, from the file. With a
- * `resume` session id, the argv continues that session under the same id (`claude --bg --resume <id>`).
+ * `resume` session id, the argv continues that session under the same id (`claude --bg <prompt> --resume <id>`).
+ * The first prompt is the first argument after `--bg`: a fresh session takes that one turn and then idles, ready for mail.
  */
-export function startArgs({ key, folder, home, kit, role, model = MODEL, name = checkKey(key), resume = '' }) {
+export function startArgs({ key, folder, home, kit, role, model = MODEL, name = checkKey(key), resume = '', prompt = FIRST_PROMPT }) {
   // The id is typed into the argv of a process, so it must be a session id (see SESSION_ID).
   if (resume && !validSessionId(resume)) throw new Error(`not a session id: ${resume}`)
   return {
     cwd: folder,
     args: [
-      '--bg', ...(resume ? ['--resume', resume] : []), '-n', name, '--model', model,
+      '--bg', prompt, ...(resume ? ['--resume', resume] : []), '-n', name, '--model', model,
       '--setting-sources', 'user', '--settings', settingsPath(home, key),
       '--strict-mcp-config', '--mcp-config', mcpConfigPath(home, key),
       '--permission-mode', 'auto',
