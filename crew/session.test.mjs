@@ -92,7 +92,8 @@ if (args.includes('--bg')) {
   process.stdout.write(sessionId + '\\n'); process.exit(0)
 }
 if (args[0] === 'stop') {
-  const hit = list.find(a => a.sessionId === args[1] || a.id === args[1])
+  // Like claude: stop takes the short id that agents shows (id); the full sessionId is refused.
+  const hit = list.find(a => a.id === args[1])
   if (!hit) { process.stderr.write('no such session'); process.exit(1) }
   hit.state = 'ended'
   fs.writeFileSync(${JSON.stringify(state)}, JSON.stringify(list))
@@ -185,6 +186,16 @@ test('status and list read the recorded id, and report a session that was stoppe
   const after = sessionStatus({ home, key: 'wick', bin: fake.bin })
   assert.equal(after.live, false, 'after the stop the recorded id is not live')
   assert.match(after.line, /not live/)
+})
+
+test('stop passes claude the short id that agents shows, not the full session id (claude stop refuses the full one)', () => {
+  const fake = fakeClaude()
+  const home = mkdtempSync(join(tmpdir(), 'session-home-'))
+  const started = startSession({ home, kit: HERE, key: 'wick', folder: '/tmp', role: 'r', bin: fake.bin, trust: NO_TRUST })
+  const stopped = stopSession({ home, key: 'wick', bin: fake.bin })
+  assert.equal(stopped.ok, true, stopped.reason)
+  const stopCall = calls(fake).find(args => args[0] === 'stop')
+  assert.deepEqual(stopCall, ['stop', started.id.slice(0, 8)])
 })
 
 test('a start that claude refuses is reported with its reason, and nothing is recorded', () => {
@@ -294,9 +305,10 @@ test('a start gives the session its first prompt as the first argument after --b
   assert.ok(fresh.args[1].length > 0 && !fresh.args[1].startsWith('-'), 'the prompt is text, not a flag')
   const given = startArgs({ key: 'wren', folder: '/tmp', home: '/h', kit: '/k', role: 'r', prompt: 'check your mail' })
   assert.deepEqual(given.args.slice(0, 2), ['--bg', 'check your mail'])
+  // A resume passes no flags and no prompt: claude keeps the session's saved options, and any flag makes a copy under a new id
+  // (checked 2026-11-19: `claude --bg --resume <id> -n ...` started 7b34828e; the bare `claude --bg --resume <id>` woke 61c5977d).
   const resumed = startArgs({ key: 'wren', folder: '/tmp', home: '/h', kit: '/k', role: 'r', resume: 'a1b2c3d4' })
-  assert.equal(resumed.args[1], fresh.args[1], 'a resume gets the same first prompt')
-  assert.equal(resumed.args[2], '--resume')
+  assert.deepEqual(resumed.args, ['--bg', '--resume', 'a1b2c3d4'], 'a resume is the bare form, with no flags that would start a copy')
 })
 
 test('a start names the session <crew slug>-<key> and finds the new session by that name', () => {

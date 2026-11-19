@@ -110,6 +110,8 @@ export function sessionName({ slug, key }) {
 export function startArgs({ key, folder, home, kit, role, model = MODEL, name = checkKey(key), resume = '', prompt = FIRST_PROMPT }) {
   // The id is typed into the argv of a process, so it must be a session id (see SESSION_ID).
   if (resume && !validSessionId(resume)) throw new Error(`not a session id: ${resume}`)
+  // A resume is the bare form: claude keeps the session's saved options, and any other flag starts a copy under a new id.
+  if (resume) return { cwd: folder, args: ['--bg', '--resume', resume] }
   return {
     cwd: folder,
     args: [
@@ -248,8 +250,10 @@ export function sessionList({ home, bin }) {
 export function stopSession({ home, key, bin }) {
   const record = readRecord(home, key)
   if (!record) return { ok: false, reason: `${key}: no recorded session to stop` }
-  // `claude stop <id>` is a verified verb: Boss used it on real sessions on 2026-11-19 (card mwmzv2jt).
-  const run = runClaude(['stop', record.id], { bin })
+  // `claude stop` takes the short id that `claude agents` shows (the first 8 characters of the session id), not the full one:
+  // the full id gets "No session matching" (checked 2026-11-19 on a scratch session). Resume still takes the full id.
+  const short = validSessionId(record.id) ? record.id.slice(0, 8) : record.id
+  const run = runClaude(['stop', short], { bin })
   return run.ok ? { ok: true, id: record.id } : { ok: false, reason: `claude stop ${record.id} failed: ${run.stderr || `exit ${run.status}`}` }
 }
 
