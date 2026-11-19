@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.56.0 - 2026-11-19
+
+- **Pasting an image into a task description shows its progress, and typing at a pending placeholder no longer drops the upload.** A pasted image shows an "Uploading image…" placeholder with a bar that fills as the upload goes, then the image; a failed upload leaves a visible line with the reason, which stays until you delete it; several pasted images each get their own placeholder. A late answer to an earlier save no longer puts back the text from before the typing, so the upload lands (or shows its error line). Files: `app/utils/editor/`, `app/components/RichEditor.vue`, `app/components/kanban/TaskDrawer.vue`.
+
 ## 0.55.0 - 2026-11-19
 
 - **Pia's terminal is a tmux session; `crew up`, `crew stop` and `crew restart` run her start, stop and restart.** Pia's Claude Code session runs in the tmux session `pia` on the crew's socket. `crew/pia-tmux.mjs` (new) resumes her recorded session id (a fresh start only when no id is recorded), checks her screen for a dialog, pastes a test mail and checks it shows, then has her start her board listener as her own background command (the command her hook gives her), so her Stop hook counts it, and reports its pid; a listener that does not come up is a FAIL line. A dialog on her screen (the `--add-dir` one, for example) refuses the start and is named; it is never answered. Stop ends her listener with her. Stop sends `/exit`, answers the background-shell exit confirm once, and kills the session after the grace time. A start in a home with no `crew.json` is refused before anything runs. `crew/pia-term.sh` (new) is the adapter the mailbox daemon types into, now on tmux. `crew/people-control.mjs` routes `up`, `restart` and `stop` for Pia through it, and `crew/session.mjs` notes that `claude stop` is verified. Files: `crew/pia-tmux.mjs`, `crew/pia-term.sh`, `crew/people-control.mjs`, `crew/session.mjs`, `crew/PROMPTS.md.tmpl`, `crew/kit-files.txt`, with the tests in `crew/pia-tmux.test.mjs`, `crew/pia-term.test.mjs` and `crew/people-control.test.mjs`.
