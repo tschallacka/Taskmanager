@@ -3,7 +3,7 @@ import { customers, projects, projectColumns } from '../db/schema'
 import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm'
 import { getProjectAccessFilter, genId } from '../utils/projects'
 import { customerIdsOf, getUserActiveTeamId } from '../utils/auth-helpers'
-import { customerNameForAudience } from '../utils/customerNames'
+import { customerNameForAudience, ownCustomerNameMap } from '../utils/customerNames'
 import { audienceByMembership } from '#shared/utils/projectAudience'
 import { sharedPairsOf } from '../utils/customerProjects'
 import { requireOrgCustomer } from '../utils/customers'
@@ -82,10 +82,7 @@ export default defineEventHandler(async (event) => {
     }
 
     // The name of the viewer's own customer on each project (a contact of a customer that shares it). Only those names.
-    const ownCustomerNameOf = new Map<string, string>()
-    for (const pair of await sharedPairsOf(await customerIdsOf(userId))) {
-      if (!ownCustomerNameOf.has(pair.projectId)) ownCustomerNameOf.set(pair.projectId, pair.customerName)
-    }
+    const ownCustomerNameOf = ownCustomerNameMap(await sharedPairsOf(await customerIdsOf(userId)))
 
     return rows.map(({ project, customerName }) => {
       const columnsOf = byProject.get(project.id) ?? []

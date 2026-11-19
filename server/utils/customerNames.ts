@@ -7,3 +7,12 @@ export function customerNameForAudience(input: { audience: ProjectAudience, staf
   if (input.audience === 'staff') return input.staffName
   return input.ownName ?? null
 }
+
+/** The viewer's own customer name per project, from the pairs of their customers' shared projects. The first pair wins. */
+export function ownCustomerNameMap(pairs: { projectId: string, customerName: string }[]): Map<string, string> {
+  const names = new Map<string, string>()
+  for (const pair of pairs) {
+    if (!names.has(pair.projectId)) names.set(pair.projectId, pair.customerName)
+  }
+  return names
+}

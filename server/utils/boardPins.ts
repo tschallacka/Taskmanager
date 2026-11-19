@@ -3,7 +3,7 @@ import { db } from '../db'
 import { boardPins, customers, organization, projects } from '../db/schema'
 import { hiddenCrewShadows } from './boardTree'
 import { customerIdsOf } from './auth-helpers'
-import { customerNameForAudience } from './customerNames'
+import { customerNameForAudience, ownCustomerNameMap } from './customerNames'
 import { sharedPairsOf } from './customerProjects'
 import { reachOf, workspaceTeam } from './workspaces'
 
@@ -36,10 +36,7 @@ export async function listPins(userId: string): Promise<PinnedBoard[]> {
 
   const hidden = await hiddenCrewShadows(userId, rows.map(row => row.projectId))
   // A contact sees only their own customer's name on a pinned board, never the first customer's (customerNames.ts).
-  const ownCustomerNameOf = new Map<string, string>()
-  for (const pair of await sharedPairsOf(await customerIdsOf(userId))) {
-    if (!ownCustomerNameOf.has(pair.projectId)) ownCustomerNameOf.set(pair.projectId, pair.customerName)
-  }
+  const ownCustomerNameOf = ownCustomerNameMap(await sharedPairsOf(await customerIdsOf(userId)))
   return rows.filter(row => !hidden.has(row.projectId)).map((row) => {
     const teamId = workspaceTeam(teamIds, row.teamId)
     const audience = teamId ? 'staff' as const : 'customer' as const
