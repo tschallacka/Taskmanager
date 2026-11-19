@@ -10,12 +10,11 @@
 //   restart  stop, then up.
 //
 // The deps are injected (startPia, stopPia): fakes in pia-tmux.test.mjs, realPiaDeps in production.
-import { execFileSync, spawn, spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, openSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
+import { execFileSync, spawnSync } from 'node:child_process'
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { randomBytes } from 'node:crypto'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { findDialog } from './modal-detect.mjs'
 import { livePid } from './pidfile.mjs'
 import { shellWord } from './home.mjs'
 import { MODEL, readRecord, runClaude, sessionName, validSessionId, writeRecord, crewSlug } from './session.mjs'
@@ -27,6 +26,7 @@ export const PIA_TMUX = 'pia'
 export const TIMEOUTS = { ready: 60000, mail: 30000, listener: 120000, grace: 20000, poll: 500 }
 const LISTENER_MATCH = 'listen.mjs pia'
 const GONE = 'gone'
+const DIALOG = 'dialog'
 
 /**
  * The sessions of `claude agents --json` as Pia reads them: { id, name, state, status, startedAt }. A background session's id is
@@ -63,6 +63,32 @@ export function piaTrust({ home, kit, folder, file = configFile(), worktreeBase 
  */
 export function piaListenerLine({ home, kit }) {
   return `CREW_HOME='${home}' node '${kit}/listen.mjs' pia 3600`
+}
+
+/**
+ * What the kit types into Pia's terminal to start her listener: the hook's own instruction, with the hook's command. Run by her
+ * Bash tool, the listener is her background command, so her Stop hook counts it and its exit wakes her.
+ */
+export function piaListenerInstruction({ home, kit }) {
+  return `Start your board listener now: run this with your Bash tool, run_in_background: true (never nohup): ${piaListenerLine({ home, kit })} . Then carry on; its exit wakes you.`
+}
+
+// The title line of a dialog on Pia's screen: the footer ("Enter to confirm", "Enter to continue" or "Esc to cancel") is the
+// last dialog row; the title is the topmost row of the six above it that is not an option. Null when no dialog shows.
+const DIALOG_FOOTER = /enter to (confirm|continue)|esc to cancel/i
+const OPTION_ROW = /^(❯|>|\d+\.)/
+export function dialogTitle(screen) {
+  const rows = String(screen ?? '').split('\n').map(r => r.trim())
+  let footer = -1
+  for (let i = rows.length - 1; i >= 0; i -= 1) {
+    if (DIALOG_FOOTER.test(rows[i])) {
+      footer = i
+      break
+    }
+  }
+  if (footer < 0) return null
+  const above = rows.slice(Math.max(0, footer - 6), footer).filter(r => r && !OPTION_ROW.test(r))
+  return above[0] ?? rows[footer]
 }
 
 /** The shell line that starts Pia's claude in her tmux session. The flags are the ones PROMPTS.md "Starting Pia" gives. */
@@ -103,8 +129,10 @@ export async function startPia({ deps, timeouts }) {
   deps.merge()
   deps.tmux.start(deps.folder, deps.command(resume))
 
+  // A dialog on her screen during the start (the --add-dir one, a trust one) refuses the start and is named; it is never answered.
   const found = await waitFor(() => {
     if (!deps.tmux.has()) return GONE
+    if (dialogTitle(deps.tmux.screen())) return DIALOG
     const list = deps.listAgents() ?? []
     if (resume) return list.find(a => a.id === resume && live(a)) ?? null
     return list.filter(a => a.name === deps.name && live(a)).sort((a, b) => b.startedAt - a.startedAt)[0] ?? null
@@ -113,13 +141,10 @@ export async function startPia({ deps, timeouts }) {
     const why = resume ? `resume of ${resume} failed: her session ended on start; the id stays recorded; not started fresh` : 'her session ended on start'
     return { ok: false, lines: [...lines, `pia: ${why}`] }
   }
-  if (!found) {
-    const dialog = findDialog(deps.tmux.screen())
-    const why = dialog ? `a dialog is showing ("${dialog.first}")` : `no live session after ${Math.round(t.ready / 1000)} s`
-    return { ok: false, lines: [...lines, `pia: ${why}`] }
-  }
-  const dialog = findDialog(deps.tmux.screen())
-  if (dialog) return { ok: false, lines: [...lines, `pia: session ${found.id} is up, but a dialog is showing ("${dialog.first}"); not answered`] }
+  if (found === DIALOG) return { ok: false, lines: [...lines, `pia: a dialog is showing ("${dialogTitle(deps.tmux.screen())}"); not answered; not started`] }
+  if (!found) return { ok: false, lines: [...lines, `pia: no live session after ${Math.round(t.ready / 1000)} s`] }
+  const dialog = dialogTitle(deps.tmux.screen())
+  if (dialog) return { ok: false, lines: [...lines, `pia: session ${found.id} is up, but a dialog is showing ("${dialog}"); not answered`] }
   if (resume) lines.push(`pia: session ${found.id} live`)
   else {
     deps.recordId(found.id)
@@ -132,10 +157,11 @@ export async function startPia({ deps, timeouts }) {
   if (!seen) return { ok: false, lines: [...lines, `pia: test mail ${token} not seen on her screen after ${Math.round(t.mail / 1000)} s`] }
   lines.push(`pia: test mail ${token} pasted and on her screen`)
 
-  // Her board listener is started by the kit, after the mail check, with the command her own hook runs (Boss, 2026-11-19).
+  // Her board listener is started after the mail check, by her own background command (the one her hook gives her), so her Stop
+  // hook counts it and its exit wakes her (Quincy V4, 2026-11-19). The kit waits for its pid.
   const already = deps.listenerUp()
   if (already) return { ok: true, lines: [...lines, `pia: board listener already up (pid ${already})`] }
-  deps.startListener()
+  await deps.startListener()
   const pid = await waitFor(() => deps.listenerUp(), { ms: t.listener, ...clock })
   if (!pid) return { ok: false, lines: [...lines, `pia: FAIL: board listener did not come up after ${Math.round(t.listener / 1000)} s`] }
   lines.push(`pia: board listener started (pid ${pid})`)
@@ -162,11 +188,22 @@ export function exitConfirmShowing(screen) {
 export async function stopPia({ deps, timeouts }) {
   const t = withDefaults(timeouts)
   const clock = { sleep: deps.sleep, poll: t.poll }
-  if (!deps.tmux.has()) return { ok: true, lines: ['pia: not running'] }
   const lines = []
-  const screen = deps.tmux.screen()
-  const dialog = findDialog(screen)
-  if (dialog) lines.push(`pia: a dialog is showing ("${dialog.first}"); not answered`)
+  // Her board listener ends with her: a listener that is still up is stopped too (Quincy V5, 2026-11-19).
+  const endListener = () => {
+    const pid = deps.listenerUp()
+    if (!pid) return
+    deps.killListener(pid)
+    lines.push(`pia: board listener stopped (pid ${pid})`)
+  }
+  if (!deps.tmux.has()) {
+    lines.push('pia: not running')
+    endListener()
+    return { ok: true, lines }
+  }
+  // A dialog on her screen is named and never answered; /exit is never pasted into one (Quincy V1, 2026-11-19).
+  const dialog = dialogTitle(deps.tmux.screen())
+  if (dialog) lines.push(`pia: a dialog is showing ("${dialog}"); not answered`)
   else {
     await deps.tmux.paste('/exit')
     // The background-shell exit confirm gets one Enter (Boss, 2026-11-19); any other dialog is never answered.
@@ -180,11 +217,16 @@ export async function stopPia({ deps, timeouts }) {
       }
       return null
     }, { ms: t.grace, ...clock })
-    if (ended) return { ok: true, lines: [...lines, 'pia: stopped: her session ended on /exit'] }
+    if (ended) {
+      lines.push('pia: stopped: her session ended on /exit')
+      endListener()
+      return { ok: true, lines }
+    }
     lines.push(`pia: /exit did not end her session in ${Math.round(t.grace / 1000)} s; her screen ends: "${lastLine(deps.tmux.screen())}"`)
   }
   deps.tmux.kill()
   lines.push('pia: tmux session killed')
+  endListener()
   const record = deps.readRecord()
   if (!validSessionId(record?.id)) return { ok: true, lines }
   const listed = (deps.listAgents() ?? []).some(a => a.id === record.id && live(a))
@@ -276,12 +318,13 @@ export function realPiaDeps(home, kit, opts = {}) {
     },
     trust: opts.trust || (() => piaTrust({ home, kit, folder })),
     listenerUp: () => livePid(home, PIA_KEY, LISTENER_MATCH),
-    // The listener runs detached from this process, in her crew home, with its output in .listen/pia.out (listen.mjs writes its pid).
-    startListener: () => {
-      mkdirSync(join(home, '.listen'), { recursive: true })
-      const out = openSync(join(home, '.listen', 'pia.out'), 'a')
-      const child = spawn(process.execPath, [join(kit, 'listen.mjs'), 'pia', '3600'], { cwd: home, env: { ...process.env, CREW_HOME: home }, detached: true, stdio: ['ignore', out, out] })
-      child.unref()
+    // Her own terminal runs the listener as her background command (see piaListenerInstruction); listen.mjs writes its pid.
+    startListener: () => tmux.paste(piaListenerInstruction({ home, kit })),
+    // A listener still up after her session is ended is stopped (Quincy V5). SIGTERM only: the pid is the one listen.mjs wrote.
+    killListener: pid => {
+      try {
+        process.kill(pid, 'SIGTERM')
+      } catch {}
     },
     hasCrewJson: () => existsSync(join(home, 'crew.json')) || existsSync(join(home, 'crew.config.json')),
     sleep: ms => new Promise(resolve => setTimeout(resolve, ms)),

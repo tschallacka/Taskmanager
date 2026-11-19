@@ -8,7 +8,8 @@ import { mkdirSync, mkdtempSync, writeFileSync, existsSync, readFileSync } from 
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { piaCommand, piaListenerLine, startPia, stopPia, restartPia, realPiaDeps, piaTrust, piaAgentsOf, exitConfirmShowing, PIA_TMUX } from './pia-tmux.mjs'
+import { piaCommand, piaListenerLine, piaListenerInstruction, dialogTitle, startPia, stopPia, restartPia, realPiaDeps, piaTrust, piaAgentsOf, exitConfirmShowing, PIA_TMUX } from './pia-tmux.mjs'
+import { pidFile } from './pidfile.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const ID = 'aa11bb22'
@@ -68,6 +69,11 @@ function fakeDeps({ tmux, agents = [], record = null, token = 'tok123', listener
     merge: () => log.push(['merge']),
     trust: trust ?? (() => ({ ok: true })),
     listenerUp: () => listening ?? listenerPid,
+    killListener: pid => {
+      log.push(['killListener', pid])
+      listening = null
+      listenerPid = null
+    },
     sleep: async () => {},
     token: () => token
   }
@@ -265,10 +271,13 @@ test('stop with a dialog up does not answer it: it kills the session and says wh
 test('restart stops her, then starts her again, each step on its own line', async () => {
   const tmux = fakeTmux({ alive: false, screen: '' })
   tmux.tmux.paste = async text => { tmux.log.push(['paste', text]); tmux.screen = text }
-  const { deps } = fakeDeps({ tmux, agents: [{ id: ID, name: 'x', state: 'idle', status: 'running', startedAt: 1 }], record: { id: ID }, token: 'tok8', listenerPid: 9 })
+  const { deps } = fakeDeps({ tmux, agents: [{ id: ID, name: 'x', state: 'idle', status: 'running', startedAt: 1 }], record: { id: ID }, token: 'tok8', listenerPid: 9, listenerStarts: 10 })
   const out = await restartPia({ deps, timeouts: FAST })
   assert.equal(out.ok, true, out.lines.join('\n'))
   assert.equal(out.lines[0], 'pia: not running')
+  // stop ends the old listener (9); the start brings up the new one (10).
+  assert.ok(out.lines.some(l => /board listener stopped \(pid 9\)/.test(l)), out.lines.join('\n'))
+  assert.ok(out.lines.some(l => /board listener started \(pid 10\)/.test(l)), out.lines.join('\n'))
   assert.ok(out.lines.some(l => /session aa11bb22 live/.test(l)), out.lines.join('\n'))
 })
 
@@ -433,6 +442,95 @@ test('the real start refuses a home with no crew.json before claude is run', asy
   assert.equal(existsSync(marker), false)
   assert.equal(existsSync(join(home, 'tmux.sock')), false)
   assert.equal(existsSync(join(home, '.listen')), false)
+})
+
+// Quincy's V1 (2026-11-19): the first real start stops at claude's "Adding a new directory" dialog (--add-dir). The kit names any
+// dialog on its output by its title line and refuses; it never answers one, and stop never pastes /exit into one.
+const ADD_DIR = ['Adding a new directory', '  /srv/agents/taskmanager-maintenance/.config/taskmanager-crew', '❯ No, exit', '  Yes, add it', '  Enter to confirm · Esc to cancel']
+
+test('dialogTitle names a dialog by its title line, and is null when no dialog is up', () => {
+  assert.equal(dialogTitle(ADD_DIR.join('\n')), 'Adding a new directory')
+  assert.equal(dialogTitle(['? Teach auto mode about your environment?', '  Enter to continue'].join('\n')), '? Teach auto mode about your environment?')
+  assert.equal(dialogTitle('> '), null)
+  assert.equal(dialogTitle('some transcript\n> '), null)
+})
+
+test('a start on the add-dir dialog is refused and named, with no key and no paste', async () => {
+  const tmux = fakeTmux({ alive: false, screen: ADD_DIR.join('\n') })
+  const { deps } = fakeDeps({ tmux, agents: [], record: { id: ID } })
+  const out = await startPia({ deps, timeouts: FAST })
+  assert.equal(out.ok, false)
+  assert.ok(out.lines.some(l => /dialog is showing \("Adding a new directory"\); not answered; not started/.test(l)), out.lines.join('\n'))
+  assert.equal(tmux.log.some(e => e[0] === 'key'), false)
+  assert.equal(tmux.pasted.length, 0)
+})
+
+test('stop on the add-dir dialog does not paste /exit into it: it kills and names it', async () => {
+  const tmux = fakeTmux({ alive: true, screen: ADD_DIR.join('\n') })
+  const { deps } = fakeDeps({ tmux, record: null })
+  const out = await stopPia({ deps, timeouts: FAST })
+  assert.equal(out.ok, true)
+  assert.equal(tmux.pasted.length, 0)
+  assert.equal(tmux.log.some(e => e[0] === 'key'), false)
+  assert.ok(out.lines.some(l => /dialog is showing \("Adding a new directory"\)/.test(l)), out.lines.join('\n'))
+  assert.equal(tmux.alive, false)
+})
+
+test('the trust step covers the --add-dir folders it passes: the crew home and the kit, and Pia\'s folder', () => {
+  const home = mkdtempSync(join(tmpdir(), 'pia-trust2-home-'))
+  const file = join(mkdtempSync(join(tmpdir(), 'pia-trust2-cfg-')), '.claude.json')
+  writeFileSync(file, '{}\n')
+  const folder = join(home, 'pia-session')
+  assert.equal(piaTrust({ home, kit: here, folder, file }).ok, true)
+  const data = JSON.parse(readFileSync(file, 'utf8'))
+  for (const p of [home, here, folder]) assert.equal(data.projects[p].hasTrustDialogAccepted, true, p)
+})
+
+// Quincy's V4 (2026-11-19): the listener must be the one her Stop hook recognises. The hook counts a listener that is a
+// descendant of her own claude process, and that is only true when she starts it as her background command. So the kit has
+// her start it with the hook's command and waits for its pid.
+test('the kit has Pia start her listener as her own background command, with the command her hook gives her', () => {
+  const home = '/crew/home'
+  const text = piaListenerInstruction({ home, kit: here })
+  assert.ok(text.includes(piaListenerLine({ home, kit: here })), text)
+  assert.match(text, /run_in_background: true/)
+  assert.match(text, /never nohup/)
+})
+
+test('the real deps paste that instruction into her terminal, and the hook reads the pid file the listener writes', async () => {
+  const home = mkdtempSync(join(tmpdir(), 'pia-instr-home-'))
+  writeFileSync(join(home, 'crew.json'), '{"team":"throwaway"}\n')
+  const log = join(home, 'tmux-calls.log')
+  const fakeTmuxBin = join(home, 'fake-tmux.sh')
+  writeFileSync(fakeTmuxBin, `#!/bin/sh\necho "$*" >> "${log}"\ncase "$3" in load-buffer) cat >> "${log}.stdin";; esac\nexit 0\n`, { mode: 0o755 })
+  const deps = realPiaDeps(home, here, { bin: 'claude', tmuxBin: fakeTmuxBin, trust: () => ({ ok: true }) })
+  await deps.startListener()
+  const stdin = readFileSync(`${log}.stdin`, 'utf8')
+  assert.ok(stdin.includes(piaListenerLine({ home, kit: here })), stdin)
+  assert.match(stdin, /run_in_background: true/)
+  // The pid file the hook reads (pia-listener-hook.sh: $CREW/.listen/pia.pid) is the one listen.mjs writes (pidfile.mjs).
+  assert.equal(pidFile(home, 'pia'), join(home, '.listen', 'pia.pid'))
+  const hook = readFileSync(join(here, 'pia-listener-hook.sh'), 'utf8')
+  assert.ok(hook.includes('$CREW/.listen/pia.pid'))
+  assert.ok(hook.includes('listen.mjs pia'))
+})
+
+// Quincy's V5 (2026-11-19): stop ends Pia's listener too, so a restart does not find the old one still up.
+test('stop ends her board listener when it is up, after her session is killed', async () => {
+  const tmux = fakeTmux({ alive: true, screen: '> ' })
+  const { deps, log } = fakeDeps({ tmux, record: null, listenerPid: 77 })
+  const out = await stopPia({ deps, timeouts: FAST })
+  assert.equal(out.ok, true)
+  assert.deepEqual(log.filter(e => e[0] === 'killListener'), [['killListener', 77]])
+  assert.ok(out.lines.some(l => /board listener stopped \(pid 77\)/.test(l)), out.lines.join('\n'))
+})
+
+test('stop with her session already gone still ends a listener that is up', async () => {
+  const tmux = fakeTmux({ alive: false })
+  const { deps, log } = fakeDeps({ tmux, record: null, listenerPid: 78 })
+  const out = await stopPia({ deps, timeouts: FAST })
+  assert.equal(out.ok, true)
+  assert.deepEqual(log.filter(e => e[0] === 'killListener'), [['killListener', 78]])
 })
 
 test('the tmux session name is pia', () => {
