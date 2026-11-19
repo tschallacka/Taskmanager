@@ -27,6 +27,6 @@ test('a filed customer not in the active list is not taken: the picker value sta
 test('the invite posts the picker value, never the filed id, so no stale id is sent', () => {
   const body = functionBody('inviteCustomer')
   assert.match(body, /body: \{ customerId: customerChoice\.value,/)
-  assert.equal(body.includes('filedCustomerId'), false)
+  assert.equal(body.includes('customerId: filedCustomerId'), false)
   assert.equal(body.includes('customerId: filedChoice'), false)
 })

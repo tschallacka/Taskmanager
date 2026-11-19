@@ -102,6 +102,10 @@ const customerLinkFor = ref('')
 const customerSending = ref(false)
 // The picker's options: the team's customers by id. The picker is AppSelect, the app's select (no native selects).
 const customerOptions = computed(() => customers.value.map(customer => ({ label: customer.name, value: customer.id })))
+// A typed new name takes over from the picker: the picker and a typed name never both hold a customer.
+watch(customerNewName, (name) => {
+  if (name.trim()) customerChoice.value = ''
+})
 
 async function inviteCustomer() {
   const problem = customerChoiceError({ customerId: customerChoice.value, customerName: customerNewName.value, email: customerEmail.value })
@@ -112,7 +116,7 @@ async function inviteCustomer() {
   customerSending.value = true
   customerError.value = ''
   try {
-    const answer = await untypedFetch<{ url: string }>(`${base.value}/customer-invite`, {
+    const answer = await untypedFetch<{ url: string, customerId: string }>(`${base.value}/customer-invite`, {
       method: 'POST',
       headers: realtimeHeaders(),
       body: { customerId: customerChoice.value, customerName: customerNewName.value.trim(), email: customerEmail.value.trim() }
@@ -121,8 +125,10 @@ async function inviteCustomer() {
     customerLinkFor.value = customerEmail.value.trim()
     customerEmail.value = ''
     customerNewName.value = ''
-    customerChoice.value = filedChoice.value
     await refreshCustomers()
+    // The server files the project under this customer: the picker shows it, as the Share line does after a reopen.
+    filedCustomerId.value = answer.customerId
+    customerChoice.value = answer.customerId
   } catch (e) {
     customerError.value = errorMessage(e, 'Could not invite that person')
   } finally {
@@ -439,6 +445,7 @@ watch(open, (isOpen) => {
                 class="w-full"
                 aria-label="The customer"
                 data-share-customer-choice
+                @update:model-value="customerNewName = ''"
               />
               <UInput
                 v-model="customerNewName"
