@@ -10,6 +10,10 @@ import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
+// The script waits up to 30 s for the prompt; the tests with a screen that never shows one wait 2 s instead (every
+// spawned session-wake.sh inherits this). The real wait is covered in crew/session-wake.test.mjs.
+process.env.WAKE_PROMPT_WAIT ??= '2'
+process.env.WAKE_POLL_SECONDS ??= '1'
 
 // A fake interactive-shell MCP for session-wake.sh: every tool call answers with a result, except the tools named in
 // `failOn`, which answer with an error. Calls are appended to a log so a test can see the order.
@@ -109,7 +113,7 @@ test('an idle recorded session is typed into once, by its id', async () => {
     type: async call => typed.push(call), readList: () => [entry('idle', 'idle')], now: c.now, sleep: c.sleep, timeoutMs: 1000, pollMs: 100
   })
   assert.equal(out.ok, true)
-  assert.deepEqual(typed, [{ id: ID, text: 'The limit has reset. Read your card and carry on.' }])
+  assert.deepEqual(typed, [{ id: ID, text: 'The limit has reset. Read your card and carry on.', key: 'wren' }])
   assert.ok(out.reason.length <= LOG_CUT)
 })
 
