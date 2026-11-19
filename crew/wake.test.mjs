@@ -1,7 +1,7 @@
 // The wake sender's light parts, with fakes (no real session, no real typing). Run: node --test crew/wake.test.mjs
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { logCut, sessionReady, waitForIdle, recordWake, wakeOnce, bossMailText, deliverBossMail, LOG_CUT, FAILURES_TO_MAIL_BOSS } from './wake.mjs'
+import { logCut, sessionReady, waitForIdle, recordWake, wakeOnce, bossMailText, deliverBossMail, LOG_CUT, MAIL_CUT, FAILURES_TO_MAIL_BOSS } from './wake.mjs'
 import { spawnSync } from 'node:child_process'
 import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { parseAgents, planWake, validSessionId } from './session.mjs'
@@ -99,11 +99,17 @@ test('three failures in a row mail Boss once; a success resets the streak', () =
   assert.equal(FAILURES_TO_MAIL_BOSS, 3)
 })
 
-test('the Boss mail names the person, the card and the last error, cut to 80', () => {
+test('the Boss mail names the person, the card and the last error, cut to 300 (not 80: a hold reason was cut mid-sentence)', () => {
   const text = bossMailText({ key: 'wren', cardId: 'mw8b8is1txcwmtwp7c', lastError: 'x'.repeat(200) })
   assert.match(text, /for wren on card mw8b8is1txcwmtwp7c/)
-  assert.ok(text.includes('x'.repeat(LOG_CUT)))
-  assert.ok(!text.includes('x'.repeat(LOG_CUT + 1)))
+  assert.ok(text.includes('x'.repeat(200)), 'the whole 200-character reason is in the mail')
+  assert.ok(!text.includes('x'.repeat(MAIL_CUT + 1)))
+})
+
+test('a hold reason is mailed whole: "SCREEN-UNREADABLE ... the screen could not be read in 30 s, last answer: ..." is not cut at 80', () => {
+  const reason = 'SCREEN-UNREADABLE session 8e4b4f1a-3a4b-4baf-873b-2f373c0bb180: the screen could not be read in 30 s, last answer: row 60 is outside the 50-row screen; nothing typed'
+  const text = bossMailText({ key: 'usher', cardId: 'mwnxqqj45nne9ye7l3k', lastError: reason })
+  assert.ok(text.includes('row 60 is outside the 50-row screen; nothing typed'), text)
 })
 
 test('an idle recorded session is typed into once, by its id', async () => {

@@ -147,6 +147,53 @@ test('wake.mjs names the terminal sessionwake-<key>, and strips anything but let
   assert.equal(terminalName(undefined), 'sessionwake-')
 })
 
+// The view prints each row with a prefix: "048 [001-001] " (the row number, then the columns it spans). These are real rows
+// from a view of an idle session (card mwnxqqj45nne9ye7l3k, QA w1). The prefix is part of the text the script gets.
+const RULE_ROW = `047 [001-200] ${'─'.repeat(60)} taskmanager-maintenance-nina ─`
+const REAL_IDLE = [
+  '041 [001-019] ❯ wake test, ignore',
+  '042 [000-000] ',
+  RULE_ROW,
+  '048 [001-001] ❯',
+  `049 [001-200] ${'─'.repeat(60)}`,
+  '050 [003-053]   ⏵⏵ auto mode on (shift+tab to cycle) · ← for agents'
+].join('\n')
+const REAL_TRANSCRIPT_ONLY = [
+  '041 [001-019] ❯ wake test, ignore',
+  '042 [000-000] ',
+  '043 [003-151]   ● Understood, ignoring it. No further action on the wake test.',
+  '044 [000-000] ',
+  '050 [003-053]   ⏵⏵ auto mode on (shift+tab to cycle) · ← for agents'
+].join('\n')
+
+test('a real prefixed view of an idle session is read as ready and typed into', () => {
+  const mcp = fakeTerminal({ screen: REAL_IDLE })
+  const r = run(mcp)
+  assert.equal(r.status, 0, r.stderr)
+  assert.ok(calls(mcp).some(c => c.name === 'paste'), 'the text was pasted')
+})
+
+test('a real prefixed transcript-only screen is not ready: exit 3, nothing typed', () => {
+  const mcp = fakeTerminal({ screen: REAL_TRANSCRIPT_ONLY })
+  const r = run(mcp, { env: { WAKE_PROMPT_WAIT: '2' } })
+  assert.equal(r.status, 3, r.stderr)
+  assert.ok(!calls(mcp).some(c => c.name === 'paste' || c.name === 'key'), 'nothing typed')
+})
+
+test('claude attach gets the SHORT id (first 8 characters, as claude agents lists it), not the full session id', () => {
+  const full = '8e4b4f1a-3a4b-4baf-873b-2f373c0bb180'
+  const mcp = fakeTerminal()
+  const r = spawnSync('sh', [SCRIPT, full, 'hello'], {
+    encoding: 'utf8',
+    timeout: 120000,
+    env: { ...process.env, SESSION_WAKE_MCP: mcp.bin, WAKE_PROMPT_WAIT: '4', WAKE_POLL_SECONDS: '1' }
+  })
+  assert.equal(r.status, 0, r.stderr)
+  const start = calls(mcp).find(c => c.name === 'start')
+  assert.match(start.args.command.join(' '), /claude attach 8e4b4f1a(\s|$)/)
+  assert.ok(!start.args.command.join(' ').includes(full), 'the full id never reaches claude attach')
+})
+
 // prompt-line.mjs run from a path with a space: its main block must still run, or every screen reads as ready (fail-open).
 test('prompt-line.mjs run from a directory with a space still reads a transcript-only screen as not ready (exit 1)', () => {
   const dir = mkdtempSync(join(tmpdir(), 'wake pl space '))
