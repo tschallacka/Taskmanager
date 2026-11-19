@@ -10,8 +10,8 @@
 //   restart  stop, then up.
 //
 // The deps are injected (startPia, stopPia): fakes in pia-tmux.test.mjs, realPiaDeps in production.
-import { execFileSync, spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
+import { execFileSync, spawn, spawnSync } from 'node:child_process'
+import { existsSync, mkdirSync, openSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { randomBytes } from 'node:crypto'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -55,6 +55,14 @@ export function piaTrust({ home, kit, folder, file = configFile(), worktreeBase 
   const { trust } = crewOwnPaths({ home, kit, worktreeBase, folders: recordedFolders(home) })
   const res = ensureTrusted([...trust, folder], { file })
   return res.ok ? { ok: true, changed: res.changed } : { ok: false, reason: res.reason }
+}
+
+/**
+ * The listener command for Pia, in the form her SessionStart hook prints (pia-listener-hook.sh): her crew home, the kit's
+ * listen.mjs, the name pia, one hour. The kit starts her listener with it; her hook would start the same one.
+ */
+export function piaListenerLine({ home, kit }) {
+  return `CREW_HOME='${home}' node '${kit}/listen.mjs' pia 3600`
 }
 
 /** The shell line that starts Pia's claude in her tmux session. The flags are the ones PROMPTS.md "Starting Pia" gives. */
@@ -124,9 +132,13 @@ export async function startPia({ deps, timeouts }) {
   if (!seen) return { ok: false, lines: [...lines, `pia: test mail ${token} not seen on her screen after ${Math.round(t.mail / 1000)} s`] }
   lines.push(`pia: test mail ${token} pasted and on her screen`)
 
+  // Her board listener is started by the kit, after the mail check, with the command her own hook runs (Boss, 2026-11-19).
+  const already = deps.listenerUp()
+  if (already) return { ok: true, lines: [...lines, `pia: board listener already up (pid ${already})`] }
+  deps.startListener()
   const pid = await waitFor(() => deps.listenerUp(), { ms: t.listener, ...clock })
-  if (pid) lines.push(`pia: board listener up (pid ${pid})`)
-  else lines.push(`pia: board listener not up after ${Math.round(t.listener / 1000)} s; her SessionStart hook asks her to start it on her next turn`)
+  if (!pid) return { ok: false, lines: [...lines, `pia: FAIL: board listener did not come up after ${Math.round(t.listener / 1000)} s`] }
+  lines.push(`pia: board listener started (pid ${pid})`)
   return { ok: true, lines }
 }
 
@@ -264,6 +276,13 @@ export function realPiaDeps(home, kit, opts = {}) {
     },
     trust: opts.trust || (() => piaTrust({ home, kit, folder })),
     listenerUp: () => livePid(home, PIA_KEY, LISTENER_MATCH),
+    // The listener runs detached from this process, in her crew home, with its output in .listen/pia.out (listen.mjs writes its pid).
+    startListener: () => {
+      mkdirSync(join(home, '.listen'), { recursive: true })
+      const out = openSync(join(home, '.listen', 'pia.out'), 'a')
+      const child = spawn(process.execPath, [join(kit, 'listen.mjs'), 'pia', '3600'], { cwd: home, env: { ...process.env, CREW_HOME: home }, detached: true, stdio: ['ignore', out, out] })
+      child.unref()
+    },
     hasCrewJson: () => existsSync(join(home, 'crew.json')) || existsSync(join(home, 'crew.config.json')),
     sleep: ms => new Promise(resolve => setTimeout(resolve, ms)),
     token: () => randomBytes(4).toString('hex')
