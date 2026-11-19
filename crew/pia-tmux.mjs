@@ -228,7 +228,7 @@ export function realPiaDeps(home, kit, opts = {}) {
       tmuxRun(home, tmuxBin, ['send-keys', '-t', PIA_TMUX, 'Enter'])
     },
     screen: () => tmuxRun(home, tmuxBin, ['capture-pane', '-p', '-t', PIA_TMUX]).stdout ?? '',
-    key: name => tmuxRun(home, tmuxBin, ['send-keys', '-t', PIA_TMUX, name]),
+    key: key => tmuxRun(home, tmuxBin, ['send-keys', '-t', PIA_TMUX, key]),
     kill: () => tmuxRun(home, tmuxBin, ['kill-session', '-t', PIA_TMUX])
   }
   return {
