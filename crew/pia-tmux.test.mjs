@@ -8,7 +8,7 @@ import { mkdirSync, mkdtempSync, writeFileSync, existsSync, readFileSync } from 
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { piaCommand, startPia, stopPia, restartPia, realPiaDeps, piaTrust, piaAgentsOf, PIA_TMUX } from './pia-tmux.mjs'
+import { piaCommand, startPia, stopPia, restartPia, realPiaDeps, piaTrust, piaAgentsOf, exitConfirmShowing, PIA_TMUX } from './pia-tmux.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const ID = 'aa11bb22'
@@ -31,6 +31,9 @@ function fakeTmux({ alive = false, screen = '', startEndsAt = null } = {}) {
       t.pasted.push(text)
     },
     screen: () => t.screen,
+    key: name => {
+      t.log.push(['key', name])
+    },
     kill: () => {
       t.log.push(['kill'])
       t.alive = false
@@ -40,10 +43,11 @@ function fakeTmux({ alive = false, screen = '', startEndsAt = null } = {}) {
 }
 
 // The deps around a fake tmux. `agents` is what claude agents lists (ids that are live), `record` the recorded pia session.
-function fakeDeps({ tmux, agents = [], record = null, token = 'tok123', listenerPid = null, stopOk = true, trust } = {}) {
+function fakeDeps({ tmux, agents = [], record = null, token = 'tok123', listenerPid = null, stopOk = true, trust, hasCrewJson = true } = {}) {
   const log = []
   const deps = {
     tmux: tmux.tmux,
+    hasCrewJson: () => hasCrewJson,
     folder: '/crew/pia-session',
     name: 'taskmanager-maintenance-pia',
     command: resume => `CMD resume=${resume || '-'}`,
@@ -231,6 +235,7 @@ test('restart stops her, then starts her again, each step on its own line', asyn
 test('the real tmux part: start, paste a mail that shows, stop; on a throwaway socket', { skip: !hasTmux }, async () => {
   const home = mkdtempSync(join(process.env.TMPDIR || '/tmp', 'pia-tmux-home-'))
   mkdirSync(join(home, 'sessions'), { recursive: true })
+  writeFileSync(join(home, 'crew.json'), '{"team":"throwaway"}\n')
   writeFileSync(join(home, 'sessions', 'pia.json'), JSON.stringify({ id: ID, name: 'pia' }))
   // The fake claude: `agents --json` lists the recorded id as live; anything else echoes its input.
   const fake = join(home, 'fake-claude.sh')
@@ -293,6 +298,93 @@ test('Pia\'s folder is trusted in Claude\'s config, and no other folder is', () 
   const other = piaTrust({ home, kit: here, folder: '/tmp/somewhere-else', file })
   assert.equal(other.ok, false)
   assert.match(other.reason, /not the crew home's pia-session folder/)
+})
+
+// The /exit confirm (Boss, 2026-11-19): after /exit with a background shell running, Claude shows "Enter to confirm · Esc to
+// cancel". The kit presses Enter once for that dialog only. The question line above the footer is the background-shell wording;
+// it is matched on "background" (assumed wording: check it against a real screen when one is next seen).
+const EXIT_CONFIRM = ['1 background shell is still running', 'Exit anyway?', '  Enter to confirm · Esc to cancel']
+const OTHER_CONFIRM = ['Teach auto mode about your environment?', '  Enter to confirm · Esc to cancel']
+const CONTINUE_DIALOG = ['? Teach auto mode about your environment?', '  Enter to continue']
+
+test('exitConfirmShowing matches only the background-shell exit confirm', () => {
+  assert.equal(exitConfirmShowing(EXIT_CONFIRM.join('\n')), true)
+  assert.equal(exitConfirmShowing(OTHER_CONFIRM.join('\n')), false)
+  assert.equal(exitConfirmShowing(CONTINUE_DIALOG.join('\n')), false)
+  assert.equal(exitConfirmShowing('> '), false)
+  assert.equal(exitConfirmShowing(''), false)
+})
+
+// A tmux whose /exit shows `screenAfterExit`, and whose Enter ends the session when `endsOnKey` is set.
+function exitConfirmTmux(screenAfterExit, { endsOnKey = false } = {}) {
+  const tmux = fakeTmux({ alive: true, screen: '> ' })
+  tmux.tmux.paste = async text => {
+    tmux.log.push(['paste', text])
+    tmux.pasted.push(text)
+    tmux.screen = screenAfterExit
+  }
+  tmux.tmux.key = name => {
+    tmux.log.push(['key', name])
+    if (endsOnKey) tmux.alive = false
+  }
+  return tmux
+}
+
+test('stop presses Enter once on the background-shell exit confirm, and her session ends: no kill', async () => {
+  const tmux = exitConfirmTmux(EXIT_CONFIRM.join('\n'), { endsOnKey: true })
+  const { deps } = fakeDeps({ tmux, record: null })
+  const out = await stopPia({ deps, timeouts: FAST })
+  assert.equal(out.ok, true)
+  assert.deepEqual(tmux.log.filter(e => e[0] === 'key'), [['key', 'Enter']])
+  assert.equal(tmux.log.some(e => e[0] === 'kill'), false)
+  assert.ok(out.lines.some(l => /exit confirm answered \(Enter, once\)/.test(l)), out.lines.join('\n'))
+})
+
+test('stop presses Enter only once even when the confirm stays up, and then kills after the grace time', async () => {
+  const tmux = exitConfirmTmux(EXIT_CONFIRM.join('\n'), { endsOnKey: false })
+  const { deps } = fakeDeps({ tmux, record: null })
+  const out = await stopPia({ deps, timeouts: FAST })
+  assert.equal(out.ok, true)
+  assert.equal(tmux.log.filter(e => e[0] === 'key').length, 1)
+  assert.ok(out.lines.some(l => /did not end her session/.test(l)), out.lines.join('\n'))
+  assert.equal(tmux.alive, false)
+})
+
+test('stop never answers any other dialog after /exit: it kills after the grace time', async () => {
+  for (const screen of [CONTINUE_DIALOG, OTHER_CONFIRM]) {
+    const tmux = exitConfirmTmux(screen.join('\n'), { endsOnKey: true })
+    const { deps } = fakeDeps({ tmux, record: null })
+    const out = await stopPia({ deps, timeouts: FAST })
+    assert.equal(tmux.log.some(e => e[0] === 'key'), false, screen[0])
+    assert.ok(out.lines.some(l => /did not end her session/.test(l)), out.lines.join('\n'))
+    assert.equal(tmux.alive, false)
+  }
+})
+
+// A home with no crew.json is not a crew home: a Pia start there would start a listener that reads the wrong crew (card mwmzv2jt,
+// Boss 2026-11-19). The start refuses before anything runs.
+test('a start with no crew.json refuses, and nothing runs: no tmux, no claude, no listener', async () => {
+  const tmux = fakeTmux({ alive: false })
+  const { deps, log } = fakeDeps({ tmux, hasCrewJson: false, record: { id: ID } })
+  const out = await startPia({ deps, timeouts: FAST })
+  assert.equal(out.ok, false)
+  assert.ok(out.lines.some(l => /no crew\.json/.test(l) && /not started/.test(l)), out.lines.join('\n'))
+  assert.equal(tmux.log.length, 0)
+  assert.equal(log.length, 0)
+})
+
+test('the real start refuses a home with no crew.json before claude is run', async () => {
+  const home = mkdtempSync(join(tmpdir(), 'pia-nocrew-home-'))
+  const marker = join(home, 'claude-was-run')
+  const bin = join(home, 'fake-claude.sh')
+  writeFileSync(bin, `#!/bin/sh\ntouch ${marker}\n`, { mode: 0o755 })
+  const deps = realPiaDeps(home, here, { bin, trust: () => ({ ok: true }) })
+  const out = await startPia({ deps, timeouts: FAST })
+  assert.equal(out.ok, false)
+  assert.ok(out.lines.some(l => /no crew\.json/.test(l)), out.lines.join('\n'))
+  assert.equal(existsSync(marker), false)
+  assert.equal(existsSync(join(home, 'tmux.sock')), false)
+  assert.equal(existsSync(join(home, '.listen')), false)
 })
 
 test('the tmux session name is pia', () => {

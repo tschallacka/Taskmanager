@@ -83,6 +83,8 @@ const live = a => a.state !== 'ended' && a.status !== 'stopped'
 export async function startPia({ deps, timeouts }) {
   const t = withDefaults(timeouts)
   const clock = { sleep: deps.sleep, poll: t.poll }
+  // A home with no crew.json is not a crew home: refused before anything runs, so no listener starts against the wrong crew.
+  if (!deps.hasCrewJson()) return { ok: false, lines: ['pia: the crew home has no crew.json, so it is not a crew home: she is not started and no listener is started'] }
   if (deps.tmux.has()) return { ok: true, lines: ['pia: already running'] }
   deps.cleanSocket()
   const record = deps.readRecord()
@@ -131,6 +133,19 @@ export async function startPia({ deps, timeouts }) {
 // The last non-empty line of a screen, trimmed: where her screen was when a stop did not end her session.
 const lastLine = screen => String(screen ?? '').split('\n').map(l => l.trim()).filter(Boolean).pop() ?? ''
 
+const CONFIRM_FOOTER = 'Enter to confirm · Esc to cancel'
+
+/**
+ * True when the screen shows the background-shell exit confirm: the footer "Enter to confirm · Esc to cancel" is the last line,
+ * and a line within six rows above it says "background" (the running background shell). Any other dialog is not this one.
+ */
+export function exitConfirmShowing(screen) {
+  const rows = String(screen ?? '').split('\n').map(r => r.trim()).filter(Boolean)
+  const footer = rows.lastIndexOf(CONFIRM_FOOTER)
+  if (footer < 0 || footer !== rows.length - 1) return false
+  return rows.slice(Math.max(0, footer - 6), footer).some(r => /background/i.test(r))
+}
+
 /** `stop`: /exit, then kill after the grace time; `claude stop` only while claude still lists her session. */
 export async function stopPia({ deps, timeouts }) {
   const t = withDefaults(timeouts)
@@ -142,8 +157,18 @@ export async function stopPia({ deps, timeouts }) {
   if (dialog) lines.push(`pia: a dialog is showing ("${dialog.first}"); not answered`)
   else {
     await deps.tmux.paste('/exit')
-    const ended = await waitFor(() => !deps.tmux.has(), { ms: t.grace, ...clock })
-    if (ended) return { ok: true, lines: ['pia: stopped: her session ended on /exit'] }
+    // The background-shell exit confirm gets one Enter (Boss, 2026-11-19); any other dialog is never answered.
+    let answered = false
+    const ended = await waitFor(() => {
+      if (!deps.tmux.has()) return true
+      if (!answered && exitConfirmShowing(deps.tmux.screen())) {
+        deps.tmux.key('Enter')
+        answered = true
+        lines.push('pia: exit confirm answered (Enter, once)')
+      }
+      return null
+    }, { ms: t.grace, ...clock })
+    if (ended) return { ok: true, lines: [...lines, 'pia: stopped: her session ended on /exit'] }
     lines.push(`pia: /exit did not end her session in ${Math.round(t.grace / 1000)} s; her screen ends: "${lastLine(deps.tmux.screen())}"`)
   }
   deps.tmux.kill()
@@ -203,6 +228,7 @@ export function realPiaDeps(home, kit, opts = {}) {
       tmuxRun(home, tmuxBin, ['send-keys', '-t', PIA_TMUX, 'Enter'])
     },
     screen: () => tmuxRun(home, tmuxBin, ['capture-pane', '-p', '-t', PIA_TMUX]).stdout ?? '',
+    key: name => tmuxRun(home, tmuxBin, ['send-keys', '-t', PIA_TMUX, name]),
     kill: () => tmuxRun(home, tmuxBin, ['kill-session', '-t', PIA_TMUX])
   }
   return {
@@ -238,6 +264,7 @@ export function realPiaDeps(home, kit, opts = {}) {
     },
     trust: opts.trust || (() => piaTrust({ home, kit, folder })),
     listenerUp: () => livePid(home, PIA_KEY, LISTENER_MATCH),
+    hasCrewJson: () => existsSync(join(home, 'crew.json')) || existsSync(join(home, 'crew.config.json')),
     sleep: ms => new Promise(resolve => setTimeout(resolve, ms)),
     token: () => randomBytes(4).toString('hex')
   }
