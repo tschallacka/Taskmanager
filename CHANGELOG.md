@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.56.1 - 2026-11-19
+
+- **A stopped session resumes with its own id, and a refused resume is said, not hidden.** A resume is the bare `claude --bg --resume <id>`, and the kit checks claude's job before it says "resumed": an unknown id leaves a failed job, which is printed as `resume refused: <detail>` (exit 1), and nothing is started fresh. A record that holds the short id of a stopped session resolves the full id from its job record, and a stop sends `claude stop` the short id. Files: `crew/session.mjs`, `crew/session.test.mjs`.
+
 ## 0.56.0 - 2026-11-19
 
 - **Pasting an image into a task description shows its progress, and typing at a pending placeholder no longer drops the upload.** A pasted image shows an "Uploading image…" placeholder with a bar that fills as the upload goes, then the image; a failed upload leaves a visible line with the reason, which stays until you delete it; several pasted images each get their own placeholder. A late answer to an earlier save no longer puts back the text from before the typing, so the upload lands (or shows its error line). Files: `app/utils/editor/`, `app/components/RichEditor.vue`, `app/components/kanban/TaskDrawer.vue`.
