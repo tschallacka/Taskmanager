@@ -14,6 +14,7 @@
 //   crew janet stale plan|run <card> [--dry-run]         the crew's stale worktrees: plan, then run what is granted (janet.mjs)
 //   crew publish <slug> <branch> <title> <msg-file> <pr-file>   the merger's one command: squash onto a fresh base, check, push, open the PR (publish.mjs)
 //   crew up                    brings the crew's parts back in order after a restart, one line each, from crew.json "up" (up.mjs)
+//   crew up|restart|stop [person]   the recorded person sessions: resume, restart or stop, one line each; no person means everyone (people-control.mjs)
 //   crew restart-brief         after crew up: each standing member's open cards and last update, for Pia to start them fresh (restart-brief.mjs)
 //   crew dev-copies            after crew up: restarts the dev copies a Verify UX or Verify QA card needs, one line each (dev-copies.mjs)
 //   crew susy-daemon once|loop|start|stop|status [--live]   Susy as a daemon with no model in the loop; start/stop run the loop in its own tmux session; without --live it only logs what it would post, with --live it posts Susy's lines on the board and mails Boss when the board gives no answer (susy-daemon.mjs)
@@ -87,6 +88,13 @@ if (first === 'susy' && (rest[0] === 'check' || rest[0] === 'agent')) {
 // Boss's @cato watch, a Monitor: the mentions of Pia, Susy and Rita, each printed once, every 60 s (mentions.mjs --boss).
 if (first === 'boss-mentions') {
   const run = spawnSync(process.execPath, [join(kit, 'mentions.mjs'), '--follow', '--boss'], { stdio: 'inherit' })
+  process.exit(run.status ?? 1)
+}
+
+// `crew up <person>`, `crew restart [person]`, `crew stop [person]`: the recorded person sessions (people-control.mjs). A bare
+// `crew up` stays up.mjs, which also brings up the parts in crew.json.
+if (first === 'restart' || first === 'stop' || (first === 'up' && rest.length)) {
+  const run = spawnSync(process.execPath, [join(kit, 'people-control.mjs'), first, ...rest], { stdio: 'inherit' })
   process.exit(run.status ?? 1)
 }
 
