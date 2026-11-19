@@ -15,7 +15,9 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const SCRIPT = join(HERE, 'session-wake.sh')
 const ID = '1f592988'
 
-function fakeTerminal({ failOn = [], late = 0, screen = '> ready' } = {}) {
+// The default screen is claude's layout: the input line between two rules, and the status line under them.
+const READY = '─────────────\n❯ ready\n─────────────\n  ⏵⏵ auto mode on (shift+tab to cycle)'
+function fakeTerminal({ failOn = [], late = 0, screen = READY } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'wake-term-'))
   const log = join(dir, 'calls.log')
   const bin = join(dir, 'mcp')
@@ -92,8 +94,8 @@ test('a terminal that never answers in time: exit 3, the tool error line is the 
   assert.ok(!calls(mcp).some(c => c.name === 'paste' || c.name === 'key'), 'nothing typed')
 })
 
-test('a short screen with the prompt on its first row is read and typed into', () => {
-  const mcp = fakeTerminal({ screen: '> ready' })
+test('a short screen with the input line between its rules is read and typed into', () => {
+  const mcp = fakeTerminal({ screen: '─────\n❯\n─────' })
   const r = run(mcp)
   assert.equal(r.status, 0, r.stderr)
   assert.ok(calls(mcp).some(c => c.name === 'key'), 'Enter was pressed')
@@ -104,6 +106,21 @@ test('a screen with no claude prompt on it is not read as ready: exit 3, the rea
   const r = run(mcp, { env: { WAKE_PROMPT_WAIT: '2' } })
   assert.equal(r.status, 3, r.stderr)
   assert.match(lastLine(r.stderr), /^SCREEN-UNREADABLE session 1f592988: .*no claude prompt/)
+  assert.ok(!calls(mcp).some(c => c.name === 'paste' || c.name === 'key'), 'nothing typed')
+})
+
+test('a transcript "> " line with no input line is not a prompt: exit 3, nothing typed', () => {
+  const mcp = fakeTerminal({ screen: '> the card says to fix the prompt check\n● Reading it now.\n  ⎿ 3 files changed' })
+  const r = run(mcp, { env: { WAKE_PROMPT_WAIT: '2' } })
+  assert.equal(r.status, 3, r.stderr)
+  assert.match(lastLine(r.stderr), /^SCREEN-UNREADABLE session 1f592988: .*no claude prompt/)
+  assert.ok(!calls(mcp).some(c => c.name === 'paste' || c.name === 'key'), 'nothing typed')
+})
+
+test('a transcript "❯" message is not the input line either: no rules around it, so exit 3 and nothing typed', () => {
+  const mcp = fakeTerminal({ screen: '❯ wake test, ignore\n● Noted. Nothing to do.\n\n  ⏵⏵ auto mode on' })
+  const r = run(mcp, { env: { WAKE_PROMPT_WAIT: '2' } })
+  assert.equal(r.status, 3, r.stderr)
   assert.ok(!calls(mcp).some(c => c.name === 'paste' || c.name === 'key'), 'nothing typed')
 })
 

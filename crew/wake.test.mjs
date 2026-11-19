@@ -18,6 +18,7 @@ process.env.WAKE_POLL_SECONDS ??= '1'
 // A fake interactive-shell MCP for session-wake.sh: every tool call answers with a result, except the tools named in
 // `failOn`, which answer with an error. Calls are appended to a log so a test can see the order.
 // `screen`, when given, is the text the `view` tool shows: the wake reads it before it types.
+// The default screen is claude's layout: the input line between two rules (crew/prompt-line.mjs looks for it).
 function fakeMcp(failOn = [], screen = null) {
   const dir = mkdtempSync(join(tmpdir(), 'wake-mcp-'))
   const log = join(dir, 'calls.log')
@@ -31,7 +32,7 @@ fs.appendFileSync(${JSON.stringify(log)}, (name || 'init') + '\\n')
 const fail = ${JSON.stringify(failOn)}.includes(name)
 const screen = ${JSON.stringify(screen)}
 let text = 'ok'
-if (name === 'view') text = JSON.stringify({ responses: [{ text: screen ?? '> ready' }] })
+if (name === 'view') text = JSON.stringify({ responses: [{ text: screen ?? '─────────────\\n❯ ready\\n─────────────\\n  ⏵⏵ auto mode on' }] })
 process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: 2, result: fail ? { isError: true, content: [{ type: 'text', text: 'refused' }] } : { content: [{ type: 'text', text }] } }) + '\\n')
 `)
   chmodSync(bin, 0o755)
