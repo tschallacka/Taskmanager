@@ -229,7 +229,7 @@ export function sessionList({ home, bin }) {
 export function stopSession({ home, key, bin }) {
   const record = readRecord(home, key)
   if (!record) return { ok: false, reason: `${key}: no recorded session to stop` }
-  // The stop verb is not in the verified list yet (see the card): it is called only after Boss's go for a real session.
+  // `claude stop <id>` is a verified verb: Boss used it on real sessions on 2026-11-19 (card mwmzv2jt).
   const run = runClaude(['stop', record.id], { bin })
   return run.ok ? { ok: true, id: record.id } : { ok: false, reason: `claude stop ${record.id} failed: ${run.stderr || `exit ${run.status}`}` }
 }

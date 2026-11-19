@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { parseControl, controlPeople, CONTROL_COMMANDS, PIA_LINE } from './people-control.mjs'
+import { parseControl, controlPeople, CONTROL_COMMANDS } from './people-control.mjs'
 
 const LIVE = 'bb000002'
 const DEAD = 'aa000001'
@@ -130,11 +130,12 @@ test('up of a stopped person resumes it once and wakes it', async () => {
 
 test('up with no person handles every recorded person, in key order', async () => {
   const home = homeWith({ wren: { id: LIVE, name: 'wren', folder: '/tmp' }, wick: { id: DEAD, name: 'wick', folder: '/tmp' } })
-  const deps = fakeDeps({ live: [LIVE] })
+  const deps = withPia(fakeDeps({ live: [LIVE] }), { ok: true, lines: ['pia: already running'] })
   const out = await controlPeople('up', null, { home, deps })
-  assert.equal(out.lines.length, 2)
-  assert.match(out.lines[0], /^wick: started/)
-  assert.match(out.lines[1], /^wren: already running/)
+  assert.equal(out.lines.length, 3)
+  assert.equal(out.lines[0], 'pia: already running')
+  assert.match(out.lines[1], /^wick: started/)
+  assert.match(out.lines[2], /^wren: already running/)
 })
 
 test('a person with no recorded session is reported as failed, never started with a guessed id', async () => {
@@ -146,12 +147,37 @@ test('a person with no recorded session is reported as failed, never started wit
   assert.deepEqual(deps.log, [])
 })
 
-test('pia is not handled by the kit yet: a loud line, never a silent skip', async () => {
-  const home = homeWith({})
-  const deps = fakeDeps()
+// Pia has her own terminal (pia-tmux.mjs, card mwmzv2jt): her control goes through deps.pia, never through a recorded session.
+function withPia(deps, result) {
+  deps.pia = async command => {
+    deps.log.push(['pia', command])
+    return typeof result === 'function' ? result(command) : result
+  }
+  return deps
+}
+
+test('pia goes to her own terminal control: crew restart pia runs the pia control and touches no worker', async () => {
+  const home = homeWith({ wren: { id: LIVE, name: 'wren', folder: '/tmp' } })
+  const deps = withPia(fakeDeps({ live: [LIVE] }), { ok: true, lines: ['pia: restart done'] })
   const out = await controlPeople('restart', 'pia', { home, deps })
+  assert.equal(out.ok, true)
+  assert.deepEqual(out.lines, ['pia: restart done'])
+  assert.deepEqual(deps.log, [['pia', 'restart']])
+})
+
+test('a failing pia control makes the whole command fail, with her lines as they are', async () => {
+  const home = homeWith({})
+  const deps = withPia(fakeDeps(), { ok: false, lines: ['pia: resume of aa11bb22 failed: boom; not started fresh'] })
+  const out = await controlPeople('up', 'pia', { home, deps })
   assert.equal(out.ok, false)
-  assert.deepEqual(out.lines, [PIA_LINE])
-  assert.match(PIA_LINE, /^pia: failed: /)
-  assert.deepEqual(deps.log, [])
+  assert.deepEqual(out.lines, ['pia: resume of aa11bb22 failed: boom; not started fresh'])
+})
+
+test('crew up with no person brings Pia up first, then the recorded persons', async () => {
+  const home = homeWith({ wren: { id: LIVE, name: 'wren', folder: '/tmp' } })
+  const deps = withPia(fakeDeps({ live: [] }), { ok: true, lines: ['pia: already running'] })
+  const out = await controlPeople('up', null, { home, deps })
+  assert.equal(out.ok, true)
+  assert.deepEqual(deps.log[0], ['pia', 'up'])
+  assert.ok(out.lines.includes('pia: already running'))
 })

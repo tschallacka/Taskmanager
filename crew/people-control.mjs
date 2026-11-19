@@ -7,16 +7,17 @@
 //   restart  a running session is stopped, then resumed and woken once
 //   stop     a running session is stopped by its recorded id; a session that is not running is reported, nothing else
 //
-// Pia is not handled here yet: her terminal is started by hand (PROMPTS.md, "Starting Pia"), and the line for her says so.
+// Pia has her own terminal (tmux session `pia`): pia-tmux.mjs starts, stops and restarts her, and her lines come first.
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { crewHome } from './home.mjs'
 import { liveById, readRecord, startSession, stopSession, validSessionId } from './session.mjs'
 import { recordedKeys, realSessionDeps, RESTART_WAKE } from './sessions-up.mjs'
 import { resolveStartRole, writeRoleFile } from './role-file.mjs'
+import { piaControl, realPiaDeps, TIMEOUTS as PIA_TIMEOUTS } from './pia-tmux.mjs'
 
 export const CONTROL_COMMANDS = ['up', 'restart', 'stop']
-export const PIA_LINE = 'pia: failed: the kit does not start or stop Pia yet; her terminal is started by hand (PROMPTS.md, "Starting Pia")'
+const PIA = 'pia'
 const USAGE = 'usage: crew up|restart|stop [person]'
 const KEY = /^[a-z][a-z0-9-]{0,31}$/
 
@@ -32,11 +33,11 @@ export function parseControl(argv) {
 /**
  * Runs one control command for the person (or every recorded person). `deps` are the real ones in production (see
  * realControlDeps) and fakes in the tests: `listAgents()`, `stop({ key })`, `resolveRole({ key })` (the role, or a reason),
- * `start({ key, folder, role, resumeOnly })` and `wake({ key, id, text })`. Returns the lines and whether all went through.
+ * `start({ key, folder, role, resumeOnly })` and `wake({ key, id, text })`. `deps.pia(command)` is Pia's own control (pia-tmux.mjs):
+ * `{ ok, lines }`. Returns the lines and whether all went through.
  */
 export async function controlPeople(command, person, { home, deps }) {
-  if (person === 'pia') return { lines: [PIA_LINE], ok: false }
-  const keys = person ? [person] : recordedKeys(home)
+  const keys = person ? [person] : [PIA, ...recordedKeys(home).filter(key => key !== PIA)]
   const list = deps.listAgents()
   const lines = []
   let ok = true
@@ -45,6 +46,12 @@ export async function controlPeople(command, person, { home, deps }) {
     lines.push(`${key}: failed: ${why}`)
   }
   for (const key of keys) {
+    if (key === PIA) {
+      const out = await deps.pia(command)
+      lines.push(...out.lines)
+      if (!out.ok) ok = false
+      continue
+    }
     const record = readRecord(home, key)
     if (!record || !validSessionId(record.id)) {
       fail(key, `no recorded session; nothing to ${command}, start it by hand`)
@@ -102,6 +109,7 @@ export function realControlDeps(home, kit) {
   const bin = process.env.CREW_CLAUDE_BIN || 'claude'
   return {
     listAgents: () => base.listAgents(),
+    pia: command => piaControl(command, { deps: realPiaDeps(home, kit, { bin }), timeouts: PIA_TIMEOUTS }),
     stop: ({ key }) => stopSession({ home, key, bin }),
     resolveRole: ({ key }) => {
       const resolved = resolveStartRole({ home, key, promptsText: base.promptsText, crewText: base.crewText, env: process.env })

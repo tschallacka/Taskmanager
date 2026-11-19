@@ -70,6 +70,8 @@ people.mjs
 pia-listener-hook.sh
 pia-session.mjs
 pia-session.settings.json
+pia-term.sh
+pia-tmux.mjs
 pidfile.mjs
 port-registry.mjs
 postbrief.mjs

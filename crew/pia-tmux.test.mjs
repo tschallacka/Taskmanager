@@ -1,0 +1,300 @@
+// `crew up pia`, `crew stop pia`, `crew restart pia` (pia-tmux.mjs, card mwmzv2jt). Most tests use fakes: no real claude, no real
+// typing. The last test runs the tmux part on a real tmux with a throwaway socket, and its program is `cat`. Run:
+//   node --test crew/pia-tmux.test.mjs
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
+import { mkdirSync, mkdtempSync, writeFileSync, existsSync, readFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { piaCommand, startPia, stopPia, restartPia, realPiaDeps, piaTrust, piaAgentsOf, PIA_TMUX } from './pia-tmux.mjs'
+
+const here = dirname(fileURLToPath(import.meta.url))
+const ID = 'aa11bb22'
+const NEW_ID = 'cc33dd44'
+const FAST = { ready: 300, mail: 300, listener: 200, grace: 300, poll: 20 }
+const hasTmux = spawnSync('tmux', ['-V']).status === 0
+
+// A fake tmux: `alive` is whether the pia session exists, `screen` what it shows. Every call is logged.
+function fakeTmux({ alive = false, screen = '', startEndsAt = null } = {}) {
+  const t = { alive, screen, log: [], pasted: [] }
+  t.tmux = {
+    has: () => t.alive,
+    start: (cwd, command) => {
+      t.log.push(['start', cwd, command])
+      t.alive = true
+      if (startEndsAt === 'immediately') t.alive = false
+    },
+    paste: async text => {
+      t.log.push(['paste', text])
+      t.pasted.push(text)
+    },
+    screen: () => t.screen,
+    kill: () => {
+      t.log.push(['kill'])
+      t.alive = false
+    }
+  }
+  return t
+}
+
+// The deps around a fake tmux. `agents` is what claude agents lists (ids that are live), `record` the recorded pia session.
+function fakeDeps({ tmux, agents = [], record = null, token = 'tok123', listenerPid = null, stopOk = true, trust } = {}) {
+  const log = []
+  const deps = {
+    tmux: tmux.tmux,
+    folder: '/crew/pia-session',
+    name: 'taskmanager-maintenance-pia',
+    command: resume => `CMD resume=${resume || '-'}`,
+    listAgents: () => agents,
+    readRecord: () => record,
+    recordId: id => log.push(['recordId', id]),
+    stopClaude: id => {
+      log.push(['stopClaude', id])
+      return stopOk ? { ok: true } : { ok: false, reason: 'no such session' }
+    },
+    cleanSocket: () => log.push(['cleanSocket']),
+    merge: () => log.push(['merge']),
+    trust: trust ?? (() => ({ ok: true })),
+    listenerUp: () => listenerPid,
+    sleep: async () => {},
+    token: () => token
+  }
+  return { deps, log }
+}
+
+test('the command: model, dirs, merged settings, name, and --resume only with a valid id', () => {
+  const cmd = piaCommand({ home: '/crew', kit: '/kit', claude: 'claude', name: 'taskmanager-maintenance-pia', resume: ID })
+  assert.match(cmd, /^env CREW_HOME=\/crew /)
+  assert.match(cmd, /--model claude-haiku-5-5/)
+  assert.match(cmd, /--add-dir \/crew --add-dir \/kit/)
+  assert.match(cmd, /--settings \/crew\/pia-session\/settings\.merged\.json/)
+  assert.match(cmd, /-n taskmanager-maintenance-pia/)
+  assert.match(cmd, new RegExp(`--resume ${ID}$`))
+  const fresh = piaCommand({ home: '/crew', kit: '/kit', claude: 'claude', name: 'n', resume: '' })
+  assert.doesNotMatch(fresh, /--resume/)
+})
+
+test('the command refuses an id that is not a session id (it is typed into a shell)', () => {
+  assert.throws(() => piaCommand({ home: '/crew', kit: '/kit', claude: 'claude', name: 'n', resume: 'x; rm -rf /' }), /not a session id/)
+})
+
+test('up with no recorded id starts her fresh, says so, records the new id and checks mail and listener', async () => {
+  const tmux = fakeTmux({ alive: false, screen: '' })
+  const { deps, log } = fakeDeps({ tmux, agents: [{ id: NEW_ID, name: 'taskmanager-maintenance-pia', state: 'idle', status: 'running', startedAt: 5 }], record: null, token: 'tok123', listenerPid: 4242 })
+  // The fake shows the mail once it is pasted.
+  tmux.tmux.paste = async text => { tmux.log.push(['paste', text]); tmux.screen = `${text}\n`; }
+  const out = await startPia({ deps, timeouts: FAST })
+  assert.equal(out.ok, true, out.lines.join('\n'))
+  assert.ok(out.lines.some(l => /starting her fresh/.test(l)), out.lines.join('\n'))
+  assert.ok(out.lines.some(l => /session cc33dd44 recorded/.test(l)), out.lines.join('\n'))
+  assert.ok(out.lines.some(l => /test mail tok123 pasted and on her screen/.test(l)), out.lines.join('\n'))
+  assert.ok(out.lines.some(l => /board listener up \(pid 4242\)/.test(l)), out.lines.join('\n'))
+  assert.deepEqual(log.find(e => e[0] === 'recordId'), ['recordId', NEW_ID])
+  assert.equal(tmux.log.find(e => e[0] === 'start')[2], 'CMD resume=-')
+})
+
+test('up with a recorded id resumes that id and records nothing new', async () => {
+  const tmux = fakeTmux({ alive: false })
+  tmux.tmux.paste = async text => { tmux.log.push(['paste', text]); tmux.screen = text }
+  const { deps, log } = fakeDeps({ tmux, agents: [{ id: ID, name: 'x', state: 'idle', status: 'running', startedAt: 1 }], record: { id: ID }, token: 'tok9', listenerPid: 7 })
+  const out = await startPia({ deps, timeouts: FAST })
+  assert.equal(out.ok, true, out.lines.join('\n'))
+  assert.equal(tmux.log.find(e => e[0] === 'start')[2], `CMD resume=${ID}`)
+  assert.equal(log.some(e => e[0] === 'recordId'), false)
+  assert.ok(out.lines.some(l => new RegExp(`session ${ID} live`).test(l)), out.lines.join('\n'))
+})
+
+test('a resume that claude refuses is reported as failed, never followed by a fresh start', async () => {
+  const tmux = fakeTmux({ alive: false, startEndsAt: 'immediately' })
+  const { deps, log } = fakeDeps({ tmux, agents: [], record: { id: ID } })
+  const out = await startPia({ deps, timeouts: FAST })
+  assert.equal(out.ok, false)
+  assert.ok(out.lines.some(l => new RegExp(`resume of ${ID} failed`).test(l) && /not started fresh/.test(l)), out.lines.join('\n'))
+  assert.equal(log.some(e => e[0] === 'recordId'), false)
+  assert.equal(tmux.pasted.length, 0)
+})
+
+test('up when her session is already running does nothing', async () => {
+  const tmux = fakeTmux({ alive: true })
+  const { deps } = fakeDeps({ tmux, record: { id: ID } })
+  const out = await startPia({ deps, timeouts: FAST })
+  assert.equal(out.ok, true)
+  assert.deepEqual(out.lines, ['pia: already running'])
+  assert.equal(tmux.log.some(e => e[0] === 'start'), false)
+})
+
+test('a dialog on her screen is reported, and nothing is pasted into it', async () => {
+  const dialog = '? Teach auto mode about your environment?\n  Enter to continue\n  Esc to cancel'
+  const tmux = fakeTmux({ alive: false, screen: dialog })
+  const { deps } = fakeDeps({ tmux, agents: [{ id: ID, name: 'x', state: 'idle', status: 'running', startedAt: 1 }], record: { id: ID } })
+  const out = await startPia({ deps, timeouts: FAST })
+  assert.equal(out.ok, false)
+  assert.ok(out.lines.some(l => /dialog is showing \("\? Teach auto mode about your environment\?"\)/.test(l)), out.lines.join('\n'))
+  assert.equal(tmux.pasted.length, 0)
+})
+
+test('a test mail that never shows on her screen fails the start', async () => {
+  const tmux = fakeTmux({ alive: false, screen: '' })
+  const { deps } = fakeDeps({ tmux, agents: [{ id: ID, name: 'x', state: 'idle', status: 'running', startedAt: 1 }], record: { id: ID }, token: 'lost9' })
+  const out = await startPia({ deps, timeouts: FAST })
+  assert.equal(out.ok, false)
+  assert.ok(out.lines.some(l => /test mail lost9 not seen on her screen/.test(l)), out.lines.join('\n'))
+})
+
+test('a listener that is not up yet is reported, not a failure: her SessionStart hook asks her to start it', async () => {
+  const tmux = fakeTmux({ alive: false })
+  tmux.tmux.paste = async text => { tmux.log.push(['paste', text]); tmux.screen = text }
+  const { deps } = fakeDeps({ tmux, agents: [{ id: ID, name: 'x', state: 'idle', status: 'running', startedAt: 1 }], record: { id: ID }, token: 'tok5', listenerPid: null })
+  const out = await startPia({ deps, timeouts: FAST })
+  assert.equal(out.ok, true, out.lines.join('\n'))
+  assert.ok(out.lines.some(l => /board listener not up after/.test(l) && /SessionStart hook/.test(l)), out.lines.join('\n'))
+})
+
+test('an untrusted folder stops the start before tmux is touched', async () => {
+  const tmux = fakeTmux({ alive: false })
+  const { deps } = fakeDeps({ tmux, record: { id: ID }, trust: () => ({ ok: false, reason: 'the folder /crew/pia-session is not trusted by claude' }) })
+  const out = await startPia({ deps, timeouts: FAST })
+  assert.equal(out.ok, false)
+  assert.ok(out.lines.some(l => /not trusted by claude/.test(l)), out.lines.join('\n'))
+  assert.equal(tmux.log.some(e => e[0] === 'start'), false)
+})
+
+test('stop when she is not running says so', async () => {
+  const tmux = fakeTmux({ alive: false })
+  const { deps } = fakeDeps({ tmux })
+  const out = await stopPia({ deps, timeouts: FAST })
+  assert.equal(out.ok, true)
+  assert.deepEqual(out.lines, ['pia: not running'])
+})
+
+test('stop sends /exit and the session ends: no kill', async () => {
+  const tmux = fakeTmux({ alive: true, screen: '> ' })
+  tmux.tmux.paste = async text => {
+    tmux.log.push(['paste', text])
+    tmux.pasted.push(text)
+    tmux.alive = false
+  }
+  const { deps, log } = fakeDeps({ tmux, record: { id: ID } })
+  const out = await stopPia({ deps, timeouts: FAST })
+  assert.equal(out.ok, true)
+  assert.deepEqual(tmux.pasted, ['/exit'])
+  assert.ok(out.lines.some(l => /stopped: her session ended on \/exit/.test(l)), out.lines.join('\n'))
+  assert.equal(tmux.log.some(e => e[0] === 'kill'), false)
+  assert.equal(log.some(e => e[0] === 'stopClaude'), false)
+})
+
+test('stop when /exit does not end her session kills it, names her last screen line, and runs claude stop while she is still listed', async () => {
+  const tmux = fakeTmux({ alive: true, screen: 'a reply\n> ' })
+  const still = [{ id: ID, name: 'x', state: 'busy', status: 'busy', startedAt: 1 }]
+  const { deps, log } = fakeDeps({ tmux, record: { id: ID }, agents: still })
+  const out = await stopPia({ deps, timeouts: FAST })
+  assert.equal(out.ok, true)
+  assert.ok(out.lines.some(l => /did not end her session/.test(l) && /screen ends: ">"/.test(l)), out.lines.join('\n'))
+  assert.ok(out.lines.some(l => /tmux session killed/.test(l)), out.lines.join('\n'))
+  assert.ok(log.some(e => e[0] === 'stopClaude' && e[1] === ID))
+  assert.equal(tmux.alive, false)
+})
+
+// `claude stop` has no session to stop for an interactive one that the kill already ended (it answers "No session matching").
+test('after the kill, claude stop is not run when she is no longer listed', async () => {
+  const tmux = fakeTmux({ alive: true, screen: '> ' })
+  const { deps, log } = fakeDeps({ tmux, record: { id: ID }, agents: [] })
+  const out = await stopPia({ deps, timeouts: FAST })
+  assert.equal(out.ok, true)
+  assert.equal(log.some(e => e[0] === 'stopClaude'), false)
+  assert.ok(out.lines.some(l => /not listed after the kill/.test(l)), out.lines.join('\n'))
+})
+
+test('stop with a dialog up does not answer it: it kills the session and says why', async () => {
+  const dialog = '? Teach auto mode about your environment?\n  Enter to continue\n  Esc to cancel'
+  const tmux = fakeTmux({ alive: true, screen: dialog })
+  const { deps } = fakeDeps({ tmux, record: null })
+  const out = await stopPia({ deps, timeouts: FAST })
+  assert.equal(out.ok, true)
+  assert.equal(tmux.pasted.length, 0)
+  assert.ok(out.lines.some(l => /dialog is showing/.test(l)), out.lines.join('\n'))
+  assert.equal(tmux.alive, false)
+})
+
+test('restart stops her, then starts her again, each step on its own line', async () => {
+  const tmux = fakeTmux({ alive: false, screen: '' })
+  tmux.tmux.paste = async text => { tmux.log.push(['paste', text]); tmux.screen = text }
+  const { deps } = fakeDeps({ tmux, agents: [{ id: ID, name: 'x', state: 'idle', status: 'running', startedAt: 1 }], record: { id: ID }, token: 'tok8', listenerPid: 9 })
+  const out = await restartPia({ deps, timeouts: FAST })
+  assert.equal(out.ok, true, out.lines.join('\n'))
+  assert.equal(out.lines[0], 'pia: not running')
+  assert.ok(out.lines.some(l => /session aa11bb22 live/.test(l)), out.lines.join('\n'))
+})
+
+test('the real tmux part: start, paste a mail that shows, stop; on a throwaway socket', { skip: !hasTmux }, async () => {
+  const home = mkdtempSync(join(process.env.TMPDIR || '/tmp', 'pia-tmux-home-'))
+  mkdirSync(join(home, 'sessions'), { recursive: true })
+  writeFileSync(join(home, 'sessions', 'pia.json'), JSON.stringify({ id: ID, name: 'pia' }))
+  // The fake claude: `agents --json` lists the recorded id as live; anything else echoes its input.
+  const fake = join(home, 'fake-claude.sh')
+  writeFileSync(fake, `#!/bin/sh\nif [ "$1" = agents ]; then echo '[{"id":"${ID}","name":"taskmanager-maintenance-pia","state":"idle","status":"running","startedAt":1}]'; exit 0; fi\nexec cat\n`, { mode: 0o755 })
+  const deps = realPiaDeps(home, here, { bin: fake, trust: () => ({ ok: true }), name: 'taskmanager-maintenance-pia' })
+  try {
+    const up = await startPia({ deps, timeouts: { ready: 5000, mail: 8000, listener: 300, grace: 500, poll: 100 } })
+    assert.equal(up.ok, true, up.lines.join('\n'))
+    assert.ok(up.lines.some(l => /test mail .* pasted and on her screen/.test(l)), up.lines.join('\n'))
+    assert.equal(existsSync(join(home, 'pia-session', 'settings.merged.json')), true)
+    const down = await stopPia({ deps, timeouts: { ready: 5000, mail: 8000, listener: 300, grace: 500, poll: 100 } })
+    assert.equal(down.ok, true, down.lines.join('\n'))
+    assert.equal(deps.tmux.has(), false)
+    assert.match(readFileSync(join(home, 'sessions', 'pia.json'), 'utf8'), new RegExp(ID))
+  } finally {
+    spawnSync('tmux', ['-S', join(home, 'tmux.sock'), 'kill-server'])
+  }
+})
+
+// Her merged settings are written with this home's and this kit's hook commands: the static pia-session.settings.json has none of
+// the arguments the listener hook needs (crew home and kit), so her listener start line came out empty.
+test('Pia\'s merged settings carry the hook commands for this crew home and kit', () => {
+  const home = mkdtempSync(join(tmpdir(), 'pia-hooks-home-'))
+  const deps = realPiaDeps(home, here, { bin: 'claude', trust: () => ({ ok: true }) })
+  deps.merge()
+  const merged = JSON.parse(readFileSync(join(home, 'pia-session', 'settings.merged.json'), 'utf8'))
+  assert.equal(merged.remoteControlAtStartup, false)
+  const stop = merged.hooks.Stop[0].hooks[0].command
+  const start = merged.hooks.SessionStart[0].hooks[0].command
+  assert.match(stop, /pia-listener-hook\.sh' stop|pia-listener-hook\.sh stop/)
+  assert.ok(stop.includes(home) && stop.includes(here), stop)
+  assert.ok(start.includes('sessionstart') && start.includes(home), start)
+})
+
+// `claude agents --json` lists background sessions with `id` and interactive ones (Pia's, in her tmux session) with `sessionId`
+// and no `id`. Both are her session's id when she is live; session.mjs parseAgents drops the interactive ones, so Pia reads her own.
+test('Pia reads an interactive session by its sessionId, and a background one by its id', () => {
+  const json = JSON.stringify([
+    { pid: 1, sessionId: `${ID}-0000-4000-8000-000000000001`, name: 'qa-wade-pia', kind: 'interactive', status: 'busy', startedAt: 5 },
+    { pid: 2, id: 'ee55ff66', name: 'usher', kind: 'background', state: 'blocked', status: 'idle', startedAt: 3 }
+  ])
+  const list = piaAgentsOf(json)
+  assert.deepEqual(list.map(a => a.id), [`${ID}-0000-4000-8000-000000000001`, 'ee55ff66'])
+  assert.equal(list[0].name, 'qa-wade-pia')
+  assert.equal(list[0].startedAt, 5)
+  assert.equal(piaAgentsOf('not json'), null)
+})
+
+// Pia's folder is pia-session inside the crew home: trusted in Claude's config with the crew's own paths, and nothing else is.
+test('Pia\'s folder is trusted in Claude\'s config, and no other folder is', () => {
+  const home = mkdtempSync(join(tmpdir(), 'pia-trust-home-'))
+  const file = join(mkdtempSync(join(tmpdir(), 'pia-trust-cfg-')), '.claude.json')
+  writeFileSync(file, '{}\n')
+  const folder = join(home, 'pia-session')
+  const out = piaTrust({ home, kit: here, folder, file })
+  assert.equal(out.ok, true, out.reason)
+  const data = JSON.parse(readFileSync(file, 'utf8'))
+  assert.equal(data.projects[folder].hasTrustDialogAccepted, true)
+  assert.equal(data.projects[home].hasTrustDialogAccepted, true)
+  const other = piaTrust({ home, kit: here, folder: '/tmp/somewhere-else', file })
+  assert.equal(other.ok, false)
+  assert.match(other.reason, /not the crew home's pia-session folder/)
+})
+
+test('the tmux session name is pia', () => {
+  assert.equal(PIA_TMUX, 'pia')
+})
