@@ -26,7 +26,7 @@ A team has:
 - A **join code** that lets other people in. See [Create or join a team](/help/team/create-or-join-a-team).
 - **Customers**, the outside parties you share boards with. See
   [Customers and contacts](/help/team/customers-and-contacts).
-- **Board defaults**, the columns a new board starts with. See [Board defaults](/help/team/board-defaults).
+- **Projects**, the columns a new board starts with (the section was called Board defaults). See [Board defaults](/help/team/board-defaults).
 - Rules and Crews, which have their own sections on the Team page.
 
 ## Switch between workspaces

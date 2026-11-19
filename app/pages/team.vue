@@ -36,8 +36,9 @@ function fail(e: unknown, fallback: string) {
 const SECTIONS = computed(() => [
   { id: 'general', label: 'General', icon: 'i-lucide-settings-2' },
   { id: 'members', label: 'Members', icon: 'i-lucide-users' },
+  ...(isTeamAdmin.value ? [{ id: 'invitations', label: 'Invitations', icon: 'i-lucide-mail-plus' }] : []),
   { id: 'customers', label: 'Customers', icon: 'i-lucide-building-2' },
-  { id: 'boards', label: 'Board defaults', icon: 'i-lucide-columns-3' },
+  { id: 'boards', label: 'Projects', icon: 'i-lucide-columns-3' },
   { id: 'rules', label: 'Rules', icon: 'i-lucide-workflow' },
   { id: 'crews', label: 'Crews', icon: 'i-lucide-users-round' },
   ...(isTeamAdmin.value ? [{ id: 'keys', label: 'Keys', icon: 'i-lucide-key-round' }] : [])
@@ -479,11 +480,6 @@ async function saveColumns(names: string[]) {
 
             <!-- Members -->
             <template v-else-if="section === 'members'">
-              <TeamInvitesPanel
-                v-if="isTeamAdmin && activeTeamId"
-                :team-id="activeTeamId"
-                :is-owner="isTeamOwner"
-              />
               <div class="space-y-2">
                 <p class="text-xs text-muted">
                   Every member of the team can see these email addresses.
@@ -564,6 +560,15 @@ async function saveColumns(names: string[]) {
                   </div>
                 </div>
               </div>
+            </template>
+
+            <!-- Invitations: owners and admins only, the same as the panel (its own section) -->
+            <template v-else-if="section === 'invitations'">
+              <TeamInvitesPanel
+                v-if="isTeamAdmin && activeTeamId"
+                :team-id="activeTeamId"
+                :is-owner="isTeamOwner"
+              />
             </template>
 
             <!-- Customers -->

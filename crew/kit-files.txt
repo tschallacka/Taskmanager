@@ -4,6 +4,7 @@
 # profiles, logs, rendered documents, work folders) stays in the working copy.
 # One file name per line; lines starting with # are comments. Keep it sorted.
 
+BOSS-ROUND.md.tmpl
 BRIEF.md.tmpl
 CHANGELOG.md
 CREW.md.tmpl
@@ -89,6 +90,9 @@ stale-copies.mjs
 susy-activity.mjs
 susy-collector.mjs
 susy-daemon.mjs
+susy-gate-wakes.mjs
+susy-next-card.mjs
+susy-review-needs.mjs
 susy-workers.mjs
 susy.mjs
 tm.mjs

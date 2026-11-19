@@ -106,6 +106,17 @@ export default defineNuxtConfig({
       ]
     }
   },
+  hooks: {
+    // The per-section address of a project's settings (/projects/<id>/settings/<key>) is a sibling of the board page: it
+    // only redirects to the board page's settings tab (settingsTargetFor). The board page itself is not changed.
+    'pages:extend': (pages) => {
+      pages.push({
+        name: 'project-settings-section',
+        path: '/projects/:id/settings/:section',
+        file: fileURLToPath(new URL('./app/components/settings/ProjectSettingsRedirect.vue', import.meta.url))
+      })
+    }
+  },
 
   eslint: {
     config: {
@@ -114,6 +125,16 @@ export default defineNuxtConfig({
         braceStyle: '1tbs'
       }
     }
+  },
+
+  // Icons come from our own server only. The two collections the app uses are bundled on the server, the icons it
+  // uses are bundled into the client, and a missing icon is not looked up at the public Iconify API (no visitor's IP
+  // goes to a third party). Card mwjfpwrmy51vqimyvsj.
+  icon: {
+    provider: 'server',
+    fallbackToApi: false,
+    serverBundle: { collections: ['lucide', 'simple-icons'] },
+    clientBundle: { scan: true }
   },
 
   pwa: {

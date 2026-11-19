@@ -1,0 +1,35 @@
+// Each account settings section is its own component (redesign 8/9, step B): the section table names one for each
+// section, the file exists, and the page no longer holds the moved sections inline. The page keeps the shell and the list.
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import { existsSync, readFileSync } from 'node:fs'
+import { ACCOUNT_SECTIONS, SECTION_COMPONENTS } from '../app/utils/settingsSections'
+
+const componentsDir = new URL('../app/components/settings/', import.meta.url)
+const page = readFileSync(new URL('../app/pages/settings/index.vue', import.meta.url), 'utf8')
+
+test('the section table names a component for every section', () => {
+  for (const section of ACCOUNT_SECTIONS) {
+    assert.ok(SECTION_COMPONENTS[section.key], `no component for ${section.key}`)
+  }
+})
+
+test('every section component has its own file under app/components/settings/', () => {
+  for (const section of ACCOUNT_SECTIONS) {
+    const name = SECTION_COMPONENTS[section.key]
+    assert.ok(existsSync(new URL(`${name.replace(/^Settings/, '')}.vue`, componentsDir)), `${name} has no file`)
+  }
+})
+
+test('the page no longer holds the moved sections inline', () => {
+  assert.equal(page.includes('id="ai"'), false)
+  assert.equal(page.includes('id="appearance"'), false)
+  assert.equal(page.includes('AI (OpenRouter)'), false)
+})
+
+test('the shell keeps the section list (step C moved the list and the shell into Shell.vue)', () => {
+  const shell = readFileSync(new URL('../app/components/settings/Shell.vue', import.meta.url), 'utf8')
+  assert.ok(shell.includes('aria-label="Settings sections"'))
+  // CQ 1 (8/9): the items are drawn by the one shared component, from the list the shell builds.
+  assert.ok(shell.includes('<SectionNav :items="sections" />'))
+})

@@ -74,6 +74,22 @@ test('the PM start line makes one merged file and passes it as the only --settin
   assert.ok(tmpl.indexOf('claude.mjs merge') < tmpl.indexOf('--settings {{crew_dir}}/pia-session/settings.merged.json'))
 })
 
+// Card mwmh94f2959efe5zi9v: remote control is off for Pia's own session, in her file and in the merged file her start uses.
+test('Pia\'s session file turns remote control off, and the merged file keeps that', () => {
+  const pia = JSON.parse(readFileSync(join(kit, 'pia-session.settings.json'), 'utf8'))
+  assert.equal(pia.remoteControlAtStartup, false, 'remote control is off for the PM session')
+  const dir = mkdtempSync(join(tmpdir(), 'claude-pia-rc-'))
+  const merged = JSON.parse(readFileSync(writeMergedSettings(kit, join(kit, 'pia-session.settings.json'), join(dir, 'settings.merged.json')), 'utf8'))
+  assert.equal(merged.remoteControlAtStartup, false, 'the file her start passes has remote control off')
+  rmSync(dir, { recursive: true, force: true })
+})
+
+test('the PM start line names her session <crew slug>-pia, the name her session is resumed by', () => {
+  const tmpl = readFileSync(join(kit, 'PROMPTS.md.tmpl'), 'utf8')
+  const line = tmpl.split('\n').find(l => l.includes('claude --model {{models.pia.model}}'))
+  assert.match(line, /-n \{\{sessions\.pia\}\}/)
+})
+
 test('the wrapper passes the profile first, then the owner arguments', () => {
   assert.deepEqual(claudeArgs(kit, ['--continue']), ['--settings', profilePath(kit), '--continue'])
   assert.deepEqual(claudeArgs(kit), ['--settings', profilePath(kit)])

@@ -130,3 +130,12 @@ export function markMailed(sessionErrors, key, error) {
   const prior = sessionErrors?.[key] ?? { seen: [] }
   return { ...sessionErrors, [key]: { seen: [...(prior.seen ?? []), error] } }
 }
+
+/**
+ * The sessionErrors map with the error's mail queued: it is in the outbox, not sent, so the error is not marked mailed. The
+ * mail id is kept, so the next try sends the same row. Called only when a live send was queued.
+ */
+export function noteQueuedMail(sessionErrors, key, error, id) {
+  const prior = sessionErrors?.[key] ?? { seen: [] }
+  return { ...sessionErrors, [key]: { ...prior, queued: { error, id } } }
+}

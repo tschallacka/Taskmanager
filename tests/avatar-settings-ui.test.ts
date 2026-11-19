@@ -7,11 +7,12 @@ import { readFileSync } from 'node:fs'
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8')
 
 test('the editor is in the Settings Account block and the old avatar is gone from its row', () => {
-  const settings = read('app/pages/settings/index.vue')
-  assert.match(settings, /<AccountProfileEditor/)
-  const account = settings.slice(settings.indexOf('id="account"'), settings.indexOf('<!-- Passkeys and two-factor -->'))
+  // The account block is its own component since redesign 8/9 step B (app/components/settings/Account.vue).
+  const account = read('app/components/settings/Account.vue')
+  assert.match(account, /<AccountProfileEditor/)
+  assert.match(account, /id="account"/)
   assert.doesNotMatch(account, /<UAvatar/, 'the row no longer shows the old avatar')
-  assert.match(settings, /@changed="refreshSession\(\)"/)
+  assert.match(account, /@changed="refreshSession\(\)"/)
 })
 
 test('the editor calls the picture routes and the name route, and crops the picture to 256 px in the browser', () => {

@@ -31,7 +31,7 @@ test('the team crews board picker uses AppSelect with its placeholder, and no na
 })
 
 test('the project owner picker uses AppSelect, lists the staff, and hands the owner over on change', () => {
-  const general = read('app/components/kanban/ProjectGeneralSettings.vue')
+  const general = read('app/components/project-settings/ProjectGeneralSettings.vue')
   assert.doesNotMatch(general, /<select[\s>]/, 'the owner picker is no longer a native select')
   assert.match(general, /<AppSelect\s[\s\S]*?data-owner-select/)
   assert.match(general, /:options="ownerOptions"/)
@@ -76,7 +76,7 @@ test('the list view group and sort pickers use AppSelect with their options', ()
 })
 
 test('the secret access pickers (add and edit) use AppSelect with the two access choices', () => {
-  const secrets = read('app/components/kanban/ProjectSecretsSettings.vue')
+  const secrets = read('app/components/project-settings/ProjectSecretsSettings.vue')
   assert.doesNotMatch(secrets, /<select[\s>]/, 'the access pickers are no longer native selects')
   assert.match(secrets, /<AppSelect\s[\s\S]*?data-secret-access-input/)
   assert.match(secrets, /<AppSelect\s[\s\S]*?data-secret-edit-access/)
@@ -86,7 +86,7 @@ test('the secret access pickers (add and edit) use AppSelect with the two access
 })
 
 test('the project members pickers (team, row role, add user, add role) use AppSelect and no native select is left', () => {
-  const members = read('app/components/kanban/ProjectMembersSettings.vue')
+  const members = read('app/components/project-settings/ProjectMembersSettings.vue')
   assert.doesNotMatch(members, /<select[\s>]/, 'the members pickers are no longer native selects')
   assert.match(members, /<AppSelect\s[\s\S]*?data-members-team-pick/)
   assert.match(members, /<AppSelect\s[\s\S]*?data-member-role-change/)
@@ -107,7 +107,7 @@ test('the board share guest role pickers (invite form and each guest row) use Ap
 })
 
 test('the GitHub settings pickers (link visibility, sync column and visibility, new link and default visibility) use AppSelect', () => {
-  const gh = read('app/components/kanban/ProjectGithubSettings.vue')
+  const gh = read('app/components/project-settings/ProjectGithubSettings.vue')
   assert.doesNotMatch(gh, /<select[\s>]/, 'the GitHub pickers are no longer native selects')
   for (const hook of ['data-github-repo-visibility-change', 'data-github-sync-column', 'data-github-sync-visibility', 'data-github-repo-visibility', 'data-github-default-visibility']) {
     assert.match(gh, new RegExp(`<AppSelect\\s[\\s\\S]*?${hook}`), `${hook} is an AppSelect`)

@@ -1,0 +1,17 @@
+# The Boss round
+
+This is the prompt of Boss's recurring round (CronCreate, every 30 minutes, at 7 and 37 past the hour, durable). Boss does
+not retype it: the round runs this file, from the kit folder. Each round, in this order:
+
+1. **Lockups.** Run `crew activity` and look for an agent that is stuck: a session that has not moved for a long time, a
+   card in progress with no update, or a listener that has stopped. Name each one you find.
+2. **Questions to Boss.** Read your mentions and the cards that ask Boss something (`crew boss-mentions` output, or the
+   board). Answer the questions addressed to Boss, on the card each was asked on.
+3. **Verify.** Review what reached Verify since the last round, as SKILL.md says. A card you cannot judge yet waits; say
+   what is missing.
+4. **Nudges.** For a stalled agent or one that stopped itself, nudge it through Pia: a line on the card, `@{{people.pia}}`,
+   with the name and what you saw. Do not start people yourself.
+5. **Monitors.** Re-arm any Monitor whose timeout has passed (`crew boss-mentions`, `crew watch-crew`), so the watch on Pia
+   and the mentions keep running.
+
+Keep each round short. A round that finds nothing ends with one line saying so.
