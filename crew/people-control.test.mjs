@@ -149,7 +149,7 @@ test('a person with no recorded session is reported as failed, never started wit
 
 // Pia has her own terminal (pia-tmux.mjs, card mwmzv2jt): her control goes through deps.pia, never through a recorded session.
 function withPia(deps, result) {
-  deps.pia = async command => {
+  deps.pia = async (command) => {
     deps.log.push(['pia', command])
     return typeof result === 'function' ? result(command) : result
   }

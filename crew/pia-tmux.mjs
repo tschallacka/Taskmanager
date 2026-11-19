@@ -302,7 +302,7 @@ export function realPiaDeps(homeIn, kitIn, opts = {}) {
       mkdirSync(cwd, { recursive: true })
       return tmuxRun(home, tmuxBin, ['new-session', '-d', '-s', PIA_TMUX, '-x', '200', '-y', '50', '-c', cwd, command])
     },
-    paste: async text => {
+    paste: async (text) => {
       const buffer = `crew-pia-${process.pid}-${Date.now()}`
       tmuxRun(home, tmuxBin, ['load-buffer', '-b', buffer, '-'], text)
       tmuxRun(home, tmuxBin, ['paste-buffer', '-p', '-d', '-b', buffer, '-t', PIA_TMUX])
@@ -324,7 +324,7 @@ export function realPiaDeps(homeIn, kitIn, opts = {}) {
     },
     readRecord: () => readRecord(home, PIA_KEY),
     recordId: id => writeRecord(home, PIA_KEY, { id, name: PIA_KEY, folder, startedAt: Date.now(), recordedAt: new Date().toISOString() }),
-    stopClaude: id => {
+    stopClaude: (id) => {
       const run = runClaude(['stop', id], { bin })
       return run.ok ? { ok: true } : { ok: false, reason: run.stderr || `exit ${run.status}` }
     },
@@ -351,10 +351,12 @@ export function realPiaDeps(homeIn, kitIn, opts = {}) {
     // Her own terminal runs the listener as her background command (see piaListenerInstruction); listen.mjs writes its pid.
     startListener: () => tmux.paste(piaListenerInstruction({ home, kit })),
     // A listener still up after her session is ended is stopped (Quincy V5). SIGTERM only: the pid is the one listen.mjs wrote.
-    killListener: pid => {
+    killListener: (pid) => {
       try {
         process.kill(pid, 'SIGTERM')
-      } catch {}
+      } catch {
+        // The listener was already gone: nothing to stop.
+      }
     },
     hasCrewJson: () => existsSync(join(home, 'crew.json')) || existsSync(join(home, 'crew.config.json')),
     sleep: ms => new Promise(resolve => setTimeout(resolve, ms)),

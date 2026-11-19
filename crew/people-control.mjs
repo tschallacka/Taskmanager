@@ -8,7 +8,7 @@
 //   stop     a running session is stopped by its recorded id; a session that is not running is reported, nothing else
 //
 // Pia has her own terminal (tmux session `pia`): pia-tmux.mjs starts, stops and restarts her, and her lines come first.
-import { dirname, join } from 'node:path'
+import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { crewHome } from './home.mjs'
 import { liveById, readRecord, startSession, stopSession, validSessionId } from './session.mjs'

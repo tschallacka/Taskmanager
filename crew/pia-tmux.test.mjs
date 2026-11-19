@@ -27,12 +27,12 @@ function fakeTmux({ alive = false, screen = '', startEndsAt = null } = {}) {
       t.alive = true
       if (startEndsAt === 'immediately') t.alive = false
     },
-    paste: async text => {
+    paste: async (text) => {
       t.log.push(['paste', text])
       t.pasted.push(text)
     },
     screen: () => t.screen,
-    key: name => {
+    key: (name) => {
       t.log.push(['key', name])
     },
     kill: () => {
@@ -61,7 +61,7 @@ function fakeDeps({ tmux, agents = [], record = null, token = 'tok123', listener
     listAgents: () => agents,
     readRecord: () => record,
     recordId: id => log.push(['recordId', id]),
-    stopClaude: id => {
+    stopClaude: (id) => {
       log.push(['stopClaude', id])
       return stopOk ? { ok: true } : { ok: false, reason: 'no such session' }
     },
@@ -69,7 +69,7 @@ function fakeDeps({ tmux, agents = [], record = null, token = 'tok123', listener
     merge: () => log.push(['merge']),
     trust: trust ?? (() => ({ ok: true })),
     listenerUp: () => listening ?? listenerPid,
-    killListener: pid => {
+    killListener: (pid) => {
       log.push(['killListener', pid])
       listening = null
       listenerPid = null
@@ -100,7 +100,10 @@ test('up with no recorded id starts her fresh, says so, records the new id and c
   const tmux = fakeTmux({ alive: false, screen: '' })
   const { deps, log } = fakeDeps({ tmux, agents: [{ id: NEW_ID, name: 'taskmanager-maintenance-pia', state: 'idle', status: 'running', startedAt: 5 }], record: null, token: 'tok123', listenerStarts: 4242 })
   // The fake shows the mail once it is pasted.
-  tmux.tmux.paste = async text => { tmux.log.push(['paste', text]); tmux.screen = `${text}\n`; }
+  tmux.tmux.paste = async (text) => {
+    tmux.log.push(['paste', text])
+    tmux.screen = `${text}\n`
+  }
   const out = await startPia({ deps, timeouts: FAST })
   assert.equal(out.ok, true, out.lines.join('\n'))
   assert.ok(out.lines.some(l => /starting her fresh/.test(l)), out.lines.join('\n'))
@@ -113,7 +116,10 @@ test('up with no recorded id starts her fresh, says so, records the new id and c
 
 test('up with a recorded id resumes that id and records nothing new', async () => {
   const tmux = fakeTmux({ alive: false })
-  tmux.tmux.paste = async text => { tmux.log.push(['paste', text]); tmux.screen = text }
+  tmux.tmux.paste = async (text) => {
+    tmux.log.push(['paste', text])
+    tmux.screen = text
+  }
   const { deps, log } = fakeDeps({ tmux, agents: [{ id: ID, name: 'x', state: 'idle', status: 'running', startedAt: 1 }], record: { id: ID }, token: 'tok9', listenerPid: 7 })
   const out = await startPia({ deps, timeouts: FAST })
   assert.equal(out.ok, true, out.lines.join('\n'))
@@ -163,7 +169,10 @@ test('a test mail that never shows on her screen fails the start', async () => {
 // that does not come up is a FAIL line, never a hint.
 test('the start starts her board listener after the mail check, and reports its pid', async () => {
   const tmux = fakeTmux({ alive: false })
-  tmux.tmux.paste = async text => { tmux.log.push(['paste', text]); tmux.screen = text }
+  tmux.tmux.paste = async (text) => {
+    tmux.log.push(['paste', text])
+    tmux.screen = text
+  }
   const { deps, log } = fakeDeps({ tmux, agents: [{ id: ID, name: 'x', state: 'idle', status: 'running', startedAt: 1 }], record: { id: ID }, token: 'tok6', listenerStarts: 5150 })
   const out = await startPia({ deps, timeouts: FAST })
   assert.equal(out.ok, true, out.lines.join('\n'))
@@ -176,7 +185,10 @@ test('the start starts her board listener after the mail check, and reports its 
 
 test('a listener that does not come up is a FAIL line and the start fails', async () => {
   const tmux = fakeTmux({ alive: false })
-  tmux.tmux.paste = async text => { tmux.log.push(['paste', text]); tmux.screen = text }
+  tmux.tmux.paste = async (text) => {
+    tmux.log.push(['paste', text])
+    tmux.screen = text
+  }
   const { deps } = fakeDeps({ tmux, agents: [{ id: ID, name: 'x', state: 'idle', status: 'running', startedAt: 1 }], record: { id: ID }, token: 'tok5', listenerStarts: null })
   const out = await startPia({ deps, timeouts: FAST })
   assert.equal(out.ok, false)
@@ -185,7 +197,10 @@ test('a listener that does not come up is a FAIL line and the start fails', asyn
 
 test('a listener that is already up is reported with its pid, and no second one is started', async () => {
   const tmux = fakeTmux({ alive: false })
-  tmux.tmux.paste = async text => { tmux.log.push(['paste', text]); tmux.screen = text }
+  tmux.tmux.paste = async (text) => {
+    tmux.log.push(['paste', text])
+    tmux.screen = text
+  }
   const { deps, log } = fakeDeps({ tmux, agents: [{ id: ID, name: 'x', state: 'idle', status: 'running', startedAt: 1 }], record: { id: ID }, token: 'tok7', listenerPid: 77 })
   const out = await startPia({ deps, timeouts: FAST })
   assert.equal(out.ok, true, out.lines.join('\n'))
@@ -221,7 +236,7 @@ test('stop when she is not running says so', async () => {
 
 test('stop sends /exit and the session ends: no kill', async () => {
   const tmux = fakeTmux({ alive: true, screen: '> ' })
-  tmux.tmux.paste = async text => {
+  tmux.tmux.paste = async (text) => {
     tmux.log.push(['paste', text])
     tmux.pasted.push(text)
     tmux.alive = false
@@ -270,7 +285,10 @@ test('stop with a dialog up does not answer it: it kills the session and says wh
 
 test('restart stops her, then starts her again, each step on its own line', async () => {
   const tmux = fakeTmux({ alive: false, screen: '' })
-  tmux.tmux.paste = async text => { tmux.log.push(['paste', text]); tmux.screen = text }
+  tmux.tmux.paste = async (text) => {
+    tmux.log.push(['paste', text])
+    tmux.screen = text
+  }
   const { deps } = fakeDeps({ tmux, agents: [{ id: ID, name: 'x', state: 'idle', status: 'running', startedAt: 1 }], record: { id: ID }, token: 'tok8', listenerPid: 9, listenerStarts: 10 })
   const out = await restartPia({ deps, timeouts: FAST })
   assert.equal(out.ok, true, out.lines.join('\n'))
@@ -308,7 +326,9 @@ test('the real tmux part: start, paste a mail that shows, stop; on a throwaway s
     spawnSync('tmux', ['-S', join(home, 'tmux.sock'), 'kill-server'])
     try {
       process.kill(Number(readFileSync(join(home, '.listen', 'pia.pid'), 'utf8')), 'SIGTERM')
-    } catch {}
+    } catch {
+      // No listener to stop.
+    }
   }
 })
 
@@ -409,12 +429,12 @@ test('exitConfirmShowing matches only the background-shell exit confirm', () => 
 // A tmux whose /exit shows `screenAfterExit`, and whose Enter ends the session when `endsOnKey` is set.
 function exitConfirmTmux(screenAfterExit, { endsOnKey = false } = {}) {
   const tmux = fakeTmux({ alive: true, screen: '> ' })
-  tmux.tmux.paste = async text => {
+  tmux.tmux.paste = async (text) => {
     tmux.log.push(['paste', text])
     tmux.pasted.push(text)
     tmux.screen = screenAfterExit
   }
-  tmux.tmux.key = name => {
+  tmux.tmux.key = (name) => {
     tmux.log.push(['key', name])
     if (endsOnKey) tmux.alive = false
   }
@@ -486,7 +506,7 @@ const SEPARATOR_ROW = '───────────────────
 const ADD_DIR = [
   SEPARATOR_ROW,
   'Adding a new directory: /srv/agents/taskmanager-maintenance/.config/taskmanager-crew',
-  "Claude Code'll be able to read files in this directory.",
+  'Claude Code\'ll be able to read files in this directory.',
   'Security guide: https://code.claude.com/docs/en/security',
   '',
   '❯ 1. No, exit',
