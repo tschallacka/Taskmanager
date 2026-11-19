@@ -312,6 +312,17 @@ test('the real tmux part: start, paste a mail that shows, stop; on a throwaway s
   }
 })
 
+// Quincy's V1 (2026-11-19): the two --add-dir folders are in her merged settings as permissions.additionalDirectories, so claude
+// does not ask "Adding a new directory" on the first start.
+test('the merged settings allow the two --add-dir folders (crew home and kit) as additionalDirectories', () => {
+  const home = mkdtempSync(join(tmpdir(), 'pia-adddir-home-'))
+  const deps = realPiaDeps(home, here, { bin: 'claude', trust: () => ({ ok: true }) })
+  deps.merge()
+  const merged = JSON.parse(readFileSync(join(home, 'pia-session', 'settings.merged.json'), 'utf8'))
+  assert.deepEqual(merged.permissions.additionalDirectories, [home, here])
+  assert.equal(merged.remoteControlAtStartup, false)
+})
+
 // Her merged settings are written with this home's and this kit's hook commands: the static pia-session.settings.json has none of
 // the arguments the listener hook needs (crew home and kit), so her listener start line came out empty.
 test('Pia\'s merged settings carry the hook commands for this crew home and kit', () => {
@@ -446,10 +457,28 @@ test('the real start refuses a home with no crew.json before claude is run', asy
 
 // Quincy's V1 (2026-11-19): the first real start stops at claude's "Adding a new directory" dialog (--add-dir). The kit names any
 // dialog on its output by its title line and refuses; it never answers one, and stop never pastes /exit into one.
-const ADD_DIR = ['Adding a new directory', '  /srv/agents/taskmanager-maintenance/.config/taskmanager-crew', '❯ No, exit', '  Yes, add it', '  Enter to confirm · Esc to cancel']
+// The add-dir dialog as Quincy saw it (75ea1ab): a separator line, the title "Adding a new directory: <folder>", the dialog's own text
+// (with a "Security guide" link row under the title), the options, and the footer.
+const SEPARATOR_ROW = '────────────────────────────────────────────────────────────'
+const ADD_DIR = [
+  SEPARATOR_ROW,
+  'Adding a new directory: /srv/agents/taskmanager-maintenance/.config/taskmanager-crew',
+  "Claude Code'll be able to read files in this directory.",
+  'Security guide: https://code.claude.com/docs/en/security',
+  '',
+  '❯ 1. No, exit',
+  '  2. Yes, add it',
+  '',
+  'Enter to confirm · Esc to cancel'
+]
+
+test('dialogTitle takes the title from the block above the first option row: "Adding a new directory:" on the real screen', () => {
+  assert.equal(dialogTitle(ADD_DIR.join('\n')), 'Adding a new directory:')
+  // Transcript rows above the separator are not the title, and neither is the "Security guide" row under it.
+  assert.equal(dialogTitle(['Claude Code will read the transcript above.', SEPARATOR_ROW, 'Adding a new directory: /x', 'Security guide: https://x', '❯ 1. No, exit', 'Enter to confirm · Esc to cancel'].join('\n')), 'Adding a new directory:')
+})
 
 test('dialogTitle names a dialog by its title line, and is null when no dialog is up', () => {
-  assert.equal(dialogTitle(ADD_DIR.join('\n')), 'Adding a new directory')
   assert.equal(dialogTitle(['? Teach auto mode about your environment?', '  Enter to continue'].join('\n')), '? Teach auto mode about your environment?')
   assert.equal(dialogTitle('> '), null)
   assert.equal(dialogTitle('some transcript\n> '), null)
@@ -460,7 +489,7 @@ test('a start on the add-dir dialog is refused and named, with no key and no pas
   const { deps } = fakeDeps({ tmux, agents: [], record: { id: ID } })
   const out = await startPia({ deps, timeouts: FAST })
   assert.equal(out.ok, false)
-  assert.ok(out.lines.some(l => /dialog is showing \("Adding a new directory"\); not answered; not started/.test(l)), out.lines.join('\n'))
+  assert.ok(out.lines.some(l => /dialog is showing \("Adding a new directory:"\); not answered; not started/.test(l)), out.lines.join('\n'))
   assert.equal(tmux.log.some(e => e[0] === 'key'), false)
   assert.equal(tmux.pasted.length, 0)
 })
@@ -472,7 +501,7 @@ test('stop on the add-dir dialog does not paste /exit into it: it kills and name
   assert.equal(out.ok, true)
   assert.equal(tmux.pasted.length, 0)
   assert.equal(tmux.log.some(e => e[0] === 'key'), false)
-  assert.ok(out.lines.some(l => /dialog is showing \("Adding a new directory"\)/.test(l)), out.lines.join('\n'))
+  assert.ok(out.lines.some(l => /dialog is showing \("Adding a new directory:"\)/.test(l)), out.lines.join('\n'))
   assert.equal(tmux.alive, false)
 })
 

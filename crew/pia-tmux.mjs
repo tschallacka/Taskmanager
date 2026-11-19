@@ -73,10 +73,12 @@ export function piaListenerInstruction({ home, kit }) {
   return `Start your board listener now: run this with your Bash tool, run_in_background: true (never nohup): ${piaListenerLine({ home, kit })} . Then carry on; its exit wakes you.`
 }
 
-// The title line of a dialog on Pia's screen: the footer ("Enter to confirm", "Enter to continue" or "Esc to cancel") is the
-// last dialog row; the title is the topmost row of the six above it that is not an option. Null when no dialog shows.
+// The title line of a dialog on Pia's screen (Boss, 2026-11-19): the block above the first option row, from the separator line above
+// it (or the rows above, when there is none) down to the option. Its first non-empty row is the title; a colon ends it, so
+// "Adding a new directory: <folder>" reads "Adding a new directory:". Null when no dialog shows.
 const DIALOG_FOOTER = /enter to (confirm|continue)|esc to cancel/i
 const OPTION_ROW = /^(❯|>|\d+\.)/
+const SEPARATOR_ROW = /^[─━]{8,}$/
 export function dialogTitle(screen) {
   const rows = String(screen ?? '').split('\n').map(r => r.trim())
   let footer = -1
@@ -87,8 +89,18 @@ export function dialogTitle(screen) {
     }
   }
   if (footer < 0) return null
-  const above = rows.slice(Math.max(0, footer - 6), footer).filter(r => r && !OPTION_ROW.test(r))
-  return above[0] ?? rows[footer]
+  const firstOption = rows.findIndex(r => OPTION_ROW.test(r))
+  const option = firstOption >= 0 && firstOption < footer ? firstOption : footer
+  let start = Math.max(0, option - 12)
+  for (let i = option - 1; i >= start; i -= 1) {
+    if (SEPARATOR_ROW.test(rows[i])) {
+      start = i + 1
+      break
+    }
+  }
+  const title = rows.slice(start, option).find(r => r && !SEPARATOR_ROW.test(r)) ?? rows[footer]
+  const colon = title.indexOf(':')
+  return colon > 0 ? title.slice(0, colon + 1) : title
 }
 
 /** The shell line that starts Pia's claude in her tmux session. The flags are the ones PROMPTS.md "Starting Pia" gives. */
@@ -312,6 +324,8 @@ export function realPiaDeps(home, kit, opts = {}) {
       mkdirSync(folder, { recursive: true })
       const session = JSON.parse(readFileSync(join(kit, 'pia-session.settings.json'), 'utf8'))
       session.hooks = piaHooks({ crewHome: home, kitDir: kit })
+      // The two --add-dir folders are allowed in her settings, so claude does not ask "Adding a new directory" (Quincy V1).
+      session.permissions = { ...(session.permissions ?? {}), additionalDirectories: [home, kit] }
       const sessionFile = join(folder, 'settings.session.json')
       writeFileSync(sessionFile, `${JSON.stringify(session, null, 2)}\n`)
       execFileSync(process.execPath, [join(kit, 'claude.mjs'), 'merge', sessionFile, join(folder, 'settings.merged.json')], { encoding: 'utf8' })
