@@ -28,8 +28,27 @@ test('the customer link answers the same sentence as the team and board links', 
   assert.match(preview, /if \(row\.revokedAt\) throw createError\(\{ statusCode: 410, message: '[^']*withdrawn or revoked/)
 })
 
-test('the invite page says the same sentence for a withdrawn (not found) or revoked link', () => {
+test('a withdrawn board-guest link is its own problem, not used, and gets its own server message', () => {
+  const lookup = read('server/utils/invitations.ts')
+  assert.match(lookup, /export type InvitationProblem = 'missing' \| 'used' \| 'expired' \| 'revoked' \| 'withdrawn'/)
+  assert.match(lookup, /if \(board\.status === 'revoked'\) return 'withdrawn'/)
+  const preview = read('server/api/invitations/[token]/index.get.ts')
+  assert.match(preview, /addressed === 'withdrawn'\) throw createError\(\{ statusCode: 410, message: 'This board invitation was withdrawn\.' \}\)/)
+  const accept = read('server/api/invitations/[token]/accept.post.ts')
+  assert.match(accept, /addressed === 'withdrawn'/)
+})
+
+test('a link that does not exist is a 404 that says the link is not valid, not that it was withdrawn', () => {
+  const preview = read('server/api/invitations/[token]/index.get.ts')
+  assert.match(preview, /statusCode: 404, message: 'This invitation link is not valid'/)
+  assert.doesNotMatch(preview, /This invitation does not exist/)
+})
+
+test('the invite page: a 404 says the link is not valid; only a withdrawn 410 says it was withdrawn', () => {
   const page = read('app/pages/invite/[token].vue')
+  assert.match(page, /status === 404\) return 'This invitation link is not valid\.'/)
+  const withdrawn = page.slice(page.indexOf('WITHDRAWN_MESSAGES.includes'), page.indexOf('if (status === 410) return'))
+  assert.doesNotMatch(withdrawn, /404/, 'a 404 is not a withdrawn link')
+  assert.match(page, /const WITHDRAWN_MESSAGES = \['This invitation was withdrawn or revoked\.', 'This board invitation was withdrawn\.'\]/)
   assert.match(page, new RegExp(WORDING.replace(/\./g, '\\.')))
-  assert.doesNotMatch(page, /This invitation link is not valid/)
 })

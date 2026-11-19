@@ -1,10 +1,10 @@
-import { eq, inArray, or, sql } from 'drizzle-orm'
+import { and, eq, inArray, isNotNull, or, sql } from 'drizzle-orm'
 import { db } from '../db'
 import { customerProjects, customers, organization, projects } from '../db/schema'
 
 // Which projects a customer sees. A project can be shared with several customers (the customer_projects join table),
-// and projects.customerId is the first customer it was filed under, from before the join table existed. Both count,
-// so a project filed before the join table stays shared with its customer.
+// and the first customer it was filed under, from before the join table existed, is kept on the project row. Both
+// count, so a project filed before the join table stays shared with its customer. The rule is read in one place: sharedLinks.
 
 /** SQL: the projects shared with any of the given customers. An empty list matches nothing. */
 export function projectsOfCustomers(customerIds: string[]) {
@@ -15,20 +15,43 @@ export function projectsOfCustomers(customerIds: string[]) {
   )
 }
 
-/** The customers a project is shared with, each once (the join table and projects.customerId). */
+interface SharedLink { projectId: string, customerId: string }
+
+/**
+ * The project-customer links, from both sources (the join table and the first-customer column), each once. The scope is the
+ * given customers, or the given project. An empty scope matches nothing.
+ */
+async function sharedLinks(scope: { customerIds: string[] } | { projectId: string }): Promise<SharedLink[]> {
+  const byCustomers = 'customerIds' in scope
+  if (byCustomers && !scope.customerIds.length) return []
+  const firstCustomer = projects.customerId
+  const joined = await db
+    .select({ projectId: customerProjects.projectId, customerId: customerProjects.customerId })
+    .from(customerProjects)
+    .where(byCustomers ? inArray(customerProjects.customerId, scope.customerIds) : eq(customerProjects.projectId, scope.projectId))
+  const legacy = await db
+    .select({ projectId: projects.id, customerId: firstCustomer })
+    .from(projects)
+    .where(and(
+      isNotNull(firstCustomer),
+      byCustomers ? inArray(firstCustomer, scope.customerIds) : eq(projects.id, scope.projectId)
+    ))
+  const links = new Map<string, SharedLink>()
+  for (const row of [...joined, ...legacy]) {
+    if (row.customerId) links.set(`${row.customerId}:${row.projectId}`, { projectId: row.projectId, customerId: row.customerId })
+  }
+  return [...links.values()]
+}
+
+/** The customers a project is shared with, each once (the join table and the first customer). */
 export async function sharedCustomerIdsOf(projectId: string): Promise<string[]> {
-  const joined = await db.select({ id: customerProjects.customerId }).from(customerProjects).where(eq(customerProjects.projectId, projectId))
-  const [legacy] = await db.select({ id: projects.customerId }).from(projects).where(eq(projects.id, projectId))
-  const ids = new Set(joined.map(row => row.id))
-  if (legacy?.id) ids.add(legacy.id)
-  return [...ids]
+  return [...new Set((await sharedLinks({ projectId })).map(link => link.customerId))]
 }
 
 /** The projects shared with one customer, each once. */
 export async function projectsSharedWith(customerId: string): Promise<{ id: string }[]> {
-  const joined = await db.select({ id: customerProjects.projectId }).from(customerProjects).where(eq(customerProjects.customerId, customerId))
-  const legacy = await db.select({ id: projects.id }).from(projects).where(eq(projects.customerId, customerId))
-  return [...new Map([...joined, ...legacy].map(row => [row.id, row])).values()]
+  const ids = new Set((await sharedLinks({ customerIds: [customerId] })).map(link => link.projectId))
+  return [...ids].map(id => ({ id }))
 }
 
 export interface SharedPair {
@@ -49,21 +72,27 @@ export async function projectCountsByCustomer(customerIds: string[]): Promise<Ma
 
 /** Each project shared with one of the given customers, once per customer, with the customer's organisation. */
 export async function sharedPairsOf(customerIds: string[]): Promise<SharedPair[]> {
-  if (!customerIds.length) return []
-  const joined = await db
-    .select({ projectId: projects.id, projectName: projects.name, customerId: customers.id, customerName: customers.name, organizationName: organization.name })
-    .from(customerProjects)
-    .innerJoin(projects, eq(projects.id, customerProjects.projectId))
-    .innerJoin(customers, eq(customers.id, customerProjects.customerId))
-    .innerJoin(organization, eq(organization.id, customers.organizationId))
-    .where(inArray(customerProjects.customerId, customerIds))
-  const legacy = await db
-    .select({ projectId: projects.id, projectName: projects.name, customerId: customers.id, customerName: customers.name, organizationName: organization.name })
-    .from(projects)
-    .innerJoin(customers, eq(customers.id, projects.customerId))
-    .innerJoin(organization, eq(organization.id, customers.organizationId))
-    .where(inArray(projects.customerId, customerIds))
-  const pairs = new Map<string, SharedPair>()
-  for (const row of [...joined, ...legacy]) pairs.set(`${row.customerId}:${row.projectId}`, row)
-  return [...pairs.values()]
+  const links = await sharedLinks({ customerIds })
+  if (!links.length) return []
+  const [customerRows, projectRows] = await Promise.all([
+    db
+      .select({ id: customers.id, name: customers.name, organizationName: organization.name })
+      .from(customers)
+      .innerJoin(organization, eq(organization.id, customers.organizationId))
+      .where(inArray(customers.id, customerIds)),
+    db
+      .select({ id: projects.id, name: projects.name })
+      .from(projects)
+      .where(inArray(projects.id, [...new Set(links.map(link => link.projectId))]))
+  ])
+  const customersById = new Map(customerRows.map(row => [row.id, row]))
+  const projectsById = new Map(projectRows.map(row => [row.id, row]))
+  const pairs: SharedPair[] = []
+  for (const link of links) {
+    const customer = customersById.get(link.customerId)
+    const project = projectsById.get(link.projectId)
+    if (!customer || !project) continue
+    pairs.push({ projectId: project.id, projectName: project.name, customerId: customer.id, customerName: customer.name, organizationName: customer.organizationName })
+  }
+  return pairs
 }

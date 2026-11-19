@@ -31,7 +31,7 @@ export default defineEventHandler(async (event) => {
   const tokenHash = hashInvitationToken(token)
 
   const addressed = await lookupAddressedInvitation(token)
-  if (addressed === 'used' || addressed === 'expired' || addressed === 'revoked') {
+  if (addressed === 'used' || addressed === 'expired' || addressed === 'revoked' || addressed === 'withdrawn') {
     throw createError({ statusCode: 410, message: 'This invitation is no longer valid' })
   }
   if (addressed !== 'missing') {

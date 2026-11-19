@@ -32,6 +32,7 @@ export default defineEventHandler(async (event) => {
     if (addressed === 'used') throw createError({ statusCode: 410, message: 'This invitation has already been used' })
     if (addressed === 'expired') throw createError({ statusCode: 410, message: 'This invitation has expired' })
     if (addressed === 'revoked') throw createError({ statusCode: 410, message: 'This invitation was withdrawn or revoked.' })
+    if (addressed === 'withdrawn') throw createError({ statusCode: 410, message: 'This board invitation was withdrawn.' })
     rememberToken()
     // The address stays out of the answer: whoever holds the link has to know it, not read it here.
     // `forYou` only says whether the account signed in right now (if any) is the one invited.
@@ -66,7 +67,7 @@ export default defineEventHandler(async (event) => {
     .innerJoin(organization, eq(organization.id, customers.organizationId))
     .where(eq(customerInvitations.tokenHash, hashInvitationToken(token)))
 
-  if (!row) throw createError({ statusCode: 404, message: 'This invitation does not exist' })
+  if (!row) throw createError({ statusCode: 404, message: 'This invitation link is not valid' })
   if (row.acceptedAt) {
     // The page sends the account that accepted the link to its projects (see app/utils/usedInvite.ts).
     const usedBy = await auth.api.getSession({ headers: event.headers }).catch(() => null)
