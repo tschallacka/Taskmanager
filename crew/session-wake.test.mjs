@@ -147,6 +147,19 @@ test('wake.mjs names the terminal sessionwake-<key>, and strips anything but let
   assert.equal(terminalName(undefined), 'sessionwake-')
 })
 
+// prompt-line.mjs run from a path with a space: its main block must still run, or every screen reads as ready (fail-open).
+test('prompt-line.mjs run from a directory with a space still reads a transcript-only screen as not ready (exit 1)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wake pl space '))
+  writeFileSync(join(dir, 'prompt-line.mjs'), readFileSync(join(HERE, 'prompt-line.mjs')))
+  writeFileSync(join(dir, 'modal-detect.mjs'), readFileSync(join(HERE, 'modal-detect.mjs')))
+  const r = spawnSync('node', [join(dir, 'prompt-line.mjs')], {
+    encoding: 'utf8',
+    input: '> the card says to fix the prompt check\n● Reading it now.\n  ⎿ 3 files changed\n',
+    timeout: 60000
+  })
+  assert.equal(r.status, 1, `exit ${r.status}: a transcript-only screen must not read as ready (${r.stderr})`)
+})
+
 test('a terminal name with a space or a metacharacter is refused before any tool call', () => {
   const mcp = fakeTerminal()
   const r = run(mcp, { terminal: 'sessionwake-x;y' })
