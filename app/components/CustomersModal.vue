@@ -433,11 +433,15 @@ function confirmRevoke(customerId: string, invitation: CustomerInvitation) {
                     <div
                       v-for="inv in invitations"
                       :key="inv.id"
-                      class="flex items-center justify-between gap-2 text-xs"
+                      class="flex items-start justify-between gap-2 text-xs"
                     >
-                      <span class="min-w-0 break-words text-default">{{ inv.email ? `Invited, not accepted yet: ${inv.email}` : (inv.label || 'Unlabelled link') }}</span>
+                      <div class="min-w-0 flex-1">
+                        <p class="break-words text-default">
+                          {{ inv.email ? `Invited, not accepted yet: ${inv.email}` : (inv.label || 'Unlabelled link') }}
+                        </p>
+                        <span class="block text-muted">expires {{ formatDate(inv.expiresAt) }}</span>
+                      </div>
                       <div class="flex shrink-0 items-center gap-1">
-                        <span class="text-muted">expires {{ formatDate(inv.expiresAt) }}</span>
                         <UButton
                           icon="i-lucide-x"
                           size="xs"
