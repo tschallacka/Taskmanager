@@ -8,7 +8,7 @@ import { errorMessage, untypedFetch } from '~/utils/untypedFetch'
 const props = defineProps<{ teamId: string, isOwner: boolean }>()
 
 interface OpenInvitation { id: string, email: string, role: string, createdAt: number, expiresAt: number, canWithdraw: boolean }
-interface Issued { id: string, email: string, role: string, url: string, emailed: boolean }
+interface Issued { id: string, email: string, role: string, url: string, emailed: boolean, mailConfigured?: boolean }
 
 const toast = useToast()
 const email = ref('')
@@ -63,6 +63,17 @@ async function resend(invitation: OpenInvitation) {
   }
 }
 
+// The invitation the owner is asked about before it is withdrawn (the confirm below does it).
+const pendingWithdraw = ref<OpenInvitation | null>(null)
+function askWithdraw(invitation: OpenInvitation) {
+  pendingWithdraw.value = invitation
+}
+async function confirmWithdraw() {
+  const invitation = pendingWithdraw.value
+  pendingWithdraw.value = null
+  if (invitation) await withdraw(invitation)
+}
+
 async function withdraw(invitation: OpenInvitation) {
   busy.value = invitation.id
   try {
@@ -106,7 +117,7 @@ async function copy(text: string) {
         v-model="email"
         type="email"
         placeholder="name@example.com"
-        class="min-w-0 flex-1"
+        class="min-w-0 w-full sm:w-auto sm:flex-1"
         data-invite-email
       />
       <AppSelect
@@ -138,7 +149,7 @@ async function copy(text: string) {
       data-invite-issued
     >
       <p class="text-xs text-default">
-        {{ issued.emailed ? `Invitation mailed to ${issued.email}.` : `Send this link to ${issued.email}. This instance cannot send mail, or it failed.` }}
+        {{ issued.emailed ? `Invitation mailed to ${issued.email}.` : `Send this link to ${issued.email}. ${issued.mailConfigured === false ? 'This instance cannot send mail, so send this link yourself.' : 'Sending the mail failed. Send this link yourself.'}` }}
       </p>
       <div class="flex items-center gap-2">
         <code class="min-w-0 flex-1 truncate rounded bg-default px-2 py-1 text-xs">{{ issued.url }}</code>
@@ -160,15 +171,15 @@ async function copy(text: string) {
       <li
         v-for="invitation in open"
         :key="invitation.id"
-        class="flex items-center gap-3 px-3 py-2"
+        class="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2"
         data-invite-open
       >
         <UIcon
           name="i-lucide-mail"
           class="size-4 shrink-0 text-muted"
         />
-        <div class="min-w-0 flex-1">
-          <p class="truncate text-xs text-default">
+        <div class="min-w-0 flex-1 basis-full sm:basis-auto">
+          <p class="break-words text-xs text-default">
             {{ invitation.email }}
           </p>
           <p class="text-[11px] text-muted">
@@ -192,9 +203,15 @@ async function copy(text: string) {
           color="neutral"
           variant="ghost"
           :disabled="busy === invitation.id"
-          @click="withdraw(invitation)"
+          @click="askWithdraw(invitation)"
         />
       </li>
     </ul>
+    <!-- Withdraw takes the link back at once, so it asks first. -->
+    <WithdrawConfirm
+      :open="pendingWithdraw !== null"
+      @update:open="(open: boolean) => { if (!open) pendingWithdraw = null }"
+      @confirm="confirmWithdraw"
+    />
   </div>
 </template>

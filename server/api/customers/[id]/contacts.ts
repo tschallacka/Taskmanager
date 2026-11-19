@@ -37,6 +37,7 @@ export default defineEventHandler(async (event) => {
         .where(and(
           eq(customerInvitations.customerId, customer.id),
           isNull(customerInvitations.acceptedAt),
+          isNull(customerInvitations.revokedAt),
           gt(customerInvitations.expiresAt, Date.now())
         ))
         .orderBy(desc(customerInvitations.createdAt))

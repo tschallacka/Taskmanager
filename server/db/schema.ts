@@ -238,6 +238,22 @@ export const customerMembers = pgTable(
   ]
 )
 
+// A project shared with a customer. A project can be shared with several customers; projects.customerId is the first one
+// it was filed under and stays as it was. Additive table (part 2 of invite by email).
+export const customerProjects = pgTable(
+  'customer_projects',
+  {
+    id: text('id').primaryKey(),
+    customerId: text('customer_id').notNull().references(() => customers.id, { onDelete: 'cascade' }),
+    projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+    createdAt: bigint('created_at', { mode: 'number' }).notNull()
+  },
+  table => [
+    uniqueIndex('customer_projects_customer_project_idx').on(table.customerId, table.projectId),
+    index('customer_projects_project_id_idx').on(table.projectId)
+  ]
+)
+
 // A single-use link that turns whoever opens it into a contact of one customer.
 // It also lets that person create an account while sign-up is otherwise closed.
 export const customerInvitations = pgTable(
@@ -255,7 +271,9 @@ export const customerInvitations = pgTable(
     createdAt: bigint('created_at', { mode: 'number' }).notNull(),
     expiresAt: bigint('expires_at', { mode: 'number' }).notNull(),
     acceptedBy: text('accepted_by').references(() => user.id, { onDelete: 'set null' }),
-    acceptedAt: bigint('accepted_at', { mode: 'number' })
+    acceptedAt: bigint('accepted_at', { mode: 'number' }),
+    // Set when the manager revokes an open link: the link stops working. Null for a live link.
+    revokedAt: bigint('revoked_at', { mode: 'number' })
   },
   table => [index('customer_invitations_customer_id_idx').on(table.customerId)]
 )

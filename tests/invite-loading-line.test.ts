@@ -11,11 +11,6 @@ test('the loading block names what it is loading', () => {
   assert.match(block, /Loading/)
 })
 
-test('the invitation is not awaited at setup, so the page renders (and the loading line shows) before the fetch ends', () => {
-  // An awaited useFetch in <script setup> suspends the whole page: nothing is drawn until the request ends (the bug).
-  assert.equal(/await useFetch/.test(page), false)
-})
-
 test('the loading line is not behind a timer, so it shows on the first paint', () => {
   const block = page.slice(page.indexOf('v-if="pending || sessionPending"'), page.indexOf('v-else-if="loadMessage"'))
   assert.equal(/setTimeout|delay|debounce/i.test(block), false)

@@ -3,13 +3,16 @@ import { db } from '../db'
 import { customerInvitations, customers, organization } from '../db/schema'
 import { addressesOfUser } from '../utils/extraEmails'
 import { customerInvitesToClaim } from '../utils/customerInviteRules'
+import { countPendingTeamAndBoardInvites } from '../utils/pendingInvites'
 
 // The open invitations tied to the signed-in account's addresses that it has not accepted yet. Each one shows with
-// Accept invitation on the pending-invitations page (the page accepts it by id, after this check).
+// Accept invitation on the pending-invitations page (the page accepts it by id, after this check). `claimable` counts
+// the team and board invitations the sign-in claim accepts by itself; they are not listed here.
 export default defineEventHandler(async (event) => {
   const addresses = await addressesOfUser(event.context.session.user.id)
-  if (!addresses.length) return { invitations: [] }
+  if (!addresses.length) return { invitations: [], claimable: 0 }
   const now = Date.now()
+  const claimable = await countPendingTeamAndBoardInvites(addresses, now)
   const lowered = addresses.map(address => address.toLowerCase())
 
   const rows = await db
@@ -17,6 +20,7 @@ export default defineEventHandler(async (event) => {
       id: customerInvitations.id,
       email: customerInvitations.email,
       acceptedAt: customerInvitations.acceptedAt,
+      revokedAt: customerInvitations.revokedAt,
       expiresAt: customerInvitations.expiresAt,
       customerName: customers.name,
       organizationName: organization.name
@@ -33,6 +37,7 @@ export default defineEventHandler(async (event) => {
   return {
     invitations: rows
       .filter(row => open.has(row.id))
-      .map(row => ({ id: row.id, customerName: row.customerName, organizationName: row.organizationName }))
+      .map(row => ({ id: row.id, customerName: row.customerName, organizationName: row.organizationName })),
+    claimable
   }
 })

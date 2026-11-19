@@ -132,9 +132,10 @@ test('a project admin invites anyone; the link is returned once and is bound to 
   assert.equal(found.email, 'new.person@elsewhere.com')
   assert.equal(await isLiveAddressedInvitation(tokenOf(answer.url)), true)
 
-  // Inviting the same address again withdraws the first link.
+  // Inviting the same address again withdraws the first link: a withdrawn board link is 'withdrawn' (its own wording),
+  // not 'used' (the owner took it back; nobody spent it).
   const again = await invites.inviteGuest(project(), owner, { email: 'new.person@elsewhere.com', role: 'editor' }, link)
-  assert.equal(await lookupAddressedInvitation(tokenOf(answer.url)), 'used')
+  assert.equal(await lookupAddressedInvitation(tokenOf(answer.url)), 'withdrawn')
   assert.equal(await isLiveAddressedInvitation(tokenOf(answer.url)), false)
   assert.equal(await isLiveAddressedInvitation(tokenOf(again.url)), true)
 })
@@ -294,7 +295,8 @@ test('a team invitation is looked up by its link, and is spent or withdrawn for 
   assert.equal(await isLiveAddressedInvitation(token), true)
 
   await db.update(teamInvitations).set({ revokedAt: Date.now() }).where(eq(teamInvitations.tokenHash, hashInvitationToken(token)))
-  assert.equal(await lookupAddressedInvitation(token), 'used')
+  // A withdrawn team link is 'revoked' (its own wording on the invite page), no longer 'used' (one wording for withdrawn links).
+  assert.equal(await lookupAddressedInvitation(token), 'revoked')
   assert.equal(await isLiveAddressedInvitation(token), false)
   assert.equal(await lookupAddressedInvitation('no-such-token'), 'missing')
 })

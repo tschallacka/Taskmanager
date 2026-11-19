@@ -1,7 +1,8 @@
 import { inArray, eq } from 'drizzle-orm'
 import { db } from '../db'
-import { customers, organization, projects } from '../db/schema'
+import { organization, projects } from '../db/schema'
 import { customerIdsOf } from '../utils/auth-helpers'
+import { sharedPairsOf } from '../utils/customerProjects'
 import { guestProjectIdsOf } from '../utils/guests'
 import { sharedProjectIds } from '../utils/sharedProjectIds'
 import { groupKey, SHARED_FALLBACK_LABEL } from '#shared/utils/sharedGroups'
@@ -21,17 +22,7 @@ export default defineEventHandler(async (event) => {
   const seen = new Set<string>()
 
   if (customerIds.length) {
-    const rows = await db
-      .select({
-        projectId: projects.id,
-        projectName: projects.name,
-        customerId: customers.id,
-        organizationName: organization.name
-      })
-      .from(projects)
-      .innerJoin(customers, eq(customers.id, projects.customerId))
-      .innerJoin(organization, eq(organization.id, customers.organizationId))
-      .where(inArray(projects.customerId, customerIds))
+    const rows = await sharedPairsOf(customerIds)
 
     for (const row of rows) {
       const key = groupKey('customer', row.customerId)

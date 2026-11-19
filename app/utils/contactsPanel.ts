@@ -5,7 +5,12 @@ export function showNobodyLine(contactCount: number, pendingCount: number): bool
   return contactCount === 0 && pendingCount === 0
 }
 
+/** The invitations that carry an address (an anonymous link carries none). Each row keeps its own invitation. */
+export function pendingInvitations<T extends { email?: string | null }>(invitations: T[]): (T & { email: string })[] {
+  return invitations.filter((invite): invite is T & { email: string } => Boolean(invite.email))
+}
+
 /** The addresses of the invitations that carry one (an anonymous link carries none). */
 export function pendingInvitedEmails(invitations: { email?: string | null }[]): string[] {
-  return invitations.map(invite => invite.email).filter((email): email is string => Boolean(email))
+  return pendingInvitations(invitations).map(invite => invite.email)
 }

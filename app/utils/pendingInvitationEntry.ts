@@ -7,6 +7,14 @@ export function pendingInvitationEntry(input: { asksNew: boolean, hasProjects: b
   return '/pending-invitations'
 }
 
+/**
+ * What the sign-in claim checks: the customer invitations the pending page lists, and the team and board invitations
+ * the claim accepts (the server counts them in `claimable`).
+ */
+export function claimableCount(input: { invitations: unknown[], claimable?: number } | null | undefined): number {
+  return (input?.invitations.length ?? 0) + (input?.claimable ?? 0)
+}
+
 /** The invitations tied to the signed-in verified address are accepted by themselves, once, on the projects page. */
 export function autoClaimDue(input: { ready: boolean, teamsPending: boolean, pendingCount: number, done: boolean }): boolean {
   return input.ready && !input.teamsPending && input.pendingCount > 0 && !input.done

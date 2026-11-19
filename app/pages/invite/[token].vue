@@ -58,6 +58,9 @@ const shareText = computed(() => {
   return shareLine({ count: invite.sharedProjectCount, signedIn: !!session.value, organizationName: invite.organizationName })
 })
 
+// The 410 messages that say a link was withdrawn (the team or customer link, and the board guest link).
+const WITHDRAWN_MESSAGES = ['This invitation was withdrawn or revoked.', 'This board invitation was withdrawn.']
+
 // A link already used: the account that accepted it goes to its projects; anyone else gets a button (see utils/usedInvite).
 const usedBody = computed(() => loadError.value?.data as { message?: string, data?: { acceptedByYou?: boolean } } | undefined)
 const usedPlan = computed(() => {
@@ -70,8 +73,13 @@ watch([usedPlan, sessionPending], () => {
 
 const loadMessage = computed(() => {
   const status = loadError.value?.statusCode
-  if (status === 410) return 'This invitation has already been used or has expired.'
+  // A withdrawn link (revoked or withdrawn, 410, with its own server message) gets one sentence, whatever the kind.
+  // A link that is not in the database is a 404: that one says the link is not valid, not that it was withdrawn.
   if (status === 404) return 'This invitation link is not valid.'
+  if (status === 410 && WITHDRAWN_MESSAGES.includes(usedBody.value?.message ?? '')) {
+    return 'This invitation was withdrawn or revoked. Ask for a new link.'
+  }
+  if (status === 410) return 'This invitation has already been used or has expired.'
   return loadError.value ? 'This invitation could not be loaded.' : ''
 })
 

@@ -5,7 +5,7 @@ import { requireTeamRole } from '../../../../utils/auth-helpers'
 import { INVITATION_TTL_MS, newInvitationToken } from '../../../../utils/customers'
 import { isInvalidDomain } from '../../../../utils/crewAccounts'
 import { accountByEmail, normalizeEmail } from '../../../../utils/guests'
-import { inviteUrl, mailInvitation, mayManageTeamInvitation } from '../../../../utils/invitations'
+import { inviteUrl, mailInvitation, mailIsConfigured, mayManageTeamInvitation } from '../../../../utils/invitations'
 import { genId } from '../../../../utils/projects'
 
 // Invites an address to join the team. Owners and admins invite members; only an owner invites an
@@ -69,5 +69,5 @@ export default defineEventHandler(async (event) => {
   const url = inviteUrl(event, token)
   const emailed = await mailInvitation({ to: email, inviterName: inviter?.name ?? null, what: `join ${team?.name ?? 'a team'}`, url })
 
-  return { id: invitation!.id, email, role, expiresAt: invitation!.expiresAt, url, emailed }
+  return { id: invitation!.id, email, role, expiresAt: invitation!.expiresAt, url, emailed, mailConfigured: mailIsConfigured() }
 })

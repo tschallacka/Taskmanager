@@ -28,9 +28,3 @@ export function emptyCustomerWarning(input: { customerProjectCount: number, tick
   if (input.customerProjectCount > 0 || input.tickedCount > 0) return null
   return 'This customer has no projects yet: they will see nothing.'
 }
-
-/** Only the team's own projects can be filed under a customer, each once: the ticked ids not in the team are dropped. */
-export function fileableProjectIds(requested: string[], teamProjectIds: string[]): string[] {
-  const own = new Set(teamProjectIds)
-  return [...new Set(requested)].filter(id => own.has(id))
-}

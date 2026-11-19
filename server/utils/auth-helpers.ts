@@ -4,6 +4,7 @@ import { db } from '../db'
 import { customerMembers, member, projects, projectTasks, taskComments } from '../db/schema'
 import { eq, and, inArray, isNull, or } from 'drizzle-orm'
 import { CUSTOMER_COMMENT_VISIBILITY } from './commentVisibility'
+import { projectsOfCustomers } from './customerProjects'
 
 export async function getUserActiveTeamId(event: H3Event): Promise<string | null> {
   const session = event.context.session
@@ -90,7 +91,7 @@ export function sessionProjectFilter(
   // The boards a person was let onto as a guest open in the personal workspace, like a customer's.
   return or(
     own,
-    customerIds.length ? inArray(projects.customerId, customerIds) : undefined,
+    customerIds.length ? projectsOfCustomers(customerIds) : undefined,
     guestProjectIds.length ? inArray(projects.id, guestProjectIds) : undefined
   )
 }

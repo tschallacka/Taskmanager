@@ -1,5 +1,5 @@
 import { db } from '../../../db'
-import { customerInvitations, customerMembers, member, projectGuestInvitations, projects, teamInvitations } from '../../../db/schema'
+import { customerInvitations, customerMembers, member, projectGuestInvitations, teamInvitations } from '../../../db/schema'
 import { and, eq, gt, isNull } from 'drizzle-orm'
 import { auth } from '../../../lib/auth'
 import { genId } from '../../../utils/projects'
@@ -10,6 +10,7 @@ import { addressesOfUser } from '../../../utils/extraEmails'
 import { invitedAddressIsMine } from '../../../utils/customerInviteRules'
 import { guestProjectIdsOf } from '../../../utils/guests'
 import { sharedProjectIds } from '../../../utils/sharedProjectIds'
+import { projectsSharedWith } from '../../../utils/customerProjects'
 import { acceptBoardGuest, claimPendingBoardInvites, claimTiedCustomerInvites } from '../../../utils/pendingInvites'
 
 // Turns the signed-in account into a member of the invitation's team, a guest of its board, or a
@@ -30,7 +31,7 @@ export default defineEventHandler(async (event) => {
   const tokenHash = hashInvitationToken(token)
 
   const addressed = await lookupAddressedInvitation(token)
-  if (addressed === 'used' || addressed === 'expired') {
+  if (addressed === 'used' || addressed === 'expired' || addressed === 'revoked' || addressed === 'withdrawn') {
     throw createError({ statusCode: 410, message: 'This invitation is no longer valid' })
   }
   if (addressed !== 'missing') {
@@ -106,6 +107,7 @@ export default defineEventHandler(async (event) => {
     .where(and(
       eq(customerInvitations.tokenHash, tokenHash),
       isNull(customerInvitations.acceptedAt),
+      isNull(customerInvitations.revokedAt),
       gt(customerInvitations.expiresAt, now)
     ))
     .returning({ customerId: customerInvitations.customerId })
@@ -124,7 +126,7 @@ export default defineEventHandler(async (event) => {
 
   // The projects shared with this person as a customer contact: the customer's own projects and the boards they
   // hold as a guest. The landing opens the one or lists the several (see utils/inviteLanding).
-  const customerShared = await db.select({ id: projects.id }).from(projects).where(eq(projects.customerId, claimed.customerId))
+  const customerShared = await projectsSharedWith(claimed.customerId)
   const guestShared = await guestProjectIdsOf(session.user.id)
 
   deleteCookie(event, INVITATION_COOKIE, { path: '/' })
