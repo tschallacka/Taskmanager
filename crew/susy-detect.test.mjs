@@ -6,7 +6,9 @@ import assert from 'node:assert/strict'
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { detectProblems, dueMails, pruneMailed, lastBashCommand, isStopped, setStopped, stopMarkerPath, MIN, REPEAT_MINUTES, STARTUP_MINUTES, HUNG_MINUTES, GATE_MINUTES } from './susy-detect.mjs'
+import { detectProblems, dueMails, pruneMailed, lastBashCommand, MIN, REPEAT_MINUTES, STARTUP_MINUTES, HUNG_MINUTES, GATE_MINUTES } from './susy-detect.mjs'
+import { GATES } from './susy.mjs'
+import { isStopped, setStopped, stopMarkerPath } from './susy-stop.mjs'
 
 const NOW = Date.parse('2026-11-19T20:30:00.000Z')
 const ago = minutes => new Date(NOW - minutes * MIN).toISOString()
@@ -224,6 +226,48 @@ test('a changed state is a new problem: the same card with another error is mail
   const first = { key: 'blocked|nina|API Error: 403' }
   const second = { key: 'blocked|nina|API Error: Connection lost' }
   assert.deepEqual(dueMails({ problems: [second], mailed: { [first.key]: NOW - MIN }, now: NOW }), [second])
+})
+
+test('the gate owners are GATES in susy.mjs: a stalled gate names the owner GATES gives its column, for every gate', () => {
+  for (const [column, owner] of Object.entries(GATES)) {
+    const problems = detectProblems({ now: NOW, sessions: [], cards: [card(`g-${owner}`, column, { updatedAt: ago(40) })], keyOf })
+    assert.equal(problems.length, 1, `${column} has one gate problem`)
+    assert.equal(problems[0].who, owner, `${column} is owned by ${owner}, as GATES says`)
+  }
+  assert.equal(GATES['Verify PM'], 'pia', 'Verify PM is Pia: she sets the pm label from Pat\'s verdict')
+})
+
+test('a gate with a session whose name is the owner\'s own (pia-session-82 for Pia) is not reported as having no session', () => {
+  const problems = detectProblems({
+    now: NOW,
+    sessions: [session('pia-session-82', 'p1')],
+    jobs: new Map([job('p1', { tempo: 'idle', updatedAt: ago(20) })]),
+    cards: [card('c7', 'Verify PM', { updatedAt: ago(30) })],
+    keyOf
+  })
+  assert.equal(problems.length, 1)
+  assert.equal(problems[0].who, 'pia')
+  assert.match(problems[0].evidence, /pia has been idle for 20 min/)
+})
+
+test('the gate evidence says "no update for N min", counted from the newest post, and a newer post clears it', () => {
+  const stalled = detectProblems({
+    now: NOW,
+    sessions: [],
+    cards: [card('c8', 'Verify QA', { updatedAt: ago(40), updates: [{ at: ago(20), body: 'QA ready' }] })],
+    keyOf
+  })
+  assert.equal(stalled.length, 1)
+  assert.match(stalled[0].evidence, /^Verify QA: no update for 20 min; quincy has no live session$/)
+  assert.doesNotMatch(stalled[0].text, /ready work/)
+  assert.equal(stalled[0].age, 20)
+  const fresh = detectProblems({
+    now: NOW,
+    sessions: [],
+    cards: [card('c8', 'Verify QA', { updatedAt: ago(40), updates: [{ at: ago(2), body: 'QA ready' }] })],
+    keyOf
+  })
+  assert.deepEqual(kinds(fresh), [])
 })
 
 test('the stop marker: stopped on purpose is a file in the crew home, set and cleared by the daemon', () => {

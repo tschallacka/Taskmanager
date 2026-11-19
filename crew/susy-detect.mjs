@@ -10,8 +10,9 @@
 //   wake     a wake that failed three times in a row, with the real error the wake recorded.
 // The functions here are pure: they take the evidence (`claude agents --json`, the job states, the board's cards, the
 // session records, a command reader) and return the problems. The daemon reads the evidence and sends the mail.
-import { existsSync, openSync, readFileSync, readSync, closeSync, rmSync, statSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs'
+import { existsSync, openSync, readFileSync, readSync, closeSync, statSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
+import { GATES } from './susy.mjs'
 
 export const MIN = 60000
 export const STARTUP_MINUTES = 5
@@ -19,7 +20,6 @@ export const HUNG_MINUTES = 15
 export const GATE_MINUTES = 15
 export const REPEAT_MINUTES = 30
 export const WAKE_FAILURES = 3
-export const GATE_OWNERS = { 'Verify PM': 'pat', 'Verify UX': 'usher', 'Verify CQ': 'nina', 'Verify QA': 'quincy' }
 
 const CUT = 160
 const API_ERROR = /^API Error\b/
@@ -29,28 +29,9 @@ const TITLE = {
   blocked: 'session blocked by an API error',
   startup: 'session never got past its start',
   hung: 'command hung',
-  gate: 'gate has ready work and nobody on it',
+  gate: 'gate has had no update and nobody on it',
   gone: 'person has a card and no live session',
   wake: 'wake failed three times'
-}
-
-/** The file that says Susy is stopped on purpose (`crew susy-daemon stop` writes it, `start` removes it). */
-export function stopMarkerPath(home) {
-  return join(home, '.listen', 'susy-daemon.stopped')
-}
-
-export function isStopped(home) {
-  return existsSync(stopMarkerPath(home))
-}
-
-/** Writes or clears the stop marker. Clearing a marker that is not there is not an error. */
-export function setStopped(home, stopped) {
-  if (stopped) {
-    mkdirSync(join(home, '.listen'), { recursive: true })
-    writeFileSync(stopMarkerPath(home), `${new Date().toISOString()}\n`, { mode: 0o600 })
-  } else {
-    rmSync(stopMarkerPath(home), { force: true })
-  }
 }
 
 /** A job's state (`~/.claude/jobs/<id>/state.json`: state, detail, tempo, tokens, updatedAt, linkScanPath), or null. */
@@ -121,9 +102,22 @@ const minutesSince = (at, now) => {
   return Number.isFinite(t) ? Math.floor((now - t) / MIN) : null
 }
 
-/** The session of an owner key: its name is the key, or ends with -key (`taskmanager-maintenance-nina`). */
+/**
+ * The session of an owner key. The name is the key, or starts with it or ends with it (`pia-session-82`, `taskmanager-maintenance-nina`).
+ */
 function sessionOf(key, sessions) {
-  return sessions.find(s => s.name === key || String(s.name ?? '').endsWith(`-${key}`)) ?? null
+  return sessions.find((s) => {
+    const name = String(s.name ?? '')
+    return name === key || name.startsWith(`${key}-`) || name.endsWith(`-${key}`)
+  }) ?? null
+}
+
+/** The newest post on a card (its update times), or its own updatedAt when it has no post. Ms, or null. */
+function lastPostAt(card) {
+  const times = (card.updates ?? []).map(u => Date.parse(u.at)).filter(Number.isFinite)
+  if (times.length) return Math.max(...times)
+  const own = Date.parse(card.updatedAt)
+  return Number.isFinite(own) ? own : null
 }
 
 /** The one line Boss gets for a problem: what, who, card, since when, the evidence, and the one next step. */
@@ -187,9 +181,11 @@ export function detectProblems({ now, sessions = null, jobs = new Map(), cards =
 
   if (sessions) {
     for (const card of cards) {
-      const owner = GATE_OWNERS[card.column]
+      // The owner of a gate is GATES in susy.mjs (Verify PM is Pia, who sets the pm label from Pat's verdict).
+      const owner = GATES[card.column]
       if (!owner) continue
-      const age = minutesSince(card.updatedAt, now)
+      const posted = lastPostAt(card)
+      const age = posted === null ? null : Math.floor((now - posted) / MIN)
       if (age === null || age < GATE_MINUTES) continue
       const session = sessionOf(owner, sessions)
       let reason = null
@@ -201,8 +197,8 @@ export function detectProblems({ now, sessions = null, jobs = new Map(), cards =
       }
       if (!reason) continue
       out.push(problem({
-        key: `gate|${card.id}|${card.column}`, kind: 'gate', who: owner, cardId: card.id, since: card.updatedAt ?? null, age,
-        evidence: `${card.column} has had ready work for ${age} min; ${reason}`,
+        key: `gate|${card.id}|${card.column}`, kind: 'gate', who: owner, cardId: card.id, since: new Date(posted).toISOString(), age,
+        evidence: `${card.column}: no update for ${age} min; ${reason}`,
         next: `wake ${owner} on card ${card.id}`
       }))
     }

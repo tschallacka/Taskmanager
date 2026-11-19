@@ -8,7 +8,7 @@
 // its runs, and a person can show "ended" for a moment between a reply and the next step).
 import { pathToFileURL } from 'node:url'
 import { activityRows, isPiaProcess, piaProjectsDir, readCmdlines } from './activity.mjs'
-import { isStopped } from './susy-detect.mjs'
+import { isStopped } from './susy-stop.mjs'
 
 export const QUIET_MINUTES = 20
 export const CHECK_SECONDS = 180

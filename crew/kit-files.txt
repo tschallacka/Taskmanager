@@ -97,6 +97,7 @@ susy-detect.mjs
 susy-gate-wakes.mjs
 susy-next-card.mjs
 susy-review-needs.mjs
+susy-stop.mjs
 susy-workers.mjs
 susy.mjs
 tm.mjs
