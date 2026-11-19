@@ -45,9 +45,9 @@ export function postBody(action) {
 /**
  * One tick over the board's cards. Returns the new state, the lines this tick adds (one per new action, and one when a
  * creds or board error starts or clears), and `fresh`: the actions new since the last tick, which live mode posts.
- * `readCards` is async and may throw; `now` is milliseconds.
+ * `readCards` is async and may throw; `now` is milliseconds. `live` false (a dry run) words the would-mail lines as dry runs.
  */
-export async function tick({ now, crew, readCards, state = {}, agents = {} }) {
+export async function tick({ now, crew, readCards, state = {}, agents = {}, live = true }) {
   const next = { ...state, pending: { ...(state.pending ?? {}) } }
   const lines = []
   let cards
@@ -61,7 +61,9 @@ export async function tick({ now, crew, readCards, state = {}, agents = {} }) {
     lines.push(`susy-daemon: ${reason}`)
     const mailBoss = !streak || next.mailedFor !== reason
     if (mailBoss) {
-      lines.push(`mail boss once: susy-daemon has no board answer: ${reason}`)
+      lines.push(live
+        ? `mail boss once: susy-daemon has no board answer: ${reason}`
+        : `would mail boss once: susy-daemon has no board answer: ${reason} (dry run)`)
       next.mailedFor = reason
     }
     return { state: next, lines, ok: false, error: reason, actions: 0, fresh: [], mailBoss: mailBoss ? reason : null }
@@ -145,7 +147,7 @@ export async function runOnce(home, now = Date.now(), { live = false, agentList 
     if (!key) throw new Error('no account yet (no people.susy in creds.json)')
     return readBoardCards(call, creds.board?.id)
   }
-  const result = await tick({ now, crew, readCards, state, agents: susyState.agents })
+  const result = await tick({ now, crew, readCards, state, agents: susyState.agents, live })
   // The activity checks: evidence from the cards already read, the session list, the mail folders, the listener's sampled
   // heartbeat and the load. A condition is logged when it starts, not on every tick it holds (newActivityLines). Logged in
   // both modes; live mode does not act on them yet. A source that cannot be read is silent.

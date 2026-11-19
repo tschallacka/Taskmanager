@@ -32,6 +32,8 @@ test('a session blocked by an API error: who, since when, the error, and that a 
   assert.match(p.text, /^susy: /)
   assert.match(p.text, /taskmanager-maintenance-nina/)
   assert.match(p.text, /API Error: Connection lost mid-response/)
+  assert.doesNotMatch(p.text, /API error: API Error/, 'the error is said once, not with a prefix that doubles it')
+  assert.equal(p.text.split('API Error').length - 1, 1, 'the words "API Error" appear once')
   assert.match(p.text, /12 min/)
   assert.match(p.text, /restart/)
 })

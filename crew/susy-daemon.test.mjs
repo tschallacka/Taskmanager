@@ -233,6 +233,18 @@ test('a board that does not answer: one line, one would-mail-Boss line for the s
   assert.equal(second.state.errorStreak, 2)
 })
 
+test('a dry run that would mail Boss says so: "would mail boss once ... (dry run)", never "mail boss once"', async () => {
+  const readCards = async () => {
+    throw new Error('get_board answered HTTP 503')
+  }
+  const dry = await tick({ now: T0, crew: CREW, readCards, state: {}, live: false })
+  assert.deepEqual(dry.lines, [
+    'susy-daemon: get_board answered HTTP 503',
+    'would mail boss once: susy-daemon has no board answer: get_board answered HTTP 503 (dry run)'
+  ])
+  assert.ok(dry.lines.every(line => !line.startsWith('mail boss once')), 'no line claims a mail was sent')
+})
+
 test('a good tick after errors says the board is back, and a new error mails Boss again', async () => {
   let fail = true
   const readCards = async () => {

@@ -152,7 +152,7 @@ export function detectProblems({ now, sessions = null, jobs = new Map(), cards =
       if (job.tempo === 'blocked' || API_ERROR.test(detail)) {
         out.push(problem({
           key: `blocked|${who}|${detail.slice(0, CUT)}`, kind: 'blocked', who, since: job.updatedAt ?? null, age,
-          evidence: `API error: ${detail.slice(0, CUT)}`,
+          evidence: /API Error/.test(detail) ? detail.slice(0, CUT) : `API error: ${detail.slice(0, CUT)}`,
           next: `restart ${who} (the error stops the session; a restart is the fix)`
         }))
         continue
