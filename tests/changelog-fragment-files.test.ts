@@ -1,6 +1,6 @@
-// Every changelog fragment in changelog.d/ names its files once, under one "Files:" sentence, and each path it names
-// exists in the repository. A path that moved, or a second "Files:" sentence, is refused here, so the changelog cannot
-// point at a file that is not there. Run:
+// A changelog fragment is its entry and nothing else (CONTRIBUTING.md, "Changelog"; Nina's new should on 93a3c2d): every
+// non-empty line is a bullet, so no loose "Files:" paragraph is folded into CHANGELOG.md. A path a bullet names in
+// backticks must exist in the repository, so the changelog cannot point at a file that moved. Run:
 //   node --import tsx --test tests/changelog-fragment-files.test.ts
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -14,19 +14,21 @@ const FOLDER = join(ROOT, 'changelog.d')
 const fragments = existsSync(FOLDER) ? readdirSync(FOLDER).filter(name => name.endsWith('.md')).sort() : []
 
 for (const name of fragments) {
-  const text = readFileSync(join(FOLDER, name), 'utf8')
+  const lines = readFileSync(join(FOLDER, name), 'utf8').split('\n').filter(line => line.trim() !== '')
 
-  test(`${name} says "Files:" once`, () => {
-    const count = text.split('Files:').length - 1
-    assert.equal(count, 1, `found ${count} "Files:" sentences; list all the files in one`)
+  test(`${name} is only bullets: no Files paragraph or other loose line`, () => {
+    for (const line of lines) {
+      assert.ok(line.startsWith('- '), `"${line.slice(0, 60)}" is not a bullet; the fold would copy it into CHANGELOG.md`)
+    }
   })
 
   test(`${name} names only paths that exist`, () => {
-    const section = text.slice(text.indexOf('Files:'))
-    const paths = [...section.matchAll(/`([^`]+)`/g)].map(match => match[1]!)
-    assert.ok(paths.length > 0, 'the Files: sentence names no file')
-    for (const path of paths) {
-      assert.ok(existsSync(join(ROOT, path)), `${path} does not exist in the repository`)
+    for (const line of lines) {
+      for (const match of line.matchAll(/`([^`]+)`/g)) {
+        const path = match[1]!
+        if (!path.includes('/')) continue
+        assert.ok(existsSync(join(ROOT, path)), `${path} does not exist in the repository`)
+      }
     }
   })
 }
