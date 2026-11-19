@@ -3,6 +3,7 @@
 // with "❯" (a message the person sent) or with ">" has no rules around it, so it does not count. A dialog also ends the wait
 // (crew/modal-detect.mjs): the caller checks the dialog next and holds on it, with PERSON-DIALOG, not a missing prompt.
 // Run as a script: read the screen from stdin, exit 0 when the input line or a dialog shows, 1 when neither does.
+import { pathToFileURL } from 'node:url'
 import { findDialog } from './modal-detect.mjs'
 
 const RULE = /^\s*─{3,}/
@@ -22,7 +23,9 @@ export function readyScreen(screen) {
   return hasInputLine(screen) || findDialog(screen) !== null
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// The path is encoded as a file URL: a path with a space (or any other character a URL escapes) would never match the raw
+// `file://` string, the main block would not run, and every screen would read as ready.
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   let text = ''
   process.stdin.setEncoding('utf8')
   process.stdin.on('data', (chunk) => {
