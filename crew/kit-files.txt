@@ -65,6 +65,7 @@ mentions.mjs
 modal-detect.mjs
 owner-file.mjs
 package.json
+people-control.mjs
 people.mjs
 pia-listener-hook.sh
 pia-session.mjs

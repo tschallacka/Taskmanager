@@ -59,7 +59,8 @@ export async function upSessions(home, deps) {
     }
     // A worker's rebuilt role is written before the start, so the start is given exactly what the file holds.
     if (resolved.write) writeRoleFile(home, key, resolved.role)
-    const started = deps.start({ key, folder: record.folder, role: resolved.role })
+    // Resume only: a refused resume is reported as failed, never followed by a fresh start (card mwmzv2jt).
+    const started = deps.start({ key, folder: record.folder, role: resolved.role, resumeOnly: true })
     if (!started.ok) {
       allUp = false
       lines.push(`${key}: failed: ${started.reason}`)
@@ -133,7 +134,7 @@ export function realSessionDeps(home, kit, { bin = process.env.CREW_CLAUDE_BIN |
     promptsText: existsSync(promptsPath) ? readFileSync(promptsPath, 'utf8') : '',
     crewText: existsSync(crewPath) ? readFileSync(crewPath, 'utf8') : '',
     listAgents: () => listAgents({ bin }),
-    start: ({ key, folder, role }) => startSession({ home, kit, key, folder, role, bin }),
+    start: ({ key, folder, role, resumeOnly }) => startSession({ home, kit, key, folder, role, bin, resumeOnly }),
     stop: ({ key }) => stopSession({ home, key, bin }),
     wake: realWake(home, kit, bin)
   }
