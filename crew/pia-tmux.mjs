@@ -13,7 +13,7 @@
 import { execFileSync, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { randomBytes } from 'node:crypto'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { livePid } from './pidfile.mjs'
 import { shellWord } from './home.mjs'
@@ -50,7 +50,10 @@ export function piaAgentsOf(json) {
  * Trust for Pia's folder: `pia-session` directly inside the crew home. claude-trust's crew folders are the home, the kit and the
  * worker folders, so Pia's folder is trusted here with the crew's own paths and nothing else. Returns { ok, changed } or { ok, reason }.
  */
-export function piaTrust({ home, kit, folder, file = configFile(), worktreeBase = readWorktreeBase(home) }) {
+export function piaTrust({ home: homeIn, kit: kitIn, folder, file = configFile(), worktreeBase }) {
+  const home = resolve(homeIn)
+  const kit = resolve(kitIn)
+  worktreeBase ??= readWorktreeBase(home)
   if (dirname(folder) !== home || !folder.endsWith('pia-session')) return { ok: false, reason: `${folder} is not the crew home's pia-session folder; not trusted` }
   const { trust } = crewOwnPaths({ home, kit, worktreeBase, folders: recordedFolders(home) })
   const res = ensureTrusted([...trust, folder], { file })
@@ -104,8 +107,10 @@ export function dialogTitle(screen) {
 }
 
 /** The shell line that starts Pia's claude in her tmux session. The flags are the ones PROMPTS.md "Starting Pia" gives. */
-export function piaCommand({ home, kit, claude = 'claude', name, resume = '' }) {
+export function piaCommand({ home: homeIn, kit: kitIn, claude = 'claude', name, resume = '' }) {
   if (resume && !validSessionId(resume)) throw new Error(`not a session id: ${resume}`)
+  const home = resolve(homeIn)
+  const kit = resolve(kitIn)
   const settings = join(home, 'pia-session', 'settings.merged.json')
   const args = [claude, '--model', MODEL, '--add-dir', home, '--add-dir', kit, '--settings', settings, '-n', name, ...(resume ? ['--resume', resume] : [])]
   return `env CREW_HOME=${shellWord(home)} ${args.map(shellWord).join(' ')}`
@@ -275,7 +280,18 @@ function tmuxRun(home, bin, args, input) {
  * her folder trusted the way `crew session start` trusts it, and her board listener's pid file. `opts.name` is her session
  * name (default: the crew's slug and `pia`); `opts.trust` replaces the trust step in a test.
  */
-export function realPiaDeps(home, kit, opts = {}) {
+/**
+ * The kit folder of a module, as a path with no trailing slash. Both entry points (`crew up pia` through people-control.mjs, and this
+ * file run directly) use the kit path from here, so the settings, the trust entry and the --add-dir folder are the same string (Quincy V6).
+ */
+export function piaKitDir(moduleUrl) {
+  return resolve(fileURLToPath(new URL('.', moduleUrl)))
+}
+
+export function realPiaDeps(homeIn, kitIn, opts = {}) {
+  // Both paths are normalised here, the one place every entry point builds its deps: no trailing slash in the settings or the trust.
+  const home = resolve(homeIn)
+  const kit = resolve(kitIn)
   const bin = opts.bin || process.env.CREW_CLAUDE_BIN || 'claude'
   const tmuxBin = opts.tmuxBin || process.env.TMUX_BIN || 'tmux'
   const folder = join(home, 'pia-session')
@@ -349,7 +365,7 @@ export function realPiaDeps(home, kit, opts = {}) {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const { crewHome } = await import('./home.mjs')
   const home = crewHome()
-  const kit = fileURLToPath(new URL('.', import.meta.url))
+  const kit = piaKitDir(import.meta.url)
   const command = process.argv[2]
   if (!['up', 'stop', 'restart'].includes(command)) {
     console.error('usage: pia-tmux.mjs up|stop|restart')

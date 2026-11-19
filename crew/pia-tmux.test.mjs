@@ -7,8 +7,8 @@ import { spawn, spawnSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, writeFileSync, existsSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
-import { piaCommand, piaListenerLine, piaListenerInstruction, dialogTitle, startPia, stopPia, restartPia, realPiaDeps, piaTrust, piaAgentsOf, exitConfirmShowing, PIA_TMUX } from './pia-tmux.mjs'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+import { piaCommand, piaKitDir, piaListenerLine, piaListenerInstruction, dialogTitle, startPia, stopPia, restartPia, realPiaDeps, piaTrust, piaAgentsOf, exitConfirmShowing, PIA_TMUX } from './pia-tmux.mjs'
 import { pidFile } from './pidfile.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -310,6 +310,29 @@ test('the real tmux part: start, paste a mail that shows, stop; on a throwaway s
       process.kill(Number(readFileSync(join(home, '.listen', 'pia.pid'), 'utf8')), 'SIGTERM')
     } catch {}
   }
+})
+
+// Quincy's V6 (2026-11-19): the direct script (pia-tmux.mjs up) passed the kit with a trailing slash, so the settings and the trust
+// entry named "<kit>/" while claude's dialog named "<kit>". Both entry points now go through the same normalised paths.
+test('a kit path with a trailing slash gives the same settings, trust entry and command as the plain path (Quincy V6)', () => {
+  const home = mkdtempSync(join(tmpdir(), 'pia-slash-home-'))
+  const deps = realPiaDeps(home, `${here}/`, { bin: 'claude', trust: () => ({ ok: true }) })
+  deps.merge()
+  const merged = JSON.parse(readFileSync(join(home, 'pia-session', 'settings.merged.json'), 'utf8'))
+  assert.deepEqual(merged.permissions.additionalDirectories, [home, here])
+  const file = join(mkdtempSync(join(tmpdir(), 'pia-slash-cfg-')), '.claude.json')
+  writeFileSync(file, '{}\n')
+  assert.equal(piaTrust({ home, kit: `${here}/`, folder: join(home, 'pia-session'), file }).ok, true)
+  const trusted = Object.keys(JSON.parse(readFileSync(file, 'utf8')).projects)
+  assert.ok(trusted.includes(here), trusted.join(' '))
+  assert.equal(trusted.includes(`${here}/`), false)
+  assert.ok(piaCommand({ home, kit: `${here}/`, claude: 'claude', name: 'n' }).includes(`--add-dir ${here}`))
+  assert.ok(!piaCommand({ home, kit: `${here}/`, claude: 'claude', name: 'n' }).includes(`${here}/ `))
+})
+
+test('the direct script computes its kit folder without a trailing slash', () => {
+  assert.equal(piaKitDir(pathToFileURL(join(here, 'pia-tmux.mjs')).href), here)
+  assert.equal(piaKitDir(import.meta.url), here)
 })
 
 // Quincy's V1 (2026-11-19): the two --add-dir folders are in her merged settings as permissions.additionalDirectories, so claude
