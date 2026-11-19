@@ -191,10 +191,14 @@ export function startSession({ home, kit, key, folder, role, bin, now = Date.now
   if (!trusted.ok) return { ok: false, reason: trusted.reason }
   const name = sessionName({ slug: crewSlug(home), key })
   // The session's own mcp config, written before the start, so the strict flag always has a file to read.
+  // Applies to a FRESH start only: a resume passes no flags, and claude keeps the mcp config saved when the session first
+  // started. A later change to this file does not reach a resumed session (a changed config needs a fresh start).
   mkdirSync(join(home, 'sessions'), { recursive: true })
   writeFileSync(mcpConfigPath(home, key), `${JSON.stringify(mcpConfig({ key, home, kit }), null, 2)}\n`, { mode: 0o600 })
   // The person's own settings file (deny rules, own CREW_HOME, remote control off), written before the start: the start
   // passes that one file as its --settings. The long-run profile's env is merged in, so the session keeps the owner's timeouts.
+  // Applies to a FRESH start only: a resume keeps the settings saved when the session first started (deny rules, profile env),
+  // so a later change to this file does not reach a resumed session.
   writeSettingsFile(home, key, { profileEnv: longRunEnv(kit) })
   // The resume first (when there is a recorded id), then a fresh start if claude refuses it. A folder claude does not trust
   // is not retried: the same refusal would come back.
