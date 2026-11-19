@@ -57,11 +57,18 @@ export function terminalName(key) {
 export const IDLE_WAIT_MS = 5 * 60_000
 export const POLL_MS = 15_000
 export const LOG_CUT = 80
+// The mail to Boss keeps the reason whole: a hold reason cut at 80 said "the screen could" and no more (QA w4).
+export const MAIL_CUT = 300
 export const FAILURES_TO_MAIL_BOSS = 3
 
 /** The logged form of a wake text: cut to 80 characters, one line, never more. */
 export function logCut(text) {
   return String(text ?? '').replace(/\s+/g, ' ').slice(0, LOG_CUT)
+}
+
+/** The reason as the mail to Boss carries it: one line, cut to MAIL_CUT characters. */
+export function mailCut(text) {
+  return String(text ?? '').replace(/\s+/g, ' ').slice(0, MAIL_CUT)
 }
 
 /** The state of a session entry for the wait: 'idle' only when claude agents says idle; anything else is 'busy'. */
@@ -106,9 +113,9 @@ export const BLOCKING = /^(PERSON-DIALOG|SCREEN-UNREADABLE)/
 /** The mail to Boss: a hold at once (the dialog or the unreadable screen), or three failures in a row, once per streak. */
 export function bossMailText({ key, cardId, lastError }) {
   if (BLOCKING.test(String(lastError ?? ''))) {
-    return `wake held for ${key} on card ${cardId}: ${logCut(lastError)}. Nothing was typed. The sender waits until the screen can be read and has no dialog.`
+    return `wake held for ${key} on card ${cardId}: ${mailCut(lastError)}. Nothing was typed. The sender waits until the screen can be read and has no dialog.`
   }
-  return `wake failed three times in a row for ${key} on card ${cardId}; last error: ${logCut(lastError)}. The sender stays quiet until a wake works.`
+  return `wake failed three times in a row for ${key} on card ${cardId}; last error: ${mailCut(lastError)}. The sender stays quiet until a wake works.`
 }
 
 /**

@@ -8,10 +8,18 @@ import { findDialog } from './modal-detect.mjs'
 
 const RULE = /^\s*─{3,}/
 const INPUT = /^\s*❯(\s|$)/
+// The view prints each row with a prefix: "048 [001-001] " (the row number, then the columns it spans). It is not part of
+// the screen, so it is taken off before the rows are read (card mwnxqqj45nne9ye7l3k, QA w1).
+const ROW_PREFIX = /^\d{3} \[\d{3}-\d{3}\] ?/gm
+
+/** The screen text with the view's row prefix taken off each row. */
+export function stripRowPrefix(screen) {
+  return String(screen ?? '').replace(ROW_PREFIX, '')
+}
 
 /** True when the input line of claude's input box is on the screen (one row of "❯" with a rule above and below). */
 export function hasInputLine(screen) {
-  const rows = String(screen ?? '').split('\n')
+  const rows = stripRowPrefix(screen).split('\n')
   for (let i = 1; i < rows.length - 1; i += 1) {
     if (INPUT.test(rows[i]) && RULE.test(rows[i - 1]) && RULE.test(rows[i + 1])) return true
   }
@@ -20,7 +28,7 @@ export function hasInputLine(screen) {
 
 /** True when the screen is ready to read as idle: the input line shows, or a dialog does (and is held on after). */
 export function readyScreen(screen) {
-  return hasInputLine(screen) || findDialog(screen) !== null
+  return hasInputLine(screen) || findDialog(stripRowPrefix(screen)) !== null
 }
 
 // The path is encoded as a file URL: a path with a space (or any other character a URL escapes) would never match the raw
