@@ -9,6 +9,7 @@ import type { FieldValues, ProjectField } from '~/composables/useCustomFields'
 import { matchesTagRequirements, type TagRequirement } from '#shared/utils/tags'
 import { isBoardFiltering, matchesBoardFilter } from '~/utils/boardFilter'
 import { countOpenTasks } from '~/utils/projectKind'
+import { createGeneration } from '~/utils/requestGeneration'
 
 // A permalink's window as the API returns it (server/utils/commentWindow.ts): the comments and what is left either side.
 interface CommentWindowPage {
@@ -250,6 +251,8 @@ interface TaskCountRow { id: string, projectId: string, columnId: string }
 const _countRows = ref<TaskCountRow[]>([])
 const _countsLoaded = ref(false)
 let _countsRequest: Promise<void> | null = null
+// A team switch moves this on; a task request started before it drops its answer (Speed, Nina's SHOULD 3).
+const _generation = createGeneration()
 const taskCounts = computed(() => countOpenTasks(
   _tasksLoaded.value ? _allTasks.value : _countRows.value,
   new Map(_projects.value.map(p => [p.id, new Set(p.terminalColumnIds ?? [])]))
@@ -565,13 +568,17 @@ export function useProjects() {
   async function ensureTasks() {
     if (_tasksLoaded.value) return
     if (!_tasksRequest) {
-      _tasksRequest = $fetch<TaskSearchRow[]>('/api/tasks')
+      const token = _generation.begin()
+      const request: Promise<void> = $fetch<TaskSearchRow[]>('/api/tasks')
         .then((tasks) => {
+          // A team switch started while this was in flight: these rows are the old team's, so they are not applied.
+          if (!token.isCurrent()) return
           _allTasks.value = tasks
           _tasksLoaded.value = true
           reindexSearch()
         })
-        .finally(() => { _tasksRequest = null })
+        .finally(() => { if (_tasksRequest === request) _tasksRequest = null })
+      _tasksRequest = request
     }
     await _tasksRequest
   }
@@ -582,12 +589,15 @@ export function useProjects() {
     if (_tasksLoaded.value) return
     if (_countsLoaded.value) return
     if (!_countsRequest) {
-      _countsRequest = $fetch<TaskCountRow[]>('/api/tasks?fields=counts')
+      const token = _generation.begin()
+      const request: Promise<void> = $fetch<TaskCountRow[]>('/api/tasks?fields=counts')
         .then((rows) => {
+          if (!token.isCurrent()) return
           _countRows.value = rows
           _countsLoaded.value = true
         })
-        .finally(() => { _countsRequest = null })
+        .finally(() => { if (_countsRequest === request) _countsRequest = null })
+      _countsRequest = request
     }
     await _countsRequest
   }
@@ -595,21 +605,29 @@ export function useProjects() {
   // Refreshes the board list and the flat task index without dropping the
   // open board or its label filter. The task index is refreshed only once it has been loaded.
   async function syncProjects() {
+    const token = _generation.begin()
     const [projects, tasks] = await Promise.all([
       $fetch<Project[]>('/api/projects'),
       _tasksLoaded.value ? $fetch<TaskSearchRow[]>('/api/tasks') : Promise.resolve(null)
     ])
     _projects.value = projects
     if (_activeProjectId.value) await refreshArchivedActive(_activeProjectId.value)
+    // A team switch during this sync: its task rows are the old team's, so they are dropped.
+    if (!token.isCurrent()) return
     if (tasks) {
       _allTasks.value = tasks
       reindexSearch()
     } else if (_countsLoaded.value) {
-      _countRows.value = await $fetch<TaskCountRow[]>('/api/tasks?fields=counts')
+      const rows = await $fetch<TaskCountRow[]>('/api/tasks?fields=counts')
+      if (token.isCurrent()) _countRows.value = rows
     }
   }
 
   async function refresh() {
+    // Team switch: every request started for the old team is stale now, and a new one may start at once.
+    _generation.bump()
+    _tasksRequest = null
+    _countsRequest = null
     // Team switch: drop per-project board state, filters do not carry over.
     _board.value = null
     _boardCache.clear()
