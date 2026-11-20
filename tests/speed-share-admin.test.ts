@@ -25,7 +25,10 @@ test('BoardShare loads the listing on board open for an admin only, and the dial
   assert.match(store, /_shareAdmin\.value = board\.shareAdmin \?\? false/, 'the store takes the flag from the board answer')
   assert.match(store, /shareAdmin: _shareAdmin,/, 'the store exposes the flag')
   assert.match(share, /const \{ activeProjectId, shareAdmin \} = useProjects\(\)/)
-  assert.match(share, /watch\(adminOnThisBoard, \(isAdmin\) => \{\s*if \(isAdmin\) loadListing\(false\)\s*\}, \{ immediate: true \}\)/, 'on board open the admin loads the listing only (no staff list, no project read)')
+  // The trigger watches the pair: an A-to-B switch between two admin boards changes the project id, so the watch runs (Nina's
+  // open should on 43e25a9: a boolean that stays true does not fire).
+  assert.match(share, /watch\(\(\) => \[props\.projectId, adminOnThisBoard\.value\], \(\[, isAdmin\]\) => \{\s*if \(isAdmin\) loadListing\(false\)\s*\}, \{ immediate: true \}\)/, 'the pair triggers the listing for an admin only')
+  assert.doesNotMatch(share, /watch\(adminOnThisBoard, /, 'the boolean-only trigger is gone')
   assert.match(share, /async function loadListing\(full = true\)/)
   const listing = share.slice(share.indexOf('async function loadListing(full = true)'), share.indexOf('async function loadListing(full = true)') + 800)
   assert.match(listing, /if \(!full\) return/, 'the board-open call stops after the listing')

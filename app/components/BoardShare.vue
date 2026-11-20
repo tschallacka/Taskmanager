@@ -359,7 +359,8 @@ watch(open, (isOpen) => {
 // SHOULD 2). The board answer says who is an admin, so a guest or a member makes no call for it.
 const { activeProjectId, shareAdmin } = useProjects()
 const adminOnThisBoard = computed(() => activeProjectId.value === props.projectId && shareAdmin.value)
-watch(adminOnThisBoard, (isAdmin) => {
+// The pair: a switch from one admin board to another changes the project id, so the watch runs even though the flag stays true.
+watch(() => [props.projectId, adminOnThisBoard.value], ([, isAdmin]) => {
   if (isAdmin) loadListing(false)
 }, { immediate: true })
 </script>
