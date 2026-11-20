@@ -1,7 +1,11 @@
-import { authClient } from '~/composables/useAuth'
+import { authClient, forgetSession, readSession } from '~/composables/useAuth'
 
 export default defineNuxtRouteMiddleware(async (to) => {
-  if (to.path === '/login') return
+  // A sign-in starts on the login page: the next read of the session must ask the server.
+  if (to.path === '/login') {
+    forgetSession()
+    return
+  }
   if (to.path.startsWith('/public/')) return
   // Read before its recipient has an account; the page itself asks them to sign in.
   if (to.path.startsWith('/invite/')) return
@@ -13,6 +17,6 @@ export default defineNuxtRouteMiddleware(async (to) => {
   const sessionState = authClient.useSession()
   const session = (!sessionState.value.isPending && sessionState.value.data)
     ? sessionState.value.data
-    : (await authClient.getSession()).data
+    : (await readSession()).data
   if (!session) return navigateTo('/login')
 })

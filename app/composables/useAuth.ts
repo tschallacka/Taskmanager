@@ -1,4 +1,5 @@
 import { createAuthClient } from 'better-auth/vue'
+import { createSessionCache } from '~/utils/sessionCache'
 import { emailOTPClient, genericOAuthClient, inferAdditionalFields, organizationClient, twoFactorClient } from 'better-auth/client/plugins'
 import { passkeyClient } from '@better-auth/passkey/client'
 
@@ -68,6 +69,18 @@ export function useAuth() {
     signInWithOidc,
     signOut
   }
+}
+
+// The session read for the app start: one server request per window (see utils/sessionCache.ts, Speed step E).
+const sessionCache = createSessionCache(() => authClient.getSession())
+
+export function readSession() {
+  return sessionCache.get()
+}
+
+// Drops the cached session, so the next read asks the server (the login page calls it).
+export function forgetSession() {
+  sessionCache.forget()
 }
 
 export { authClient }
