@@ -26,6 +26,8 @@ WORKFLOW.md
 activity.mjs
 blocked-on.mjs
 board-call.mjs
+board-health.mjs
+board-retry.mjs
 boss-session.mjs
 boss-stop-hook.sh
 browser-cleanup.mjs
