@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.58.2 - 2026-11-20
+
+- **Crew kit: a board outage is waited out, not a reason to stop.** The listener retries a board call with backoff (60 s, doubling, capped at 5 min) on an HTML answer, a 5xx, a rate limit (429) or a connection error, and reports the outage once. A board call that never answers counts as an outage after 30 s, and the status probe gives up after 5 s. A 4xx (a bad or revoked key) is logged once and the listener goes on, as before: the call answers null. The platform's status file, when it is published, adds a reason and a retry_after. Pia's Stop hook tells a board outage from a listener that is really down: during an outage it does not block the stop, and says the kit retries by itself. Files: `crew/board-retry.mjs`, `crew/board-retry.test.mjs`, `crew/listen.mjs`, `crew/board-health.mjs`, `crew/pia-listener-hook.sh`, `crew/pia-listener-hook.test.mjs`.
+
 ## 0.58.1 - 2026-11-20
 
 - **Crew wake reads the screen it can see.** `crew/session-wake.sh` attaches at 200x50, reads only rows 1-50, waits up to 30 s for the claude prompt instead of a fixed 7 s sleep, names its terminal `sessionwake-<key>` so wakes for different people do not kill each other, and says why when the screen cannot be read (the tool error line). Files: `crew/session-wake.sh`, `crew/wake.mjs`, `crew/session-wake.test.mjs`, `crew/wake.test.mjs`.
