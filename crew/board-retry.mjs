@@ -1,7 +1,7 @@
 // The board call a crew listener makes, with a retry when the board is out (card mwifm8qa5n044bzymkl). A deploy answers
 // HTML, a 5xx or nothing at all for a while; the listener used to end on the first of those, and its Stop hook then
-// gave up. Now an outage is waited out: 60 s, doubling, capped at 5 min, forever, reported once on stderr. A 4xx is a
-// fault and is thrown at once. The status file the platform may publish (STATUS_PATH) only adds a reason and a
+// gave up. Now an outage is waited out: 60 s, doubling, capped at 5 min, forever, reported once on stderr. A 429 (rate
+// limit) is transient and waits like an outage; any other 4xx is a fault and is thrown at once. The status file the platform may publish (STATUS_PATH) only adds a reason and a
 // retry_after; it is never trusted beyond waiting, and its absence means plain backoff.
 //
 // Two limits to keep in mind. The helper is generic: a write sent through it can run twice after a 502 or a reset, so
@@ -43,7 +43,7 @@ async function readStatus(url, fetchImpl) {
 }
 
 /**
- * Makes the request and returns the parsed JSON answer. Retries an outage forever with backoff; throws a 4xx at once.
+ * Makes the request and returns the parsed JSON answer. Retries an outage (and a 429) forever with backoff; throws any other 4xx at once.
  * `deps` are for tests: the fetch, the sleep and the stderr line.
  */
 export async function boardRequest(req, deps = {}) {
@@ -64,9 +64,11 @@ export async function boardRequest(req, deps = {}) {
       outage = `connection error: ${error?.message ?? error}`
     }
     if (res) {
-      if (res.status >= 400 && res.status < 500) throw new Error(`board answered ${res.status} for ${req.url}`)
+      if (res.status >= 400 && res.status < 500 && res.status !== 429) throw new Error(`board answered ${res.status} for ${req.url}`)
       const text = await res.text().catch(() => '')
-      if (res.status < 500) {
+      if (res.status === 429) {
+        outage = 'rate limited (429)'
+      } else if (res.status < 500) {
         try {
           return JSON.parse(text)
         } catch {

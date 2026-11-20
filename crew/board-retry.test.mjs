@@ -194,3 +194,19 @@ test('two 4xx calls from one listener log one line, not one each', async () => {
   assert.equal(await listenerCall(req, deps), null)
   assert.equal(logs.length, 1)
 })
+
+// Nina's nit: a 429 (rate limit) is transient, so it waits like an outage instead of ending the call as a refused key.
+test('a 429 then JSON: the rate limit is waited out (60 s), the JSON comes back, and nothing is refused', async () => {
+  const answers = [json({ error: 'slow down' }, 429), json({ ok: true })]
+  const waits = []
+  const logs = []
+  const result = await listenerCall({ url: 'https://board.example/api/mcp', init: { method: 'POST' } }, {
+    fetchImpl: async url => (url.endsWith(STATUS_PATH) ? new Response('', { status: 404 }) : answers.shift()),
+    sleep: async (ms) => { waits.push(ms) },
+    log: line => logs.push(line),
+    state: {}
+  })
+  assert.deepEqual(result, { ok: true })
+  assert.deepEqual(waits, [60000])
+  assert.equal(logs.some(line => /refused/.test(line)), false)
+})
