@@ -46,14 +46,23 @@ export async function deliverBossMail({ creds = {}, mailboxDir, text, makeId, fe
   }
 }
 
+/**
+ * The attach terminal's name for one person: sessionwake-<key>. Two wakes for different people then never kill each
+ * other's terminal (the old shared name did). Only letters, digits, dash and underscore reach the shell script.
+ */
+export function terminalName(key) {
+  return `sessionwake-${String(key ?? '').replace(/[^A-Za-z0-9_-]/g, '')}`
+}
+
 export const IDLE_WAIT_MS = 5 * 60_000
 export const POLL_MS = 15_000
 export const LOG_CUT = 80
+export const MAIL_CUT = 300
 export const FAILURES_TO_MAIL_BOSS = 3
 
-/** The logged form of a wake text: cut to 80 characters, one line, never more. */
-export function logCut(text) {
-  return String(text ?? '').replace(/\s+/g, ' ').slice(0, LOG_CUT)
+/** One line of text, cut to `cut` characters (the log's 80 by default; the mail to Boss passes MAIL_CUT). */
+export function logCut(text, cut = LOG_CUT) {
+  return String(text ?? '').replace(/\s+/g, ' ').slice(0, cut)
 }
 
 /** The state of a session entry for the wait: 'idle' only when claude agents says idle; anything else is 'busy'. */
@@ -98,9 +107,9 @@ export const BLOCKING = /^(PERSON-DIALOG|SCREEN-UNREADABLE)/
 /** The mail to Boss: a hold at once (the dialog or the unreadable screen), or three failures in a row, once per streak. */
 export function bossMailText({ key, cardId, lastError }) {
   if (BLOCKING.test(String(lastError ?? ''))) {
-    return `wake held for ${key} on card ${cardId}: ${logCut(lastError)}. Nothing was typed. The sender waits until the screen can be read and has no dialog.`
+    return `wake held for ${key} on card ${cardId}: ${logCut(lastError, MAIL_CUT)}. Nothing was typed. The sender waits until the screen can be read and has no dialog.`
   }
-  return `wake failed three times in a row for ${key} on card ${cardId}; last error: ${logCut(lastError)}. The sender stays quiet until a wake works.`
+  return `wake failed three times in a row for ${key} on card ${cardId}; last error: ${logCut(lastError, MAIL_CUT)}. The sender stays quiet until a wake works.`
 }
 
 /**
@@ -118,7 +127,7 @@ export async function wakeOnce({ record, list, text, cardId, key, type, readList
   // Only a session that is gone counts here. Busy (a timeout while working) and unknown (claude agents silent) are waits.
   if (waited !== 'idle') return finish(false, `session ${record.id} was ${waited}, not idle; retry next tick`, record, { key, cardId }, waited === 'gone')
   try {
-    await type({ id: record.id, text })
+    await type({ id: record.id, text, key })
     return finish(true, `woke ${record.id} with "${logCut(text)}"`, record, { key, cardId })
   } catch (error) {
     // The hold reasons come through as they are (the caller reads them from stderr); anything else is a paste failure.
@@ -157,7 +166,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const out = await wakeOnce({
     record, list, text, cardId, key,
     type: ({ id, text: body }) => {
-      const run = spawnSync('sh', [join(kit, 'session-wake.sh'), id, body], { encoding: 'utf8', timeout: 120000 })
+      // The script waits up to 30 s for the prompt, then pastes: the timeout covers that and the tool calls around it.
+      const run = spawnSync('sh', [join(kit, 'session-wake.sh'), id, body, terminalName(key)], { encoding: 'utf8', timeout: 300000 })
       if (run.status !== 0) throw new Error(String(run.stderr || `exit ${run.status}`).trim().split('\n').pop())
     },
     readList: () => listAgents({ bin })

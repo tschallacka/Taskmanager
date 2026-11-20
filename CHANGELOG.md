@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.58.1 - 2026-11-20
+
+- **Crew wake reads the screen it can see.** `crew/session-wake.sh` attaches at 200x50, reads only rows 1-50, waits up to 30 s for the claude prompt instead of a fixed 7 s sleep, names its terminal `sessionwake-<key>` so wakes for different people do not kill each other, and says why when the screen cannot be read (the tool error line). Files: `crew/session-wake.sh`, `crew/wake.mjs`, `crew/session-wake.test.mjs`, `crew/wake.test.mjs`.
+
 ## 0.58.0 - 2026-11-20
 
 - **Susy detects stalled people herself and alerts Boss with the cause.** The daemon reads each session's job state, the board and the session records, and mails Boss one short line per distinct problem: a session blocked by an API error, a session that never got past its start, a command hung 15 minutes or more, a gate card with no update for 15 min and nobody on it, a person with an In progress card and no live session, and a wake that failed three times with its real error. A problem repeats at most every 30 minutes and clears when its state changes. The Pia and Susy watch no longer reports Susy down while the daemon is stopped on purpose, and no longer reports Pia gone while her process runs under `--resume`.
