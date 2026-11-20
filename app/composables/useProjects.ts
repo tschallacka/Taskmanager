@@ -1356,7 +1356,6 @@ export function useProjects() {
     commentsTaskId: _commentsTaskId,
     load,
     ensureTasks,
-    tasksLoaded: _tasksLoaded,
     refresh,
     syncProjects,
     reloadBoardQuiet,
