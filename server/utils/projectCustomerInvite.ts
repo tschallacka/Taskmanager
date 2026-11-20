@@ -28,6 +28,13 @@ export async function fileAndInvite(input: { projectId: string, customerId: stri
     createdAt: input.now,
     expiresAt: input.now + INVITATION_TTL_MS
   }).returning()
+  // The Share dialog files the project under the customer it picked, so the project row moves to it. The customer it was
+  // filed under before keeps the project through the join table, so that customer does not lose access.
+  const [current] = await db.select({ customerId: projects.customerId }).from(projects).where(eq(projects.id, input.projectId))
+  if (current?.customerId && current.customerId !== input.customerId) {
+    await db.insert(customerProjects).values({ id: genId(), customerId: current.customerId, projectId: input.projectId, createdAt: input.now }).onConflictDoNothing()
+  }
   await shareProjectsWith(input.customerId, [input.projectId], input.now)
+  await db.update(projects).set({ customerId: input.customerId }).where(eq(projects.id, input.projectId))
   return { id: invitation!.id, token, expiresAt: invitation!.expiresAt }
 }

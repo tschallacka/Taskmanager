@@ -48,6 +48,26 @@ test('the project is filed under the customer and the email invitation is made',
   assert.equal(row!.customerId, customer)
 })
 
+test('a project already filed under another customer is filed under the new one, and the first customer keeps it', async () => {
+  const { projectCountsByCustomer, projectsSharedWith } = await import('../server/utils/customerProjects')
+  const first = id('first')
+  const second = id('second')
+  const moved = id('moved')
+  await db.insert(customers).values([
+    { id: first, organizationId: team, name: 'First customer', createdAt: now, updatedAt: now },
+    { id: second, organizationId: team, name: 'Second customer', createdAt: now, updatedAt: now }
+  ])
+  await db.insert(projects).values({ id: moved, userId: owner, teamId: team, name: 'Moved board', customerId: first, createdAt: now, updatedAt: now })
+  await fileAndInvite({ projectId: moved, customerId: second, email, actorId: owner, now })
+  const [project] = await db.select().from(projects).where(eq(projects.id, moved))
+  assert.equal(project!.customerId, second, 'the project is filed under the customer the Share dialog picked')
+  assert.deepEqual((await projectsSharedWith(first)).map(row => row.id), [moved], 'the first customer keeps the project')
+  assert.equal((await projectCountsByCustomer([second])).get(second), 1, 'the new customer counts the project')
+  await db.delete(customerInvitations).where(eq(customerInvitations.customerId, second))
+  await db.delete(projects).where(eq(projects.id, moved))
+  await db.delete(customers).where(inArray(customers.id, [first, second]))
+})
+
 test('when the invitation cannot be made, the project is not filed', async () => {
   const [before] = await db.select().from(projects).where(eq(projects.id, board))
   await assert.rejects(fileAndInvite({ projectId: board, customerId: 'no-such-customer', email, actorId: owner, now }))
