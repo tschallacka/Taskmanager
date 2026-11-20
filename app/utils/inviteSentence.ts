@@ -29,7 +29,8 @@ export function truncateName(text: string, max: number): string {
 export function inviteSentence(input: InviteWordsInput): InviteWords {
   const name = input.name?.trim() ? truncateName(input.name, NAME_MAX) : null
   const org = truncateName(input.org, TITLE_MAX)
-  const footnote = name ? null : `Invitation for ${input.email}`
+  // A link invitation has no address, so there is no footnote for it (never "Invitation for " with nothing after it).
+  const footnote = name || !input.email ? null : `Invitation for ${input.email}`
   const headline = name ? `Welcome, ${name}` : 'Welcome'
 
   if (input.kind === 'project') {
