@@ -59,6 +59,11 @@ describe('activity: the rows read from the transcripts', () => {
     assert.equal(isPiaProcess(['claude', '--continue']), false)
   })
 
+  test('Pia\'s process started with --resume (the form her session has now) is hers too; another model is not', () => {
+    assert.equal(isPiaProcess(['claude', '--resume', 'f6cb962c-8f76-4c58-9fb5-5f35cfa33108', '--model', 'claude-haiku-5-5', '--add-dir', '/x']), true)
+    assert.equal(isPiaProcess(['claude', '--resume', 'f6cb962c', '--model', 'opus']), false)
+  })
+
   test('rows: a subagent\'s newest transcript wins, and Pia\'s row says whether her listener runs under her', () => {
     const root = join(tempDir('activity-'), 'projects')
     const session = join(root, 'session-1')
@@ -100,6 +105,12 @@ describe('watch-crew: what counts as trouble', () => {
     assert.match(problemsOf({ rows: [healthy[0]], alive: true }), /susy-not-running/)
     assert.match(problemsOf({ rows: [healthy[0], row('susy', 'ended', 12)], alive: true }), /susy-ended-12min/)
     assert.match(problemsOf({ rows: [healthy[0], row('susy', 'working', 25)], alive: true }), /susy-working-25min/)
+  })
+
+  test('Susy stopped on purpose (the stop marker) is not a problem; Pia still is when she is gone', () => {
+    assert.equal(problemsOf({ rows: [healthy[0]], alive: true, susyStopped: true }), '')
+    assert.equal(problemsOf({ rows: [healthy[0], row('susy', 'ended', 40)], alive: true, susyStopped: true }), '')
+    assert.equal(problemsOf({ rows: [row('pia', 'gone', 1)], alive: false, susyStopped: true }), ' pia-session-gone;')
   })
 
   test('a second look is asked for on a missing listener, or on Susy in a state other than working, running or listening', () => {

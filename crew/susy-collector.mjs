@@ -4,8 +4,8 @@
 // /proc/loadavg. Any source that cannot be read is null, which the checks treat as no evidence (never a fault).
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import { spawnSync } from 'node:child_process'
 import { authorKey } from './susy.mjs'
+import { listAgents } from './session.mjs'
 import { MIN, workerLines, piaTriggerLines, escalationLines } from './susy-activity.mjs'
 import { workerPeople } from './susy-workers.mjs'
 import { livePid } from './pidfile.mjs'
@@ -13,16 +13,12 @@ import { livePid } from './pidfile.mjs'
 export const LOAD_LIMIT = 14
 export const WORKERS = ['wren', 'wick', 'wynn', 'wade']
 
-/** The session list from `claude agents --json`: [{ name, pid, kind, startedAt }], or null when it cannot be read. */
-export function readSessions(run = spawnSync) {
-  try {
-    const out = run('claude', ['agents', '--json'], { encoding: 'utf8', timeout: 20000 })
-    if (out.status !== 0) return null
-    const list = JSON.parse(out.stdout)
-    return Array.isArray(list) ? list : null
-  } catch {
-    return null
-  }
+/**
+ * The session list from `claude agents --json`: [{ name, pid, kind, startedAt }], or null when it cannot be read. The one reader
+ * the crew has is listAgents in session.mjs (card mwnzgxz5uschuba1y7 asked for it to be reused, not copied).
+ */
+export function readSessions() {
+  return listAgents()
 }
 
 /** Whether a person's session is running, found by the key in its session name (the way `mailbox.mjs where` finds it). */
