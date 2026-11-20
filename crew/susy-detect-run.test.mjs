@@ -21,7 +21,6 @@ function fakeHome() {
     state: 'working',
     tempo: 'blocked',
     detail: 'API Error: Connection lost mid-response',
-    tokens: 9000,
     updatedAt: new Date(NOW - 12 * MIN).toISOString()
   }))
   return { home, jobs }

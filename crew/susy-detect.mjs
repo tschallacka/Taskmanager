@@ -34,7 +34,7 @@ const TITLE = {
   wake: 'wake failed three times'
 }
 
-/** A job's state (`~/.claude/jobs/<id>/state.json`: state, detail, tempo, tokens, updatedAt, linkScanPath), or null. */
+/** A job's state (`~/.claude/jobs/<id>/state.json`: state, detail, tempo, updatedAt, linkScanPath), or null. */
 export function readJob(jobsRoot, id) {
   if (!id) return null
   try {
@@ -157,11 +157,11 @@ export function detectProblems({ now, sessions = null, jobs = new Map(), cards =
         }))
         continue
       }
-      const idleNoTurn = job.tempo === 'idle' && (job.tokens ?? null) === 0
-      if ((STARTUP.test(detail) || idleNoTurn) && age !== null && age >= STARTUP_MINUTES) {
+      // The startup signal is the detail text only: a session on a startup dialog, or waiting for its first prompt.
+      if (STARTUP.test(detail) && age !== null && age >= STARTUP_MINUTES) {
         out.push(problem({
           key: `startup|${who}|${detail.slice(0, CUT)}`, kind: 'startup', who, since: job.updatedAt ?? null, age,
-          evidence: `${detail.slice(0, CUT) || 'idle with no turn taken'}`,
+          evidence: detail.slice(0, CUT),
           next: `type the first instruction into ${who}, or answer its dialog, or restart it`
         }))
         continue

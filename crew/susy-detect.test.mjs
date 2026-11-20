@@ -14,7 +14,7 @@ const NOW = Date.parse('2026-11-19T20:30:00.000Z')
 const ago = minutes => new Date(NOW - minutes * MIN).toISOString()
 const keyOf = name => ({ 'Wade Worker': 'wade', 'Nina Nitpick': 'nina', 'Usher Xander': 'usher' })[name] ?? null
 const session = (name, sessionId, id = sessionId) => ({ id, sessionId, name, kind: 'background', status: 'idle' })
-const job = (sessionId, fields) => [sessionId, { updatedAt: ago(1), tokens: 5000, tempo: 'active', detail: 'working', ...fields }]
+const job = (sessionId, fields) => [sessionId, { updatedAt: ago(1), tempo: 'active', detail: 'working', ...fields }]
 const card = (id, column, fields = {}) => ({ id, title: `card ${id}`, column, assignee: null, blocked: false, updatedAt: ago(1), updates: [], ...fields })
 const kinds = problems => problems.map(p => p.kind)
 
@@ -47,17 +47,17 @@ test('a session whose detail is an API error is blocked even when its tempo is n
   assert.deepEqual(kinds(problems), ['blocked'])
 })
 
-test('a session that never took its first turn, or sits on a startup dialog for 5 minutes or more', () => {
+test('a session on a startup dialog, or waiting for its first prompt, for 5 minutes or more', () => {
   const dialog = detectProblems({
     now: NOW,
     sessions: [session('taskmanager-maintenance-usher', 'u1')],
-    jobs: new Map([job('u1', { tempo: 'idle', detail: 'Stuck on the resume picker', tokens: 0, updatedAt: ago(7) })])
+    jobs: new Map([job('u1', { tempo: 'idle', detail: 'Stuck on the resume picker', updatedAt: ago(7) })])
   })
   assert.deepEqual(kinds(dialog), ['startup'])
   const prompt = detectProblems({
     now: NOW,
     sessions: [session('taskmanager-maintenance-usher', 'u1')],
-    jobs: new Map([job('u1', { tempo: 'idle', detail: 'idle: send a prompt to start', tokens: 0, updatedAt: ago(6) })])
+    jobs: new Map([job('u1', { tempo: 'idle', detail: 'idle: send a prompt to start', updatedAt: ago(6) })])
   })
   assert.deepEqual(kinds(prompt), ['startup'])
   assert.equal(STARTUP_MINUTES, 5)
@@ -67,7 +67,7 @@ test('a startup problem under 5 minutes is not yet a problem', () => {
   const problems = detectProblems({
     now: NOW,
     sessions: [session('taskmanager-maintenance-usher', 'u1')],
-    jobs: new Map([job('u1', { tempo: 'idle', detail: 'idle: send a prompt to start', tokens: 0, updatedAt: ago(3) })])
+    jobs: new Map([job('u1', { tempo: 'idle', detail: 'idle: send a prompt to start', updatedAt: ago(3) })])
   })
   assert.deepEqual(kinds(problems), [])
 })
