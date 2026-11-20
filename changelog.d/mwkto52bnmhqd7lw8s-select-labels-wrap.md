@@ -1,0 +1,1 @@
+- **Option labels in the custom select wrap instead of being cut off.** In the open list of a select (the task panel's Stage, at phone width), a label that does not fit is shown in full on two lines, not as "To…" (`app/components/AppSelect.vue`, `tests/app-select.test.ts`).

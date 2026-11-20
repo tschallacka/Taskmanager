@@ -17,6 +17,13 @@ test('AppSelect renders through USelect with the options, placeholder and disabl
   assert.doesNotMatch(select, /<select[\s>]/, 'no native select: its open list does not follow the theme')
 })
 
+test('AppSelect lets an option label wrap in the open list: the label itself is not truncated', () => {
+  // Nuxt UI gives the item label `truncate` (no wrap, cut with an ellipsis). An item-level class does not reach the label,
+  // so the label has to be overridden here.
+  const select = read('app/components/AppSelect.vue')
+  assert.match(select, /itemLabel: 'whitespace-normal break-words'/)
+})
+
 test('AppSelect is 44 px tall at phone width (a touch target), and keeps its normal height from small screens up', () => {
   const select = read('app/components/AppSelect.vue')
   assert.match(select, /min-h-11/, 'a 44 px minimum height (Tailwind min-h-11) at phone width')
