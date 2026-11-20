@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { loginMode } from '~/utils/loginMode'
 import { lockedEmailFromQuery } from '~/utils/lockedEmail'
+import { privacyConsentToShow } from '#shared/utils/legalLinks'
 
 definePageMeta({ middleware: [] }) // skip auth middleware on this page
 
@@ -47,6 +48,9 @@ const useBackupCode = ref(false)
 const trustDevice = ref(false)
 const error = ref('')
 const isPending = ref(false)
+// The sign-up consent links the Privacy Policy only while it is published (a draft's page is 404).
+const { published: legalPublished } = useLegalPublished()
+const privacyPublished = computed(() => privacyConsentToShow(legalPublished.value))
 
 // A full page load, not a client-side one: the projects store and user
 // settings are seeded by plugins that only run once, and they need the fresh
@@ -236,6 +240,15 @@ onMounted(async () => {
         >
           {{ mode === 'sign-in' ? 'Sign in' : 'Create account' }}
         </UButton>
+        <p
+          v-if="mode === 'sign-up' && privacyPublished"
+          class="text-center text-xs text-zinc-400"
+        >
+          By continuing you accept the <NuxtLink
+            to="/privacy"
+            class="text-primary underline"
+          >Privacy Policy</NuxtLink>.
+        </p>
       </form>
 
       <!-- Email code -->
@@ -481,6 +494,7 @@ onMounted(async () => {
           </div>
         </template>
       </template>
+      <LegalLinks />
     </div>
   </div>
 </template>
