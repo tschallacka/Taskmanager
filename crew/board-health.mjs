@@ -5,7 +5,7 @@
 // The board is the base in creds.json; the probe is GET <base>/api/health and needs a JSON answer with status 200.
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { pathToFileURL } from 'node:url'
 
 export async function boardHealth(base, fetchImpl = fetch) {
   try {
@@ -18,7 +18,7 @@ export async function boardHealth(base, fetchImpl = fetch) {
   }
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const home = process.argv[2] ?? ''
   let base = ''
   try {
