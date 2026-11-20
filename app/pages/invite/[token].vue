@@ -27,20 +27,20 @@ const { data: invitation, error: loadError, pending } = useFetch<InvitationPrevi
   { server: false }
 )
 
-// The words for a team or a board invitation. The page does not learn the address (see above), so the
-// footnote with the email is not shown here, and the invitee's name is not known yet.
+// The words for a team or a board invitation. The page does not learn the invitee's name, so the headline is
+// 'Welcome' and the footnote carries the invitation's address.
 const words = computed(() => {
   const invite = invitation.value
   if (!invite || invite.kind === 'customer') return null
   if (invite.kind === 'team') {
-    return inviteSentence({ kind: 'team', org: invite.organizationName, name: null, email: '' })
+    return inviteSentence({ kind: 'team', org: invite.organizationName, name: null, email: invite.email ?? '' })
   }
   return inviteSentence({
     kind: 'project',
     org: invite.organizationName ?? invite.inviterName ?? 'Someone',
     project: invite.projectName,
     name: null,
-    email: ''
+    email: invite.email ?? ''
   })
 })
 
@@ -247,12 +247,6 @@ watch([session, invitation], () => {
           >
             Use the email address this invitation was sent to. Anyone else cannot use it.
           </p>
-          <p
-            v-if="invitation.email"
-            class="text-sm text-muted text-center"
-          >
-            This invitation is for <span class="text-default">{{ invitation.email }}</span>.
-          </p>
           <UButton
             block
             size="lg"
@@ -261,6 +255,12 @@ watch([session, invitation], () => {
           >
             {{ words ? words.button : 'Create an account' }}
           </UButton>
+          <p
+            v-if="words?.footnote"
+            class="text-xs text-muted text-center"
+          >
+            {{ words.footnote }}
+          </p>
           <p class="text-sm text-muted text-center">
             Already have an account?
             <NuxtLink
