@@ -112,7 +112,8 @@ test('a 401 through the listener call is null and one stderr line, not an except
   const result = await listenerCall({ url: 'https://board.example/api/mcp', init: { method: 'POST' } }, {
     fetchImpl: async () => json({ error: 'unauthorized' }, 401),
     sleep: async () => {},
-    log: line => logs.push(line)
+    log: line => logs.push(line),
+    state: {}
   })
   assert.equal(result, null)
   assert.equal(logs.length, 1)
@@ -175,4 +176,21 @@ test('the listener calls the board through listenerCall, not the bare helper', (
   const listen = readFileSync(join(import.meta.dirname, 'listen.mjs'), 'utf8')
   assert.match(listen, /listenerCall\(/)
   assert.doesNotMatch(listen, /boardRequest\(/)
+})
+
+// S2 (review card, Nina): a revoked key answers 4xx on every listener call (about every 5 s). The changelog says the
+// refusal is logged once, so the listener's state holds a flag and a second refusal writes nothing.
+test('two 4xx calls from one listener log one line, not one each', async () => {
+  const logs = []
+  const state = {}
+  const deps = {
+    fetchImpl: async () => json({ error: 'unauthorized' }, 401),
+    sleep: async () => {},
+    log: line => logs.push(line),
+    state
+  }
+  const req = { url: 'https://board.example/api/mcp', init: { method: 'POST' } }
+  assert.equal(await listenerCall(req, deps), null)
+  assert.equal(await listenerCall(req, deps), null)
+  assert.equal(logs.length, 1)
 })
