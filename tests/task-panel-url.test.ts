@@ -60,3 +60,23 @@ test('a query with no task is not rewritten, and a comment alone is not a panel 
   assert.equal(taskQueryAsPanelAddress('p1', { comment: 'c9' }), null)
   assert.equal(taskQueryAsPanelAddress('p1', {}), null)
 })
+
+// Criterion 2 of card mwcnnnpiw2qza030f1k (Pat): opening another task pushes its own entry, so Back returns to the
+// task before it. Only closing replaces the entry.
+test('opening a task pushes an entry; only closing the panel replaces it', () => {
+  const page = readFileSync(new URL('../app/pages/projects/[id].vue', import.meta.url), 'utf8')
+  const open = page.slice(page.indexOf('function openDrawerTask('), page.indexOf('function closeDrawer('))
+  const close = page.slice(page.indexOf('function closeDrawer('), page.indexOf('// The old deep link'))
+  assert.match(open, /navigateTo\(\{ path: taskPanelPath\(/)
+  assert.equal(/replace/.test(open), false, 'opening never replaces the entry')
+  assert.match(close, /\{ replace: true \}/)
+})
+
+// Criteria 5 and 7: a task URL whose task is not on the board (or cannot be read here) shows the notice and no panel.
+// Source level; the browser check is on the card.
+test('an unknown or unreadable task id shows the notice and the plain board', () => {
+  const page = readFileSync(new URL('../app/pages/projects/[id].vue', import.meta.url), 'utf8')
+  assert.match(page, /const unknownTask = computed\(\(\) => Boolean\(drawerTaskId\.value && board\.value && !drawerTask\.value\)\)/)
+  assert.match(page, /v-if="unknownTask"\n\s+role="status"/)
+  assert.match(page, /That task is not on this board, or you cannot open it here\. The board is shown without it\./)
+})
