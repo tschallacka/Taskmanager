@@ -7,7 +7,7 @@ import { autoClaimDue, claimableCount, pendingInvitationEntry } from '~/utils/pe
 definePageMeta({ layout: 'app' })
 
 const { ready, projects, createProject } = useProjects()
-const { teams, activeTeamId, setActiveTeam, refreshTeamList, isPending: teamsPending } = useTeams()
+const { teams, activeTeamId, setActiveTeam, refreshTeamList, isPending: teamsPending, teamsLoaded } = useTeams()
 const route = useRoute()
 
 // A customer contact or guest with no team and no board goes to the shared list, not to the first-project form.
@@ -97,6 +97,7 @@ watch([ready, wantsNew], ([isReady]) => {
 const showEmptyState = computed(() => mayShowFirstProjectForm({
   ready: ready.value,
   teamsPending: teamsPending.value,
+  teamsLoaded: teamsLoaded.value,
   sharedLoaded: sharedDecided(sharedStatus.value),
   redirecting: redirectPending(contactOnlyEntry.value, false) || redirectPending(inviteEntry.value, false) || redirectPending(pendingEntry.value, false) || redirectPending(teamEntry.value, teamSelectFailed.value)
 }) && (projects.value.length === 0 || wantsNew.value))
