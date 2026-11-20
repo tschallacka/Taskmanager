@@ -888,6 +888,7 @@ class Pool {
     this.notes = new Map()
     this.browser = null
     this.lastUsed = Date.now()
+    this.commands = 0 // commands in flight; the reaper leaves the browser alone while any runs
     this.stopping = false
     this.startLock = new Mutex()
     this.stopped = new Promise((resolve) => {
@@ -1150,6 +1151,8 @@ class Pool {
     this.lastUsed = Date.now()
     const note = this.notes.get(who) ?? null
     this.notes.delete(who)
+    // A command in flight is not idle: starting Chromium can take longer than an idle window on a loaded machine.
+    this.commands++
     try {
       const person = await this.person(who)
       person.used = Date.now()
@@ -1160,6 +1163,9 @@ class Pool {
       if (note) this.notes.set(who, note) // the command failed before the note was seen
       log(`${cmd} ${who} failed: ${e.name}`)
       throw e
+    } finally {
+      this.commands--
+      this.lastUsed = Date.now()
     }
   }
 
@@ -1173,7 +1179,7 @@ class Pool {
   }
 
   reap() {
-    if (this.stopping) return
+    if (this.stopping || this.commands > 0) return
     const now = Date.now()
     for (const person of [...this.people.values()]) {
       if (now - person.used > this.cfg.idleMs) {
