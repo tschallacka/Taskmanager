@@ -2,12 +2,12 @@ import MiniSearch from 'minisearch'
 import { initProjectsStore } from '~/composables/useProjects'
 import { loadInitialProjects } from '~/utils/projectsInitialLoad'
 import type { Project } from '~/composables/useProjects'
-import { authClient } from '~/composables/useAuth'
+import { readSession } from '~/composables/useAuth'
 
 type BoardSearchDoc = { id: string, type: 'project' | 'task', name: string, title: string, descriptionText: string }
 
 export default defineNuxtPlugin(async () => {
-  const { data: session } = await authClient.getSession()
+  const { data: session } = await readSession()
   if (!session) return
 
   // A tab coming back to the front reads the open board again, so a blocker finished in another tab shows
