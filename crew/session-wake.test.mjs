@@ -5,7 +5,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -192,6 +192,28 @@ test('claude attach gets the SHORT id (first 8 characters, as claude agents list
   const start = calls(mcp).find(c => c.name === 'start')
   assert.match(start.args.command.join(' '), /claude attach 8e4b4f1a(\s|$)/)
   assert.ok(!start.args.command.join(' ').includes(full), 'the full id never reaches claude attach')
+})
+
+test('prompt-line.mjs --strip takes the view prefix off each row and nothing else', () => {
+  const r = spawnSync('node', [join(HERE, 'prompt-line.mjs'), '--strip'], { encoding: 'utf8', input: REAL_IDLE, timeout: 60000 })
+  assert.equal(r.status, 0, r.stderr)
+  assert.equal(r.stdout, [
+    '❯ wake test, ignore',
+    '',
+    `${'─'.repeat(60)} taskmanager-maintenance-nina ─`,
+    '❯',
+    '─'.repeat(60),
+    '  ⏵⏵ auto mode on (shift+tab to cycle) · ← for agents'
+  ].join('\n'))
+})
+
+test('the row prefix is stripped by prompt-line.mjs only: no other file in the kit carries a copy of the pattern', () => {
+  const needle = '\\d{3} \\['
+  const holders = readdirSync(HERE)
+    .filter(name => /\.(mjs|sh)$/.test(name) && !name.includes('.test.'))
+    .filter(name => readFileSync(join(HERE, name), 'utf8').includes(needle))
+  assert.deepEqual(holders, ['prompt-line.mjs'])
+  assert.match(readFileSync(SCRIPT, 'utf8'), /prompt-line\.mjs" --strip/, 'the view goes through the one strip')
 })
 
 // prompt-line.mjs run from a path with a space: its main block must still run, or every screen reads as ready (fail-open).

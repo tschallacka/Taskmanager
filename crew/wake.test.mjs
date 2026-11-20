@@ -58,6 +58,13 @@ test('the logged wake text is cut to 80 characters, on one line, never more', ()
   assert.equal(logCut(null), '')
 })
 
+test('logCut takes the cut as its second argument, so the mail uses the same function with MAIL_CUT', () => {
+  const long = 'x'.repeat(400)
+  assert.equal(logCut(long, MAIL_CUT).length, MAIL_CUT)
+  assert.equal(logCut(long).length, LOG_CUT, 'the default is still LOG_CUT')
+  assert.equal(logCut('a\n\nb', MAIL_CUT), 'a b')
+})
+
 test('only an idle session counts as ready; a missing entry is gone', () => {
   assert.equal(sessionReady(entry('idle', 'idle')), 'idle')
   assert.equal(sessionReady(entry('blocked', 'idle')), 'idle')
@@ -99,14 +106,14 @@ test('three failures in a row mail Boss once; a success resets the streak', () =
   assert.equal(FAILURES_TO_MAIL_BOSS, 3)
 })
 
-test('the Boss mail names the person, the card and the last error, cut to 300 (not 80: a hold reason was cut mid-sentence)', () => {
+test('the Boss mail names the person, the card and the last error, cut to MAIL_CUT', () => {
   const text = bossMailText({ key: 'wren', cardId: 'mw8b8is1txcwmtwp7c', lastError: 'x'.repeat(200) })
   assert.match(text, /for wren on card mw8b8is1txcwmtwp7c/)
   assert.ok(text.includes('x'.repeat(200)), 'the whole 200-character reason is in the mail')
   assert.ok(!text.includes('x'.repeat(MAIL_CUT + 1)))
 })
 
-test('a hold reason is mailed whole: "SCREEN-UNREADABLE ... the screen could not be read in 30 s, last answer: ..." is not cut at 80', () => {
+test('a hold reason up to MAIL_CUT characters is mailed in full', () => {
   const reason = 'SCREEN-UNREADABLE session 8e4b4f1a-3a4b-4baf-873b-2f373c0bb180: the screen could not be read in 30 s, last answer: row 60 is outside the 50-row screen; nothing typed'
   const text = bossMailText({ key: 'usher', cardId: 'mwnxqqj45nne9ye7l3k', lastError: reason })
   assert.ok(text.includes('row 60 is outside the 50-row screen; nothing typed'), text)
