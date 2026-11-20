@@ -51,7 +51,7 @@ ok "$out" || { echo "could not start the attach for session $ID" >&2; leave; exi
 # answer with a screen, so the reason can be shown to Boss as it is.
 look() {
   out=$(tool view "{\"session\":\"$S\",\"row_ranges\":[\"1-$ROWS\"]}")
-  printf '%s' "$out" | node -e 'let t="";process.stdin.on("data",d=>t+=d).on("end",()=>{let r;try{r=JSON.parse(t)}catch{console.log("TERMINAL-ERROR: the terminal did not answer");return}const res=r.result||{};const msg=(res.content&&res.content[0]&&res.content[0].text)||(r.error&&r.error.message)||"";if(res.isError||r.error){console.log("TERMINAL-ERROR: "+String(msg).split("\n")[0].slice(0,160));return}try{const inner=JSON.parse(msg);for(const x of inner.responses) if(x.text) console.log(x.text.replace(/^\d{3} \[\d{3}-\d{3}\] ?/gm,""))}catch{console.log("TERMINAL-ERROR: the view answer could not be read")}})' 2>/dev/null
+  printf '%s' "$out" | node -e 'let t="";process.stdin.on("data",d=>t+=d).on("end",()=>{let r;try{r=JSON.parse(t)}catch{console.log("TERMINAL-ERROR: the terminal did not answer");return}const res=r.result||{};const msg=(res.content&&res.content[0]&&res.content[0].text)||(r.error&&r.error.message)||"";if(res.isError||r.error){console.log("TERMINAL-ERROR: "+String(msg).split("\n")[0].slice(0,160));return}try{const inner=JSON.parse(msg);for(const x of inner.responses) if(x.text) console.log(x.text)}catch{console.log("TERMINAL-ERROR: the view answer could not be read")}})' 2>/dev/null | node "$(dirname "$0")/prompt-line.mjs" --strip
 }
 # Fail closed. Poll until the claude prompt shows (a late terminal is waited for). If the prompt never shows, the screen
 # cannot be read: the reason goes to stderr, the last line of which the caller mails to Boss, and the script leaves with
