@@ -71,16 +71,49 @@ export function useAuth() {
   }
 }
 
-// The session read for the app start: one server request per window (see utils/sessionCache.ts, Speed step E).
-const sessionCache = createSessionCache(() => authClient.getSession())
+// The session read for the app start (Speed, step E). It comes from the auth client's own store, which is the one place that
+// asks the server for the session: a reload sends one get-session, and every reader shares its answer (utils/sessionCache.ts).
+// After forgetSession() the store is asked again, and a read waits for its new answer, not the one the login page saw. If the
+// new answer does not come in time, the read takes what the store has, so it never hangs.
+const STALE_WAIT_MS = 3000
+let staleAfter: unknown = null
+
+function readStoreSession() {
+  return new Promise<Awaited<ReturnType<typeof authClient.getSession>>>((resolve) => {
+    const state = authClient.useSession()
+    const finish = (value: typeof state.value) => {
+      staleAfter = null
+      resolve({ data: value.data, error: value.error } as Awaited<ReturnType<typeof authClient.getSession>>)
+    }
+    const current = state.value
+    if (!current.isPending && current !== staleAfter) {
+      finish(current)
+      return
+    }
+    const timer = setTimeout(() => {
+      stop()
+      finish(state.value)
+    }, STALE_WAIT_MS)
+    const stop = watch(() => state.value, (value) => {
+      if (value.isPending || value === staleAfter) return
+      clearTimeout(timer)
+      stop()
+      finish(value)
+    })
+  })
+}
+
+const sessionCache = createSessionCache(readStoreSession)
 
 export function readSession() {
   return sessionCache.get()
 }
 
-// Drops the cached session, so the next read asks the server (the login page calls it).
+// Drops the cached session, and asks the store for a new answer (the login page calls it).
 export function forgetSession() {
   sessionCache.forget()
+  staleAfter = authClient.useSession().value
+  authClient.$store.notify('$sessionSignal')
 }
 
 export { authClient }
