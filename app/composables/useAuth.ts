@@ -1,5 +1,6 @@
 import { createAuthClient } from 'better-auth/vue'
 import { createSessionCache } from '~/utils/sessionCache'
+import { readSessionFromStore, type SessionAnswer, type SessionValue } from '~/utils/sessionRead'
 import { emailOTPClient, genericOAuthClient, inferAdditionalFields, organizationClient, twoFactorClient } from 'better-auth/client/plugins'
 import { passkeyClient } from '@better-auth/passkey/client'
 
@@ -78,28 +79,24 @@ export function useAuth() {
 const STALE_WAIT_MS = 3000
 let staleAfter: unknown = null
 
+type Session = NonNullable<Awaited<ReturnType<typeof authClient.getSession>>['data']>
+
+// The store's answer once it is no longer pending. If it stays pending past STALE_WAIT_MS, the server answers instead
+// (readSessionFromStore in utils/sessionRead.ts): a pending value is never returned.
 function readStoreSession() {
-  return new Promise<Awaited<ReturnType<typeof authClient.getSession>>>((resolve) => {
-    const state = authClient.useSession()
-    const finish = (value: typeof state.value) => {
-      staleAfter = null
-      resolve({ data: value.data, error: value.error } as Awaited<ReturnType<typeof authClient.getSession>>)
-    }
-    const current = state.value
-    if (!current.isPending && current !== staleAfter) {
-      finish(current)
-      return
-    }
-    const timer = setTimeout(() => {
-      stop()
-      finish(state.value)
-    }, STALE_WAIT_MS)
-    const stop = watch(() => state.value, (value) => {
-      if (value.isPending || value === staleAfter) return
-      clearTimeout(timer)
-      stop()
-      finish(value)
-    })
+  const state = authClient.useSession()
+  const store = {
+    value: () => state.value as unknown as SessionValue<Session>,
+    onChange: (fn: () => void) => watch(() => state.value, () => fn())
+  }
+  return readSessionFromStore(
+    store,
+    () => authClient.getSession() as Promise<SessionAnswer<Session>>,
+    staleAfter,
+    STALE_WAIT_MS
+  ).then((answer) => {
+    staleAfter = null
+    return answer as unknown as Awaited<ReturnType<typeof authClient.getSession>>
   })
 }
 

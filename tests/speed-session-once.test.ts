@@ -98,7 +98,10 @@ test('the session is read from the auth client\'s own store: one request, shared
   assert.match(auth, /createSessionCache\(readStoreSession\)/, 'the cache wraps the store read')
   const store = auth.slice(auth.indexOf('function readStoreSession()'), auth.indexOf('function readStoreSession()') + 700)
   assert.match(store, /authClient\.useSession\(\)/, 'the store read subscribes to the store, which makes its one request')
-  assert.doesNotMatch(auth, /authClient\.getSession\(\)/, 'no second request is sent from useAuth')
+  const asks = auth.match(/authClient\.getSession\(\)/g) ?? []
+  assert.equal(asks.length, 1, 'the server is asked once, and only as the fallback when the store stays pending')
+  const fallback = auth.indexOf('() => authClient.getSession()')
+  assert.ok(fallback > auth.indexOf('function readStoreSession()') && fallback < auth.indexOf('const sessionCache'), 'the one ask is inside readStoreSession')
   assert.match(auth, /export function readSession\(\)/)
   assert.match(auth, /export function forgetSession\(\)/)
   const forget = auth.slice(auth.indexOf('export function forgetSession()'), auth.indexOf('export function forgetSession()') + 400)
