@@ -86,16 +86,24 @@ export async function boardRequest(req, deps = {}) {
   }
 }
 
+// One listener process, one flag: a refused key is written once, not on every call (about every 5 s).
+const defaultListenerState = {}
+
 /**
  * The listener's board call. An outage is waited out (boardRequest). A 4xx is a key or a request the board refuses: the
  * listener logs it once and gets null, as it did before the retry helper, so a bad key does not end the listener.
+ * `deps.state` holds the once-flag; tests pass their own.
  */
 export async function listenerCall(req, deps = {}) {
   const log = deps.log ?? (line => process.stderr.write(`${line}\n`))
+  const state = deps.state ?? defaultListenerState
   try {
     return await boardRequest(req, deps)
   } catch (error) {
-    log(`board call refused, the listener goes on: ${error?.message ?? error}`)
+    if (!state.refusedLogged) {
+      log(`board call refused, the listener goes on: ${error?.message ?? error}`)
+      state.refusedLogged = true
+    }
     return null
   }
 }
