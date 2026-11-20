@@ -93,9 +93,15 @@ test('the session cache is forgotten on the login page, so a sign-in in the app 
   assert.match(middleware.slice(login, login + 120), /forgetSession\(\)/, 'the login page forgets the cached session first')
 })
 
-test('useAuth wires the cache to one client read', () => {
+test('the session is read from the auth client\'s own store: one request, shared by every reader', () => {
   const auth = read('app/composables/useAuth.ts')
-  assert.match(auth, /createSessionCache\(\(\) => authClient\.getSession\(\)\)/)
+  assert.match(auth, /createSessionCache\(readStoreSession\)/, 'the cache wraps the store read')
+  const store = auth.slice(auth.indexOf('function readStoreSession()'), auth.indexOf('function readStoreSession()') + 700)
+  assert.match(store, /authClient\.useSession\(\)/, 'the store read subscribes to the store, which makes its one request')
+  assert.doesNotMatch(auth, /authClient\.getSession\(\)/, 'no second request is sent from useAuth')
   assert.match(auth, /export function readSession\(\)/)
   assert.match(auth, /export function forgetSession\(\)/)
+  const forget = auth.slice(auth.indexOf('export function forgetSession()'), auth.indexOf('export function forgetSession()') + 400)
+  assert.match(forget, /\$sessionSignal/, 'forgetting asks the store for a fresh answer')
+  assert.match(store, /staleAfter/, 'a read after a sign-in waits for the store\'s new answer, not the stale one')
 })
