@@ -77,6 +77,7 @@ port-registry.mjs
 postbrief.mjs
 prepare-worktree-cli.mjs
 prepare-worktree.mjs
+prompt-line.mjs
 publish.mjs
 restart-brief.mjs
 role-file.mjs

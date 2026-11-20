@@ -1,7 +1,7 @@
 // The wake sender's light parts, with fakes (no real session, no real typing). Run: node --test crew/wake.test.mjs
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { logCut, sessionReady, waitForIdle, recordWake, wakeOnce, bossMailText, deliverBossMail, LOG_CUT, FAILURES_TO_MAIL_BOSS } from './wake.mjs'
+import { logCut, sessionReady, waitForIdle, recordWake, wakeOnce, bossMailText, deliverBossMail, LOG_CUT, MAIL_CUT, FAILURES_TO_MAIL_BOSS } from './wake.mjs'
 import { spawnSync } from 'node:child_process'
 import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { parseAgents, planWake, validSessionId } from './session.mjs'
@@ -10,10 +10,15 @@ import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
+// The script waits up to 30 s for the prompt; the tests with a screen that never shows one wait 2 s instead (every
+// spawned session-wake.sh inherits this). The real wait is covered in crew/session-wake.test.mjs.
+process.env.WAKE_PROMPT_WAIT ??= '2'
+process.env.WAKE_POLL_SECONDS ??= '1'
 
 // A fake interactive-shell MCP for session-wake.sh: every tool call answers with a result, except the tools named in
 // `failOn`, which answer with an error. Calls are appended to a log so a test can see the order.
 // `screen`, when given, is the text the `view` tool shows: the wake reads it before it types.
+// The default screen is claude's layout: the input line between two rules (crew/prompt-line.mjs looks for it).
 function fakeMcp(failOn = [], screen = null) {
   const dir = mkdtempSync(join(tmpdir(), 'wake-mcp-'))
   const log = join(dir, 'calls.log')
@@ -27,7 +32,7 @@ fs.appendFileSync(${JSON.stringify(log)}, (name || 'init') + '\\n')
 const fail = ${JSON.stringify(failOn)}.includes(name)
 const screen = ${JSON.stringify(screen)}
 let text = 'ok'
-if (name === 'view') text = JSON.stringify({ responses: [{ text: screen ?? '> ready' }] })
+if (name === 'view') text = JSON.stringify({ responses: [{ text: screen ?? '─────────────\\n❯ ready\\n─────────────\\n  ⏵⏵ auto mode on' }] })
 process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: 2, result: fail ? { isError: true, content: [{ type: 'text', text: 'refused' }] } : { content: [{ type: 'text', text }] } }) + '\\n')
 `)
   chmodSync(bin, 0o755)
@@ -51,6 +56,13 @@ test('the logged wake text is cut to 80 characters, on one line, never more', ()
   assert.equal(logCut(long).length, LOG_CUT)
   assert.equal(logCut('a\n\nb'), 'a b')
   assert.equal(logCut(null), '')
+})
+
+test('logCut takes the cut as its second argument, so the mail uses the same function with MAIL_CUT', () => {
+  const long = 'x'.repeat(400)
+  assert.equal(logCut(long, MAIL_CUT).length, MAIL_CUT)
+  assert.equal(logCut(long).length, LOG_CUT, 'the default is still LOG_CUT')
+  assert.equal(logCut('a\n\nb', MAIL_CUT), 'a b')
 })
 
 test('only an idle session counts as ready; a missing entry is gone', () => {
@@ -94,11 +106,17 @@ test('three failures in a row mail Boss once; a success resets the streak', () =
   assert.equal(FAILURES_TO_MAIL_BOSS, 3)
 })
 
-test('the Boss mail names the person, the card and the last error, cut to 80', () => {
+test('the Boss mail names the person, the card and the last error, cut to MAIL_CUT', () => {
   const text = bossMailText({ key: 'wren', cardId: 'mw8b8is1txcwmtwp7c', lastError: 'x'.repeat(200) })
   assert.match(text, /for wren on card mw8b8is1txcwmtwp7c/)
-  assert.ok(text.includes('x'.repeat(LOG_CUT)))
-  assert.ok(!text.includes('x'.repeat(LOG_CUT + 1)))
+  assert.ok(text.includes('x'.repeat(200)), 'the whole 200-character reason is in the mail')
+  assert.ok(!text.includes('x'.repeat(MAIL_CUT + 1)))
+})
+
+test('a hold reason up to MAIL_CUT characters is mailed in full', () => {
+  const reason = 'SCREEN-UNREADABLE session 8e4b4f1a-3a4b-4baf-873b-2f373c0bb180: the screen could not be read in 30 s, last answer: row 60 is outside the 50-row screen; nothing typed'
+  const text = bossMailText({ key: 'usher', cardId: 'mwnxqqj45nne9ye7l3k', lastError: reason })
+  assert.ok(text.includes('row 60 is outside the 50-row screen; nothing typed'), text)
 })
 
 test('an idle recorded session is typed into once, by its id', async () => {
@@ -109,7 +127,7 @@ test('an idle recorded session is typed into once, by its id', async () => {
     type: async call => typed.push(call), readList: () => [entry('idle', 'idle')], now: c.now, sleep: c.sleep, timeoutMs: 1000, pollMs: 100
   })
   assert.equal(out.ok, true)
-  assert.deepEqual(typed, [{ id: ID, text: 'The limit has reset. Read your card and carry on.' }])
+  assert.deepEqual(typed, [{ id: ID, text: 'The limit has reset. Read your card and carry on.', key: 'wren' }])
   assert.ok(out.reason.length <= LOG_CUT)
 })
 
