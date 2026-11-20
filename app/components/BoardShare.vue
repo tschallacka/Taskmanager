@@ -61,7 +61,9 @@ const myDomain = computed(() => (listing.value?.me.kind === 'guest-manager' ? li
 
 const base = computed(() => `/api/projects/${props.projectId}`)
 
-async function loadListing() {
+// full: the dialog's load (the filed customer and the staff list come too). Not full: the board opening for an admin, which needs
+// only the listing for the waiting count on the Share button.
+async function loadListing(full = true) {
   loadingList.value = true
   try {
     listing.value = await untypedFetch<Listing>(`${base.value}/guests`)
@@ -72,6 +74,7 @@ async function loadListing() {
   } finally {
     loadingList.value = false
   }
+  if (!full) return
   // The customer the project is filed under: the picker starts on it, so a filed customer shows selected, not the placeholder.
   const project = await untypedFetch<{ customerId?: string | null }>(base.value).catch(() => null)
   filedCustomerId.value = project?.customerId ?? ''
@@ -357,7 +360,7 @@ watch(open, (isOpen) => {
 const { activeProjectId, shareAdmin } = useProjects()
 const adminOnThisBoard = computed(() => activeProjectId.value === props.projectId && shareAdmin.value)
 watch(adminOnThisBoard, (isAdmin) => {
-  if (isAdmin) loadListing()
+  if (isAdmin) loadListing(false)
 }, { immediate: true })
 </script>
 
