@@ -69,7 +69,7 @@ test('live site: the API-error mail, queued, is not marked seen; the retry sends
   writeFileSync(join(folder, `${ID_}-20e1-4968-a501-19719be32608.jsonl`), `${JSON.stringify({ type: 'assistant', message: { role: 'assistant', content: blocked } })}\n`)
   const fx = await startLive(liveHome({ sessions: { wren: { id: ID_, name: 'wren', cardId: 'c9' } }, projects }))
   try {
-    await runOnce(fx.home, T0, { live: true })
+    await runOnce(fx.home, T0, { live: true, agentList: [] })
     assert.equal(fx.mails.length, 1)
     const id = fx.mails[0].id
     assert.match(logOfHome(fx.home), /queued for boss, not sent yet: api error/)
@@ -77,7 +77,7 @@ test('live site: the API-error mail, queued, is not marked seen; the retry sends
     assert.equal(stateOfHome(fx.home).sessionErrors.wren.seen.length, 0, 'a queued error is not marked seen')
     assert.equal(stateOfHome(fx.home).sessionErrors.wren.queued.id, id)
     fx.fake.mailUp = true
-    await runOnce(fx.home, T0 + MIN, { live: true })
+    await runOnce(fx.home, T0 + MIN, { live: true, agentList: [] })
     assert.equal(fx.mails[1].id, id, 'the retry is the same mail row')
     assert.match(logOfHome(fx.home), /mailed boss: api error/)
     assert.equal(stateOfHome(fx.home).sessionErrors.wren.seen.length, 1)
@@ -90,9 +90,9 @@ test('live site: a gate wake, queued, stays owed with its id; the retry sends th
   const card = column => ({ id: 'g1', title: 'Gate card', column, assignee: 'Wade Worker', labels: [], updatedAt: new Date(T0 - 60 * MIN).toISOString() })
   const fx = await startLive(liveHome({ cards: [card('In progress')], crew: { dispatch: { gateWakes: true } } }))
   try {
-    await runOnce(fx.home, T0, { live: true })
+    await runOnce(fx.home, T0, { live: true, agentList: [] })
     fx.cards.splice(0, 1, card('Verify CQ'))
-    await runOnce(fx.home, T0 + MIN, { live: true })
+    await runOnce(fx.home, T0 + MIN, { live: true, agentList: [] })
     assert.equal(fx.mails.length, 1)
     const id = fx.mails[0].id
     assert.match(logOfHome(fx.home), /queued for nina, not sent yet: gate wake for g1/)
@@ -100,7 +100,7 @@ test('live site: a gate wake, queued, stays owed with its id; the retry sends th
     assert.equal(stateOfHome(fx.home).owed.length, 1, 'a queued wake stays owed')
     assert.equal(stateOfHome(fx.home).owed[0].mailId, id)
     fx.fake.mailUp = true
-    await runOnce(fx.home, T0 + 2 * MIN, { live: true })
+    await runOnce(fx.home, T0 + 2 * MIN, { live: true, agentList: [] })
     assert.equal(fx.mails[1].id, id, 'the retry is the same mail row')
     assert.match(logOfHome(fx.home), /mailed nina: gate wake for g1/)
     assert.deepEqual(stateOfHome(fx.home).owed, [])
@@ -114,7 +114,7 @@ test('live site: an offer whose mail is queued is logged as queued, not as offer
   const busy = name => ({ id: `busy-${name}`, title: `busy ${name}`, column: 'In progress', assignee: `${name[0].toUpperCase()}${name.slice(1)} Worker`, labels: [], updatedAt: new Date(T0 - 60 * MIN).toISOString() })
   const fx = await startLive(liveHome({ cards: [todo, busy('wren'), busy('wick'), busy('wynn')], crew: { dispatch: { nextCard: true } } }))
   try {
-    await runOnce(fx.home, T0, { live: true })
+    await runOnce(fx.home, T0, { live: true, agentList: [] })
     const log = logOfHome(fx.home)
     assert.equal(fx.mails.length, 1, 'one offer mail for the one idle worker')
     assert.match(log, /marked q1 for wade; the mail is queued, not sent yet/)
@@ -127,7 +127,7 @@ test('live site: an offer whose mail is queued is logged as queued, not as offer
 test('live site: the app mail to Boss, queued, is logged as queued, not as sent', async () => {
   const fx = await startLive(liveHome({ board: 'down' }))
   try {
-    await runOnce(fx.home, T0, { live: true })
+    await runOnce(fx.home, T0, { live: true, agentList: [] })
     assert.equal(fx.mails.length, 1)
     assert.match(logOfHome(fx.home), /queued for boss through the app, not sent yet/)
     assert.doesNotMatch(logOfHome(fx.home), /mailed boss through the app/)
@@ -169,7 +169,7 @@ test('live run: a queued review mail is not marked sent; the next run sends the 
     const stateOf = () => JSON.parse(readFileSync(join(home, '.listen', 'susy-daemon.json'), 'utf8')).state
     const logOf = () => readFileSync(join(home, '.listen', 'susy-daemon-dryrun.log'), 'utf8')
 
-    await runOnce(home, T0, { live: true })
+    await runOnce(home, T0, { live: true, agentList: [] })
     assert.equal(posts.length, 1)
     const id = posts[0].id
     assert.match(id, /^[0-9a-f]{32}$/)
@@ -180,7 +180,7 @@ test('live run: a queued review mail is not marked sent; the next run sends the 
     assert.equal(stateOf().reviewQueued.id, id)
 
     mailUp = true
-    await runOnce(home, T0 + MIN, { live: true })
+    await runOnce(home, T0 + MIN, { live: true, agentList: [] })
     assert.equal(posts.length, 2)
     assert.equal(posts[1].id, id, 'the retry is the same mail row')
     assert.equal(posts[1].text, posts[0].text)
@@ -233,6 +233,18 @@ test('a board that does not answer: one line, one would-mail-Boss line for the s
   assert.equal(second.state.errorStreak, 2)
 })
 
+test('a dry run that would mail Boss says so: "would mail boss once ... (dry run)", never "mail boss once"', async () => {
+  const readCards = async () => {
+    throw new Error('get_board answered HTTP 503')
+  }
+  const dry = await tick({ now: T0, crew: CREW, readCards, state: {}, live: false })
+  assert.deepEqual(dry.lines, [
+    'susy-daemon: get_board answered HTTP 503',
+    'would mail boss once: susy-daemon has no board answer: get_board answered HTTP 503 (dry run)'
+  ])
+  assert.ok(dry.lines.every(line => !line.startsWith('mail boss once')), 'no line claims a mail was sent')
+})
+
 test('a good tick after errors says the board is back, and a new error mails Boss again', async () => {
   let fail = true
   const readCards = async () => {
@@ -267,7 +279,7 @@ test('the heartbeat and the dry-run log are written by a tick, and status reads 
   mkdirSync(join(home, '.listen'), { recursive: true })
   writeFileSync(join(home, 'crew.json'), JSON.stringify({ people: {}, susy: {} }))
   // No creds.json: the tick finds no account, logs it, and writes the heartbeat.
-  const result = await runOnce(home, T0)
+  const result = await runOnce(home, T0, { agentList: [] })
   assert.equal(result.ok, false)
   const heartbeat = JSON.parse(readFileSync(join(home, '.listen', 'susy-daemon.json'), 'utf8'))
   assert.equal(heartbeat.mode, 'dry-run')

@@ -13,11 +13,14 @@
 // shared with `crew susy`).
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
+import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { crewHome } from './home.mjs'
 import { DEFAULT_CLEANER, findPokes, keyOfName, makeCall, readBoardCards } from './susy.mjs'
-import { collectActivity, listenerRunning, newActivityLines, readLoad } from './susy-collector.mjs'
+import { collectActivity, listenerRunning, newActivityLines, readLoad, readSessions } from './susy-collector.mjs'
+import { detectProblems, dueMails, lastBashCommand, pruneMailed, readJob, readRecords } from './susy-detect.mjs'
+import { setStopped } from './susy-stop.mjs'
 import { projectsRoot, readWorkerRows, workerStates } from './susy-workers.mjs'
 import { markMailed, noteQueuedMail, sessionErrorReport } from './session-errors.mjs'
 import { noteQueuedGateMail, planGateRound, settleGateMail } from './susy-gate-wakes.mjs'
@@ -42,9 +45,9 @@ export function postBody(action) {
 /**
  * One tick over the board's cards. Returns the new state, the lines this tick adds (one per new action, and one when a
  * creds or board error starts or clears), and `fresh`: the actions new since the last tick, which live mode posts.
- * `readCards` is async and may throw; `now` is milliseconds.
+ * `readCards` is async and may throw; `now` is milliseconds. `live` false (a dry run) words the would-mail lines as dry runs.
  */
-export async function tick({ now, crew, readCards, state = {}, agents = {} }) {
+export async function tick({ now, crew, readCards, state = {}, agents = {}, live = true }) {
   const next = { ...state, pending: { ...(state.pending ?? {}) } }
   const lines = []
   let cards
@@ -58,7 +61,9 @@ export async function tick({ now, crew, readCards, state = {}, agents = {} }) {
     lines.push(`susy-daemon: ${reason}`)
     const mailBoss = !streak || next.mailedFor !== reason
     if (mailBoss) {
-      lines.push(`mail boss once: susy-daemon has no board answer: ${reason}`)
+      lines.push(live
+        ? `mail boss once: susy-daemon has no board answer: ${reason}`
+        : `would mail boss once: susy-daemon has no board answer: ${reason} (dry run)`)
       next.mailedFor = reason
     }
     return { state: next, lines, ok: false, error: reason, actions: 0, fresh: [], mailBoss: mailBoss ? reason : null }
@@ -128,7 +133,8 @@ export async function postFresh({ fresh, pending, call }) {
 }
 
 /** One tick from the files of CREW_HOME: reads the config, the key and the board, acts (live) and logs. */
-export async function runOnce(home, now = Date.now(), { live = false } = {}) {
+// `agentList` is the `claude agents --json` list; a test passes its own, so the machine's live sessions never reach it.
+export async function runOnce(home, now = Date.now(), { live = false, agentList } = {}) {
   const stored = readJson(heartbeatPath(home), {})
   const state = stored.state ?? {}
   const crew = readJson(`${home}/crew.json`, null) ?? readJson(`${home}/crew.config.json`, null)
@@ -141,7 +147,7 @@ export async function runOnce(home, now = Date.now(), { live = false } = {}) {
     if (!key) throw new Error('no account yet (no people.susy in creds.json)')
     return readBoardCards(call, creds.board?.id)
   }
-  const result = await tick({ now, crew, readCards, state, agents: susyState.agents })
+  const result = await tick({ now, crew, readCards, state, agents: susyState.agents, live })
   // The activity checks: evidence from the cards already read, the session list, the mail folders, the listener's sampled
   // heartbeat and the load. A condition is logged when it starts, not on every tick it holds (newActivityLines). Logged in
   // both modes; live mode does not act on them yet. A source that cannot be read is silent.
@@ -269,6 +275,49 @@ export async function runOnce(home, now = Date.now(), { live = false } = {}) {
         lines.push(`could not mail boss through the app: ${error.message}`)
       }
     }
+  }
+  // Susy's own detection (card mwnzgxz5uschuba1y7): six stalled-person problems, from the session list, the job states, the
+  // board and the session records. Dry-run logs each new problem once and mails nothing. Live mails Boss once per problem,
+  // and again only after 30 minutes; a problem that clears is dropped, so its return is mailed at once. A mail that throws
+  // is not marked, so it is tried again on the next tick.
+  const jobsRoot = process.env.CREW_JOBS || join(homedir(), '.claude', 'jobs')
+  const sessions = agentList === undefined ? readSessions() : agentList
+  const jobs = new Map()
+  for (const s of sessions ?? []) {
+    const id = s.id ?? s.sessionId
+    const job = id ? readJob(jobsRoot, id) : null
+    if (job) jobs.set(id, job)
+  }
+  const problems = detectProblems({
+    now,
+    sessions,
+    jobs,
+    cards: result.ok ? result.cards ?? [] : [],
+    records: readRecords(home),
+    keyOf: keyOfName(crew?.people),
+    commandOf: job => lastBashCommand(job.linkScanPath)
+  })
+  if (live) {
+    let mailed = pruneMailed(result.state.detectMailed, problems)
+    for (const p of dueMails({ problems, mailed, now })) {
+      if (!key || !creds.crew?.slug) {
+        lines.push(`cannot mail boss about ${p.kind} ${p.who}: no susy key or crew slug`)
+        break
+      }
+      try {
+        const { sendMail } = await import('./mail-client.mjs')
+        const sent = await sendMail({ base: creds.base, slug: creds.crew.slug, key, to: 'boss', text: p.text, mailboxDir: `${home}/mailbox`, makeId: () => crypto.randomUUID().replaceAll('-', '') })
+        mailed = { ...mailed, [p.key]: now }
+        lines.push(sent.sent ? `mailed boss: ${p.kind} ${p.who}` : `queued for boss, not sent yet: ${p.kind} ${p.who}`)
+      } catch (error) {
+        lines.push(`could not mail boss about ${p.kind} ${p.who}, tried again next tick: ${error.message}`)
+      }
+    }
+    result.state.detectMailed = mailed
+  } else {
+    const seen = new Set(result.state.detectSeen ?? [])
+    for (const p of problems) if (!seen.has(p.key)) lines.push(`would mail boss: ${p.text}`)
+    result.state.detectSeen = problems.map(p => p.key)
   }
   const at = new Date(now).toISOString()
   const logLines = lines.map(line => `${at} ${line}`)
@@ -424,6 +473,8 @@ async function main(argv) {
     const run = spawnSync(file, args, { encoding: 'utf8', timeout: 60000 })
     const text = `${run.stdout ?? ''}${run.stderr ?? ''}`.trim()
     console.log(text || `susy-daemon: ${command} done`)
+    // The stop marker says Susy is stopped on purpose, so the watch does not report her down (card mwnzgxz5uschuba1y7).
+    if (run.status === 0) setStopped(home, command === 'stop')
     return run.status ?? 1
   }
   if (command !== 'once' && command !== 'loop') {
