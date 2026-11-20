@@ -2,6 +2,22 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.59.0 - 2026-11-20
+
+- **A board opens with one board call and the picker.** The top bar's people and the "notify me" flag come with the board's answer, and the share dialog fetches its guest list when it opens, not for every board the page shows (`server/api/projects/[id]/board.get.ts`, `app/composables/useProjects.ts`, `app/pages/projects/[id].vue`, `app/components/BoardShare.vue`, `tests/speed-board-fold.test.ts`).
+
+- **Pinned boards load once.** The sidebar and the projects list ask for the pins together when a page opens; they now share one request instead of fetching the same list twice (`app/composables/usePins.ts`, `tests/pins-load-once.test.ts`).
+
+- **Slow requests can be traced.** Protected API answers carry a `Server-Timing` header with the time of the session lookup and the crew-account check, so a browser's network panel shows where a request's time went. No change in what the app shows. Files: `server/middleware/requireAuth.ts`, `server/utils/serverTiming.ts`, `tests/server-timing.test.ts`.
+
+- **The session is read once for the app start, not once per plugin.** The route middleware and the start plugins used to ask the server for the session one after another, so a reload sent it four times. A read now reuses the answer for 30 seconds, and the login page forgets it, so a sign-in is seen at once. The server still checks every protected request.
+
+- **The sidebar's open-task counts no longer load the whole task list.** A board visit fetches the slim counts (each task's board and column, no text) from the same endpoint and with the same access rules; the full list loads only where a screen reads its text. The counts stay in step as tasks are created, moved or removed.
+
+- **The task list loads on first use, not on every page load.** The app start fetches the projects only, so a reload no longer sends the whole task list (about 1.6 MB on the live site). The list is fetched when search, home, my tasks, the timesheet, the profile or the projects list first need it. A search opened in the first second after the app starts waits for the list, so it shows "loading" for the task results until the list arrives.
+
+- **Invite page: say what you are joining and who invited you, not the invited email.** A team or board invitation shows "Welcome", a sentence with the organisation's name, and a "Join …" button; the invited address is a small grey line under the button, and no longer a sentence of its own. Files: `app/pages/invite/[token].vue`, `app/utils/inviteSentence.ts`, `tests/invite-page-footnote.test.ts`.
+
 ## 0.58.2 - 2026-11-20
 
 - **Crew kit: a board outage is waited out, not a reason to stop.** The listener retries a board call with backoff (60 s, doubling, capped at 5 min) on an HTML answer, a 5xx, a rate limit (429) or a connection error, and reports the outage once. A board call that never answers counts as an outage after 30 s, and the status probe gives up after 5 s. A 4xx (a bad or revoked key) is logged once and the listener goes on, as before: the call answers null. The platform's status file, when it is published, adds a reason and a retry_after. Pia's Stop hook tells a board outage from a listener that is really down: during an outage it does not block the stop, and says the kit retries by itself. Files: `crew/board-retry.mjs`, `crew/board-retry.test.mjs`, `crew/listen.mjs`, `crew/board-health.mjs`, `crew/pia-listener-hook.sh`, `crew/pia-listener-hook.test.mjs`.

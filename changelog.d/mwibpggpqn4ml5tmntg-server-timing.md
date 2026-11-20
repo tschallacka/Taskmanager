@@ -1,1 +1,0 @@
-- **Slow requests can be traced.** Protected API answers carry a `Server-Timing` header with the time of the session lookup and the crew-account check, so a browser's network panel shows where a request's time went. No change in what the app shows. Files: `server/middleware/requireAuth.ts`, `server/utils/serverTiming.ts`, `tests/server-timing.test.ts`.

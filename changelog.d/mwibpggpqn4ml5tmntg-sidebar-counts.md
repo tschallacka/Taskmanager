@@ -1,1 +1,0 @@
-- **The sidebar's open-task counts no longer load the whole task list.** A board visit fetches the slim counts (each task's board and column, no text) from the same endpoint and with the same access rules; the full list loads only where a screen reads its text. The counts stay in step as tasks are created, moved or removed.

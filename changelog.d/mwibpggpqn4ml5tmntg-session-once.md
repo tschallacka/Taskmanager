@@ -1,1 +1,0 @@
-- **The session is read once for the app start, not once per plugin.** The route middleware and the start plugins used to ask the server for the session one after another, so a reload sent it four times. A read now reuses the answer for 30 seconds, and the login page forgets it, so a sign-in is seen at once. The server still checks every protected request.
