@@ -4,8 +4,9 @@
 //   node --import tsx --test tests/projects-entry.test.ts
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 
-import { entryFor, firstRedirect, mayShowFirstProjectForm, redirectPending, sharedDecided } from '../app/utils/projectsEntry'
+import { entryFor, firstRedirect, mayShowFirstProjectForm, redirectPending, sharedDecided, teamsLoaded } from '../app/utils/projectsEntry'
 
 test('one redirect at a time: a pending invitation wins over the shared list', () => {
   assert.equal(firstRedirect('/shared-with-me', '/invite/abc'), '/invite/abc')
@@ -29,17 +30,33 @@ test('the shared list counts as decided once its fetch has finished, even when i
 
 test('the first-project form does not paint until the page has decided to stay', () => {
   // Not decided yet: the teams or the shared list are still loading.
-  assert.equal(mayShowFirstProjectForm({ ready: true, teamsPending: true, sharedLoaded: true, redirecting: false }), false)
-  assert.equal(mayShowFirstProjectForm({ ready: true, teamsPending: false, sharedLoaded: false, redirecting: false }), false)
-  assert.equal(mayShowFirstProjectForm({ ready: false, teamsPending: false, sharedLoaded: true, redirecting: false }), false)
+  assert.equal(mayShowFirstProjectForm({ ready: true, teamsPending: true, teamsLoaded: true, sharedLoaded: true, redirecting: false }), false)
+  assert.equal(mayShowFirstProjectForm({ ready: true, teamsPending: false, teamsLoaded: true, sharedLoaded: false, redirecting: false }), false)
+  assert.equal(mayShowFirstProjectForm({ ready: false, teamsPending: false, teamsLoaded: true, sharedLoaded: true, redirecting: false }), false)
+})
+
+test('the first-project form waits for the team list itself, not only for its fetch to finish', () => {
+  // Before the team fetch starts, nothing is pending and the list is still empty: that is not a decision to stay.
+  assert.equal(mayShowFirstProjectForm({ ready: true, teamsPending: false, teamsLoaded: false, sharedLoaded: true, redirecting: false }), false)
 })
 
 test('the first-project form does not paint while a redirect is on its way', () => {
-  assert.equal(mayShowFirstProjectForm({ ready: true, teamsPending: false, sharedLoaded: true, redirecting: true }), false)
+  assert.equal(mayShowFirstProjectForm({ ready: true, teamsPending: false, teamsLoaded: true, sharedLoaded: true, redirecting: true }), false)
 })
 
 test('once decided and not redirecting, the form may show', () => {
-  assert.equal(mayShowFirstProjectForm({ ready: true, teamsPending: false, sharedLoaded: true, redirecting: false }), true)
+  assert.equal(mayShowFirstProjectForm({ ready: true, teamsPending: false, teamsLoaded: true, sharedLoaded: true, redirecting: false }), true)
+})
+
+test('the teams count as loaded once their list has data or has failed to load', () => {
+  assert.equal(teamsLoaded({ data: null, error: null }), false, 'not fetched yet')
+  assert.equal(teamsLoaded({ data: [], error: null }), true, 'a person with no team is decided too')
+  assert.equal(teamsLoaded({ data: null, error: { message: 'x' } }), true, 'a failed fetch does not keep the page waiting')
+})
+
+test('the projects page passes the team list state to the form gate', () => {
+  const source = readFileSync(new URL('../app/pages/projects/index.vue', import.meta.url), 'utf8')
+  assert.match(source, /teamsLoaded: teamsLoaded\.value/)
 })
 
 test('a customer contact with no team and no board is sent to the shared list, even with nothing shared yet', () => {

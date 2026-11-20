@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.60.1 - 2026-11-20
+
+- **The Projects page waits for the team list before it shows "Your first project".** A member who has a shared board no longer sees the create form for a moment after sign-in, before their team opens (`app/utils/projectsEntry.ts`, `app/composables/useTeams.ts`, `app/pages/projects/index.vue`).
+
 ## 0.60.0 - 2026-11-20
 
 - **Privacy policy and legal notice pages, with their archive.** The pages /privacy and /imprint show the current legal document, public, with its version and dates at the top. A draft, or a document with an open placeholder, is not published: the page and the API answer 404 and the server logs why. The archive pages /privacy/archive and /imprint/archive list every version that was in force, newest first, with the dates from each document's front matter, and each archived version reads as it was. Files: `legal/` (bundled), `shared/utils/legalDocs.ts`, `shared/utils/legalArchive.ts`, `server/utils/legalPages.ts`, `server/api/legal/`, `app/components/LegalDocumentPage.vue`, `app/components/LegalArchivePage.vue`, `app/pages/privacy/`, `app/pages/imprint/`, `nuxt.config.ts`, `tests/legal-publish.test.ts`, `tests/legal-pages.test.ts`, `tests/legal-archive.test.ts`. The Privacy and Imprint links are at the foot of the sign-in, invitation and settings pages, and the sign-up form says "By continuing you accept the Privacy Policy" with the link. A link shows only while its document is published, so while the documents are drafts no visitor is sent to a 404. Files: `app/components/LegalLinks.vue`, `app/composables/useLegalPublished.ts`, `shared/utils/legalLinks.ts`, `app/pages/login.vue`, `app/pages/invite/[token].vue`, `app/pages/settings/index.vue`, `tests/legal-links.test.ts`, `tests/legal-links-published.test.ts`.

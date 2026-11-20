@@ -21,13 +21,22 @@ export function firstRedirect(contactTarget: string | null, inviteTarget: string
 export interface FormGateInput {
   ready: boolean
   teamsPending: boolean
+  teamsLoaded: boolean
   sharedLoaded: boolean
   redirecting: boolean
 }
 
+/**
+ * The team list counts as loaded once it has data or has failed. Before its fetch starts, nothing is pending and the list is
+ * empty: that is not yet a decision, so the form must not paint then.
+ */
+export function teamsLoaded(list: { data: unknown, error: unknown }): boolean {
+  return list.data != null || list.error != null
+}
+
 /** The first-project form paints only once the page has decided to stay: everything loaded, and no redirect pending. */
 export function mayShowFirstProjectForm(input: FormGateInput): boolean {
-  return input.ready && !input.teamsPending && input.sharedLoaded && !input.redirecting
+  return input.ready && !input.teamsPending && input.teamsLoaded && input.sharedLoaded && !input.redirecting
 }
 
 /** A redirect is pending while it has a target and its move has not failed (a failed team selection stays put). */
