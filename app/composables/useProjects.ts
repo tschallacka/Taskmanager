@@ -8,6 +8,7 @@ import { clearCustomFields, ingestBoardFields } from '~/composables/useCustomFie
 import type { FieldValues, ProjectField } from '~/composables/useCustomFields'
 import { matchesTagRequirements, type TagRequirement } from '#shared/utils/tags'
 import { isBoardFiltering, matchesBoardFilter } from '~/utils/boardFilter'
+import { countOpenTasks } from '~/utils/projectKind'
 
 // A permalink's window as the API returns it (server/utils/commentWindow.ts): the comments and what is left either side.
 interface CommentWindowPage {
@@ -243,6 +244,16 @@ const _ready = ref(false)
 // The flat task index is fetched on first use (ensureTasks), not at start.
 const _tasksLoaded = ref(false)
 let _tasksRequest: Promise<void> | null = null
+// The sidebar's open counts (Speed, card mwibpggp): the slim rows (id, board, column) from /api/tasks?fields=counts. Used
+// until the full list is loaded; a change to one task keeps them in step while they are the source.
+interface TaskCountRow { id: string, projectId: string, columnId: string }
+const _countRows = ref<TaskCountRow[]>([])
+const _countsLoaded = ref(false)
+let _countsRequest: Promise<void> | null = null
+const taskCounts = computed(() => countOpenTasks(
+  _tasksLoaded.value ? _allTasks.value : _countRows.value,
+  new Map(_projects.value.map(p => [p.id, new Set(p.terminalColumnIds ?? [])]))
+))
 const _comments = ref<TaskComment[]>([])
 const _commentsTaskId = ref<string | null>(null)
 // What is left on each side of the comments shown, when a permalink opened a window (null: the whole thread).
@@ -491,11 +502,13 @@ function upsertSearchRow(task: ProjectTask) {
   const idx = _allTasks.value.findIndex(t => t.id === row.id)
   if (idx < 0) _allTasks.value = [row, ..._allTasks.value]
   else _allTasks.value = [..._allTasks.value.slice(0, idx), row, ..._allTasks.value.slice(idx + 1)]
+  if (_countsLoaded.value) _countRows.value = [..._countRows.value.filter(t => t.id !== row.id), { id: row.id, projectId: row.projectId, columnId: row.columnId }]
   reindexSearch()
 }
 
 function removeSearchRow(id: string) {
   _allTasks.value = _allTasks.value.filter(t => t.id !== id)
+  _countRows.value = _countRows.value.filter(t => t.id !== id)
   reindexSearch()
 }
 
@@ -563,6 +576,22 @@ export function useProjects() {
     await _tasksRequest
   }
 
+  // The sidebar's open counts, fetched once from the slim mode of the flat list. A loaded full list already has them, so it
+  // is not asked again. Concurrent callers share one request.
+  async function ensureTaskCounts() {
+    if (_tasksLoaded.value) return
+    if (_countsLoaded.value) return
+    if (!_countsRequest) {
+      _countsRequest = $fetch<TaskCountRow[]>('/api/tasks?fields=counts')
+        .then((rows) => {
+          _countRows.value = rows
+          _countsLoaded.value = true
+        })
+        .finally(() => { _countsRequest = null })
+    }
+    await _countsRequest
+  }
+
   // Refreshes the board list and the flat task index without dropping the
   // open board or its label filter. The task index is refreshed only once it has been loaded.
   async function syncProjects() {
@@ -575,6 +604,8 @@ export function useProjects() {
     if (tasks) {
       _allTasks.value = tasks
       reindexSearch()
+    } else if (_countsLoaded.value) {
+      _countRows.value = await $fetch<TaskCountRow[]>('/api/tasks?fields=counts')
     }
   }
 
@@ -595,10 +626,14 @@ export function useProjects() {
     _activeProjectId.value = null
     // Another team's tasks must not show: a loaded index is fetched again for the new team.
     const hadTasks = _tasksLoaded.value
+    const hadCounts = _countsLoaded.value
     _tasksLoaded.value = false
     _allTasks.value = []
+    _countRows.value = []
+    _countsLoaded.value = false
     await load()
     if (hadTasks) await ensureTasks()
+    else if (hadCounts) await ensureTaskCounts()
   }
 
   async function createProject(name: string, customerId: string | null = null) {
@@ -1263,6 +1298,8 @@ export function useProjects() {
     ready: _ready,
     projects: _projects,
     allTasks: _allTasks,
+    taskCounts,
+    ensureTaskCounts,
     activeProject,
     isCustomerView,
     isReadOnlyBoard,

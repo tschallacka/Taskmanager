@@ -26,7 +26,6 @@ test('the task list is fetched once, on demand, through ensureTasks', () => {
 test('every screen that reads the task list asks for it first', () => {
   for (const page of [
     'app/components/SearchModal.vue',
-    'app/components/ProjectsListPanel.vue',
     'app/pages/projects/home.vue',
     'app/pages/projects/my-tasks.vue',
     'app/pages/projects/timesheet.vue',
