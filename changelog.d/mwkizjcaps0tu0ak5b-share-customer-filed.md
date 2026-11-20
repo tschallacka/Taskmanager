@@ -1,1 +1,0 @@
-- **Share with a new customer files the project under it.** The Share dialog's "File and create link" now files the project under the customer it picked, also when the project was filed under another customer before; that customer keeps the project through the join table (`server/utils/projectCustomerInvite.ts`, `tests/share-customer-invite-db.test.ts`).

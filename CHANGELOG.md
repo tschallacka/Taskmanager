@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.59.1 - 2026-11-20
+
+- **Share with a new customer files the project under it.** The Share dialog's "File and create link" now files the project under the customer it picked, also when the project was filed under another customer before; that customer keeps the project through the join table (`server/utils/projectCustomerInvite.ts`, `tests/share-customer-invite-db.test.ts`).
+
 ## 0.59.0 - 2026-11-20
 
 - **A board opens with one board call and the picker.** The top bar's people and the "notify me" flag come with the board's answer, and the share dialog fetches its guest list when it opens, not for every board the page shows (`server/api/projects/[id]/board.get.ts`, `app/composables/useProjects.ts`, `app/pages/projects/[id].vue`, `app/components/BoardShare.vue`, `tests/speed-board-fold.test.ts`).
