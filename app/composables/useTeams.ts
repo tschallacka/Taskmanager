@@ -1,4 +1,5 @@
 import { authClient } from './useAuth'
+import { teamsLoaded as teamsLoadedOf } from '~/utils/projectsEntry'
 
 export interface TeamMember {
   id: string
@@ -25,6 +26,8 @@ export function useTeams() {
 
   const teams = computed(() => (listOrgsRef.value.data ?? []) as unknown as Team[])
   const isPending = computed(() => listOrgsRef.value.isPending || activeOrgRef.value.isPending)
+  // The list is decided once it has data or has failed: before its fetch starts, nothing is pending and the list is empty.
+  const teamsLoaded = computed(() => teamsLoadedOf({ data: listOrgsRef.value.data, error: listOrgsRef.value.error }))
 
   // Active team/organization (null = Personal Workspace)
   const activeTeam = computed(() => (activeOrgRef.value.data ?? null) as unknown as Team | null)
@@ -189,6 +192,7 @@ export function useTeams() {
     isTeamAdmin,
     mustTransferBeforeLeaving,
     isPending,
+    teamsLoaded,
     createTeam,
     setActiveTeam,
     refreshActiveTeam,

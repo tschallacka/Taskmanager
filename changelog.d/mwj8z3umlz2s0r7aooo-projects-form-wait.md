@@ -1,0 +1,1 @@
+- **The Projects page waits for the team list before it shows "Your first project".** A member who has a shared board no longer sees the create form for a moment after sign-in, before their team opens (`app/utils/projectsEntry.ts`, `app/composables/useTeams.ts`, `app/pages/projects/index.vue`).
