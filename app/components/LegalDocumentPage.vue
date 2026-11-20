@@ -32,11 +32,12 @@ useSeoMeta({ title: () => doc.value?.title ?? 'Legal' })
           Version {{ doc.version }} · In force from {{ dateLabel(doc.effective) }} · Last changed {{ dateLabel(doc.changed) }}
         </p>
       </header>
-      <!-- eslint-disable-next-line vue/no-v-html -- the text comes from our own legal/ files and is sanitised first -->
+      <!-- eslint-disable vue/no-v-html -- the text comes from our own legal/ files and is sanitised first -->
       <div
         class="prose prose-sm max-w-none text-default"
         v-html="html"
       />
+      <!-- eslint-enable vue/no-v-html -->
     </article>
   </div>
 </template>
