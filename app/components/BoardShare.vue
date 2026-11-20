@@ -351,6 +351,14 @@ watch(open, (isOpen) => {
     boardWatch.load()
   }
 })
+
+// An admin of the board gets the listing when the board opens, for the waiting-approval count on the Share button (Speed, Nina's
+// SHOULD 2). The board answer says who is an admin, so a guest or a member makes no call for it.
+const { activeProjectId, shareAdmin } = useProjects()
+const adminOnThisBoard = computed(() => activeProjectId.value === props.projectId && shareAdmin.value)
+watch(adminOnThisBoard, (isAdmin) => {
+  if (isAdmin) loadListing()
+}, { immediate: true })
 </script>
 
 <template>

@@ -190,6 +190,7 @@ interface BoardPayload {
   githubBadges?: Record<string, GithubBadge[]>
   // Whether a crew works on this board, so the Office view is offered. Never sent to a customer.
   crewBoard?: boolean
+  shareAdmin?: boolean
   // The crews on this board when it is a real board (its Office view picks one). Staff only; never for a customer.
   linkedCrews?: { id: string, name: string }[]
   // The people the top bar shows (staff only, masked as /members masks them), and whether the person is notified of new tasks.
@@ -228,6 +229,9 @@ const _boardLoadError = ref<BoardLoadError | null>(null)
 const _commentCounts = ref<Record<string, number>>({})
 // Whether the board is a crew's, so its Office view is offered. Set with the board it came with.
 const _crewBoard = ref(false)
+// Whether the viewer may share the open board as its admin (the board answer's shareAdmin): the Share button's waiting count
+// loads on board open only then (Speed, Nina's SHOULD 2).
+const _shareAdmin = ref(false)
 // The crews linked to the open board when it is a real board. Set with the board it came with.
 const _linkedCrews = ref<{ id: string, name: string }[]>([])
 // The open board's people for the top bar, and whether the person is notified of new tasks: both come with the board.
@@ -244,6 +248,8 @@ const _boardLoading = ref(false)
 const _ready = ref(false)
 // The flat task index is fetched on first use (ensureTasks), not at start.
 const _tasksLoaded = ref(false)
+// The last load of the task list failed: the pages say so, rather than showing an empty account (Speed, Nina's SHOULD 1).
+const _tasksFailed = ref(false)
 let _tasksRequest: Promise<void> | null = null
 // The sidebar's open counts (Speed, card mwibpggp): the slim rows (id, board, column) from /api/tasks?fields=counts. Used
 // until the full list is loaded; a change to one task keeps them in step while they are the source.
@@ -351,6 +357,7 @@ const _boardCache = new Map<string, {
   commentCounts: Record<string, number>
   githubBadges: Record<string, GithubBadge[]>
   crewBoard: boolean
+  shareAdmin: boolean
   linkedCrews: { id: string, name: string }[]
   members: { id: string, name: string, image?: string | null }[]
   watching: boolean
@@ -367,6 +374,7 @@ function cacheBoard(projectId: string) {
     commentCounts: _commentCounts.value,
     githubBadges: _githubBadges.value,
     crewBoard: _crewBoard.value,
+    shareAdmin: _shareAdmin.value,
     linkedCrews: _linkedCrews.value,
     members: _boardMembers.value,
     watching: _boardWatching.value
@@ -569,13 +577,20 @@ export function useProjects() {
     if (_tasksLoaded.value) return
     if (!_tasksRequest) {
       const token = _generation.begin()
+      _tasksFailed.value = false
       const request: Promise<void> = $fetch<TaskSearchRow[]>('/api/tasks')
         .then((tasks) => {
           // A team switch started while this was in flight: these rows are the old team's, so they are not applied.
           if (!token.isCurrent()) return
           _allTasks.value = tasks
           _tasksLoaded.value = true
+          _tasksFailed.value = false
           reindexSearch()
+        })
+        .catch((error: unknown) => {
+          // Recorded, so the pages say the list could not load rather than showing an empty account.
+          if (token.isCurrent()) _tasksFailed.value = true
+          throw error
         })
         .finally(() => { if (_tasksRequest === request) _tasksRequest = null })
       _tasksRequest = request
@@ -628,6 +643,7 @@ export function useProjects() {
     _generation.bump()
     _tasksRequest = null
     _countsRequest = null
+    _tasksFailed.value = false
     // Team switch: drop per-project board state, filters do not carry over.
     _board.value = null
     _boardCache.clear()
@@ -792,6 +808,7 @@ export function useProjects() {
         _commentCounts.value = cached?.commentCounts ?? {}
         _githubBadges.value = cached?.githubBadges ?? {}
         _crewBoard.value = cached?.crewBoard ?? false
+        _shareAdmin.value = cached?.shareAdmin ?? false
         _linkedCrews.value = cached?.linkedCrews ?? []
         _boardMembers.value = cached?.members ?? []
         _boardWatching.value = cached?.watching ?? false
@@ -813,6 +830,7 @@ export function useProjects() {
         _commentCounts.value = board.commentCounts ?? {}
         _githubBadges.value = board.githubBadges ?? {}
         _crewBoard.value = board.crewBoard ?? false
+        _shareAdmin.value = board.shareAdmin ?? false
         _linkedCrews.value = board.linkedCrews ?? []
         _boardMembers.value = board.members ?? []
         _boardWatching.value = board.watching ?? false
@@ -1012,6 +1030,7 @@ export function useProjects() {
         _commentCounts.value = board.commentCounts ?? {}
         _githubBadges.value = board.githubBadges ?? {}
         _crewBoard.value = board.crewBoard ?? false
+        _shareAdmin.value = board.shareAdmin ?? false
         _linkedCrews.value = board.linkedCrews ?? []
         _boardMembers.value = board.members ?? []
         _boardWatching.value = board.watching ?? false
@@ -1316,6 +1335,8 @@ export function useProjects() {
     ready: _ready,
     projects: _projects,
     allTasks: _allTasks,
+    tasksLoaded: computed(() => _tasksLoaded.value),
+    tasksFailed: computed(() => _tasksFailed.value),
     taskCounts,
     ensureTaskCounts,
     activeProject,
@@ -1375,6 +1396,7 @@ export function useProjects() {
     showTrashed: _showTrashed,
     trashedCount: _trashedCount,
     crewBoard: _crewBoard,
+    shareAdmin: _shareAdmin,
     toggleShowTrashed,
     isTrashed,
     addColumn,

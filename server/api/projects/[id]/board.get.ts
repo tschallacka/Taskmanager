@@ -123,13 +123,17 @@ export default defineEventHandler(async (event) => {
   // The top bar's people and the "notify me" flag come with the board, so a visit is this call and the picker call.
   // The people are the members list (staff only, as /members serves them), masked the way /members masks them.
   const viewerId = event.context.session.user.id
+  // The viewer's vault role on this board, read once: the members masking uses it, and shareAdmin is the same admin rule the guest
+  // listing applies (Speed, Nina's SHOULD 2): the Share button's waiting count loads on board open only for an admin.
+  const viewerRole = isCustomer ? null : await vaultRoleOf(project, viewerId)
   const members = project.audience === 'staff'
-    ? await maskEmails(viewerId, await listProjectPeople(project), { sharesBoard: true, managesBoard: (await vaultRoleOf(project, viewerId)) === 'manager' })
+    ? await maskEmails(viewerId, await listProjectPeople(project), { sharesBoard: true, managesBoard: viewerRole === 'manager' })
     : []
 
   return {
     audience: project.audience,
     watching: isCustomer ? false : await isWatching(id, viewerId),
+    shareAdmin: viewerRole === 'manager',
     members,
     columns,
     tasks: tasks.map(task => ({ ...task, ...marks.get(task.id) })),
