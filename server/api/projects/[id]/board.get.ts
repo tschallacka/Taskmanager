@@ -8,6 +8,9 @@ import { githubBadgesForBoard } from '../../../utils/githubBadges'
 import { blockedStatesOn } from '../../../utils/taskDependencyService'
 import { blockedMark } from '../../../utils/mcpBlockerLinks'
 import { crewsOfRealBoard, isCrewBoard } from '../../../utils/officeCast'
+import { listProjectPeople, vaultRoleOf } from '../../../utils/projectMembers'
+import { maskEmails } from '../../../utils/emailPrivacy'
+import { isWatching } from '../../../utils/projectWatchers'
 
 // Full board in one payload: columns ordered, tasks grouped by column, and the
 // per-task update count the cards render as a badge.
@@ -117,8 +120,21 @@ export default defineEventHandler(async (event) => {
   const blockedStates = await blockedStatesOn(id, tasks.map(t => t.id))
   const marks = new Map(tasks.map(t => [t.id, blockedMark(blockedStates.get(t.id) ?? { blocked: false, openBlockerIds: [] }, project.audience)]))
 
+  // The top bar's people and the "notify me" flag come with the board, so a visit is this call and the picker call.
+  // The people are the members list (staff only, as /members serves them), masked the way /members masks them.
+  const viewerId = event.context.session.user.id
+  // The viewer's vault role on this board, read once: the members masking uses it, and shareAdmin is the same admin rule the guest
+  // listing applies (Speed, Nina's SHOULD 2): the Share button's waiting count loads on board open only for an admin.
+  const viewerRole = isCustomer ? null : await vaultRoleOf(project, viewerId)
+  const members = project.audience === 'staff'
+    ? await maskEmails(viewerId, await listProjectPeople(project), { sharesBoard: true, managesBoard: viewerRole === 'manager' })
+    : []
+
   return {
     audience: project.audience,
+    watching: isCustomer ? false : await isWatching(id, viewerId),
+    shareAdmin: viewerRole === 'manager',
+    members,
     columns,
     tasks: tasks.map(task => ({ ...task, ...marks.get(task.id) })),
     subtasks,

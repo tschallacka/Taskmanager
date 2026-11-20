@@ -61,7 +61,9 @@ const myDomain = computed(() => (listing.value?.me.kind === 'guest-manager' ? li
 
 const base = computed(() => `/api/projects/${props.projectId}`)
 
-async function loadListing() {
+// full: the dialog's load (the filed customer and the staff list come too). Not full: the board opening for an admin, which needs
+// only the listing for the waiting count on the Share button.
+async function loadListing(full = true) {
   loadingList.value = true
   try {
     listing.value = await untypedFetch<Listing>(`${base.value}/guests`)
@@ -72,6 +74,7 @@ async function loadListing() {
   } finally {
     loadingList.value = false
   }
+  if (!full) return
   // The customer the project is filed under: the picker starts on it, so a filed customer shows selected, not the placeholder.
   const project = await untypedFetch<{ customerId?: string | null }>(base.value).catch(() => null)
   filedCustomerId.value = project?.customerId ?? ''
@@ -338,12 +341,12 @@ const waitingCount = computed(() => listing.value?.invitations.filter(i => i.sta
 
 const boardWatch = useBoardWatch(() => props.projectId)
 
-// Last, so everything they touch is declared by the time the immediate run happens.
+// Last, so everything they touch is declared by the time the immediate run happens. The guest list is fetched when
+// the dialog opens (below), not for every board the page shows.
 watch(() => props.projectId, () => {
   listing.value = null
   staff.value = []
   lastInvite.value = null
-  loadListing()
 }, { immediate: true })
 watch(open, (isOpen) => {
   if (isOpen) {
@@ -351,6 +354,15 @@ watch(open, (isOpen) => {
     boardWatch.load()
   }
 })
+
+// An admin of the board gets the listing when the board opens, for the waiting-approval count on the Share button (Speed, Nina's
+// SHOULD 2). The board answer says who is an admin, so a guest or a member makes no call for it.
+const { activeProjectId, shareAdmin } = useProjects()
+const adminOnThisBoard = computed(() => activeProjectId.value === props.projectId && shareAdmin.value)
+// The pair: a switch from one admin board to another changes the project id, so the watch runs even though the flag stays true.
+watch(() => [props.projectId, adminOnThisBoard.value], ([, isAdmin]) => {
+  if (isAdmin) loadListing(false)
+}, { immediate: true })
 </script>
 
 <template>

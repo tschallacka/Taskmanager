@@ -8,7 +8,10 @@ definePageMeta({ layout: 'app' })
 useSeoMeta({ title: 'My tasks' })
 
 const { session } = useAuth()
-const { ready, allTasks, updateTask } = useProjects()
+const { ready, allTasks, updateTask, ensureTasks, tasksLoaded, tasksFailed } = useProjects()
+onMounted(() => {
+  ensureTasks().catch(() => {})
+})
 
 const TABS = ['Upcoming', 'Overdue', 'Completed'] as const
 const tab = ref<(typeof TABS)[number]>('Upcoming')
@@ -109,10 +112,22 @@ function setView(next: 'list' | 'board') {
       class="min-h-0 flex-1 overflow-y-auto px-4 py-4 lg:px-6"
     >
       <p
-        v-if="ready && !shown.length"
+        v-if="ready && tasksLoaded && !tasksFailed && !shown.length"
         class="py-12 text-center text-sm text-muted"
       >
         Nothing in {{ tab.toLowerCase() }}.
+      </p>
+      <p
+        v-else-if="ready && tasksFailed"
+        class="py-12 text-center text-sm text-muted"
+      >
+        Your tasks could not be loaded. Reload the page to try again.
+      </p>
+      <p
+        v-else-if="!tasksLoaded"
+        class="py-12 text-center text-sm text-muted"
+      >
+        Loading your tasks…
       </p>
       <ul
         v-else

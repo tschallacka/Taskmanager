@@ -44,6 +44,12 @@ test('a blank name counts as no name', () => {
   assert.equal(words.footnote, 'Invitation for ada@example.com')
 })
 
+test('a link invitation has no address: no name and an empty email gives no footnote, never "Invitation for "', () => {
+  const words = inviteSentence({ kind: 'team', org, name: null, email: '' })
+  assert.equal(words.headline, 'Welcome')
+  assert.equal(words.footnote, null)
+})
+
 test('a long name is cut with an ellipsis, and a short one is kept whole', () => {
   const long = 'A'.repeat(80)
   const cut = truncateName(long, 40)

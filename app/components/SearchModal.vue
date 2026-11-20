@@ -4,7 +4,7 @@ import { relativeTime } from '~/composables/useRelativeTime'
 import { tagChipClass } from '~/utils/tagColors'
 import { expandTagToken, type TagRequirement } from '#shared/utils/tags'
 
-const { searchBoards, allTasks } = useProjects()
+const { searchBoards, allTasks, ensureTasks, tasksLoaded, tasksFailed } = useProjects()
 
 const open = useSearchModal()
 const query = ref('')
@@ -68,6 +68,8 @@ watch(open, (v) => {
   if (v) {
     query.value = ''
     highlighted.value = 0
+    // The search reads every task: the first open fetches the list (once).
+    ensureTasks().catch(() => {})
   }
 })
 
@@ -276,10 +278,22 @@ function smartSnippet(html: string): string {
           class="max-h-[min(28rem,60vh)] overflow-y-auto border-t border-default p-1.5"
         >
           <div
-            v-if="isFiltered && !hasResults"
+            v-if="isFiltered && !hasResults && tasksLoaded && !tasksFailed"
             class="px-3 py-6 text-center text-sm text-muted"
           >
             Nothing found for “{{ query.trim() }}”
+          </div>
+          <div
+            v-else-if="isFiltered && !hasResults && tasksFailed"
+            class="px-3 py-6 text-center text-sm text-muted"
+          >
+            Tasks could not be loaded to search. Reload the page to try again.
+          </div>
+          <div
+            v-else-if="isFiltered && !hasResults && !tasksLoaded"
+            class="px-3 py-6 text-center text-sm text-muted"
+          >
+            Loading tasks to search…
           </div>
 
           <template

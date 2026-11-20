@@ -12,11 +12,23 @@ export interface PinnedBoard {
 
 const _pins = ref<PinnedBoard[]>([])
 const _loaded = ref(false)
+// The sidebar and the projects list both ask for the pins when the page opens. They share one request
+// while it is in flight, so a load does not fetch the same list twice.
+let _inFlight: Promise<void> | null = null
 
 export function usePins() {
-  async function loadPins() {
-    _pins.value = await $fetch<PinnedBoard[]>('/api/pins')
-    _loaded.value = true
+  function loadPins() {
+    if (!_inFlight) {
+      _inFlight = $fetch<PinnedBoard[]>('/api/pins')
+        .then((pins) => {
+          _pins.value = pins
+          _loaded.value = true
+        })
+        .finally(() => {
+          _inFlight = null
+        })
+    }
+    return _inFlight
   }
 
   function isPinned(projectId: string) {

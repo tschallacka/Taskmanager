@@ -8,7 +8,10 @@ definePageMeta({ layout: 'app' })
 useSeoMeta({ title: 'Profile' })
 
 const { session } = useAuth()
-const { ready, projects, allTasks } = useProjects()
+const { ready, projects, allTasks, ensureTasks, tasksLoaded, tasksFailed } = useProjects()
+onMounted(() => {
+  ensureTasks().catch(() => {})
+})
 
 const me = computed(() => session.value?.user)
 
@@ -86,10 +89,22 @@ watch(projects, async (list) => {
             </NuxtLink>
           </div>
           <p
-            v-if="ready && !mine.length"
+            v-if="ready && tasksLoaded && !tasksFailed && !mine.length"
             class="py-8 text-center text-sm text-muted"
           >
             Nothing assigned to you.
+          </p>
+          <p
+            v-else-if="ready && tasksFailed"
+            class="py-8 text-center text-sm text-muted"
+          >
+            Your tasks could not be loaded. Reload the page to try again.
+          </p>
+          <p
+            v-else-if="!tasksLoaded"
+            class="py-8 text-center text-sm text-muted"
+          >
+            Loading your tasks…
           </p>
           <ul
             v-else

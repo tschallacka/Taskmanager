@@ -10,7 +10,7 @@ definePageMeta({ layout: 'app' })
 useSeoMeta({ title: 'Home' })
 
 const { session } = useAuth()
-const { ready, projects, allTasks, updateTask } = useProjects()
+const { ready, projects, allTasks, updateTask, ensureTasks, tasksLoaded, tasksFailed } = useProjects()
 
 const greeting = computed(() => {
   const hour = new Date().getHours()
@@ -34,6 +34,7 @@ const { items: inboxItems, unread: inboxUnread, load: loadInbox } = useNotificat
 onMounted(() => {
   loadTimer()
   loadInbox()
+  ensureTasks().catch(() => {})
 })
 const weekStart = computed(() => {
   const now = new Date()
@@ -281,10 +282,22 @@ function openTask(task: { id: string, projectId: string }) {
             </NuxtLink>
           </div>
           <p
-            v-if="ready && !upcoming.length"
+            v-if="ready && tasksLoaded && !tasksFailed && !upcoming.length"
             class="py-8 text-center text-sm text-muted"
           >
             Nothing assigned to you.
+          </p>
+          <p
+            v-else-if="ready && tasksFailed"
+            class="py-8 text-center text-sm text-muted"
+          >
+            Your tasks could not be loaded. Reload the page to try again.
+          </p>
+          <p
+            v-else-if="!tasksLoaded"
+            class="py-8 text-center text-sm text-muted"
+          >
+            Loading your tasks…
           </p>
           <div
             v-else

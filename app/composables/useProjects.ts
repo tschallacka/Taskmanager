@@ -8,6 +8,8 @@ import { clearCustomFields, ingestBoardFields } from '~/composables/useCustomFie
 import type { FieldValues, ProjectField } from '~/composables/useCustomFields'
 import { matchesTagRequirements, type TagRequirement } from '#shared/utils/tags'
 import { isBoardFiltering, matchesBoardFilter } from '~/utils/boardFilter'
+import { countOpenTasks } from '~/utils/projectKind'
+import { createGeneration } from '~/utils/requestGeneration'
 
 // A permalink's window as the API returns it (server/utils/commentWindow.ts): the comments and what is left either side.
 interface CommentWindowPage {
@@ -188,8 +190,12 @@ interface BoardPayload {
   githubBadges?: Record<string, GithubBadge[]>
   // Whether a crew works on this board, so the Office view is offered. Never sent to a customer.
   crewBoard?: boolean
+  shareAdmin?: boolean
   // The crews on this board when it is a real board (its Office view picks one). Staff only; never for a customer.
   linkedCrews?: { id: string, name: string }[]
+  // The people the top bar shows (staff only, masked as /members masks them), and whether the person is notified of new tasks.
+  members?: { id: string, name: string, image?: string | null }[]
+  watching?: boolean
   // The project's custom fields and each task's values. Staff only; a
   // contact's board carries empty ones.
   fields?: ProjectField[]
@@ -223,8 +229,14 @@ const _boardLoadError = ref<BoardLoadError | null>(null)
 const _commentCounts = ref<Record<string, number>>({})
 // Whether the board is a crew's, so its Office view is offered. Set with the board it came with.
 const _crewBoard = ref(false)
+// Whether the viewer may share the open board as its admin (the board answer's shareAdmin): the Share button's waiting count
+// loads on board open only then (Speed, Nina's SHOULD 2).
+const _shareAdmin = ref(false)
 // The crews linked to the open board when it is a real board. Set with the board it came with.
 const _linkedCrews = ref<{ id: string, name: string }[]>([])
+// The open board's people for the top bar, and whether the person is notified of new tasks: both come with the board.
+const _boardMembers = ref<{ id: string, name: string, image?: string | null }[]>([])
+const _boardWatching = ref(false)
 // The open board's GitHub badges, from the board endpoint. Read by each card.
 const _githubBadges = ref<Record<string, GithubBadge[]>>({})
 // The open board's subtasks. Kept beside the cards rather than among them, so
@@ -234,6 +246,23 @@ const _subtasks = ref<ProjectTask[]>([])
 const _people = ref<ProjectPerson[]>([])
 const _boardLoading = ref(false)
 const _ready = ref(false)
+// The flat task index is fetched on first use (ensureTasks), not at start.
+const _tasksLoaded = ref(false)
+// The last load of the task list failed: the pages say so, rather than showing an empty account (Speed, Nina's SHOULD 1).
+const _tasksFailed = ref(false)
+let _tasksRequest: Promise<void> | null = null
+// The sidebar's open counts (Speed, card mwibpggp): the slim rows (id, board, column) from /api/tasks?fields=counts. Used
+// until the full list is loaded; a change to one task keeps them in step while they are the source.
+interface TaskCountRow { id: string, projectId: string, columnId: string }
+const _countRows = ref<TaskCountRow[]>([])
+const _countsLoaded = ref(false)
+let _countsRequest: Promise<void> | null = null
+// A team switch moves this on; a task request started before it drops its answer (Speed, Nina's SHOULD 3).
+const _generation = createGeneration()
+const taskCounts = computed(() => countOpenTasks(
+  _tasksLoaded.value ? _allTasks.value : _countRows.value,
+  new Map(_projects.value.map(p => [p.id, new Set(p.terminalColumnIds ?? [])]))
+))
 const _comments = ref<TaskComment[]>([])
 const _commentsTaskId = ref<string | null>(null)
 // What is left on each side of the comments shown, when a permalink opened a window (null: the whole thread).
@@ -328,7 +357,10 @@ const _boardCache = new Map<string, {
   commentCounts: Record<string, number>
   githubBadges: Record<string, GithubBadge[]>
   crewBoard: boolean
+  shareAdmin: boolean
   linkedCrews: { id: string, name: string }[]
+  members: { id: string, name: string, image?: string | null }[]
+  watching: boolean
 }>()
 
 function cacheBoard(projectId: string) {
@@ -342,7 +374,10 @@ function cacheBoard(projectId: string) {
     commentCounts: _commentCounts.value,
     githubBadges: _githubBadges.value,
     crewBoard: _crewBoard.value,
-    linkedCrews: _linkedCrews.value
+    shareAdmin: _shareAdmin.value,
+    linkedCrews: _linkedCrews.value,
+    members: _boardMembers.value,
+    watching: _boardWatching.value
   })
   while (_boardCache.size > BOARD_CACHE_SIZE) _boardCache.delete(_boardCache.keys().next().value!)
 }
@@ -478,11 +513,13 @@ function upsertSearchRow(task: ProjectTask) {
   const idx = _allTasks.value.findIndex(t => t.id === row.id)
   if (idx < 0) _allTasks.value = [row, ..._allTasks.value]
   else _allTasks.value = [..._allTasks.value.slice(0, idx), row, ..._allTasks.value.slice(idx + 1)]
+  if (_countsLoaded.value) _countRows.value = [..._countRows.value.filter(t => t.id !== row.id), { id: row.id, projectId: row.projectId, columnId: row.columnId }]
   reindexSearch()
 }
 
 function removeSearchRow(id: string) {
   _allTasks.value = _allTasks.value.filter(t => t.id !== id)
+  _countRows.value = _countRows.value.filter(t => t.id !== id)
   reindexSearch()
 }
 
@@ -506,14 +543,13 @@ export function boardLabelColor(tag: string): string | null {
 
 // ─── init (called from plugin) ──────────────────────────────
 
+// The flat task list is not part of the start: ensureTasks() fetches it the first time a screen or the search reads it.
 export function initProjectsStore(
   projects: Project[],
-  tasks: TaskSearchRow[],
   search: MiniSearch<ProjectSearchDoc>
 ) {
   _search = search
   _projects.value = projects
-  _allTasks.value = tasks
   reindexSearch()
   _ready.value = true
 }
@@ -531,30 +567,83 @@ export function useProjects() {
   const isReadOnlyBoard = computed(() => activeProject.value?.readOnly === true)
 
   async function load() {
-    const [projects, tasks] = await Promise.all([
-      $fetch<Project[]>('/api/projects'),
-      $fetch<TaskSearchRow[]>('/api/tasks')
-    ])
-    _projects.value = projects
-    _allTasks.value = tasks
+    _projects.value = await $fetch<Project[]>('/api/projects')
     reindexSearch()
     _ready.value = true
   }
 
+  // Fetches the flat task index once, when a screen or the search first needs it. Concurrent callers share one request.
+  async function ensureTasks() {
+    if (_tasksLoaded.value) return
+    if (!_tasksRequest) {
+      const token = _generation.begin()
+      _tasksFailed.value = false
+      const request: Promise<void> = $fetch<TaskSearchRow[]>('/api/tasks')
+        .then((tasks) => {
+          // A team switch started while this was in flight: these rows are the old team's, so they are not applied.
+          if (!token.isCurrent()) return
+          _allTasks.value = tasks
+          _tasksLoaded.value = true
+          _tasksFailed.value = false
+          reindexSearch()
+        })
+        .catch((error: unknown) => {
+          // Recorded, so the pages say the list could not load rather than showing an empty account.
+          if (token.isCurrent()) _tasksFailed.value = true
+          throw error
+        })
+        .finally(() => { if (_tasksRequest === request) _tasksRequest = null })
+      _tasksRequest = request
+    }
+    await _tasksRequest
+  }
+
+  // The sidebar's open counts, fetched once from the slim mode of the flat list. A loaded full list already has them, so it
+  // is not asked again. Concurrent callers share one request.
+  async function ensureTaskCounts() {
+    if (_tasksLoaded.value) return
+    if (_countsLoaded.value) return
+    if (!_countsRequest) {
+      const token = _generation.begin()
+      const request: Promise<void> = $fetch<TaskCountRow[]>('/api/tasks?fields=counts')
+        .then((rows) => {
+          if (!token.isCurrent()) return
+          _countRows.value = rows
+          _countsLoaded.value = true
+        })
+        .finally(() => { if (_countsRequest === request) _countsRequest = null })
+      _countsRequest = request
+    }
+    await _countsRequest
+  }
+
   // Refreshes the board list and the flat task index without dropping the
-  // open board or its label filter.
+  // open board or its label filter. The task index is refreshed only once it has been loaded.
   async function syncProjects() {
+    const token = _generation.begin()
     const [projects, tasks] = await Promise.all([
       $fetch<Project[]>('/api/projects'),
-      $fetch<TaskSearchRow[]>('/api/tasks')
+      _tasksLoaded.value ? $fetch<TaskSearchRow[]>('/api/tasks') : Promise.resolve(null)
     ])
     _projects.value = projects
     if (_activeProjectId.value) await refreshArchivedActive(_activeProjectId.value)
-    _allTasks.value = tasks
-    reindexSearch()
+    // A team switch during this sync: its task rows are the old team's, so they are dropped.
+    if (!token.isCurrent()) return
+    if (tasks) {
+      _allTasks.value = tasks
+      reindexSearch()
+    } else if (_countsLoaded.value) {
+      const rows = await $fetch<TaskCountRow[]>('/api/tasks?fields=counts')
+      if (token.isCurrent()) _countRows.value = rows
+    }
   }
 
   async function refresh() {
+    // Team switch: every request started for the old team is stale now, and a new one may start at once.
+    _generation.bump()
+    _tasksRequest = null
+    _countsRequest = null
+    _tasksFailed.value = false
     // Team switch: drop per-project board state, filters do not carry over.
     _board.value = null
     _boardCache.clear()
@@ -569,7 +658,16 @@ export function useProjects() {
     _showTrashed.value = false
     _trashedCount.value = 0
     _activeProjectId.value = null
+    // Another team's tasks must not show: a loaded index is fetched again for the new team.
+    const hadTasks = _tasksLoaded.value
+    const hadCounts = _countsLoaded.value
+    _tasksLoaded.value = false
+    _allTasks.value = []
+    _countRows.value = []
+    _countsLoaded.value = false
     await load()
+    if (hadTasks) await ensureTasks()
+    else if (hadCounts) await ensureTaskCounts()
   }
 
   async function createProject(name: string, customerId: string | null = null) {
@@ -710,7 +808,10 @@ export function useProjects() {
         _commentCounts.value = cached?.commentCounts ?? {}
         _githubBadges.value = cached?.githubBadges ?? {}
         _crewBoard.value = cached?.crewBoard ?? false
+        _shareAdmin.value = cached?.shareAdmin ?? false
         _linkedCrews.value = cached?.linkedCrews ?? []
+        _boardMembers.value = cached?.members ?? []
+        _boardWatching.value = cached?.watching ?? false
         _trashedCount.value = 0
       }
       _activeProjectId.value = id
@@ -729,7 +830,10 @@ export function useProjects() {
         _commentCounts.value = board.commentCounts ?? {}
         _githubBadges.value = board.githubBadges ?? {}
         _crewBoard.value = board.crewBoard ?? false
+        _shareAdmin.value = board.shareAdmin ?? false
         _linkedCrews.value = board.linkedCrews ?? []
+        _boardMembers.value = board.members ?? []
+        _boardWatching.value = board.watching ?? false
         _trashedCount.value = board.trashedCount ?? 0
         ingestBoardFields(id, board.fields ?? [], board.fieldValues ?? {})
       }
@@ -926,7 +1030,10 @@ export function useProjects() {
         _commentCounts.value = board.commentCounts ?? {}
         _githubBadges.value = board.githubBadges ?? {}
         _crewBoard.value = board.crewBoard ?? false
+        _shareAdmin.value = board.shareAdmin ?? false
         _linkedCrews.value = board.linkedCrews ?? []
+        _boardMembers.value = board.members ?? []
+        _boardWatching.value = board.watching ?? false
         _trashedCount.value = board.trashedCount ?? 0
         ingestBoardFields(projectId, board.fields ?? [], board.fieldValues ?? {})
       }
@@ -1228,6 +1335,10 @@ export function useProjects() {
     ready: _ready,
     projects: _projects,
     allTasks: _allTasks,
+    tasksLoaded: computed(() => _tasksLoaded.value),
+    tasksFailed: computed(() => _tasksFailed.value),
+    taskCounts,
+    ensureTaskCounts,
     activeProject,
     isCustomerView,
     isReadOnlyBoard,
@@ -1244,6 +1355,7 @@ export function useProjects() {
     activity: _activity,
     commentsTaskId: _commentsTaskId,
     load,
+    ensureTasks,
     refresh,
     syncProjects,
     reloadBoardQuiet,
@@ -1278,9 +1390,12 @@ export function useProjects() {
     labelColor,
     setLabelColor,
     linkedCrews: _linkedCrews,
+    boardMembers: _boardMembers,
+    boardWatching: _boardWatching,
     showTrashed: _showTrashed,
     trashedCount: _trashedCount,
     crewBoard: _crewBoard,
+    shareAdmin: _shareAdmin,
     toggleShowTrashed,
     isTrashed,
     addColumn,

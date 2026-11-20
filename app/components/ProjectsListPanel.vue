@@ -7,9 +7,9 @@ import { taskCountLabel } from '#shared/utils/board'
 import { crewChildLabel, crewTreeRows, rowGutter } from '~/utils/crewTreeRows'
 import { mayCreateProjects, panelListsProject } from '~/utils/sidebarAccess'
 import { teamToOpenFor } from '~/utils/teamEntry'
-import { countOpenTasks, healthTint, kindIcon, projectKind } from '~/utils/projectKind'
+import { healthTint, kindIcon, projectKind } from '~/utils/projectKind'
 
-const { ready, projects, allTasks, deleteProject, renameProject } = useProjects()
+const { ready, projects, taskCounts, deleteProject, renameProject, ensureTaskCounts } = useProjects()
 const route = useRoute()
 const { unread: inboxUnread } = useNotifications()
 const { pins, pinsLoaded, loadPins, isPinned, pinBoard, unpinBoard } = usePins()
@@ -126,6 +126,8 @@ watch([activeId, ready], openActiveTree)
 
 onMounted(() => {
   if (!pinsLoaded.value) loadPins().catch(() => {})
+  // The open count per board reads the slim task rows (id, board, column), not the full list (Speed, card mwibpggp).
+  ensureTaskCounts().catch(() => {})
 })
 // A team switch can add or drop a membership's boards (joining, leaving), so reload then.
 watch(activeTeamId, () => loadPins().catch(() => {}))
@@ -161,11 +163,7 @@ function newProject() {
 
 // "47 tasks" on a board six months old says nothing — almost all of them are
 // finished. Counting what is still short of the board's finishing columns says
-// how much is left, and the total is still there behind it.
-const taskCounts = computed(() => {
-  const terminal = new Map(projects.value.map(p => [p.id, new Set(p.terminalColumnIds ?? [])]))
-  return countOpenTasks(allTasks.value, terminal)
-})
+// how much is left, and the total is still there behind it. The store computes it (taskCounts).
 
 function countsFor(project: Project) {
   return taskCounts.value.get(project.id) ?? { open: 0, total: 0 }
