@@ -39,21 +39,31 @@ export default defineEventHandler(async (event) => {
     .filter(p => neighbourIds.has(p.id) || audienceFor(userId, teamId, p) === 'staff')
     .map(p => p.id)
 
+  // `?fields=counts` is the slim mode the sidebar uses for its open-task counts (Speed, card mwibpggp): the same rows and the same
+  // access rules, with only the id, the board and the column. It carries no text, so it is small on a large board.
+  const slim = getQuery(event).fields === 'counts'
+  const countFields = {
+    id: projectTasks.id,
+    projectId: projectTasks.projectId,
+    columnId: projectTasks.columnId
+  }
+  const fullFields = {
+    id: projectTasks.id,
+    projectId: projectTasks.projectId,
+    projectName: projects.name,
+    columnId: projectTasks.columnId,
+    title: projectTasks.title,
+    description: projectTasks.description,
+    tags: projectTasks.tags,
+    visibility: projectTasks.visibility,
+    assigneeId: projectTasks.assigneeId,
+    dueOn: projectTasks.dueOn,
+    completedAt: projectTasks.completedAt,
+    updatedAt: projectTasks.updatedAt
+  }
+
   return db
-    .select({
-      id: projectTasks.id,
-      projectId: projectTasks.projectId,
-      projectName: projects.name,
-      columnId: projectTasks.columnId,
-      title: projectTasks.title,
-      description: projectTasks.description,
-      tags: projectTasks.tags,
-      visibility: projectTasks.visibility,
-      assigneeId: projectTasks.assigneeId,
-      dueOn: projectTasks.dueOn,
-      completedAt: projectTasks.completedAt,
-      updatedAt: projectTasks.updatedAt
-    })
+    .select(slim ? countFields : fullFields)
     .from(projectTasks)
     .innerJoin(projects, eq(projects.id, projectTasks.projectId))
     .where(and(
