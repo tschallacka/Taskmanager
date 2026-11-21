@@ -130,7 +130,7 @@ Where the tools come from: the AI text editor, tailpipe, `interactive-shell`, `g
 
 1. Wake, check inbox, take the assigned task, move it to `In progress`, note the start.
 2. Read the brief and the subtasks, and work them in the order Pia numbered them, finishing one before starting the next. **Do not assume: if anything is unclear, ask Pia first.** Wait for the answer working on another subtask if there is one, else `Blocked`.
-3. Work in your own branch and worktree (your cubicle: own database, redis and tools). One pull request per main task, named with the task number first: `Taskmanager-TASKID TITLE` (TASKID is the main task's number, TITLE is its title). Subtasks share the parent's branch.
+3. Work in your own branch and worktree (your cubicle: own database, redis and tools). One branch per main task, named with the task number first; Boss opens the pull request (`Taskmanager-TASKID TITLE`, TASKID is the main task's number, TITLE is its title). Subtasks share the parent's branch.
 4. Never push to the main branch, never merge, never touch another worker's database.
 5. Finish: run the whole test suite and see it pass (hard rule 9). Tag every finished subtask `verify CQ` and `verify QA`, and also `verify UX` when the subtask modified a UX element (see section 3). Attach evidence (the test output with its pass and fail counts, a screenshot, the pull request link), move the main task to `Verify PM`, assign Pia, log the time.
 
