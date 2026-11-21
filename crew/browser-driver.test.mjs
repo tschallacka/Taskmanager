@@ -79,6 +79,16 @@ function chromiumPids(dir) {
   return [...text.matchAll(/chromium pid (\d+)/g)].map(m => Number(m[1]))
 }
 
+// The driver's last line before it exits is "stopped" (browser-driver.mjs, serve). Its log is the word on it: a status
+// probe can get no answer under load (its 500 ms connect gives up), which reads as "no driver" when it is still up.
+function driverStopped(dir) {
+  const text = existsSync(join(dir, 'pool.log')) ? readFileSync(join(dir, 'pool.log'), 'utf8') : ''
+  return /^\S+ stopped$/m.test(text)
+}
+
+// A loaded machine (load 60 on the crew host) can take far longer than 15 s to stop a browser or its Chromium.
+const LOAD_WAIT_MS = 90000
+
 async function stopDriver(dir) {
   await request({ dir, cmd: 'shutdown', start: false }).catch(() => null)
   await waitUntil(async () => (await request({ dir, cmd: 'status', start: false }).catch(() => null)) === null, 15000, 'the driver to stop')
@@ -514,6 +524,16 @@ describe('small parts', () => {
   })
 })
 
+// A stopped browser is not yet a stopped driver, and the driver's own log is the only word on it: a status probe that
+// gets no answer under load reads as "no driver", so the test waits on the log instead (card mwf9jjmdcd9rolti5q).
+test('the driver counts as stopped only when its own log says so', () => {
+  const dir = freshDir()
+  writeFileSync(join(dir, 'pool.log'), '2026-11-21T00:00:00.000Z chromium pid 123\n2026-11-21T00:00:02.000Z browser stopped (idle)\n')
+  assert.equal(driverStopped(dir), false, 'the browser stopping is not the driver stopping')
+  writeFileSync(join(dir, 'pool.log'), '2026-11-21T00:00:00.000Z chromium pid 123\n2026-11-21T00:00:02.000Z browser stopped (idle)\n2026-11-21T00:00:02.100Z stopped\n')
+  assert.equal(driverStopped(dir), true)
+})
+
 // ---------- integration tests: a real Chromium ----------
 
 /** A page server for the tests: /set plants a cookie and a localStorage value, /read is plain. */
@@ -692,8 +712,9 @@ describe('the shared browser (real Chromium)', { skip: SKIP }, () => {
       const dir = newDir()
       await ask(dir, 'w1', 'goto', { url: `${site.url}/read` })
       const chromium = chromiumPids(dir).at(-1)
-      await waitUntil(async () => (await request({ dir, cmd: 'status', start: false })) === null, 20000, 'the driver to exit')
-      await waitUntil(() => !pidAlive(chromium), 15000, 'Chromium to exit')
+      assert.ok(Number.isInteger(chromium), 'the driver logged the Chromium it started')
+      await waitUntil(() => driverStopped(dir), LOAD_WAIT_MS, 'the driver to log that it stopped')
+      await waitUntil(() => !pidAlive(chromium), LOAD_WAIT_MS, 'Chromium to exit')
     })
   })
 
