@@ -18,6 +18,10 @@ live in the task's panel under **Subtasks**, and the parent card shows a count s
 2. Press **Enter** inside a subtask to finish it and start the next one right under it.
 3. Click the circle to tick a subtask off. The heading shows how many are done.
 4. Drag the grip at the left to reorder; the **x** on the right removes one.
+5. Open a subtask with the **arrow** on its row (it shows on hover; on a touch screen it is always there, and you can
+   reach it with the keyboard). The subtask opens in the task panel like a card: its own description, assignee, dates,
+   time, updates and subtasks. Its title line shows the path, **Parent > Subtask**; click the parent to go back. The
+   address of the panel is the subtask's own link, so it can be shared.
 
 Subtasks can be nested. **Tab** puts a subtask under the one just above it; **Shift+Tab** brings it back out one level.
 A nested subtask can only live inside its own task: you cannot move it to another card, and a subtask cannot become a
