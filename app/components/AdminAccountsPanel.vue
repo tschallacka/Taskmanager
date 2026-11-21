@@ -129,6 +129,12 @@ async function setCanCreate(u: InstanceUser, value: boolean) {
               {{ u.email }}
             </p>
             <p
+              v-else
+              class="truncate text-[11px] text-muted italic"
+            >
+              Hidden by its owner
+            </p>
+            <p
               class="truncate text-[11px] text-muted"
               :title="u.organisations.map(o => `${o.name} (${o.role})`).join(', ')"
             >
