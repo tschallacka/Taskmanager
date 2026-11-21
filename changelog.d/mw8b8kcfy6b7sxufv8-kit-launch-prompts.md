@@ -1,0 +1,1 @@
+- **Crew kit: launch prompts for Susy, Tess and Pat.** `PROMPTS.md` had sections for the workers, Usher, Nina, Quincy, Rita, the log watcher and Janet, but none for the Secretary, the Triage clerk and the Pre-check, so the PM started them from their role documents by hand. Each now has a launch prompt in the same form. Files: `crew/PROMPTS.md.tmpl`, `crew/roles.test.mjs`.
