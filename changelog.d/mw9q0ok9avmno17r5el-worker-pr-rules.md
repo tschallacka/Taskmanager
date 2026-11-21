@@ -1,0 +1,1 @@
+- **Workers push their branch; Boss opens the pull request and publishes.** The worker prompt says a worker never opens a pull request and never runs `crew publish`, a rebase keeps its branch name, and one worktree is kept per card (`crew/PROMPTS.md.tmpl`, `crew/WORKFLOW.md`, `crew/worker-pr-rules.test.mjs`).
