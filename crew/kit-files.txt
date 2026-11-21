@@ -103,6 +103,7 @@ susy-review-needs.mjs
 susy-stop.mjs
 susy-workers.mjs
 susy.mjs
+tester-copy.sh
 tm.mjs
 totp.mjs
 unslop.SKILL.md
