@@ -1,1 +1,0 @@
-- **Invite page: "Loading your invitation…" is on the first paint.** A person who opens an invitation link sees that line from the first moment, not a splash that says "Opening your projects…" until the app starts. Files: `app/spa-loading-template.html`, `tests/spa-loading-template.test.ts`.

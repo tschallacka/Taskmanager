@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.60.2 - 2026-11-21
+
+- **Invite page: "Loading your invitation…" is on the first paint.** A person who opens an invitation link sees that line from the first moment, not a splash that says "Opening your projects…" until the app starts. Files: `app/spa-loading-template.html`, `tests/spa-loading-template.test.ts`.
+
 ## 0.60.1 - 2026-11-20
 
 - **The Projects page waits for the team list before it shows "Your first project".** A member who has a shared board no longer sees the create form for a moment after sign-in, before their team opens (`app/utils/projectsEntry.ts`, `app/composables/useTeams.ts`, `app/pages/projects/index.vue`).
