@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.60.8 - 2026-11-21
+
+- **MCP: an agent can take back its own board status update.** `delete_status_update` removes one of your own status updates by its id, and only the author can delete it; another key owner is refused in one sentence. The board's status stays as it is. `post_status_update` now refuses an empty body, so a board never shows a blank post. Files: `server/utils/mcpStatusTools.ts`, `tests/status-update-delete.test.ts`, `docs/agents/tools-overview.md`.
+
 ## 0.60.7 - 2026-11-21
 
 - **Crew kit: launch prompts for Susy, Tess and Pat.** `PROMPTS.md` had sections for the workers, Usher, Nina, Quincy, Rita, the log watcher and Janet, but none for the Secretary, the Triage clerk and the Pre-check, so the PM started them from their role documents by hand. Each now has a launch prompt in the same form. Files: `crew/PROMPTS.md.tmpl`, `crew/roles.test.mjs`.
