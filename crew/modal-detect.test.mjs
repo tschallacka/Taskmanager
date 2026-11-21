@@ -2,6 +2,11 @@
 // dialog, and screens that must not count (a question in prose, a transcript question with no footer, an empty screen).
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
+import { copyFileSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { findDialog, dialogMail } from './modal-detect.mjs'
 
 const AUTO_MODE = [
@@ -58,4 +63,22 @@ test('a very long question is cut to 200 characters with an ellipsis', () => {
   const { first } = findDialog(long)
   assert.equal(first.length, 200)
   assert.ok(first.endsWith('…'))
+})
+
+// The script block runs when the file is run directly, also from a path with a space (card mwo4n5zrl63ri0scpmk). The
+// old check built a file:// URL by hand, and a space never matched, so the script printed nothing.
+test('run as a script from a path with a space, it reads the screen and answers', () => {
+  const root = mkdtempSync(join(tmpdir(), 'md-'))
+  try {
+    const dir = join(root, 'crew home with space')
+    mkdirSync(dir)
+    const script = join(dir, 'modal-detect.mjs')
+    copyFileSync(join(dirname(fileURLToPath(import.meta.url)), 'modal-detect.mjs'), script)
+    const run = spawnSync(process.execPath, [script, 'pia'], { input: AUTO_MODE, encoding: 'utf8' })
+    assert.equal(run.status, 0, `exit ${run.status}, stdout "${run.stdout}", stderr "${run.stderr}"`)
+    assert.notEqual(run.stdout.trim(), 'NO-DIALOG')
+    assert.notEqual(run.stdout.trim(), '')
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
 })
