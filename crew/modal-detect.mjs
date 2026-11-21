@@ -6,6 +6,8 @@
 // A dialog is a line that starts with a question mark, with a footer below it that says how to answer: "Enter to continue",
 // "Enter to confirm", or "Esc to cancel". A question in prose or in the transcript has no footer, so it does not count.
 
+import { pathToFileURL } from 'node:url'
+
 const QUESTION = /^\s*[│|]?\s*\?\s*\S/
 const FOOTER = /(enter to (continue|confirm)|esc to cancel)/i
 const LOOK_BELOW = 6
@@ -35,7 +37,7 @@ export function dialogMail(who, screen) {
 }
 
 // Run as a script: read the screen from stdin, print the mail line (exit 0) or NO-DIALOG (exit 1).
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   let text = ''
   process.stdin.setEncoding('utf8')
   process.stdin.on('data', (chunk) => {
