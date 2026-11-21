@@ -34,7 +34,7 @@ test('each tester template uses the URL the start prints, not the dev copy of th
 })
 
 test('a failed test goes back to the worker: a violation subtask, the commit from the READY line, the card to To do', () => {
-  for (const [key, file] of Object.entries(TESTERS)) {
+  for (const file of Object.values(TESTERS)) {
     const text = read(file)
     assert.match(text, /A failed test goes back to the worker/, `${file} says it`)
     assert.match(text, /the commit from the READY line/, `${file} names the tested commit`)
