@@ -16,6 +16,15 @@ test('the first paint carries the "Opening your projects…" line and a spinner'
   assert.match(html, /class="spinner"|animate-spin|@keyframes/, 'a spinner')
 })
 
+// The invitation page is client-rendered: for ~20 s on a slow load the first paint is the splash, and the invite page's own
+// "Loading your invitation…" only shows after the app mounts. On an invitation link the first paint says the invitation
+// is loading (card mwkbue4u4c06mbv0w1u).
+test('on an invitation link the first paint says "Loading your invitation…"', () => {
+  const html = readFileSync(TEMPLATE, 'utf8')
+  assert.match(html, /Loading your invitation…/)
+  assert.match(html, /location\.pathname[^\n]*\/invite\//, 'the line is swapped on an /invite/ address')
+})
+
 test('the template has no external resources', () => {
   const html = readFileSync(TEMPLATE, 'utf8')
   assert.doesNotMatch(html, /<link\s|<script\s+[^>]*src=|src=|@import/, 'inline only')
