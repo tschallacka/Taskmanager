@@ -2,6 +2,12 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.60.9 - 2026-11-21
+
+- **A subtask opens in the task panel.** Each subtask row has an open arrow (on hover, always there on touch, and reachable with the keyboard). The subtask opens with its own description, assignee, dates, time, updates and subtasks, its address is a permalink, and the panel's title line shows Parent > Subtask with a link back to the parent (`app/components/kanban/SubtaskList.vue`, `app/components/kanban/TaskDrawer.vue`, `app/pages/projects/[id].vue`, `app/utils/subtaskPanel.ts`, `tests/subtask-panel.test.ts`, `docs/basics/subtasks-blockers-and-fields.md`).
+
+- **Workers push their branch; Boss opens the pull request and publishes.** The worker prompt says a worker never opens a pull request and never runs `crew publish`, a rebase keeps its branch name, and one worktree is kept per card (`crew/PROMPTS.md.tmpl`, `crew/WORKFLOW.md`, `crew/worker-pr-rules.test.mjs`).
+
 ## 0.60.8 - 2026-11-21
 
 - **MCP: an agent can take back its own board status update.** `delete_status_update` removes one of your own status updates by its id, and only the author can delete it; another key owner is refused in one sentence. The board's status stays as it is. `post_status_update` now refuses an empty body, so a board never shows a blank post. Files: `server/utils/mcpStatusTools.ts`, `tests/status-update-delete.test.ts`, `docs/agents/tools-overview.md`.
