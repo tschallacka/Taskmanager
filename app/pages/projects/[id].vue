@@ -8,6 +8,7 @@ import { tagChipAttrs } from '~/utils/tagColors'
 import { boardLabelColor, boardPeople as projectPeople } from '~/composables/useProjects'
 import { UNASSIGNED, personLabel } from '~/utils/boardFilter'
 import { queryWithoutTask, taskPanelPath, taskQueryAsPanelAddress } from '~/utils/taskPanelUrl'
+import { panelTaskById } from '~/utils/subtaskPanel'
 
 // One page for the board and for its task panel addresses: the same key keeps the board mounted while the panel opens.
 definePageMeta({ layout: 'app', key: route => `projects/${route.params.id}` })
@@ -46,7 +47,8 @@ const {
   toggleShowTrashed,
   isTrashed,
   crewBoard,
-  linkedCrews
+  linkedCrews,
+  subtasks
 } = useProjects()
 
 const projectId = computed(() => route.params.id as string)
@@ -234,8 +236,9 @@ watch(() => route.query.task, () => {
   if (address) navigateTo({ path: address.path, query: address.query }, { replace: true })
 }, { immediate: true })
 
+// A subtask is kept beside the cards (useProjects), so its address is looked up in both lists (subtaskPanel.ts).
 const drawerTask = computed<ProjectTask | null>(() =>
-  drawerTaskId.value ? board.value?.tasks.find(t => t.id === drawerTaskId.value) ?? null : null
+  drawerTaskId.value && board.value ? panelTaskById(drawerTaskId.value, board.value.tasks, subtasks.value) : null
 )
 
 // A task URL whose task is not on this board (or cannot be read here): the board opens with no panel, and says so.
