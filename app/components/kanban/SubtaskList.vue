@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import Sortable from 'sortablejs'
 import { errorMessage } from '~/utils/untypedFetch'
+import { queryWithoutTask, taskPanelPath } from '~/utils/taskPanelUrl'
 
 const props = defineProps<{
   parentTaskId: string
@@ -81,6 +82,15 @@ async function removeSubtask(id: string) {
   } catch {
     toast.add({ title: 'Could not remove the subtask', icon: 'i-lucide-alert-triangle', color: 'error' })
   }
+}
+
+// Opens the subtask in the task panel: the board's address for it, with the same query kept. The panel shows what a card
+// shows (description, assignee, dates, time, updates, its own subtasks), and its trail goes back to this parent.
+const route = useRoute()
+function openSubtask(sub: { id: string }) {
+  const projectId = activeProject.value?.id
+  if (!projectId) return
+  navigateTo({ path: taskPanelPath(projectId, sub.id), query: queryWithoutTask(route.query) })
 }
 
 // ─── Inline rename / Asana-style "Enter adds the next row" ─────────────────
@@ -271,6 +281,16 @@ onBeforeUnmount(destroySortable)
             @keydown.tab.prevent="onRowTab(sub, $event)"
             @blur="onRowBlur(sub, $event)"
           >
+          <UButton
+            icon="i-lucide-arrow-up-right"
+            size="xs"
+            color="neutral"
+            variant="ghost"
+            aria-label="Open subtask"
+            title="Open subtask"
+            class="shrink-0 opacity-0 transition-opacity focus-visible:opacity-100 group-hover/sub:opacity-100 pointer-coarse:opacity-100"
+            @click="openSubtask(sub)"
+          />
           <UserAvatar
             v-if="personById(sub.assigneeId)"
             :user-id="personById(sub.assigneeId)!.id"

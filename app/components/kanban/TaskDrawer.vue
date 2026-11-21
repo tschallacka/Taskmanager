@@ -6,6 +6,7 @@ import type { Visibility, ProjectTask } from '~/composables/useProjects'
 import { dueDayToMs, isOverdueDay } from '~/utils/dueDate'
 import { absoluteUrl, copyTaskLink } from '~/utils/copyTaskLink'
 import { activityStartsOpen, taskPanelPath } from '~/utils/taskPanelUrl'
+import { panelTrail } from '~/utils/subtaskPanel'
 import { taskLink } from '~/utils/taskLink'
 import { shouldAdoptServerDescription, stripPendingPlaceholders } from '~/utils/editor/imagePlaceholders'
 
@@ -72,7 +73,9 @@ const {
   deleteTask,
   restoreTask,
   loadComments,
-  clearComments
+  clearComments,
+  board,
+  subtasks: subtaskRows
 } = useProjects()
 
 // A customer contact reads the task and talks about it; the task itself is the
@@ -446,6 +449,8 @@ function allSubtasks(taskId: string): ProjectTask[] {
   return direct.flatMap(t => [t, ...allSubtasks(t.id)])
 }
 const subtasks = computed(() => shownTask.value ? allSubtasks(shownTask.value.id) : [])
+// The path from the top card to this task (Parent > Subtask), each link opening that task's panel (subtaskPanel.ts).
+const trail = computed(() => (shownTask.value && board.value ? panelTrail(shownTask.value, board.value.tasks, subtaskRows.value) : []))
 
 // ─── Visibility ────────────────────────────────────────────
 
@@ -570,6 +575,32 @@ const menuItems = computed(() => [[
 
         <!-- Header: state, breadcrumb, actions -->
         <header class="flex flex-wrap shrink-0 items-center gap-x-2 gap-y-1.5 border-b border-default px-4 py-2.5">
+          <!-- The trail for a subtask: Parent > Subtask. Each parent opens its own panel; the subtask is the current page. -->
+          <nav
+            v-if="trail.length > 1"
+            aria-label="Task path"
+            class="flex min-w-0 basis-full flex-wrap items-center gap-1 text-xs text-muted"
+          >
+            <template
+              v-for="(node, i) in trail"
+              :key="node.id"
+            >
+              <span
+                v-if="i > 0"
+                aria-hidden="true"
+              >›</span>
+              <NuxtLink
+                v-if="i < trail.length - 1"
+                :to="taskPanelPath(activeProject?.id ?? '', node.id)"
+                class="truncate hover:text-default"
+              >{{ node.title }}</NuxtLink>
+              <span
+                v-else
+                aria-current="page"
+                class="truncate text-default"
+              >{{ node.title }}</span>
+            </template>
+          </nav>
           <!-- The button borrows the menu's own padding and gap (6px each) so
                that with the menu flush against it, its dot and label sit on the
                same two vertical lines as every dot and label in the list.
