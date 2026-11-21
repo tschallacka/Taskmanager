@@ -2,6 +2,12 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.60.5 - 2026-11-21
+
+- **The admin accounts list says when an address is hidden.** A row whose address its owner keeps private now shows "Hidden by its owner" where the address would be, so an empty value does not look like missing data (`app/components/AdminAccountsPanel.vue`, `tests/admin-accounts-section.test.ts`).
+
+- **Crew kit: the dialog detector's script block runs from a path with a space.** `crew/modal-detect.mjs` built its `file://` URL by hand, so a kit path with a space or another character a URL escapes never matched and the script printed nothing. It now compares `pathToFileURL(process.argv[1])`, as `crew/mentions.mjs` does. Files: `crew/modal-detect.mjs`, `crew/modal-detect.test.mjs`.
+
 ## 0.60.4 - 2026-11-21
 
 - **Crew browser: a command in flight is not idle, and the driver's test waits on its own log under load.** The shared browser's idle timer no longer expires a person or stops the browser while a command is running, so a slow Chromium start is not cut short. The "browser exits once nobody has used it" test waits on the driver's own "stopped" log line and on Chromium's pid, with a 90 s window, instead of a status probe that can time out under load (card mwf9jjmdcd9rolti5q). Files: `crew/browser-driver.mjs`, `crew/browser-driver.test.mjs`.

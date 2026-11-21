@@ -1,1 +1,0 @@
-- **The admin accounts list says when an address is hidden.** A row whose address its owner keeps private now shows "Hidden by its owner" where the address would be, so an empty value does not look like missing data (`app/components/AdminAccountsPanel.vue`, `tests/admin-accounts-section.test.ts`).
