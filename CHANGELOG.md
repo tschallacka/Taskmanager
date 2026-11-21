@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.60.3 - 2026-11-21
+
+- **Option labels in the custom select wrap instead of being cut off.** In the open list of a select (the task panel's Stage, at phone width), a label that does not fit is shown in full on two lines, not as "To…" (`app/components/AppSelect.vue`, `tests/app-select.test.ts`).
+
 ## 0.60.2 - 2026-11-21
 
 - **Invite page: "Loading your invitation…" is on the first paint.** A person who opens an invitation link sees that line from the first moment, not a splash that says "Opening your projects…" until the app starts. Files: `app/spa-loading-template.html`, `tests/spa-loading-template.test.ts`.
