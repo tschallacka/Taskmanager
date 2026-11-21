@@ -19,5 +19,9 @@
 </style>
 <div class="spa-loading" role="status" aria-live="polite">
   <div class="spinner" aria-hidden="true"></div>
-  <p>Opening your projects…</p>
+  <p id="spa-line">Opening your projects…</p>
 </div>
+<script>
+  // An invitation link waits for its invitation, so the first paint says that (the page shows the same line once it mounts).
+  if (location.pathname.indexOf('/invite/') === 0) document.getElementById('spa-line').textContent = 'Loading your invitation…'
+</script>
