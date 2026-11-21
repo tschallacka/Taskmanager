@@ -18,9 +18,10 @@ import { pathToFileURL } from 'node:url'
 
 // "@cato" or "@boss" as a word of its own: not inside an address (x@cato.nl) or a longer name (@catoni).
 export const MENTION = /(?<![\w.+-])@(cato|boss)(?![\w-]|\.\w)/i
-// The PM's author name on the board, whole: "fork <board>-pia (agent)" for a fork, "Pia Planner (agent)" for the crew's
-// own. Only an agent author counts, so a person who happens to be called Pia (Maria Pia) never wakes Boss.
-export const PM_AUTHOR = /^(fork \S+-pia|Pia Planner) \(agent\)$/i
+// The PM's author name on the board, whole: "fork <board>-pia (agent)" for a fork, "crew pia (agent)" for the crew's own
+// (the API key name the server writes, server/utils/mcpBoardTools.ts), "Pia Planner (agent)" on older boards.
+// Only an agent author counts, so a person who happens to be called Pia (Maria Pia) never wakes Boss.
+export const PM_AUTHOR = /^(fork \S+-pia|crew pia|Pia Planner) \(agent\)$/i
 // Boss's watch (`crew boss-mentions`): the same check for the agents that report to Boss, Pia, Susy and Rita. Their
 // author label is "crew pia (agent)" on the board, or the name of the crew's own, or "fork <board>-<key>" for a fork.
 export const BOSS_AUTHOR = /^(crew (pia|susy|rita)|fork \S+-(pia|susy|rita)|Pia Planner|Susy Secretary|Rita Reporter) \(agent\)$/i
