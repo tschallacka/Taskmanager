@@ -130,13 +130,13 @@ Where the tools come from: the AI text editor, tailpipe, `interactive-shell`, `g
 
 1. Wake, check inbox, take the assigned task, move it to `In progress`, note the start.
 2. Read the brief and the subtasks, and work them in the order Pia numbered them, finishing one before starting the next. **Do not assume: if anything is unclear, ask Pia first.** Wait for the answer working on another subtask if there is one, else `Blocked`.
-3. Work in your own branch and worktree (your cubicle: own database, redis and tools). One pull request per main task, named with the task number first: `Taskmanager-TASKID TITLE` (TASKID is the main task's number, TITLE is its title). Subtasks share the parent's branch.
+3. Work in your own branch and worktree (your cubicle: own database, redis and tools). One branch per main task, named with the task number first; Boss opens the pull request (`Taskmanager-TASKID TITLE`, TASKID is the main task's number, TITLE is its title). Subtasks share the parent's branch.
 4. Never push to the main branch, never merge, never touch another worker's database.
-5. Finish: run the whole test suite and see it pass (hard rule 9). Tag every finished subtask `verify CQ` and `verify QA`, and also `verify UX` when the subtask modified a UX element (see section 3). Attach evidence (the test output with its pass and fail counts, a screenshot, the pull request link), move the main task to `Verify PM`, assign Pia, log the time.
+5. Finish: run the whole test suite and see it pass (hard rule 9). Tag every finished subtask `verify CQ` and `verify QA`, and also `verify UX` when the subtask modified a UX element (see section 3). Attach evidence (the test output with its pass and fail counts, a screenshot, the pushed branch name), move the main task to `Verify PM`, assign Pia, log the time.
 
 ### Phase 4: Verify PM (Pia)
 
-1. Check against the brief and the acceptance lines: every subtask carries `verify CQ` and `verify QA`, plus `verify UX` where it modified a UX element, evidence attached, the pull request exists and is named right, no "I think it is done". The test output in the evidence shows 0 failures. Output with a failure goes back to the worker, whatever caused it.
+1. Check against the brief and the acceptance lines: every subtask carries `verify CQ` and `verify QA`, plus `verify UX` where it modified a UX element, evidence attached, the branch is pushed and named right; Boss opens the pull request at publish, no "I think it is done". The test output in the evidence shows 0 failures. Output with a failure goes back to the worker, whatever caused it.
 2. Anything missing: back to the worker as a subtask, task to `In progress`.
 3. Send the task through every gate, in this order: `Verify UX`, `Verify CQ`, `Verify QA`. A UX element is anything a user sees or interacts with: a screen, a component, a text, a layout, a style, a form, an error message, an email. Pia corrects a `verify UX` tag the worker got wrong, in either direction.
    - Any subtask has `verify UX`: assign Usher and move to `Verify UX`.
@@ -195,8 +195,8 @@ Hard rule 9 applies to every agent. This is what happens when it cannot be follo
 
 1. **Blocked path and escalation.** Blocked tasks are tagged, linked to what blocks them, and Pia raises them with Cato. No agent waits in silence.
 2. **Rework cap.** The same task returning through the same gate three times goes to Cato with a note.
-3. **Evidence rule.** A handover without evidence (test output, screenshot, pull request link) is sent back by Pia without further review.
-4. **One handover format.** Every handover update has the same lines: done, how checked, branch and pull request, open risks, time spent.
+3. **Evidence rule.** A handover without evidence (test output, screenshot, the pushed branch name) is sent back by Pia without further review.
+4. **One handover format.** Every handover update has the same lines: done, how checked, branch (pushed, named right), open risks, time spent.
 5. **WIP limit.** One In progress task per worker.
 6. **Merge rights.** Only Cato merges. Workers push their own branch only.
 7. **Stale timers and silence.** Pia's sweep in section 4.

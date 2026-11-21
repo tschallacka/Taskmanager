@@ -57,7 +57,7 @@ Columns: Backlog, To do, In progress, **Verify PM**, **Verify UX**, **Verify CQ*
    that a reboot wipes). Move a task to **Done**
    when everything is wrapped up and the crew does not need to act on it anymore: it is published or
    accepted by the user, and no subtask, question or follow-up is open.
-5. Workers commit and push only their own branch, one pull request per main task (`WORKFLOW.md`, Phase 3).
+5. Workers commit and push only their own branch, one branch per main task; Boss opens the pull request (`WORKFLOW.md`, Phase 3).
    Only you merge. The PM and the reviewers never commit or push, and nobody but you touches the database.
 6. Bugs: anyone files a `[BUG]` task in the Bugs column; Tess triages it and assigns it, a worker fixes it and
    moves it through Verify like anything else.
