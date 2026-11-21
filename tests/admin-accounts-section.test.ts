@@ -29,3 +29,8 @@ test('the panel holds the list and the search, and the modal shows the same pane
   assert.match(panel, /can create organisations/i)
   assert.match(read('app/components/AdminUsersModal.vue'), /<AdminAccountsPanel/)
 })
+
+test('a row with no address says the owner keeps it hidden, so an empty value does not look like missing data', () => {
+  const panel = read('app/components/AdminAccountsPanel.vue')
+  assert.match(panel, /v-if="u\.email"[\s\S]*?\{\{ u\.email \}\}[\s\S]*?<\/p>\s*<p\s+v-else[^>]*>\s*Hidden by its owner\s*<\/p>/, 'the note sits where the address would be')
+})
