@@ -275,8 +275,10 @@ function removeGuest(guest: Guest) {
 function withdraw(invitation: Invitation) {
   return act(`i:${invitation.id}`, async () => {
     await untypedFetch(`${base.value}/guests/invitations/${invitation.id}`, { method: 'DELETE', headers: realtimeHeaders() })
-    // The link box shows the link of the invitation just made: once that invitation is withdrawn, the box goes too.
-    if (lastInvite.value?.id === invitation.id) lastInvite.value = null
+    // The link box shows the link of the invitation just made: once that invitation is withdrawn, the box goes too. So does a
+    // resent or approved link for the same address, which shows under "Who has access" (it stayed on screen before, a dead link).
+    if (lastInvite.value?.id === invitation.id || lastInvite.value?.email === invitation.email) lastInvite.value = null
+    if (approvedLink.value?.email === invitation.email) approvedLink.value = null
   }, 'Could not withdraw that')
 }
 

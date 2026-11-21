@@ -1,0 +1,1 @@
+- **Withdrawing a guest invitation takes back every link shown for it.** The resent or approved link that stayed under "Who has access" after a withdrawal is cleared with the link box, so no dead link stays on the dialog.
