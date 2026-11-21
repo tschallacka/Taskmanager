@@ -2,6 +2,12 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.60.4 - 2026-11-21
+
+- **Crew browser: a command in flight is not idle, and the driver's test waits on its own log under load.** The shared browser's idle timer no longer expires a person or stops the browser while a command is running, so a slow Chromium start is not cut short. The "browser exits once nobody has used it" test waits on the driver's own "stopped" log line and on Chromium's pid, with a 90 s window, instead of a status probe that can time out under load (card mwf9jjmdcd9rolti5q). Files: `crew/browser-driver.mjs`, `crew/browser-driver.test.mjs`.
+
+- **Withdrawing a guest invitation takes back every link shown for it.** The resent or approved link that stayed under "Who has access" after a withdrawal is cleared with the link box, so no dead link stays on the dialog.
+
 ## 0.60.3 - 2026-11-21
 
 - **Option labels in the custom select wrap instead of being cut off.** In the open list of a select (the task panel's Stage, at phone width), a label that does not fit is shown in full on two lines, not as "To…" (`app/components/AppSelect.vue`, `tests/app-select.test.ts`).
