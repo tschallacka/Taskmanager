@@ -38,7 +38,7 @@ const items = computed<PickerItem[] | PickerItem[][]>(() => props.groups
     :placeholder="props.placeholder"
     :disabled="props.disabled"
     :size="props.size"
-    :ui="{ base: 'min-h-11 sm:min-h-0 min-w-0 max-w-full', value: 'min-w-0 truncate', content: 'z-[80] min-w-fit max-w-[calc(100vw-2rem)]', item: 'whitespace-normal break-words', itemLabel: 'whitespace-normal break-words' }"
+    :ui="{ base: 'min-h-11 sm:min-h-0 min-w-0 max-w-full', value: 'min-w-0 truncate', content: 'z-[80] min-w-fit max-w-[calc(100vw-2rem)]', item: 'whitespace-normal break-words max-w-[calc(100vw-4rem)]', itemLabel: 'whitespace-normal break-words' }"
     @update:model-value="model = $event ?? null"
   />
 </template>
