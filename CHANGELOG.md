@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.60.6 - 2026-11-21
+
+- **`crew mentions` finds Pia's questions on the crew's own board.** The server writes the PM's author as her key name, `crew pia (agent)`; the watch accepted only `Pia Planner (agent)` and the fork form, so every `@cato` from Pia was skipped. `crew/mentions.mjs` accepts `crew pia (agent)` too and still refuses other crew keys and people. Test: `reads the PM the way the server names her` in `crew/kit.test.mjs`.
+
 ## 0.60.5 - 2026-11-21
 
 - **The admin accounts list says when an address is hidden.** A row whose address its owner keeps private now shows "Hidden by its owner" where the address would be, so an empty value does not look like missing data (`app/components/AdminAccountsPanel.vue`, `tests/admin-accounts-section.test.ts`).

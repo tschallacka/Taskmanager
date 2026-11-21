@@ -969,6 +969,17 @@ describe('crew mentions: the updates that ask Boss something', async () => {
     assert.deepEqual(mentionLines(task, updates, new Set()).map(f => f.id), ['p1', 'p2'])
   })
 
+  test('reads the PM the way the server names her: "crew pia (agent)", not only the fork or the old crew name', () => {
+    // The server writes an agent author as its API key name plus " (agent)" (server/utils/mcpBoardTools.ts). Card mw89prc9iw2htxhvct.
+    const updates = [
+      { id: 'real', author: 'crew pia (agent)', body: '@cato from the PM on the crew board' },
+      { id: 'wren', author: 'crew wren (agent)', body: '@cato a worker, not the PM' },
+      { id: 'pianist', author: 'crew pianist (agent)', body: '@cato another role' },
+      { id: 'bare', author: 'crew pia', body: '@cato no agent suffix' }
+    ]
+    assert.deepEqual(mentionLines(task, updates, new Set()).map(f => f.id), ['real'])
+  })
+
   test('skips Boss\'s own updates and cuts a long one to 240 characters', () => {
     assert.deepEqual(mentionLines(task, [{ id: 'u1', author: 'Cato (agent)', body: '@pia quoting @cato' }], new Set()), [])
     const [found] = mentionLines(task, [{ id: 'u2', author: 'Pia Planner (agent)', body: `@cato ${'x'.repeat(400)}` }], new Set())
