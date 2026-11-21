@@ -73,6 +73,30 @@ test('Rita writes the status to Boss and the minutes, and the PM no longer does'
   assert.ok(crew.includes('RITA.md'), 'CREW.md points at Rita for status and minutes')
 })
 
+// Card mw8b8kcfy6b7sxufv8: every role the PM starts by hand has a launch section in PROMPTS.md, under the heading the
+// other sections use, and a row in the table at the top. Susy and Tess had none, and Pat's was missing too.
+test('PROMPTS.md has a launch section and a table row for Susy, Tess and Pat', () => {
+  const prompts = readFileSync(join(KIT, 'PROMPTS.md.tmpl'), 'utf8')
+  const table = prompts.slice(0, prompts.indexOf('## Boss\'s watches'))
+  const launch = [
+    ['susy', '## Secretary ({{people.susy}}, key `susy`, `subagent_type: {{agents.susy}}`)'],
+    ['tess', '## Triage ({{people.tess}}, key `tess`, `subagent_type: {{agents.tess}}`)'],
+    ['pat', '## Pre-check ({{people.pat}}, key `pat`, `subagent_type: {{agents.pat}}`)']
+  ]
+  for (const [key, heading] of launch) {
+    assert.ok(prompts.includes(heading), `a launch section for ${key}`)
+    assert.ok(table.includes(`| \`${key}\` | {{people.${key}}}`), `a table row for ${key}`)
+    const section = prompts.slice(prompts.indexOf(heading), prompts.indexOf('\n## ', prompts.indexOf(heading) + 1))
+    assert.ok(section.includes('```'), `${key} has a prompt in a code block`)
+    assert.ok(section.includes(`\`${key}\``), `${key}'s prompt names its key`)
+  }
+})
+
+test('no kit file says "tokens" (the archive test forbids it)', () => {
+  const prompts = readFileSync(join(KIT, 'PROMPTS.md.tmpl'), 'utf8')
+  assert.doesNotMatch(prompts, /tokens/i)
+})
+
 test('the Rita figure is registered and gets her own look, not the placeholder', () => {
   const figures = readFileSync(join(REPO, 'app', 'office', 'figures', 'index.ts'), 'utf8')
   assert.match(figures, /rita: RITA_LOOK/, 'FIGURES names rita')
