@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.60.7 - 2026-11-21
+
+- **Crew kit: launch prompts for Susy, Tess and Pat.** `PROMPTS.md` had sections for the workers, Usher, Nina, Quincy, Rita, the log watcher and Janet, but none for the Secretary, the Triage clerk and the Pre-check, so the PM started them from their role documents by hand. Each now has a launch prompt in the same form. Files: `crew/PROMPTS.md.tmpl`, `crew/roles.test.mjs`.
+
 ## 0.60.6 - 2026-11-21
 
 - **`crew mentions` finds Pia's questions on the crew's own board.** The server writes the PM's author as her key name, `crew pia (agent)`; the watch accepted only `Pia Planner (agent)` and the fork form, so every `@cato` from Pia was skipped. `crew/mentions.mjs` accepts `crew pia (agent)` too and still refuses other crew keys and people. Test: `reads the PM the way the server names her` in `crew/kit.test.mjs`.
