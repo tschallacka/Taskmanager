@@ -3,7 +3,10 @@
 // for the script, so no git, dependency or database work runs here.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { cardWorktrees, parseResultLine, prepareWorktree, removePlan, reservationFailure, slugOf, worktreeFolder } from './prepare-worktree.mjs'
+import { mkdirSync, mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { cardWorktrees, parseResultLine, prepareWorktree, removePlan, reservationFailure, slugOf, worktreeFolder, worktreeRowsIn } from './prepare-worktree.mjs'
 
 test('a new worktree whose port cannot be reserved is removed only when it holds nothing; otherwise it is kept and says so', () => {
   const empty = reservationFailure({ created: true, dirty: false, aheadOfBase: 0, error: 'port 3101 is held', who: 'wren', taskId: 'mwdlkxb56xr2ek89g92' })
@@ -149,4 +152,31 @@ test('a card with no worktree yet runs the script as before', () => {
   const result = prepareWorktree({ who: 'wynn', taskId: 'mwnew000', title: 'x', config, runner, existing: [] })
   assert.equal(calls.length, 1)
   assert.equal(result.ok, true)
+})
+
+// The scan of the worktree base (crew/prepare-worktree-cli.mjs passes its rows in). A missing or empty base is an empty list,
+// never an error; a worktree is listed whatever its folder is called, and the branch decides which card it is.
+test('a missing worktree base gives an empty list, not an error', () => {
+  const missing = join(mkdtempSync(join(tmpdir(), 'wt-base-')), 'does-not-exist')
+  assert.deepEqual(worktreeRowsIn(missing, { branchOf: () => 'wynn/mwx-y' }), [])
+  assert.deepEqual(worktreeRowsIn('', { branchOf: () => 'wynn/mwx-y' }), [])
+})
+
+test('an empty worktree base gives an empty list', () => {
+  const base = mkdtempSync(join(tmpdir(), 'wt-base-'))
+  assert.deepEqual(worktreeRowsIn(base, { branchOf: () => 'wynn/mwx-y' }), [])
+})
+
+test('every folder under the base is listed with its branch, whatever its name, and cardWorktrees picks the card by branch', () => {
+  const base = mkdtempSync(join(tmpdir(), 'wt-base-'))
+  mkdirSync(join(base, 'taskmanager-wynn-mwjfx58b'))
+  mkdirSync(join(base, 'some-old-folder-name'))
+  const branches = {
+    [join(base, 'taskmanager-wynn-mwjfx58b')]: 'wynn/mwjfx58bi6p4dqqeo8-invite-by-email-part-2',
+    [join(base, 'some-old-folder-name')]: 'wynn/mwjfx58bi6p4dqqeo8-invite-by-email-part-2-old'
+  }
+  const rows = worktreeRowsIn(base, { branchOf: path => branches[path] ?? '' })
+  assert.equal(rows.length, 2, 'both folders are listed, the name is not the filter')
+  const found = cardWorktrees(rows, { who: 'wynn', taskId: 'mwjfx58bi6p4dqqeo8' })
+  assert.deepEqual(found.map(row => row.path).sort(), [join(base, 'some-old-folder-name'), join(base, 'taskmanager-wynn-mwjfx58b')].sort())
 })
