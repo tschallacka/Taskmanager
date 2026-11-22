@@ -253,6 +253,15 @@ describe('the sign-in (real Chromium)', { skip: SKIP }, () => {
   })
 })
 
+// The scratch folders are removed once no process names them (browser-cleanup.mjs), not by a synchronous remove in an exit
+// hook: the hook can run while Chromium still writes into its profile, and the remove fails with ENOTEMPTY (card
+// mwczkgwtv54p5g7vxc). The same wait the driver tests use.
+test('the scratch folders go through removeWhenUnused, not a synchronous remove at exit', () => {
+  const source = readFileSync(join(import.meta.dirname, 'browser.test.mjs'), 'utf8')
+  assert.doesNotMatch(source, /process\.on\('exit'/)
+  assert.match(source, /removeWhenUnused\(/)
+})
+
 // Removes the scratch folders this file made.
 process.on('exit', () => {
   for (const dir of made) rmSync(dir, { recursive: true, force: true })
