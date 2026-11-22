@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSy
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { downSessions, recordedKeys, roleFileText, upSessions, workerRole, writeRoleFile, RESTART_WAKE } from './sessions-up.mjs'
-import { resolveStartRole } from './role-file.mjs'
+import { resolveStartRole, withIdentity } from './role-file.mjs'
 
 // The standing rules a person reads on every start: CREW.md. A marker line stands in for the whole file here.
 const CREW_MD = '# The crew: how we work\n\nSTANDING RULE MARKER: post on the card, never by file.\n'
@@ -130,7 +130,7 @@ test('crew up honours CREW_ROLE_FILE for every key, as crew session start does',
     },
     wake: async () => ({ ok: true })
   })
-  assert.equal(started[0].role, 'OVERRIDE ROLE\n', 'the override file is the role, not the PROMPTS.md section')
+  assert.equal(started[0].role, withIdentity('wynn', 'OVERRIDE ROLE\n'), 'the override file is the role, not the PROMPTS.md section, and it names the key first')
   assert.deepEqual(out.lines, ['wynn: started (cc000006), woke once'])
 })
 
@@ -231,7 +231,7 @@ test('crew up starts a session with the role file, which holds both the section 
   })
   assert.match(role, /chat nick `Wynn Worker`/)
   assert.match(role, /STANDING RULE MARKER/)
-  assert.equal(readFileSync(join(home, 'sessions', 'wynn.role.md'), 'utf8'), roleFileText(PROMPTS, CREW_MD, 'wynn'))
+  assert.equal(readFileSync(join(home, 'sessions', 'wynn.role.md'), 'utf8'), withIdentity('wynn', roleFileText(PROMPTS, CREW_MD, 'wynn')))
 })
 
 // A role file a person's session already has (Nina, Pat, Quincy: no worker section in PROMPTS.md). Written by hand or by an
@@ -254,7 +254,7 @@ test('crew up starts a session from its own role file when PROMPTS.md has no wor
   })
   assert.deepEqual(out.lines, ['nina: started (cc000005), woke once'])
   assert.equal(out.ok, true)
-  assert.equal(started[0].role, NINA_FILE, 'the start is given the file text, not a guessed role')
+  assert.equal(started[0].role, withIdentity('nina', NINA_FILE), 'the start is given the file text, with the key line first, not a guessed role')
   assert.equal(readFileSync(join(home, 'sessions', 'nina.role.md'), 'utf8'), NINA_FILE, 'an existing role file is not rewritten')
 })
 
@@ -284,6 +284,6 @@ test('a worker with a role file is regenerated from PROMPTS.md, so a prompt chan
     },
     wake: async () => ({ ok: true, reason: 'woke' })
   })
-  assert.equal(started[0], roleFileText(PROMPTS, CREW_MD, 'wynn'))
-  assert.equal(readFileSync(join(home, 'sessions', 'wynn.role.md'), 'utf8'), roleFileText(PROMPTS, CREW_MD, 'wynn'))
+  assert.equal(started[0], withIdentity('wynn', roleFileText(PROMPTS, CREW_MD, 'wynn')))
+  assert.equal(readFileSync(join(home, 'sessions', 'wynn.role.md'), 'utf8'), withIdentity('wynn', roleFileText(PROMPTS, CREW_MD, 'wynn')))
 })

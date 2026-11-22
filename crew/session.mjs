@@ -117,7 +117,9 @@ export function startArgs({ key, folder, home, kit, role, model = MODEL, name = 
     cwd: folder,
     args: [
       '--bg', prompt, ...(resume ? ['--resume', resume] : []), '-n', name, '--model', model,
-      '--setting-sources', 'user', '--settings', settingsPath(home, key),
+      // Project and local settings only: the user settings on this host are Boss's, with Boss's example identity
+      // (card mwghrx2k8dwf8h93say). The role below names the person's own key.
+      '--setting-sources', 'project,local', '--settings', settingsPath(home, key),
       '--strict-mcp-config', '--mcp-config', mcpConfigPath(home, key),
       '--permission-mode', 'auto',
       '--add-dir', home, '--add-dir', kit,

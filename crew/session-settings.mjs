@@ -35,7 +35,8 @@ export function settingsFor({ home, key, profileEnv = {} }) {
   if (!KEY.test(String(key ?? ''))) throw new Error(`no such person key: ${key}`)
   return {
     permissions: { deny: [...DENY_RULES] },
-    env: { ...profileEnv, CREW_HOME: home },
+    // CREW_WHO binds the session's crew commands to its own key (who-guard.mjs).
+    env: { ...profileEnv, CREW_HOME: home, CREW_WHO: key },
     remoteControlAtStartup: false
   }
 }
