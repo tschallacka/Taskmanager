@@ -35,9 +35,18 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { crewHome } from './home.mjs'
 import { writePidFile } from './pidfile.mjs'
+import { guardedKey, whoGuard } from './who-guard.mjs'
 
 const kit = dirname(fileURLToPath(import.meta.url))
 const [first, ...rest] = process.argv.slice(2)
+// A person's session may run its own key only (card mwghrx2k8dwf8h93say): CREW_WHO is set in the session's settings.
+{
+  const guard = whoGuard(guardedKey(first, rest), process.env)
+  if (!guard.ok) {
+    console.error(guard.reason)
+    process.exit(64)
+  }
+}
 // Boss's two watches record their pid for the Stop hook (boss-stop-hook.sh reads CREW_HOME/.listen/<name>.pid).
 if (first === 'boss-mentions' || first === 'watch-crew') writePidFile(crewHome(), first)
 const scripts = { 'people': 'people.mjs', 'listen': 'listen.mjs', 'watch': 'watch.mjs', 'init': 'init.mjs', 'setup': 'setup.mjs', 'channel': 'channel.mjs', 'update': 'update.mjs', 'mentions': 'mentions.mjs', 'totp': 'totp.mjs', 'devadmin': 'devadmin.mjs', 'claude': 'claude.mjs', 'janet': 'janet.mjs', 'publish': 'publish.mjs', 'activity': 'activity.mjs', 'watch-crew': 'watch-crew.mjs', 'up': 'up.mjs', 'restart-brief': 'restart-brief.mjs', 'dev-copies': 'dev-copies.mjs', 'down': 'down.mjs', 'susy-daemon': 'susy-daemon.mjs', 'session': 'session.mjs', 'doctor': 'doctor.mjs' }
