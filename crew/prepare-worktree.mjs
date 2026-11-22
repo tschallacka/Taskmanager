@@ -4,6 +4,40 @@
 // script gets a clear message instead. The script is the only place that touches git, the dependencies and the database.
 
 import { spawnSync } from 'node:child_process'
+import { existsSync, readdirSync, statSync } from 'node:fs'
+import { join } from 'node:path'
+
+/** The branch a worktree folder is on, or '' when the folder is not a git worktree (or git cannot say). */
+export function gitBranchOf(path) {
+  const run = spawnSync('git', ['-C', path, 'rev-parse', '--abbrev-ref', 'HEAD'], { encoding: 'utf8' })
+  return run.status === 0 ? run.stdout.trim() : ''
+}
+
+/**
+ * Every folder under the worktree base, as { path, branch } rows, the branch read by `branchOf`. A missing or empty base, or
+ * one that cannot be read, is an empty list: the first worktree of a card is not an error. The folder name is not the filter;
+ * cardWorktrees picks the card by its branch.
+ */
+export function worktreeRowsIn(base, { branchOf = gitBranchOf } = {}) {
+  if (!base || !existsSync(base)) return []
+  let names
+  try {
+    names = readdirSync(base)
+  } catch {
+    return []
+  }
+  return names
+    .map(name => join(base, name))
+    .filter((path) => {
+      try {
+        return statSync(path).isDirectory()
+      } catch {
+        return false
+      }
+    })
+    .map(path => ({ path, branch: branchOf(path) }))
+    .filter(row => row.branch !== '')
+}
 
 /**
  * The folder of a card's worktree: <worktreeBase>/taskmanager-<who>-<first 8 characters of the task id>. The base comes

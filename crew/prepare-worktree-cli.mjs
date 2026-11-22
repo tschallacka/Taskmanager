@@ -3,11 +3,11 @@
 // line. --remove removes the worktree only when prepare-worktree.mjs's removePlan allows it (clean, pushed, nothing ahead).
 
 import { spawnSync } from 'node:child_process'
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { config as loaded } from './config.mjs'
-import { prepareWorktree, removePlan, reservationFailure, worktreeFolder } from './prepare-worktree.mjs'
+import { prepareWorktree, removePlan, reservationFailure, worktreeFolder, worktreeRowsIn } from './prepare-worktree.mjs'
 import { aliveProcess, planRelease, planReserve, portOf, pruned, readRegistry, registryFile, stopGroup, withLock, writeRegistry } from './port-registry.mjs'
 
 const kit = dirname(fileURLToPath(import.meta.url))
@@ -73,15 +73,9 @@ try {
 
 // Whether this run creates the folder: a folder that is already there (a reused worktree) is never removed on failure.
 const createdHere = !existsSync(worktree)
-// The worktrees of this person's folders under the base, with the branch each one is on: a card's own worktree is found by its
-// branch, so one made under another folder name is reused, not copied (Wynn's report, mwlgeaodug4zu87rmb).
-const existing = readdirSync(loaded.worktreeBase)
-  .filter(name => name.startsWith(`taskmanager-${who}-`))
-  .map((name) => {
-    const path = join(loaded.worktreeBase, name)
-    const run = spawnSync('git', ['-C', path, 'rev-parse', '--abbrev-ref', 'HEAD'], { encoding: 'utf8' })
-    return { path, branch: run.status === 0 ? run.stdout.trim() : '' }
-  })
+// The worktrees under the base, each with its branch: a card's own worktree is found by its branch, so one made under another
+// folder name is reused, not copied (Wynn's report, mwlgeaodug4zu87rmb). A missing base is an empty list.
+const existing = worktreeRowsIn(loaded.worktreeBase)
 const result = prepareWorktree({ who, taskId, title, config, existing })
 if (!result.ok) fail(result.message)
 
