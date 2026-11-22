@@ -263,6 +263,14 @@ Use `browser` to look and check. Use `run` (Playwright, below) for a script that
   `{{node_kit}}/tm.mjs contact shot /projects/<board.id from creds.json> out.png` (and `api`, `mcp`,
   `run` the same way) to see what a customer sees. Never put the contact's password anywhere.
 
+## Waiting on a job
+
+A long job (a test run, a browser script, a dev server that is starting) is waited on by its process id from the launch,
+or by an output file or a marker line it writes. Never wait with `pgrep -f` on a pattern that also appears in the waiting
+command (a loop that checks `pgrep -f` for the script it started) finds its own command line, so it never ends and runs
+until the tool times out. Run a job in the foreground when you can. If you need a wait loop you cannot write safely, ask Pia for a
+check; do not write your own.
+
 ## The rules of the road (these are not optional)
 
 1. **Rounds.** If you are woken to do a round of work (the PM, a worker without a listening
