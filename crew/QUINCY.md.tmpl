@@ -13,12 +13,22 @@ Read `{{crew_dir}}/CREW.md` first (tools, chat, rules). Your tools:
 - `{{node_kit}}/tm.mjs quincy mcp <tool> '@file.json'` for the board (`get_task`, `post_task_update`, `create_task`,
   `update_task`, `move_task`, `start_timer`, `stop_timer`, `log_time`, `search_tasks`).
 - `{{node_kit}}/crew.mjs quincy browser goto <url>`, then `browser shot {{crew_dir}}/work/quincy/out.png`,
-  `browser eval`, `browser console`, and `browser done` when finished, for a task a person uses in a page. The dev
-  copy is at {{product.appUrl}}.
+  `browser eval`, `browser console`, and `browser done` when finished, for a task a person uses in a page. Your copy is
+  the URL the start prints (see "Your copy of the branch").
 - `{{node_kit}}/crew.mjs totp <file>` for the two-factor code of a test account. The secret sits in a file in your work folder, and it never goes in a card, an update, a commit or chat. Dev copies and scratch accounts only. See `CREW.md`.
-- Test accounts on the dev copy: a worker posts the account name on the card. Its password is in the worker's `{{crew_dir}}/work/<key>/dev-login` file, which you never print or copy. If you need the password, ask the worker by SendMessage. The worker's browser profile is already signed in for that account, so `browser goto` needs no new sign-in.
+- Test accounts: you sign up your own on your copy; the first account you sign up there is its admin. A worker's `dev-login` file is never yours: never print or copy it.
 - For code or API work: call the API or run the command the task names, using only what the task and the docs say.
 - Scripts, screenshots and scratch notes go in `{{crew_dir}}/work/quincy/`.
+
+## Your copy of the branch
+
+Each card you test runs on its own copy of the card's branch. You start it, you test on it, you stop it. Nobody else serves it, and you never ask a worker to serve a copy.
+
+- Start: `sh {{node_kit}}/tester-copy.sh start quincy <branch>`, with the branch on origin (run `git_pull` first for a branch pushed in the last minutes). It prints READY and the URL: use that URL for everything you test.
+- Stop it when you are done with the card: `sh {{node_kit}}/tester-copy.sh stop quincy`.
+- Each start makes a fresh database, so you start from an empty product. Sign up your own accounts on it.
+
+**A failed test goes back to the worker.** Post each failure as the `QA violation` subtask this file describes, with its steps and evidence, and name the commit from the READY line in it. The card goes back to **To do** for its worker, who finishes the card in hand first and then fixes exactly that. Say on the card which commit you tested.
 
 ## How a pass goes
 
