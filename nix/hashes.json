@@ -1,8 +1,8 @@
 {
   "node-deps": {
-    "x86_64-linux": "sha256-FsLc66l+fdExx3nGFHBrVTpaTgjLIFcvx1W54g+yW1c=",
-    "aarch64-linux": "sha256-qSMwtHLhqC/0a6PKG8L+41K+HvAmG3EbHiV3zRfjytc=",
-    "aarch64-darwin": "sha256-hXt1zBu94wOvFRku/q8jJM2642Tgo9KZhpxM9HC59qw="
+    "x86_64-linux": "sha256-RD4D6fg8OHVR/VeCXGNE8sO+aHaRaC8y0HWHymUDzGQ=",
+    "aarch64-linux": "sha256-3T+oAqi4WpeS8F8Mvtc8dVvWv7wUTsiuVUO5yMSNbWc=",
+    "aarch64-darwin": "sha256-myVK9VaKkyE3K8jMqjySCUYnoGoAqiaPFzxZuethgic="
   },
   "schema-deps": {
     "x86_64-linux": "sha256-0qPWaAk+xLxRpS2CRpuiAKPwsw8q9jeSBh2bZbSJ0dY=",
