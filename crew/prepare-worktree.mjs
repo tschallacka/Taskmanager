@@ -43,10 +43,30 @@ export function parseResultLine(output) {
 }
 
 /**
- * Runs the project script for a card and returns its result. `config` is the parsed crew.json; `runner` runs a command
- * and returns { status, stdout, stderr } (the real one spawns it; tests pass a fake).
+ * The worktrees of one card, found by their branch: who/<task-id>-... (the branch the script cuts for the card). The folder
+ * name does not matter, so a worktree the script made under an older folder name is found too. `list` is the worktrees
+ * git knows, as { path, branch } rows (`git worktree list --porcelain`).
  */
-export function prepareWorktree({ who, taskId, title, config, runner = runScript }) {
+export function cardWorktrees(list, { who, taskId }) {
+  const prefix = `${who}/${taskId}-`
+  return (list ?? []).filter(row => typeof row.branch === 'string' && row.branch.startsWith(prefix))
+    .map(row => ({ path: row.path, branch: row.branch }))
+}
+
+/**
+ * Runs the project script for a card and returns its result. `config` is the parsed crew.json; `runner` runs a command
+ * and returns { status, stdout, stderr } (the real one spawns it; tests pass a fake). `existing` is the card's worktrees
+ * (cardWorktrees): one is reused as it is, several are named and nothing is made.
+ */
+export function prepareWorktree({ who, taskId, title, config, runner = runScript, existing = [] }) {
+  const found = cardWorktrees(existing, { who, taskId })
+  if (found.length === 1) {
+    return { ok: true, path: found[0].path, branch: found[0].branch, db: `arnotes_test_${who}`, line: `worktree ${found[0].path} branch ${found[0].branch} db arnotes_test_${who}`, reused: true }
+  }
+  if (found.length > 1) {
+    const names = found.map(row => `${row.path} (branch ${row.branch})`).join('; ')
+    return { ok: false, message: `This card has more than one worktree, so none is made: ${names}. Remove the ones you do not need (crew ${who} prepare worktree --remove <task-id>, or git worktree remove), then run this again.` }
+  }
   const script = config?.scripts?.prepareWorktree
   if (!script) {
     return { ok: false, message: 'This project has no prepareWorktree script in crew.json (scripts.prepareWorktree). Ask Boss to add it; the kit does not set up worktrees itself.' }
