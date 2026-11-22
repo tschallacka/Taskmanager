@@ -2,6 +2,10 @@
 
 All notable changes to Arnotes are documented in this file.
 
+## 0.60.10 - 2026-11-22
+
+- **A background session runs as its own person, and cannot act as another.** A person's session loads only the project and local settings (not the host's user settings, which carry Boss's identity), its role names its own key first, and a session bound to one key may run only that key's crew commands (`CREW_WHO`); changed in `crew/session.mjs`, `crew/role-file.mjs`, `crew/session-settings.mjs`, `crew/who-guard.mjs` and `crew/crew.mjs`.
+
 ## 0.60.9 - 2026-11-21
 
 - **A subtask opens in the task panel.** Each subtask row has an open arrow (on hover, always there on touch, and reachable with the keyboard). The subtask opens with its own description, assignee, dates, time, updates and subtasks, its address is a permalink, and the panel's title line shows Parent > Subtask with a link back to the parent (`app/components/kanban/SubtaskList.vue`, `app/components/kanban/TaskDrawer.vue`, `app/pages/projects/[id].vue`, `app/utils/subtaskPanel.ts`, `tests/subtask-panel.test.ts`, `docs/basics/subtasks-blockers-and-fields.md`).
