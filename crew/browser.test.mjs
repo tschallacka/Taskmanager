@@ -1,11 +1,12 @@
 // Tests for the crew's sign-in (browser.mjs): the board's origin rule, the Set-Cookie reader, and,
 // with Chromium, that the password stays out of the page and the cookies stay in one person's context.
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync } from 'node:fs'
 import http from 'node:http'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { describe, test } from 'node:test'
+import { after, describe, test } from 'node:test'
+import { removeWhenUnused } from './browser-cleanup.mjs'
 import { BrowserError, findChromium, request, serve } from './browser-driver.mjs'
 import { boardOrigin, parseSetCookie, productIsBoard, signIn } from './browser.mjs'
 
@@ -115,7 +116,8 @@ async function withDriver(prepare, job) {
   console.log = (...parts) => logs.push(parts.join(' '))
   try {
     const running = serve({ dir, chromium: CHROMIUM, signals: false, prepare })
-    await waitUntil(async () => (await request({ dir, cmd: 'status', start: false })) !== null, 20000, 'the in-process driver')
+    // A loaded machine (load 200 seen) can keep the status probe's 500 ms connect from answering for a while: wait longer.
+    await waitUntil(async () => (await request({ dir, cmd: 'status', start: false })) !== null, 90000, 'the in-process driver')
     const ask = (who, cmd, args = {}) => request({ dir, who, cmd, args, start: true, seam: false })
     try {
       return await job({ dir, ask, logs })
@@ -262,7 +264,7 @@ test('the scratch folders go through removeWhenUnused, not a synchronous remove 
   assert.match(source, /removeWhenUnused\(/)
 })
 
-// Removes the scratch folders this file made.
-process.on('exit', () => {
-  for (const dir of made) rmSync(dir, { recursive: true, force: true })
+// Removes the scratch folders this file made, after the last test. Each waits until no process names its folder.
+after(async () => {
+  for (const dir of made) await removeWhenUnused(dir)
 })
