@@ -1,0 +1,1 @@
+- **`crew <who> prepare worktree` reuses a card's existing worktree.** A card that already has a worktree and branch gets that one back; a card with several is refused with all of them named, and no second branch is cut (`crew/prepare-worktree.mjs`, `crew/prepare-worktree.test.mjs`).

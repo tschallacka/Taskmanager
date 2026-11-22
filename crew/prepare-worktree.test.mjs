@@ -3,7 +3,7 @@
 // for the script, so no git, dependency or database work runs here.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { parseResultLine, prepareWorktree, removePlan, reservationFailure, slugOf, worktreeFolder } from './prepare-worktree.mjs'
+import { cardWorktrees, parseResultLine, prepareWorktree, removePlan, reservationFailure, slugOf, worktreeFolder } from './prepare-worktree.mjs'
 
 test('a new worktree whose port cannot be reserved is removed only when it holds nothing; otherwise it is kept and says so', () => {
   const empty = reservationFailure({ created: true, dirty: false, aheadOfBase: 0, error: 'port 3101 is held', who: 'wren', taskId: 'mwdlkxb56xr2ek89g92' })
@@ -93,4 +93,60 @@ test('slugs are short, lower case and dashed, and never empty', () => {
   assert.equal(slugOf('   '), 'card')
   assert.equal(slugOf(undefined), 'card')
   assert.ok(slugOf('x'.repeat(200)).length <= 40)
+})
+
+// A card that already has its own worktree and branch (Wynn's report, mwlgeaodug4zu87rmb): the script looks only for the folder
+// <base>/taskmanager-<who>-<first 8>, so a worktree under another folder name would get a second branch. The kit finds the
+// card's worktrees from the branches (who/<task-id>-...) and reuses the one, or stops naming them when there are several.
+const LIST = [
+  { path: '/srv/w/taskmanager-wynn-mwj3kbtt', branch: 'wynn/mwjfx58bi6p4dqqeo8-invite-by-email-part-2' },
+  { path: '/srv/w/taskmanager-wynn-mwc4jn0g', branch: 'wynn/mwc4jn0gxxxxxxxxxxxxxx-other-card' },
+  { path: '/srv/w/taskmanager-wynn-mwjfx58b', branch: 'wynn/mwjfx58bi6p4dqqeo8-invite-by-email-part-2-the-project-share' },
+  { path: '/srv/w/taskmanager-wren-mwjfx58b', branch: 'wren/mwjfx58bi6p4dqqeo8-someone-elses' }
+]
+
+test('the card’s worktrees are found by their branch, whatever the folder is called, and another card’s or another person’s are not', () => {
+  const found = cardWorktrees(LIST, { who: 'wynn', taskId: 'mwjfx58bi6p4dqqeo8' })
+  assert.deepEqual(found.map(row => row.path), ['/srv/w/taskmanager-wynn-mwj3kbtt', '/srv/w/taskmanager-wynn-mwjfx58b'])
+  assert.deepEqual(cardWorktrees(LIST, { who: 'wynn', taskId: 'nosuchcard00000000000' }), [])
+})
+
+test('a card that already has one worktree is reused: the script does not run, and the existing path and branch are returned', () => {
+  const calls = []
+  const runner = (script, args) => {
+    calls.push({ script, args })
+    return { status: 0, stdout: 'worktree /srv/w/new branch wynn/x db arnotes_test_wynn\n', stderr: '' }
+  }
+  const one = [{ path: '/srv/w/taskmanager-wynn-mwj3kbtt', branch: 'wynn/mwjfx58bi6p4dqqeo8-invite-by-email-part-2' }]
+  const result = prepareWorktree({ who: 'wynn', taskId: 'mwjfx58bi6p4dqqeo8', title: 'x', config, runner, existing: one })
+  assert.deepEqual(calls, [], 'no second worktree is made')
+  assert.equal(result.ok, true)
+  assert.equal(result.path, '/srv/w/taskmanager-wynn-mwj3kbtt')
+  assert.equal(result.branch, 'wynn/mwjfx58bi6p4dqqeo8-invite-by-email-part-2')
+  assert.equal(result.db, 'arnotes_test_wynn')
+})
+
+test('a card with several worktrees stops and names them all: nothing is made, nothing is guessed', () => {
+  const calls = []
+  const runner = (script, args) => {
+    calls.push({ script, args })
+    return { status: 0, stdout: '', stderr: '' }
+  }
+  const result = prepareWorktree({ who: 'wynn', taskId: 'mwjfx58bi6p4dqqeo8', title: 'x', config, runner, existing: LIST.slice(0, 3) })
+  assert.deepEqual(calls, [])
+  assert.equal(result.ok, false)
+  assert.match(result.message, /taskmanager-wynn-mwj3kbtt/)
+  assert.match(result.message, /taskmanager-wynn-mwjfx58b/)
+  assert.match(result.message, /more than one worktree/)
+})
+
+test('a card with no worktree yet runs the script as before', () => {
+  const calls = []
+  const runner = (script, args) => {
+    calls.push({ script, args })
+    return { status: 0, stdout: 'worktree /srv/w/taskmanager-wynn-mwnew000 branch wynn/mwnew000-x db arnotes_test_wynn\n', stderr: '' }
+  }
+  const result = prepareWorktree({ who: 'wynn', taskId: 'mwnew000', title: 'x', config, runner, existing: [] })
+  assert.equal(calls.length, 1)
+  assert.equal(result.ok, true)
 })
