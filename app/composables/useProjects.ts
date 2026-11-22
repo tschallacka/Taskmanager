@@ -10,6 +10,7 @@ import { matchesTagRequirements, type TagRequirement } from '#shared/utils/tags'
 import { isBoardFiltering, matchesBoardFilter } from '~/utils/boardFilter'
 import { countOpenTasks } from '~/utils/projectKind'
 import { createGeneration } from '~/utils/requestGeneration'
+import { markReplyParentsDeleted } from '~/utils/taskComments'
 
 // A permalink's window as the API returns it (server/utils/commentWindow.ts): the comments and what is left either side.
 interface CommentWindowPage {
@@ -1270,7 +1271,8 @@ export function useProjects() {
   async function deleteComment(taskId: string, commentId: string) {
     await $fetch(`/api/tasks/${taskId}/comments/${commentId}`, { method: 'DELETE', headers: realtimeHeaders() })
     const before = _comments.value.length
-    _comments.value = _comments.value.filter(c => c.id !== commentId)
+    // The replies to this comment now quote a deleted update, as a reload shows them (card mwqc664).
+    _comments.value = markReplyParentsDeleted(_comments.value, commentId).filter(c => c.id !== commentId)
     if (_comments.value.length < before) {
       _commentCounts.value = { ..._commentCounts.value, [taskId]: Math.max(0, (_commentCounts.value[taskId] ?? 1) - 1) }
     }

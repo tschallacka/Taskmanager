@@ -1,0 +1,1 @@
+- **A reply shows "In reply to a deleted update" as soon as its comment is deleted.** The open task drawer used to keep the deleted text in the reply's quote until a reload; the quote now changes at once, as a reload shows it.

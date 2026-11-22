@@ -18,3 +18,11 @@ export function replyLineText(replyTo: CommentReplyPreview | null | undefined): 
   const who = replyTo.authorName || 'someone'
   return replyTo.excerpt ? `In reply to ${who}: ${replyTo.excerpt}` : `In reply to ${who}`
 }
+
+// The replies to a comment that was just deleted: their quote is marked deleted, so the open drawer shows the line a reload shows
+// ("In reply to a deleted update") without reloading. Other comments are returned as they are.
+export function markReplyParentsDeleted<T extends { replyTo?: CommentReplyPreview | null }>(comments: T[], commentId: string): T[] {
+  return comments.map(c => c.replyTo?.id === commentId
+    ? { ...c, replyTo: { ...c.replyTo, deleted: true } as CommentReplyPreview }
+    : c)
+}
